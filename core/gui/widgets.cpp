@@ -1,4 +1,4 @@
-// nefuOS 小控件实现
+// nefuOS widget implementation
 #include "widgets.h"
 
 namespace nefu {
@@ -8,7 +8,7 @@ void draw_button(Surface& s, Button& b) {
     uint32_t bg = b.pressed ? 0x00C4C3BD : 0x00E6E5E0;
     gfx::fillrect(s, b.x, b.y, b.w, b.h, bg);
     gfx::rect(s, b.x, b.y, b.w, b.h, b.pressed ? color::BORDER : 0x00B0AFA8);
-    // 标签居中
+    // label centered
     int tw = gfx::text_width(b.label);
     int tx = b.x + (b.w - tw) / 2;
     int ty = b.y + (b.h - 16) / 2;

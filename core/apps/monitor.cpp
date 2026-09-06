@@ -1,4 +1,4 @@
-// nefuOS 系统监控：CPU / 内存 / 磁盘 实时曲线 + 数值面板
+// nefuOS system monitor：CPU / memory / disk live curve +
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -13,7 +13,7 @@ static uint32_t morand() {
 
 struct MonitorState {
     int cpu[80], mem[80], disk[80];
-    int head;                 // 最新数据索引（环形）
+    int head;                 // latest data index（ring）
     uint32_t last_push;
     Window* win;
 };
@@ -21,7 +21,7 @@ struct MonitorState {
 static const int HIST = 80;
 
 static void mo_push(MonitorState* st) {
-    // CPU：伪负载（波动 + 随机，整数）
+    // CPU：fake load（fluctuation + ，integer）
     static int phase = 0;
     phase++;
     int base = 32 + (20 - (phase % 40));   // 52 .. 13
@@ -30,13 +30,13 @@ static void mo_push(MonitorState* st) {
     if (c > 95) c = 95;
     if (c < 2) c = 2;
     st->cpu[st->head] = c;
-    // 内存：真实
+    // memory：real
     uint32_t used = 0, total = 0;
     platform_mem_stats(&used, &total);
     int m = total > 0 ? (int)((uint64_t)used * 100 / total) : 0;
     if (m > 100) m = 100;
     st->mem[st->head] = m;
-    // 磁盘：VFS 占用（按 64MB 虚拟容量估算）
+    // disk：VFS usage（by 64MB virtual capacity estimate）
     uint32_t bytes = g_vfs->total_bytes();
     int d = (int)((uint64_t)bytes * 100 / (64u * 1024 * 1024));
     if (d > 100) d = 100;
@@ -49,13 +49,13 @@ static void mo_draw_curve(Surface& s, int x, int y, int w, int h,
     gfx::fillrect(s, x, y, w, h, 0x00F5F5F0);
     gfx::rect(s, x, y, w, h, color::BORDER);
     gfx::text(s, x + 4, y + 2, label, color::TEXT2, 0x00F5F5F0);
-    // 网格
+    // grid
     for (int i = 1; i < 4; i++) {
         gfx::hline(s, x + 1, x + w - 2, y + h * i / 4, 0x00E3E2DC);
     }
     int lastx = -1, lasty = -1;
     for (int i = 0; i < HIST; i++) {
-        int idx = (head + i) % HIST;   // 旧 -> 新
+        int idx = (head + i) % HIST;   // old -> new
         int v = data[idx];
         int px = x + 2 + i * (w - 4) / (HIST - 1);
         int py = y + h - 4 - v * (h - 12) / 100;
@@ -80,14 +80,14 @@ static void mo_paint(Window* w) {
     gfx::text(s, 10, 8, "System Monitor", color::BLUE, color::WHITE);
     gfx::hline(s, 8, W - 8, 26, color::BORDER);
 
-    // 曲线区（左 2/3）
+    // curve area（left 2/3）
     int cw = W * 2 / 3 - 20;
     int ch = (H - 40) / 3;
     mo_draw_curve(s, 10, 34, cw, ch - 6, st->cpu, st->head, color::RED, "CPU %");
     mo_draw_curve(s, 10, 34 + ch, cw, ch - 6, st->mem, st->head, color::BLUE_LT, "Memory %");
     mo_draw_curve(s, 10, 34 + ch * 2, cw, ch - 6, st->disk, st->head, color::GREEN, "Disk %");
 
-    // 数值面板（右 1/3）
+    // （right 1/3）
     int px = 10 + cw + 10;
     int pw = W - px - 10;
     gfx::fillrect(s, px, 34, pw, H - 44, 0x00F5F5F0);
@@ -133,7 +133,7 @@ void monitor_launch() {
     st->head = 0;
     st->last_push = 0;
     for (int i = 0; i < HIST; i++) { st->cpu[i] = 0; st->mem[i] = 0; st->disk[i] = 0; }
-    // 预填充历史
+
     for (int i = 0; i < HIST; i++) mo_push(st);
     w->userdata = st;
     w->on_paint = mo_paint;

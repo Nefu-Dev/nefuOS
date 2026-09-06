@@ -1,4 +1,4 @@
-﻿# nefuOS 全功能回归：商店安装 -> 设置 -> 开始菜单 -> 游戏/画板/记事本
+﻿# nefuOS ： -> settings -> start menu -> /paint/notepad
 param(
     [string]$Exe = "D:\mycppos1\nefuOS\dist\nefuOS.exe",
     [string]$Out = "D:\mycppos1\nefuOS\dist\shots"
@@ -75,40 +75,40 @@ $h = $p.MainWindowHandle
 if ($h -eq [IntPtr]::Zero) { Write-Output "FAIL: no window"; exit 1 }
 Write-Output "hwnd=$h"
 
-# 1 桌面
+# 1
 Snap $h "n1_desktop"
 
-# 2 打开软件商城（第3行第2列图标,中心 166,264）
+# 2 （no.32column icons,center 166,264）
 DblClick $h 166 264
 Start-Sleep -Milliseconds 400
 Snap $h "n2_store"
 
-# 3 安装 5 个商店应用（行 i: y=118+i*58, x=515）
+# 3 install 5 （line i: y=118+i*58, x=515）
 foreach ($rowY in @(118,176,234,292,350)) {
   Click $h 515 $rowY
   Start-Sleep -Milliseconds 200
 }
 Snap $h "n3_store_all_installed"
-# 关闭商城（558,46），露出桌面图标
+# （558,46），
 Click $h 558 46
 Start-Sleep -Milliseconds 300
 
-# 4 打开设置（第3行第1列图标,中心 62,264）
+# 4 （no.31column icons,center 62,264）
 DblClick $h 62 264
 Start-Sleep -Milliseconds 400
 Snap $h "n4_settings"
 
-# 5 主题色 Green（设置窗口 x=78,y=64; 按钮中心 224,155）
+# 5 primary color Green（ x=78,y=64; 224,155）
 Click $h 224 155
 Start-Sleep -Milliseconds 300
 Snap $h "n5_accent_green"
 
-# 6 壁纸 Sunset（224,219）
+# 6 wallpaper Sunset（224,219）
 Click $h 224 219
 Start-Sleep -Milliseconds 300
 Snap $h "n6_wallpaper_sunset"
 
-# 7 时钟开关（170,259）：关 -> 开
+# 7 （170,259）： ->
 Click $h 170 259
 Start-Sleep -Milliseconds 250
 Snap $h "n7_clock_off"
@@ -116,14 +116,14 @@ Click $h 170 259
 Start-Sleep -Milliseconds 250
 Snap $h "n8_clock_on"
 
-# 8 关闭设置(486,73)
+# 8 (486,73)
 Click $h 486 73
 Start-Sleep -Milliseconds 300
 Snap $h "n8b_desktop_clean"
 
-# 9 开始菜单：13 应用 + Power Off; mh=380, my=190
-# 行: 0..5 内置(FM..About), 6 Settings, 7 Store, 8 Snake, 9 Paint, 10 Clock, 11 Notepad, 12 Minesweeper, 13 PowerOff
-# 行中心 = 207 + row*26
+# 9 start menu：13 app + Power Off; mh=380, my=190
+# line: 0..5 built-in(FM..About), 6 Settings, 7 Store, 8 Snake, 9 Paint, 10 Clock, 11 Notepad, 12 Minesweeper, 13 PowerOff
+# = 207 + row*26
 Click $h 36 585
 Start-Sleep -Milliseconds 350
 Snap $h "n9_startmenu"
@@ -132,7 +132,7 @@ Snap $h "n9_startmenu"
 Click $h 100 415
 Start-Sleep -Milliseconds 600
 Snap $h "n10_snake"
-# 关闭 Snake（窗口 106,88 -> 关闭钮 514,97）
+# Snake（window 106,88 -> 514,97）
 Click $h 514 97
 Start-Sleep -Milliseconds 250
 
@@ -142,7 +142,7 @@ Start-Sleep -Milliseconds 300
 Click $h 100 519
 Start-Sleep -Milliseconds 500
 Snap $h "n11_minesweeper"
-# 关闭（窗口 134,112 -> 452,121）
+# （window 134,112 -> 452,121）
 Click $h 452 121
 Start-Sleep -Milliseconds 250
 
@@ -152,7 +152,7 @@ Start-Sleep -Milliseconds 300
 Click $h 100 441
 Start-Sleep -Milliseconds 500
 Snap $h "n13_paint"
-# 画几笔（paint 窗口 162,136; 画布起点屏幕 y=188）
+# （paint window 162,136; y=188）
 Click $h 220 220; Click $h 280 270; Click $h 340 220; Click $h 400 270
 Start-Sleep -Milliseconds 200
 Snap $h "n14_paint_drawn"
@@ -164,7 +164,7 @@ Click $h 100 493
 Start-Sleep -Milliseconds 400
 Snap $h "n15_notepad"
 TypeText $h "Hello nefuOS!"; Key $h 0x0D; TypeText $h "This is my tiny OS"
-Key $h 0x1B  # Esc 保存
+Key $h 0x1B  # Esc save
 Start-Sleep -Milliseconds 300
 Snap $h "n16_notepad_saved"
 

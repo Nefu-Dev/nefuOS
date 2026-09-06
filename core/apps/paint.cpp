@@ -1,4 +1,4 @@
-// nefuOS 画板：鼠标绘画、调色板、清空、保存到 VFS
+// nefuOS paint：、palette、clear、save to VFS
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
@@ -23,7 +23,7 @@ static const uint32_t PALETTE[8] = {
 };
 
 static void paint_save(PaintState* st) {
-    // 保存画布为 /home/user/Pictures/drawing.ppm（P6 格式，通用）
+    // save canvas as /home/user/Pictures/drawing.ppm（P6 format，generic）
     FSNode* f = g_vfs->resolve("/home/user/Pictures/drawing.ppm");
     if (!f) {
         g_vfs->mkdir("/home/user/Pictures");
@@ -32,7 +32,7 @@ static void paint_save(PaintState* st) {
     if (!f) return;
     Surface& s = st->win->back;
     int W = s.width, H = s.height;
-    // 组装 PPM：头部 + RGB 数据（先算大小）
+    // assemble PPM：header + RGB data（compute size first）
     char head[64];
     int hn = ksprintf(head, sizeof(head), "P6\n%d %d\n255\n", W, H);
     uint32_t sz = (uint32_t)hn + (uint32_t)W * (uint32_t)H * 3;
@@ -64,7 +64,7 @@ static void paint_click(void* ud) {
     } else if (strcmp(lab, "S") == 0) {
         paint_save(st);
     } else {
-        // 色板按钮 label = 序号
+        // palette buttons label = index
         int idx = lab[0] - '0';
         if (idx >= 0 && idx < 8) st->color = PALETTE[idx];
     }
@@ -91,7 +91,7 @@ static void paint_mouse(Window* w, int mx, int my, uint8_t buttons) {
         ui::button_event(st->btns[i], mx, my, buttons, pressed, released);
     }
     st->cur = 0;
-    // 画布区（工具栏下方）
+    // canvas area（below toolbar）
     if (my < 34) return;
     int cx = mx, cy = my - 34;
     Surface& s = w->back;
@@ -99,7 +99,7 @@ static void paint_mouse(Window* w, int mx, int my, uint8_t buttons) {
         st->drawing = true;
         st->last_x = cx;
         st->last_y = cy;
-        gfx::fillcircle(s, cx, cy, 2, st->color); // 单点也画点
+        gfx::fillcircle(s, cx, cy, 2, st->color); // single click draws dot
         return;
     }
     if (!(buttons & 1)) { st->drawing = false; return; }
@@ -140,7 +140,7 @@ void paint_launch() {
         b.on_click = paint_click;
         b.ud = st;
     }
-    // 清空 + 保存按钮
+    // clear + save button
     Button& cb = st->btns[6];
     cb.x = 8 + 6 * 34; cb.label = "C";
     Button& sb = st->btns[7];

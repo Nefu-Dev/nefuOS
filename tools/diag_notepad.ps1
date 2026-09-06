@@ -1,4 +1,4 @@
-﻿# 复现：记事本输入崩溃测试
+﻿# ：
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -36,14 +36,14 @@ $p = Start-Process -FilePath "D:\mycppos1\nefuOS\dist\nefuOS.exe" -WorkingDirect
 Start-Sleep -Seconds 4
 $p.Refresh(); $h = $p.MainWindowHandle
 Write-Output "hwnd=$h"
-# 安装并打开记事本（装齐 5 个应用，Notepad 在菜单 row11）
+# （ 5 ，Notepad row11）
 DblClick $h 166 264; Start-Sleep -Milliseconds 300
 foreach($ry in @(118,176,234,292,350)){ Click $h 515 $ry; Start-Sleep -Milliseconds 200 }
 Click $h 558 46; Start-Sleep -Milliseconds 300    # close store
 Click $h 36 585; Start-Sleep -Milliseconds 300    # start menu
 Click $h 100 493; Start-Sleep -Milliseconds 500   # Notepad (row11, my=190: 207+286=493)
 Snap $h "p1_notepad_open"
-# 逐段输入，每段后检查进程是否存活
+# ，
 foreach($chunk in @("Hello ", "nefuOS!", "This is my tiny OS")){
   TypeText $h $chunk
   Start-Sleep -Milliseconds 200
@@ -51,11 +51,11 @@ foreach($chunk in @("Hello ", "nefuOS!", "This is my tiny OS")){
   Snap $h ("p2_typed_" + ($chunk -replace '[^a-zA-Z0-9]','_'))
 }
 if(Get-Process nefuOS -ErrorAction SilentlyContinue){
-  Key $h 0x0D   # Enter 换行
+  Key $h 0x0D   # Enter newline
   Start-Sleep -Milliseconds 300
   if(-not (Get-Process nefuOS -ErrorAction SilentlyContinue)){ Write-Output "CRASH after Enter" }
   Snap $h "p3_after_enter"
-  Key $h 0x1B   # Esc 保存
+  Key $h 0x1B   # Esc save
   Start-Sleep -Milliseconds 400
   if(Get-Process nefuOS -ErrorAction SilentlyContinue){ Write-Output "ALIVE after ESC save"; Snap $h "p4_saved" }
   else { Write-Output "CRASH after ESC save" }

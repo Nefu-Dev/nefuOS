@@ -1,4 +1,4 @@
-// nefuOS 内置应用
+// nefuOS built-in apps
 #pragma once
 #include "../gui/wm.h"
 #include "../vfs/vfs.h"
@@ -12,10 +12,10 @@ enum AppId {
     APP_TEXTVIEW,
     APP_SYSINFO,
     APP_ABOUT,
-    // 系统级
+    // system-level
     APP_SETTINGS,
     APP_STORE,
-    // 商店应用（可安装/卸载）
+    // store app（installable/umount）
     APP_SNAKE,
     APP_PAINT,
     APP_CLOCK,
@@ -30,7 +30,7 @@ enum AppId {
     APP_COUNT
 };
 
-// 内置（始终可用）应用数：About 之前的所有应用
+// built-in（always available）app count：About all previous apps
 #define APP_BUILTIN_COUNT (APP_SETTINGS)
 
 const char* app_name(int id);
@@ -41,18 +41,18 @@ void app_show_about();
 void app_show_nefud(FSNode* file);
 int  nefud_name_to_app_id(const char* name);
 
-// 安装状态（软件商城管理）
+// install state（store management）
 bool app_installed(int id);
 // pre-install store apps shipped with the OS
 void apps_preinstall_defaults();
 void app_set_installed(int id, bool on);
-// 已安装应用 id 列表（不含内置），返回数量
+// installed apps id list（excluding built-in），return count
 int app_installed_list(int* ids, int max);
-// 商店状态持久化
+// store state persistence
 void store_load();
 void store_save();
 
-// 各应用启动（内部）
+// app launch（internal）
 void fm_launch();
 void term_launch();
 void calc_launch();
@@ -71,13 +71,13 @@ void browser_launch();
 void netcfg_launch();
 void nefud_launch();
 
-// 工具：级联窗口位置
+// tool：cascade window position
 void cascade_pos(int* x, int* y);
 
-// 工具：节点绝对路径
+// tool：node absolute path
 String node_path(FSNode* n);
 
-// 工具：将文件内容按行拆分
+// tool：split file content by lines
 void file_to_lines(FSNode* f, List<String>& out, int max_lines);
 
 } // namespace nefu

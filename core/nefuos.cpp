@@ -1,4 +1,4 @@
-// nefuOS 系统主入口：初始化、输入分发、帧循环
+// nefuOS system main entry：init、input dispatch、frame loop
 #include "platform.h"
 #include "klib/klib.h"
 #include "gui/desktop.h"
@@ -16,7 +16,7 @@ static bool s_booted = false;
 static uint32_t s_boot_start = 0;
 static int s_mx = -8, s_my = -8;
 
-// 鼠标光标（8x13，MSB=左）
+// （8x13，MSB=left）
 static const unsigned char CURSOR[13] = { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xF0, 0xF0,
                                           0xF0, 0xE8, 0xCC, 0x8C, 0x0C, 0x08 };
 
@@ -41,10 +41,14 @@ void nefuos_init() {
     uint32_t sz = 0;
     if (platform_fs_load(&data, &sz) && data && g_vfs->load(data, sz)) {
         klogf("VFS loaded from storage (%u bytes)\n", sz);
+        g_vfs->ensure_standard_dirs();   // an old save must never hide /usr /tmp ...
+        klogf("VFS standard dirs ensured\n");
     } else {
         g_vfs->create_default_tree();
         klogf("VFS default tree created\n");
     }
+    // even after loading an old snapshot the standard hierarchy must exist
+    g_vfs->ensure_standard_dirs();
     // remove stray nodes left by an older browser_save_page that flattened
     // the whole path into a single name (e.g. "_usr_downloads_page_...")
     g_vfs->cleanup_stray_nodes();
@@ -138,7 +142,7 @@ void nefuos_handle_scroll(int delta) {
 
 void nefuos_tick() {
     if (g_net.up) net_poll();   // drain NIC
-    // 预留：动画/时钟驱动
+    // ：animation/
 }
 
 void nefuos_frame() {

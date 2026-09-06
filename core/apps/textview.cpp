@@ -1,4 +1,4 @@
-// nefuOS 文本查看器
+// nefuOS text viewer
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"

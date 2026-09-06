@@ -1,4 +1,4 @@
-// nefuOS 窗口管理器实现
+// nefuOS WM implementation
 #include "wm.h"
 
 namespace nefu {
@@ -93,18 +93,18 @@ void WM::paint_all(Surface& fb) {
     for (int i = 0; i < wins_.size(); i++) {
         Window* w = wins_[i];
         if (!w->visible || w->minimized || w->closed) continue;
-        // 窗口边框
+        // window border
         gfx::rect(fb, w->x, w->y, w->w, w->h, color::BORDER);
-        // 标题栏
+
         uint32_t bar = (w == focus_) ? color::BLUE : 0x006F7C8C;
         gfx::fillrect(fb, w->x + 1, w->y + 1, w->w - 2, 17, bar);
         gfx::text(fb, w->x + 4, w->y + 1, w->title.c_str(), color::WHITE, bar);
-        // 关闭按钮
+
         int bx = w->x + w->w - 20, by = w->y + 3;
         gfx::fillrect(fb, bx, by, 16, 12, color::RED);
         gfx::line(fb, bx + 3, by + 2, bx + 12, by + 9, color::WHITE);
         gfx::line(fb, bx + 12, by + 2, bx + 3, by + 9, color::WHITE);
-        // 内容区（先让应用重绘其状态，再合成上屏）
+        // content area（let app repaint first，then composite to screen）
         w->content_x = w->x;
         w->content_y = w->y + 18;
         if (w->on_paint) w->on_paint(w);
@@ -131,7 +131,7 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
         if (dw->on_drop) dw->on_drop(dw);
     }
 
-    // 拖动中
+    // dragging
     if (drag_) {
         if (released) {
             drag_->dragging = false;
@@ -156,13 +156,13 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
     if (!win) return;
 
     if (pressed) {
-        // 关闭按钮
+
         if (y >= win->y && y < win->y + 18 &&
             x >= win->x + win->w - 20 && x < win->x + win->w - 4) {
             close_window(win);
             return;
         }
-        // 标题栏拖动
+
         if (y < win->y + 18) {
             raise(win);
             win->dragging = true;

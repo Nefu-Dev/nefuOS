@@ -1,5 +1,5 @@
-// 自动生成：8x16 ASCII 位图字体（32..127），每字符 16 字节，每字节一行 8 像素，MSB=左侧
-// 生成工具：tools/fontgen.cpp，请勿手改
+// auto-generated：8x16 ASCII bitmap font（32..127），per char 16 bytes，one row per byte 8 pixel，MSB=left side
+// generator tool：tools/fontgen.cpp，do not edit manually
 #pragma once
 namespace nefu { extern const unsigned char font8x16[96][16]; }
 const unsigned char nefu::font8x16[96][16] = {

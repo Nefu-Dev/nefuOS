@@ -1,4 +1,4 @@
-// nefuOS 桌面实现：壁纸、图标、任务栏、开始菜单、启动画面
+// nefuOS ：wallpaper、icon、taskbar、start menu、
 #include "desktop.h"
 #include "../apps/apps.h"
 #include "../sys/settings.h"
@@ -93,7 +93,7 @@ static void paint_wallpaper(Surface& fb) {
         uint32_t* row = (uint32_t*)(fb.addr + (size_t)y * (size_t)fb.pitch);
         for (int x = 0; x < W; x++) row[x] = c;
     }
-    // 右下角水印
+    // bottom-right watermark
     gfx::text(fb, W - 132, H - 52, "nefuOS 0.1", 0x00C9C8C2, 0x00000000);
 }
 
@@ -137,7 +137,7 @@ static void draw_icon_tile(Surface& fb, int tx, int ty, int app) {
         break;
     }
     case APP_SETTINGS: {
-        // 齿轮
+
         gfx::fillcircle(fb, tx + 26, ty + 26, 10, 0x00666C74);
         gfx::fillcircle(fb, tx + 26, ty + 26, 6, color::WHITE);
         gfx::fillrect(fb, tx + 23, ty + 13, 6, 8, 0x00666C74);
@@ -147,7 +147,7 @@ static void draw_icon_tile(Surface& fb, int tx, int ty, int app) {
         break;
     }
     case APP_STORE: {
-        // 购物袋
+        // shopping bag
         gfx::fillrect(fb, tx + 10, ty + 16, 32, 24, 0x00E67E22);
         gfx::fillrect(fb, tx + 17, ty + 12, 18, 8, 0x00E67E22);
         gfx::rect(fb, tx + 10, ty + 16, 32, 24, 0x00A85E15);
@@ -156,7 +156,7 @@ static void draw_icon_tile(Surface& fb, int tx, int ty, int app) {
         break;
     }
     case APP_IMAGEVIEWER: {
-        // 相框 + 山 + 太阳
+        // photo frame + mountain +
         gfx::fillrect(fb, tx + 8, ty + 8, 36, 36, 0x00F5F1E8);
         gfx::rect(fb, tx + 8, ty + 8, 36, 36, 0x008C7A20);
         gfx::fillcircle(fb, tx + 15, ty + 15, 4, color::ORANGE);
@@ -166,7 +166,7 @@ static void draw_icon_tile(Surface& fb, int tx, int ty, int app) {
         break;
     }
     case APP_MUSIC: {
-        // 音符
+
         gfx::fillrect(fb, tx + 14, ty + 10, 22, 26, 0x0014181E);
         gfx::rect(fb, tx + 14, ty + 10, 22, 26, 0x00505A66);
         gfx::fillcircle(fb, tx + 19, ty + 34, 4, color::WHITE);
@@ -177,7 +177,7 @@ static void draw_icon_tile(Surface& fb, int tx, int ty, int app) {
         break;
     }
     case APP_MONITOR: {
-        // 仪表 + 曲线
+        // gauge + curve
         gfx::fillrect(fb, tx + 8, ty + 10, 36, 32, 0x0014181E);
         gfx::rect(fb, tx + 8, ty + 10, 36, 32, 0x00505A66);
         gfx::line(fb, tx + 10, ty + 36, tx + 18, ty + 28, color::GREEN);
@@ -255,7 +255,7 @@ static void paint_taskbar(Surface& fb) {
     int y0 = H - TASKBAR_H;
     gfx::fillrect(fb, 0, y0, W, TASKBAR_H, 0x00262A31);
     gfx::hline(fb, 0, W - 1, y0, 0x004F5A66);
-    // 开始按钮
+    // start button
     int sx = 4, sy = y0 + 3, sw = 64, sh = 24;
     uint32_t accent = accent_color(g_settings.accent);
     uint32_t sbc = s_start_btn_hover ? 0x004A90C2 : accent;
@@ -263,7 +263,7 @@ static void paint_taskbar(Surface& fb) {
     gfx::rect(fb, sx, sy, sw, sh, 0x002F6FB6);
     gfx::text(fb, sx + 8, sy + 4, "Start", color::WHITE, sbc);
     if (s_start_open) gfx::fillrect(fb, sx, sy, sw, 2, color::WHITE);
-    // 任务按钮
+    // task button
     int bx = sx + sw + 8;
     for (int i = 0; i < g_wm->windows().size(); i++) {
         Window* w = g_wm->windows()[i];
@@ -281,7 +281,7 @@ static void paint_taskbar(Surface& fb) {
         }
         bx += wd + 4;
     }
-    // 时钟
+    // clock
     if (g_settings.show_clock) {
         uint32_t sec = platform_seconds_of_day();
         char buf[16];
@@ -291,7 +291,7 @@ static void paint_taskbar(Surface& fb) {
     }
 }
 
-// 开始菜单条目：内置应用 + 设置 + 商城 + 已安装商店应用
+// start menu entries：built-in apps + settings + store + installed store apps
 static int build_menu(int* list) {
     int n = 0;
     for (int i = 0; i < APP_BUILTIN_COUNT; i++) list[n++] = i;
@@ -309,7 +309,7 @@ static void paint_start_menu(Surface& fb) {
     int rows = build_menu(menu_apps);
     int H = fb.height;
     int mw = 196;
-    int mh = rows * 26 + 10 + 32; // 应用行 + 分隔 + Power Off
+    int mh = rows * 26 + 10 + 32; // app rows + minute + Power Off
     int mx = 4, my = H - TASKBAR_H - mh;
     if (my < 0) my = 0;
     gfx::fillrect(fb, mx, my, mw, mh, color::WHITE);
@@ -345,10 +345,10 @@ void desktop_paint(Surface& fb) {
 void desktop_paint_boot(Surface& fb) {
     fb.fill(0x0012141A);
     int W = fb.width, H = fb.height;
-    // 大标题
+
     gfx::text_scale(fb, W / 2 - 4 * 8 * 4, H / 2 - 90, "nefuOS", color::WHITE, 0x0012141A, 4);
     gfx::text(fb, W / 2 - 52, H / 2 - 18, "v0.1.0  C++/C  tiny OS", color::BLUE_LT, 0x0012141A);
-    // 进度条
+    // progress bar
     int bw = 300, bx = W / 2 - bw / 2, by = H / 2 + 16;
     gfx::rect(fb, bx, by, bw, 12, 0x00404A58);
     int p = (platform_tick_ms() / 40) % (bw - 8);
@@ -391,7 +391,7 @@ bool desktop_handle_mouse(int x, int y, uint8_t buttons) {
         if (pressed) { s_rmenu_open = false; s_rmenu_icon = -1; }
     }
 
-    // 开始菜单打开时优先
+    // start menu priority when open
     if (s_start_open) {
         int rows = build_menu(menu_apps);
         int mw = 196, mh = rows * 26 + 10 + 32;
@@ -416,17 +416,17 @@ bool desktop_handle_mouse(int x, int y, uint8_t buttons) {
         if (pressed) { s_start_open = false; s_start_hover = -1; }
     }
 
-    // 任务栏（隐藏时跳过）
+    // taskbar（）
     if (g_settings.show_taskbar && y >= H - TASKBAR_H) {
         if (pressed) s_start_open = false;
         s_start_btn_hover = 0;
-        // 开始按钮
+        // start button
         if (x >= 4 && x < 68 && y >= H - 27 && y < H - 3) {
             s_start_btn_hover = 1;
             if (pressed) s_start_open = !s_start_open;
             return true;
         }
-        // 任务按钮
+        // task button
         int bx = 76;
         for (int i = 0; i < g_wm->windows().size(); i++) {
             Window* w = g_wm->windows()[i];
@@ -444,10 +444,10 @@ bool desktop_handle_mouse(int x, int y, uint8_t buttons) {
             }
             bx += wd + 4;
         }
-        return true; // 任务栏空白处也消费
+        return true; // taskbar blank area consumes too
     }
 
-    // 任何窗口覆盖处优先交给窗口管理器（否则桌面图标会吞掉窗口上的点击）
+    // window overlay goes to WM first（）
     if (g_wm->hit(x, y)) return false;
 
     // desktop icons: click / right-click / drag

@@ -1,4 +1,4 @@
-// nefuOS 窗口管理器
+// nefuOS window manager
 #pragma once
 #include "../klib/klib.h"
 #include "gfx.h"
@@ -20,9 +20,9 @@ struct Window {
     bool dragging;
     int drag_off_x, drag_off_y;
     String title;
-    Surface back;                    // 内容区缓冲（不含标题栏）
-    int content_x, content_y;        // 内容区屏幕坐标
-    int content_w, content_h;        // 内容区尺寸
+    Surface back;                    // content buffer（）
+    int content_x, content_y;        // content screen coords
+    int content_w, content_h;        // content size
     void (*on_paint)(Window* w);
     void (*on_key)(Window* w, const KeyEvent* e);
     void (*on_mouse)(Window* w, int mx, int my, uint8_t buttons);

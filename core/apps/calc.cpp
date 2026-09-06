@@ -1,4 +1,4 @@
-// nefuOS 计算器（整数四则运算）
+// nefuOS calculator（integer arithmetic）
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
@@ -100,7 +100,7 @@ static void calc_click(void* ud) {
     }
     if (st->err) { st->expr.clear(); st->err = false; }
     if (st->just_eq) {
-        // 按数字则替换结果，按运算符则继续
+        // digit replaces result，operator continues
         char c = lab[0];
         if (c >= '0' && c <= '9') st->expr.clear();
         st->just_eq = false;
@@ -115,7 +115,7 @@ static void calc_paint(Window* w) {
     CalcState* st = (CalcState*)w->userdata;
     Surface& s = w->back;
     s.fill(color::PANEL);
-    // 显示屏
+    // display
     gfx::fillrect(s, 8, 8, s.width - 16, 64, color::WHITE);
     gfx::rect(s, 8, 8, s.width - 16, 64, color::BORDER);
     gfx::text(s, 14, 14, st->err ? "Error" : st->expr.c_str(), st->err ? color::RED : color::TEXT, color::WHITE);

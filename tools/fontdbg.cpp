@@ -1,4 +1,4 @@
-// 字库调试：打印 'A' 等字符在两种渲染路径下的像素网格
+// ：print 'A'
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -29,7 +29,7 @@ int main() {
 
     for (int t = 0; t < (int)strlen(tests); t++) {
         char ch = tests[t];
-        // 路径1：32bpp DIB top-down
+        // path1：32bpp DIB top-down
         {
             BITMAPINFO bi; memset(&bi, 0, sizeof(bi));
             bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -52,7 +52,7 @@ int main() {
             SelectObject(dc, old);
             DeleteObject(bmp);
         }
-        // 路径2：1bpp 单色位图
+        // path2：1bpp
         {
             HBITMAP bmp = CreateBitmap(CW, CH, 1, 1, NULL);
             HGDIOBJ old = SelectObject(dc, bmp);

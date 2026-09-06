@@ -1,4 +1,4 @@
-﻿# 逐键定位记事本崩溃
+﻿
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

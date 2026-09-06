@@ -111,6 +111,14 @@ static void fm_cd(FMState* st, FSNode* dir, bool push_back) {
     st->list_scroll = 0;
     st->menu_open = false;
     st->renaming = false;
+    // expand the whole ancestor chain so the current directory is visible
+    // in the tree pane without digging down from the root manually
+    FSNode* a = dir;
+    while (a && a != g_vfs->root()) {
+        a->expanded = true;
+        a = a->parent;
+    }
+    dir->expanded = true;
 }
 
 static bool in_trash_dir(FSNode* d) {

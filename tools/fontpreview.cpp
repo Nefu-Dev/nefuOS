@@ -1,4 +1,4 @@
-// 字库预览工具：把 font.h 渲染成大图 BMP，用于检查字模是否正确
+// ： font.h BMP，
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -28,7 +28,7 @@ int main() {
     const int W = COLS * cellW + 8, H = ROWS * cellH + 8;
     uint32_t* px = new uint32_t[(size_t)W * H];
     memset(px, 0, (size_t)W * H * 4);
-    // 白底黑字
+
     for (int i = 0; i < W * H; i++) px[i] = 0x00FFFFFF;
     for (int c = 0; c < 96; c++) {
         int gx = 4 + (c % COLS) * cellW;
@@ -44,7 +44,7 @@ int main() {
             }
         }
     }
-    // 写 BMP（自下而上）
+    // BMP（）
     int rowSize = ((W * 4 + 3) / 4) * 4;
     int imgSize = rowSize * H;
     FILE* f = fopen("font_preview.bmp", "wb");

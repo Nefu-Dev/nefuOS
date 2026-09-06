@@ -1,8 +1,8 @@
 // nefuOS application package viewer / launcher.
 // Handles two formats:
-//   .nefud - text manifest that binds to a built-in app
-//   .bin   - real binary package (NEFBIN01) that either binds to a built-in
-//            app or carries NEFVM bytecode that actually executes here
+// .nefud - text manifest that binds to a built-in app
+// .bin - real binary package (NEFBIN01) that either binds to a built-in
+// app or carries NEFVM bytecode that actually executes here
 #include "apps.h"
 #include "nefvm.h"
 #include "../gui/gfx.h"

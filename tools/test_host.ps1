@@ -1,4 +1,4 @@
-﻿# nefuOS 宿主功能回归测试：注入鼠标/键盘事件并逐屏截图
+﻿# nefuOS ：/
 param(
     [string]$Exe = "D:\mycppos1\nefuOS\dist\nefuOS.exe",
     [string]$Out = "D:\mycppos1\nefuOS\dist\shots"
@@ -88,7 +88,7 @@ Snap $h "07_textview"
 DblClick $h 166 162 # System Info
 Snap $h "08_sysinfo"
 
-# 开始菜单 -> About
+# start menu -> About
 Click $h 36 585
 Start-Sleep -Milliseconds 300
 Snap $h "09_startmenu"

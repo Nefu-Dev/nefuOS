@@ -1,4 +1,4 @@
-// nefuOS 贪吃蛇：方向键控制，吃食物加分，撞墙/撞自己结束
+// nefuOS snake：，，hit wall/hit self ends game
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -7,9 +7,9 @@ namespace nefu {
 
 struct SnakeState {
     int cols, rows;
-    int body[400][2];      // 蛇身坐标
+    int body[400][2];      // snake body coords
     int len;
-    int dir;               // 0上 1下 2左 3右
+    int dir;               // 0up 1down 2left 3right
     int next_dir;
     int food[2];
     int score;
@@ -20,7 +20,7 @@ struct SnakeState {
 };
 
 static void snake_reset_food(SnakeState* st) {
-    // 找空位放食物
+
     for (int attempt = 0; attempt < 200; attempt++) {
         int fx = (int)((platform_tick_ms() * 2654435761u + attempt * 97) >> 13) % st->cols;
         int fy = (int)((platform_tick_ms() * 40503u + attempt * 131) >> 13) % st->rows;
@@ -32,7 +32,7 @@ static void snake_reset_food(SnakeState* st) {
         }
         if (!on) { st->food[0] = fx; st->food[1] = fy; return; }
     }
-    st->food[0] = -1; st->food[1] = -1; // 满了
+    st->food[0] = -1; st->food[1] = -1; // full
 }
 
 static void snake_paint(Window* w) {
@@ -40,21 +40,21 @@ static void snake_paint(Window* w) {
     Surface& s = w->back;
     s.fill(0x00101418);
     int cw = st->cols, ch = st->rows;
-    int cs = 12; // 格大小
-    // 居中
+    int cs = 12; // cell size
+    // centered
     int ox = (s.width - cw * cs) / 2;
     int oy = (s.height - ch * cs) / 2;
     if (ox < 0) { ox = 0; }
     if (oy < 0) { oy = 0; }
-    // 网格
+    // grid
     gfx::rect(s, ox, oy, cw * cs, ch * cs, 0x0030465A);
     for (int x = 1; x < cw; x++) gfx::vline(s, ox + x * cs, oy, oy + ch * cs - 1, 0x00182638);
     for (int y = 1; y < ch; y++) gfx::hline(s, ox, ox + cw * cs - 1, oy + y * cs, 0x00182638);
-    // 食物
+
     if (st->food[0] >= 0) {
         gfx::fillrect(s, ox + st->food[0] * cs + 2, oy + st->food[1] * cs + 2, cs - 4, cs - 4, color::RED);
     }
-    // 蛇身（头亮绿）
+    // snake body（head bright green）
     for (int i = st->len - 1; i >= 0; i--) {
         int px = ox + st->body[i][0] * cs, py = oy + st->body[i][1] * cs;
         uint32_t c = (i == 0) ? 0x0073E06B : 0x0047B33D;
@@ -84,16 +84,16 @@ static void snake_tick(SnakeState* st) {
     case 2: nx--; break;
     case 3: nx++; break;
     }
-    // 撞墙
+    // hit wall
     if (nx < 0 || ny < 0 || nx >= st->cols || ny >= st->rows) { st->over = true; return; }
-    // 撞自己
+    // hit self
     for (int i = 0; i < st->len; i++) {
         if (st->body[i][0] == nx && st->body[i][1] == ny) { st->over = true; return; }
     }
-    // 移动
+    // move
     for (int i = st->len - 1; i > 0; i--) { st->body[i][0] = st->body[i - 1][0]; st->body[i][1] = st->body[i - 1][1]; }
     st->body[0][0] = nx; st->body[0][1] = ny;
-    // 吃食物
+
     if (st->food[0] == nx && st->food[1] == ny) {
         if (st->len < 400) {
             st->body[st->len][0] = st->body[st->len - 1][0];
@@ -119,7 +119,7 @@ static void snake_key(Window* w, const KeyEvent* e) {
         if (!st->over) st->paused = !st->paused;
     }
     if (e->ascii == 'r' || e->ascii == 'R') {
-        // 重新开始
+        // restart
         st->len = 4;
         st->body[0][0] = st->cols / 2; st->body[0][1] = st->rows / 2;
         st->body[1][0] = st->body[0][0] - 1; st->body[1][1] = st->body[0][1];
@@ -164,7 +164,7 @@ void snake_launch() {
     st->paused = false;
     snake_reset_food(st);
     w->userdata = st;
-    w->on_paint = snake_paint_auto; // 每帧先推进再重绘
+    w->on_paint = snake_paint_auto; // advance then redraw each frame
     w->on_key = snake_key;
     w->on_close = snake_close;
 }

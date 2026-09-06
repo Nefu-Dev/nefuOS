@@ -1,4 +1,4 @@
-// nefuOS 小控件
+// nefuOS widgets
 #pragma once
 #include "gfx.h"
 
@@ -17,7 +17,7 @@ struct Button {
 namespace ui {
 
 void draw_button(Surface& s, Button& b);
-// 返回 true 表示事件被按钮消费
+// return true event consumed by button
 bool button_event(Button& b, int mx, int my, uint8_t buttons, bool pressed, bool released);
 
 } // namespace ui

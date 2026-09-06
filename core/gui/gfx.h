@@ -1,11 +1,11 @@
-// nefuOS 图形原语
+// nefuOS graphics primitives
 #pragma once
 #include "../platform.h"
 #include "../klib/klib.h"
 
 namespace nefu {
 
-// 软件表面：32bpp，内存字节序 BGRA
+// ：32bpp，memory byte order BGRA
 struct Surface {
     uint8_t* addr;
     int width, height, pitch;

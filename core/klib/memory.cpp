@@ -1,4 +1,4 @@
-// klib 内存函数与全局 new/delete
+// klib memory functions & globals new/delete
 #include "klib.h"
 #include "../platform.h"
 

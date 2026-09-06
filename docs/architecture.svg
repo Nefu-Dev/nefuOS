@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="400" viewBox="0 0 900 400" font-family="Consolas, monospace">
+  <defs>
+    <linearGradient id="host" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="bare" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#172554"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#065f46"/><stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="400" fill="#f8fafc"/>
+  <!-- backends -->
+  <text x="30" y="34" font-size="16" font-weight="bold" fill="#0f172a">nefuOS — dual backend</text>
+
+  <rect x="30" y="60" width="400" height="110" rx="14" fill="url(#host)" stroke="#334155"/>
+  <text x="50" y="90" font-size="15" fill="#38bdf8">① Win32 host  backend</text>
+  <text x="50" y="114" font-size="12" fill="#cbd5e1">nefuOS.exe — native Windows desktop</text>
+  <text x="50" y="134" font-size="12" fill="#cbd5e1">GDI+ images · real adapters · Wi-Fi scan</text>
+  <text x="50" y="154" font-size="12" fill="#cbd5e1">WinINet HTTP(S) · IcmpSendEcho ping</text>
+
+  <rect x="470" y="60" width="400" height="110" rx="14" fill="url(#bare)" stroke="#334155"/>
+  <text x="490" y="90" font-size="15" fill="#38bdf8">② Bare-metal x86_64 kernel</text>
+  <text x="490" y="114" font-size="12" fill="#cbd5e1">El Torito ISO → boot.s @0x7C00</text>
+  <text x="490" y="134" font-size="12" fill="#cbd5e1">e1000 driver · ARP · ICMP · TCP</text>
+  <text x="490" y="154" font-size="12" fill="#cbd5e1">VBE 0x118 800×600×32 · long mode paging</text>
+
+  <!-- shared core -->
+  <rect x="30" y="210" width="840" height="150" rx="14" fill="url(#core)" stroke="#065f46"/>
+  <text x="50" y="240" font-size="15" fill="#34d399">Shared core/ (platform-independent C++)</text>
+  <text x="50" y="266" font-size="12" fill="#a7f3d0">GUI: window manager · desktop · taskbar · gfx · widgets · bitmap font</text>
+  <text x="50" y="288" font-size="12" fill="#a7f3d0">VFS: Unix-like /bin /etc /home /mnt /tmp /usr · NFS1 persistence</text>
+  <text x="50" y="310" font-size="12" fill="#a7f3d0">Apps: file manager · browser · store · settings(zh/en) · terminal · notepad</text>
+  <text x="50" y="332" font-size="12" fill="#a7f3d0">      paint · calculator · clock · snake · minesweeper · image · music · monitor</text>
+
+  <!-- boot chain -->
+  <rect x="30" y="376" width="840" height="0" fill="none"/>
+</svg>

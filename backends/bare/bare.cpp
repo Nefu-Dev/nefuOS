@@ -1,5 +1,5 @@
-// nefuOS 裸机后端（x86_64 长模式，QEMU/真机可引导）
-// 平台实现：LFB 帧缓冲、PIT 定时、PS/2 键盘+鼠标、RTC、UART 调试、简单堆分配
+// nefuOS （x86_64 ，QEMU/）
+// platform implementation：LFB 、PIT 、PS/2 +、RTC、UART debug、
 #include <stdint.h>
 #include <stddef.h>
 #include "../../core/klib/klib.h"
@@ -8,7 +8,7 @@
 
 namespace nefu {
 
-// ===================== 端口 I/O =====================
+// ===================== port I/O =====================
 static inline void outb(uint16_t port, uint8_t v) {
     __asm__ volatile("outb %0, %1" : : "a"(v), "Nd"(port));
 }
@@ -22,7 +22,7 @@ static inline void outw(uint16_t port, uint16_t v) {
 }
 static inline void io_wait() { outb(0x80, 0); }
 
-// ===================== UART 调试 =====================
+// ===================== UART debug =====================
 static void uart_init() {
     outb(0x3F8 + 1, 0x00);
     outb(0x3F8 + 3, 0x80);
@@ -37,10 +37,10 @@ static void uart_putc(char c) {
     outb(0x3F8, (uint8_t)c);
 }
 
-// ===================== 简单堆分配器 =====================
+// ===================== =====================
 #define ARENA_BASE 0x400000u
 #define ARENA_SIZE (64u * 1024u * 1024u)
-struct Blk { uint32_t size; Blk* next; };   // 头 8 字节，负载 16 字节对齐
+struct Blk { uint32_t size; Blk* next; };   // 8 bytes， 16
 static uint32_t s_arena_next = ARENA_BASE;
 static Blk* s_free = 0;
 
@@ -57,7 +57,7 @@ static void* alloc_from_bump(uint32_t sz) {
 void* kalloc(size_t sz) {
     if (sz == 0) sz = 8;
     uint32_t need = ((uint32_t)sz + 15) & ~15u;
-    // 首次适配
+
     Blk** pp = &s_free;
     while (*pp) {
         if ((*pp)->size >= need) {
@@ -77,14 +77,14 @@ void kfree(void* p) {
     s_free = b;
 }
 
-// ===================== 屏幕 =====================
+// ===================== screen =====================
 static Screen s_screen;
 static uint32_t s_lfb = 0;
 
 Screen* platform_screen() { return &s_screen; }
 void platform_present() {}
 
-// ===================== 时间 =====================
+// ===================== hour =====================
 static volatile uint32_t s_ticks = 0;   // 100Hz
 static volatile uint32_t s_tick_ms = 0;
 
@@ -124,21 +124,21 @@ static void pic_eoi(int irq) {
     outb(0x20, 0x20);
 }
 
-// 键盘/鼠标队列
+// /
 #define KQ_MAX 64
 struct KEvent { int kc; char ascii; bool down; };
 static volatile int s_kq_head = 0, s_kq_tail = 0;
 static KEvent s_kq[KQ_MAX];
 static void kq_push(int kc, char ac, bool down) {
     int n = (s_kq_tail + 1) % KQ_MAX;
-    if (n == s_kq_head) return;   // 满则丢弃
+    if (n == s_kq_head) return;
     s_kq[s_kq_tail].kc = kc;
     s_kq[s_kq_tail].ascii = ac;
     s_kq[s_kq_tail].down = down;
     s_kq_tail = n;
 }
 
-// 鼠标
+
 static int s_mx = 400, s_my = 300;
 static uint8_t s_mb = 0;
 static volatile bool s_mouse_dirty = false;
@@ -146,10 +146,10 @@ static int s_mouse_pkt = 0;
 static uint8_t s_mouse_buf[3];
 static volatile int s_mouse_dx = 0, s_mouse_dy = 0;
 
-// 键盘状态
+
 static bool s_shift = false, s_caps = false;
 
-// 扫描码表（set 1）：kc!=0 为功能键，否则按字符
+// （set 1）：kc!=0 ，
 struct KeyRow { uint8_t sc; int kc; char unshifted; char shifted; };
 static const KeyRow KEYMAP[] = {
     { 0x01, KEY_ESC,     0, 0 },
@@ -165,24 +165,24 @@ static const KeyRow KEYMAP[] = {
     { 0x4F, KEY_END,     0, 0 },
     { 0x50, KEY_DOWN,    0, 0 },
     { 0x51, KEY_PGDN,    0, 0 },
-    { 0x52, 0, 0, 0 },               // Ins（忽略）
+    { 0x52, 0, 0, 0 },               // Ins（ignore）
     { 0x53, KEY_DEL,     0, 0 },
     { 0x3B, KEY_F1, 0, 0 }, { 0x3C, KEY_F2, 0, 0 }, { 0x3D, KEY_F3, 0, 0 },
     { 0x3E, KEY_F4, 0, 0 }, { 0x3F, KEY_F5, 0, 0 }, { 0x40, KEY_F6, 0, 0 },
     { 0x41, KEY_F7, 0, 0 }, { 0x42, KEY_F8, 0, 0 }, { 0x43, KEY_F9, 0, 0 },
     { 0x44, KEY_F10, 0, 0 }, { 0x57, KEY_F11, 0, 0 }, { 0x58, KEY_F12, 0, 0 },
-    // 数字行
+
     { 0x02, 0, '1', '!' }, { 0x03, 0, '2', '@' }, { 0x04, 0, '3', '#' },
     { 0x05, 0, '4', '$' }, { 0x06, 0, '5', '%' }, { 0x07, 0, '6', '^' },
     { 0x08, 0, '7', '&' }, { 0x09, 0, '8', '*' }, { 0x0A, 0, '9', '(' },
     { 0x0B, 0, '0', ')' },
-    // 标点
+
     { 0x0C, 0, '-', '_' }, { 0x0D, 0, '=', '+' },
     { 0x1A, 0, '[', '{' }, { 0x1B, 0, ']', '}' },
     { 0x27, 0, ';', ':' }, { 0x28, 0, '\'', '"' }, { 0x29, 0, '`', '~' },
     { 0x2B, 0, '\\', '|' }, { 0x33, 0, ',', '<' }, { 0x34, 0, '.', '>' },
     { 0x35, 0, '/', '?' },
-    // 字母
+    // letter
     { 0x1E, 0, 'a', 'A' }, { 0x30, 0, 'b', 'B' }, { 0x2E, 0, 'c', 'C' },
     { 0x20, 0, 'd', 'D' }, { 0x12, 0, 'e', 'E' }, { 0x21, 0, 'f', 'F' },
     { 0x22, 0, 'g', 'G' }, { 0x23, 0, 'h', 'H' }, { 0x17, 0, 'i', 'I' },
@@ -204,7 +204,7 @@ static void kbd_scancode(uint8_t sc) {
     }
     if (code == 0x1D) { kq_push(KEY_CTRL, 0, down); return; }
     if (code == 0x38) { kq_push(KEY_ALT, 0, down); return; }
-    if (code == 0xE0 || code == 0xE1) return;   // 扩展前缀忽略
+    if (code == 0xE0 || code == 0xE1) return;
     for (size_t i = 0; i < sizeof(KEYMAP) / sizeof(KEYMAP[0]); i++) {
         if (KEYMAP[i].sc == code) {
             const KeyRow& r = KEYMAP[i];
@@ -226,7 +226,7 @@ static void kbd_scancode(uint8_t sc) {
 
 static void mouse_byte(uint8_t b) {
     if (s_mouse_pkt == 0) {
-        if (!(b & 0x08)) return;      // 必须 byte0
+        if (!(b & 0x08)) return;      // byte0
         s_mouse_buf[0] = b;
         s_mouse_pkt = 1;
         return;
@@ -266,7 +266,7 @@ __attribute__((interrupt)) static void irq12_handler(void* frame) {
 __attribute__((interrupt)) static void spurious_handler(void* frame) { (void)frame; }
 
 static void idt_init() {
-    // 全部填 spurious，再覆盖 IRQ
+    // spurious， IRQ
     for (int i = 0; i < 256; i++) idt_set(i, (void*)spurious_handler);
     idt_set(32, (void*)irq0_handler);
     idt_set(33, (void*)irq1_handler);
@@ -286,8 +286,8 @@ static void pic_init() {
     outb(0xA1, 0x02); io_wait();
     outb(0x21, 0x01); io_wait();
     outb(0xA1, 0x01); io_wait();
-    outb(0x21, 0xF8);   // 允许 IRQ0/1/2
-    outb(0xA1, 0xEF);   // 允许 IRQ12
+    outb(0x21, 0xF8);   // allow IRQ0/1/2
+    outb(0xA1, 0xEF);   // allow IRQ12
 }
 
 static void pit_init() {
@@ -298,9 +298,9 @@ static void pit_init() {
 }
 
 static void ps2_init() {
-    // 启用辅助接口
+
     outb(0x64, 0xA8); io_wait();
-    // 读命令字节，使能 IRQ12
+    // ， IRQ12
     outb(0x64, 0x20); io_wait();
     uint8_t cb = inb(0x60);
     cb |= 0x02;        // enable aux IRQ
@@ -308,10 +308,10 @@ static void ps2_init() {
     cb &= ~0x10;       // enable keyboard IRQ
     outb(0x64, 0x60); io_wait();
     outb(0x60, cb); io_wait();
-    // 鼠标使能数据上报
+
     outb(0x64, 0xD4); io_wait();
     outb(0x60, 0xF4); io_wait();
-    // 排空 ACK
+    // ACK
     for (int i = 0; i < 4; i++) inb(0x60);
 }
 
@@ -328,7 +328,7 @@ uint32_t platform_seconds_of_day() {
     uint8_t h = cmos_read(0x04);
     uint8_t b = cmos_read(0x0B);
     if (!(b & 0x04)) { s = bcd2bin(s); m = bcd2bin(m); h = bcd2bin(h); }
-    if (!(b & 0x02)) {            // 12 小时制
+    if (!(b & 0x02)) {            // 12
         bool pm = (h & 0x80) != 0;
         h &= 0x7F;
         if (h >= 12) h = (uint8_t)(h - 12);
@@ -337,13 +337,13 @@ uint32_t platform_seconds_of_day() {
     return (uint32_t)h * 3600u + (uint32_t)m * 60u + (uint32_t)s;
 }
 
-// ===================== 调试 / 关机 =====================
+// ===================== debug / power off =====================
 void platform_dbg(const char* s) {
     while (*s) uart_putc(*s++);
 }
 
 void platform_poweroff() {
-    // QEMU ACPI 关机
+    // QEMU ACPI power off
     outw(0x604, 0x2000);
     outw(0xB004, 0x2000);   // Bochs
     for (;;) { __asm__ volatile("cli; hlt"); }
@@ -358,11 +358,11 @@ const char* platform_name() { return "bare (x86_64)"; }
 
 bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
     (void)out; (void)out_size;
-    return false;   // 裸机无磁盘持久化，用默认文件树
+    return false;   // ，
 }
 void platform_fs_save(const uint8_t* data, uint32_t size) { (void)data; (void)size; }
 
-// ===================== 内核主入口 =====================
+// ===================== =====================
 extern "C" void nefuos_kernel_main(void* info) {
     __asm__ volatile("movw $0xE9, %%dx; movb $'1', %%al; outb %%al, %%dx" ::: "dx", "ax");
     uint32_t* bi = (uint32_t*)info;
@@ -409,17 +409,17 @@ extern "C" void nefuos_kernel_main(void* info) {
     uint32_t last = 0;
     int frames = 0;
     for (;;) {
-        // 键盘
+
         while (s_kq_head != s_kq_tail) {
             KEvent ev = s_kq[s_kq_head];
             s_kq_head = (s_kq_head + 1) % KQ_MAX;
             nefuos_handle_key(ev.kc, ev.ascii, ev.down);
         }
-        // 鼠标
+
         if (s_mouse_dirty) {
             s_mouse_dirty = false;
             s_mx += s_mouse_dx;
-            s_my += s_mouse_dy;          // PS/2 正 Y = 向下
+            s_my += s_mouse_dy;          // PS/2 Y =
             s_mouse_dx = 0; s_mouse_dy = 0;
             if (s_mx < 0) s_mx = 0;
             if (s_mx >= s_screen.width) s_mx = s_screen.width - 1;
@@ -443,7 +443,7 @@ extern "C" void nefuos_kernel_main(void* info) {
 
 } // namespace nefu
 
-// ===================== 网络真实信息（bare） =====================
+// ===================== （bare） =====================
 #include "../../core/net/net.h"
 namespace nefu {
 
@@ -466,6 +466,13 @@ int platform_wifi_scan(WifiNetInfo* list, int max) {
 
 bool platform_ping(uint32_t ip, int timeout_ms) {
     return net_ping(ip, timeout_ms);
+}
+
+bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
+    (void)url;
+    if (out) *out = 0;
+    if (out_size) *out_size = 0;
+    return false;   // bare uses the in-house TCP stack (IP literals only)
 }
 
 } // namespace nefu

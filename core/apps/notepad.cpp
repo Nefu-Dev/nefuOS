@@ -1,4 +1,4 @@
-// nefuOS 记事本：多行文本编辑，保存到 /home/user/Documents/notes.txt
+// nefuOS notepad：multi-line text editing，save to /home/user/Documents/notes.txt
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -23,11 +23,11 @@ static void note_load(NoteState* st) {
         st->lines.clear();
         for (int i = 0; i < ls.size(); i++) st->lines.push(ls[i]);
     }
-    if (st->lines.empty()) st->lines.push(String()); // 始终保证至少一行
+    if (st->lines.empty()) st->lines.push(String()); // always keep at least one line
 }
 
 static void note_save(NoteState* st) {
-    // 组装内容
+    // assemble content
     uint32_t total = 0;
     for (int i = 0; i < st->lines.size(); i++) total += (uint32_t)st->lines[i].len() + 1;
     uint8_t* buf = (uint8_t*)kalloc(total + 1);
@@ -61,7 +61,7 @@ static void note_paint(Window* w) {
     for (int i = st->view_scroll; i < st->lines.size() && i < st->view_scroll + vis; i++) {
         gfx::text(s, 4, (i - st->view_scroll) * 16, st->lines[i].c_str(), color::TEXT, color::WHITE);
     }
-    // 光标
+    // cursor
     int cy = (st->cur_row - st->view_scroll) * 16;
     int cx = 4 + st->cur_col * 8;
     if ((platform_tick_ms() / 400) % 2 == 0 && cy >= 0 && cy < s.height) {
@@ -76,7 +76,7 @@ static void note_key(Window* w, const KeyEvent* e) {
     NoteState* st = (NoteState*)w->userdata;
     if (!e->down) return;
     if (e->keycode == KEY_CTRL && e->ascii == 0) { /* 占位 */ }
-    if (e->ascii == 26) { note_save(st); return; } // Ctrl+Z 不用，避免误触发
+    if (e->ascii == 26) { note_save(st); return; } // Ctrl+Z unused，avoid misfire
     if (e->keycode == KEY_ENTER) {
         String rest = st->lines[st->cur_row].substr(st->cur_col, st->lines[st->cur_row].len() - st->cur_col);
         st->lines[st->cur_row] = st->lines[st->cur_row].substr(0, st->cur_col);
@@ -124,7 +124,7 @@ static void note_key(Window* w, const KeyEvent* e) {
     }
     if (e->keycode == KEY_HOME) { st->cur_col = 0; return; }
     if (e->keycode == KEY_END) { st->cur_col = st->lines[st->cur_row].len(); return; }
-    if (e->keycode == KEY_ESC) { note_save(st); return; } // Esc 保存
+    if (e->keycode == KEY_ESC) { note_save(st); return; } // Esc save
     if (e->ascii >= 32 && e->ascii < 127) {
         String& l = st->lines[st->cur_row];
         String ch;

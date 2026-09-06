@@ -1,9 +1,10 @@
-// nefuOS 软件商城：浏览目录、安装/卸载/打开应用，状态持久化 /etc/store.conf
+// nefuOS app store：browse catalog、install/umount/open app，state persistence /etc/store.conf
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
 #include "../platform.h"
 #include "../sys/settings.h"
+#include "../vfs/vfs.h"
 
 namespace nefu {
 
@@ -23,7 +24,7 @@ static const StoreItem CATALOG[] = {
     { APP_IMAGEVIEWER, "Image Viewer", "PPM image viewer, zoom & gallery",     "88 KB" },
     { APP_MUSIC,   "Music Player", "Playlist, progress bar & spectrum",        "72 KB" },
     { APP_MONITOR, "System Monitor", "CPU / RAM / disk live curves",           "40 KB" },
-    { APP_BROWSER, "Browser",       "Web browser: file:// and http:// pages",  "128 KB" },
+    { APP_BROWSER, "Browser",       "Web browser: file:// and http:// pages", "128 KB" },
     { APP_NETCFG,  "Network",       "NIC status, link test, ping gateway",     "56 KB" },
     { APP_NEFUD,   "App Launcher",  ".nefud package viewer & launcher",         "32 KB" },
 };
@@ -82,9 +83,34 @@ static void store_click(void* ud) {
     if (strcmp(b.label, "Install") == 0) {
         app_set_installed(id, true);
         store_save();
+        // write a real package stub into the VFS so the store state is
+        // visible in the file manager (app downloads live in /usr/share/apps)
+        const char* name = 0;
+        for (int i = 0; i < CATALOG_N; i++) if (CATALOG[i].id == id) { name = CATALOG[i].name; break; }
+        if (name) {
+            char path[80];
+            ksprintf(path, sizeof(path), "/usr/share/apps/%s.nefud", name);
+            g_vfs->mkdir("/usr/share/apps");
+            FSNode* f = g_vfs->create_file(path);
+            if (f) {
+                char pkg[160];
+                int n = ksprintf(pkg, sizeof(pkg),
+                    "type=nefud-app\nname=%s\nversion=1.0\narch=nefuOS\ninstalled=1\nlaunch-id=%d\n",
+                    name, id);
+                g_vfs->write_file(f, (const uint8_t*)pkg, (uint32_t)n);
+            }
+        }
     } else if (strcmp(b.label, "Uninstall") == 0) {
         app_set_installed(id, false);
         store_save();
+        const char* name = 0;
+        for (int i = 0; i < CATALOG_N; i++) if (CATALOG[i].id == id) { name = CATALOG[i].name; break; }
+        if (name) {
+            char path[80];
+            ksprintf(path, sizeof(path), "/usr/share/apps/%s.nefud", name);
+            FSNode* f = g_vfs->resolve(path);
+            if (f) g_vfs->remove_node(f);
+        }
     } else if (strcmp(b.label, "Open") == 0) {
         app_launch(id);
     }
@@ -99,19 +125,19 @@ static void store_paint(Window* w) {
     int y = 34 - st->scroll * 58;
     for (int i = 0; i < CATALOG_N; i++) {
         const StoreItem& it = CATALOG[i];
-        // 卡片底
+        // card bottom
         if (y + 52 < 0) { y += 58; continue; }
         if (y > s.height) break;
         gfx::fillrect(s, 8, y, s.width - 16, 52, 0x00F5F5F0);
         gfx::rect(s, 8, y, s.width - 16, 52, 0x00E0DFD9);
-        // 名称 + 图标色块
+        // name + icon color block
         gfx::fillrect(s, 14, y + 6, 40, 40, 0x003E87B5);
         char icon[2] = { (char)('A' + i), 0 };
         gfx::text(s, 28, y + 18, icon, color::WHITE, 0x003E87B5);
         gfx::text(s, 60, y + 6, it.name, color::TEXT, 0x00F5F5F0);
         gfx::text(s, 60, y + 24, it.desc, color::TEXT2, 0x00F5F5F0);
         gfx::text(s, 60, y + 40, it.size, color::TEXT2, 0x00F5F5F0);
-        // 按钮
+        // button
         Button& b = st->btns[i];
         b.x = s.width - 96;
         b.y = y + 12;
@@ -167,7 +193,7 @@ static void store_key(Window* w, const KeyEvent* e) {
     // keyboard scrolling (no wheel on bare metal)
     if (e->keycode == KEY_PGDN || e->keycode == KEY_DOWN) { store_scroll(w, -1); return; }
     if (e->keycode == KEY_PGUP || e->keycode == KEY_UP) { store_scroll(w, 1); return; }
-    // U = 卸载当前选中（简单：卸载第一个已安装）
+    // U = uninstall selected（simple：uninstall first installed）
     if (e->ascii == 'u' || e->ascii == 'U') {
         for (int i = 0; i < CATALOG_N; i++) {
             if (app_installed(CATALOG[i].id)) {

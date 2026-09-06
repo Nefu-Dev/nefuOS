@@ -1,4 +1,4 @@
-// nefuOS 桌面
+// nefuOS
 #pragma once
 #include "gfx.h"
 #include "wm.h"

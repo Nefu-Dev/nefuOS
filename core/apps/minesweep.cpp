@@ -1,4 +1,4 @@
-// nefuOS 扫雷：9x9、10 雷，左键翻开，右键标旗，双击数字扩散
+// nefuOS ：9x9、10 ，，，double-click number spread
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -15,7 +15,7 @@ struct MinerState {
     bool won;
     int opened;
     int flags;
-    int cs;    // 格大小
+    int cs;    // cell size
     int ox, oy;
     Window* win;
 };
@@ -123,13 +123,13 @@ static void miner_mouse(Window* w, int mx, int my, uint8_t buttons) {
     int y = (my - st->oy) / st->cs;
     if (x < 0 || y < 0 || x >= MinerState::N || y >= MinerState::N) return;
     if (st->over || st->won) return;
-    if ((buttons & 1) && !(buttons & 2)) {  // 左键
+    if ((buttons & 1) && !(buttons & 2)) {  // left
         if (st->flag[y][x]) return;
         if (st->opened == 0 && st->around[y][x] > 0) {
-            // 首次点非空就重排，避免开局踩雷
+            // ，
         }
         miner_reveal(st, x, y);
-    } else if ((buttons & 2) && !(buttons & 1)) { // 右键
+    } else if ((buttons & 2) && !(buttons & 1)) { // right
         if (st->open[y][x]) return;
         st->flag[y][x] = !st->flag[y][x];
         st->flags += st->flag[y][x] ? 1 : -1;

@@ -1,5 +1,5 @@
-// nefuOS 音乐播放器：播放列表、播放/暂停/切歌、进度条、频谱可视化
-// 注：裸机内核暂无音频驱动，播放为"界面级"模拟（进度 + 频谱动画真实运行）
+// nefuOS ：playlist、play/pause/next track、progress bar、
+// note：，""（progress + ）
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
@@ -15,17 +15,17 @@ static uint32_t mrand() {
 
 struct Song {
     String name;
-    int duration;      // 秒
+    int duration;      // sec
 };
 
 struct MusicState {
     List<Song> songs;
     int cur_song;
     bool playing;
-    uint32_t play_start;      // 当前曲目开始播放时刻(ms)
-    uint32_t pause_offset;    // 暂停前累计播放 ms
+    uint32_t play_start;      // current track start time(ms)
+    uint32_t pause_offset;    // accumulated play before pause ms
     int scroll;
-    int bars[24];             // 频谱条（0..100，整数平滑）
+    int bars[24];             // （0..100，integer smoothing）
     Window* win;
     Button btns[5];
     Button* cur;
@@ -34,7 +34,7 @@ struct MusicState {
 
 static const char* MUSIC_DIR = "/home/user/Music";
 
-// ---------- 内置曲库 ----------
+// ---------- built-in tracks ----------
 static const char* BUILTIN_SONGS[6] = {
     "Sunrise Drive", "Ocean Breeze", "Night Pulse",
     "Rainy Window", "Neon City", "Golden Hour"
@@ -72,7 +72,7 @@ static void music_scan(MusicState* st) {
         const char* n = c->name.c_str();
         int len = c->name.len();
         if (len < 6 || strcmp(n + len - 5, ".song") != 0) continue;
-        // 解析 name / duration
+        // parse name / duration
         char* buf = (char*)kalloc((size_t)c->size + 1);
         if (!buf) continue;
         memcpy(buf, c->data, c->size);
@@ -109,7 +109,7 @@ static int music_progress_ms(MusicState* st) {
     return (int)(elapsed % (uint32_t)dur);
 }
 
-// ---------- 交互 ----------
+// ---------- interaction ----------
 static void music_click(void* ud) {
     MusicState* st = (MusicState*)ud;
     if (!st->cur) return;
@@ -150,7 +150,7 @@ static void music_paint(Window* w) {
     s.fill(0x0014181E);
     int W = s.width, H = s.height;
 
-    // 频谱动画（每帧更新；暂停时衰减到静音）
+    // （updated per frame；）
     for (int i = 0; i < 24; i++) {
         int target = st->playing ? (int)(mrand() % 100) : 5;
         st->bars[i] += (target - st->bars[i]) * 35 / 100;
@@ -167,13 +167,13 @@ static void music_paint(Window* w) {
     }
     gfx::rect(s, 30, by, W - 60, bh, 0x00304050);
 
-    // 当前曲目
+    // current track
     char buf[128];
     if (st->songs.size() > 0) {
         ksprintf(buf, sizeof(buf), "Now Playing: %s", st->songs[st->cur_song].name.c_str());
         gfx::text(s, 32, by + bh + 18, buf, color::WHITE, 0x0014181E);
     }
-    // 进度条
+    // progress bar
     int pb_y = by + bh + 42;
     gfx::rect(s, 32, pb_y, W - 64, 10, 0x00304050);
     if (st->songs.size() > 0) {
@@ -186,7 +186,7 @@ static void music_paint(Window* w) {
                  prog / 60000, (prog / 1000) % 60,
                  dur / 60000, (dur / 1000) % 60);
         gfx::text(s, 32, pb_y + 14, buf, color::TEXT2, 0x0014181E);
-        // 曲目结束自动下一首
+
         if (st->playing && prog >= dur - 100) {
             st->cur_song = (st->cur_song + 1) % st->songs.size();
             st->pause_offset = 0;
@@ -194,9 +194,9 @@ static void music_paint(Window* w) {
         }
     }
 
-    // 按钮
+    // button
     for (int i = 0; i < 5; i++) ui::draw_button(s, st->btns[i]);
-    // 播放列表（底部滚动区）
+    // playlist（bottom scroll area）
     gfx::hline(s, 8, W - 8, pb_y + 36, 0x002A323C);
     int ly = pb_y + 44;
     gfx::text(s, 32, ly, "Playlist", color::BLUE_LT, 0x0014181E);

@@ -1,4 +1,4 @@
-// nefuOS 虚拟文件树实现
+// nefuOS
 #include "vfs.h"
 #include "../platform.h"
 
@@ -81,7 +81,7 @@ FSNode* VFS::resolve(const char* path) {
 
 FSNode* VFS::mkdir(const char* path) {
     if (!path || !*path) return 0;
-    // 找到最后一个 '/'，父路径 + 新名
+    // '/'， +
     String p = path;
     int last = p.rfind('/');
     String parent_path, name;
@@ -124,7 +124,7 @@ FSNode* VFS::create_file(const char* path) {
     if (!parent || !parent->is_dir) return 0;
     FSNode* exist = find_child(parent, name.c_str());
     if (exist) {
-        if (!exist->is_dir) return exist;  // 覆盖写
+        if (!exist->is_dir) return exist;
         return 0;
     }
     FSNode* n = alloc_node();
@@ -163,7 +163,7 @@ bool VFS::remove_node(FSNode* n) {
     return false;
 }
 
-// ---------- 垃圾桶（Trash） ----------
+// ---------- （Trash） ----------
 FSNode* VFS::trash_dir() {
     FSNode* d = resolve("/home/user/Trash");
     if (!d) {
@@ -212,13 +212,13 @@ int VFS::empty_trash() {
 FSNode* VFS::move_node(FSNode* n, FSNode* dst_dir, const char* new_name) {
     if (!n || !dst_dir || !dst_dir->is_dir) return 0;
     if (n == &root_ || !n->parent || n == dst_dir) return 0;
-    // 防止移入自身子树
+
     FSNode* p = dst_dir;
     while (p) { if (p == n) return 0; p = p->parent; }
-    // 目标重名则失败（调用方可选自动改名）
+    // （）
     const char* nn = new_name ? new_name : n->name.c_str();
     if (find_child(dst_dir, nn)) return 0;
-    // 从旧 parent 摘下
+    // parent
     for (int i = 0; i < n->parent->children.size(); i++) {
         if (n->parent->children[i] == n) { n->parent->children.remove(i); break; }
     }
@@ -232,7 +232,7 @@ void VFS::set_cwd(FSNode* n) { if (n && n->is_dir) cwd = n; }
 
 uint32_t VFS::total_bytes() {
     uint32_t sum = 0;
-    // 简单递归
+
     struct Walk { static void go(FSNode* n, uint32_t& s) {
         if (!n->is_dir) s += n->size;
         for (int i = 0; i < n->children.size(); i++) go(n->children[i], s);
@@ -251,7 +251,7 @@ int VFS::node_count() {
     return c;
 }
 
-// ---------------- 默认文件树 ----------------
+// ---------------- ----------------
 static void put_text(VFS* v, const char* path, const char* text) {
     FSNode* f = v->create_file(path);
     if (f) v->write_file(f, (const uint8_t*)text, (uint32_t)strlen(text));
@@ -278,6 +278,23 @@ void VFS::cleanup_stray_nodes() {
             }
         }
     }
+}
+
+// Make sure the standard Unix-like hierarchy exists. Idempotent: existing
+// dirs are left untouched. Called after loading a persisted snapshot so an
+// old save can never hide the /usr /tmp ... structure.
+void VFS::ensure_standard_dirs() {
+    static const char* dirs[] = {
+        "/bin", "/boot", "/dev", "/etc",
+        "/home", "/home/user",
+        "/home/user/Documents", "/home/user/Pictures", "/home/user/Music",
+        "/home/user/Downloads", "/home/user/.Trash",
+        "/lib", "/mnt", "/opt", "/proc", "/root", "/run", "/sbin", "/srv",
+        "/sys", "/tmp", "/usr", "/usr/bin", "/usr/lib", "/usr/share",
+        "/usr/share/apps", "/usr/downloads",
+        "/var", "/var/log", "/var/cache"
+    };
+    for (unsigned i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) mkdir(dirs[i]);
 }
 
 void VFS::create_default_tree() {
@@ -371,10 +388,10 @@ void VFS::create_default_tree() {
         "or 'cp <src> /usr/downloads/' to store files.\n");
     put_text(this, "/usr/share/banner.txt",
         "    _   __ ____  _____  __  ____\n"
-        "   / | / // __ \\/ ___/ / / / /  /\n"
+        "   / | / // __ \\/ ___/ / / / / /\n"
         "  /  |/ / / / /\\__ \\ / /_/ / / / \n"
-        " / /|  / /_/ /___/ // __  / /_/  \n"
-        "/_/ |_/_____//____//_/ /_/ (_)   \n"
+        " / /|  / /_/ /___/ // __ / /_/ \n"
+        "/_/ |_/_____// ____//_/ /_/ (_) \n"
         "     a tiny operating system\n");
     put_text(this, "/usr/share/apps/calculator.nefud",
         "NEFUD1\n"
@@ -424,7 +441,7 @@ void VFS::create_default_tree() {
         "[ok] system ready\n");
 }
 
-// ---------------- 序列化 ----------------
+// ---------------- serialize ----------------
 static const uint32_t SAVE_MAGIC = 0x4E465301; // "NFS1"
 
 uint32_t VFS::ser_size(FSNode* n) {

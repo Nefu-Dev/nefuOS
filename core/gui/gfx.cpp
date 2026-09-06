@@ -1,4 +1,4 @@
-// nefuOS 图形原语实现
+// nefuOS gfx primitive implementation
 #include "gfx.h"
 #include "font.h"
 #include "font16.h"
@@ -173,12 +173,12 @@ void blit(Surface& dst, Surface& src, int dx, int dy) {
 
 void blit_clip(Surface& dst, Surface& src, int dx, int dy, int sx, int sy, int w, int h) {
     if (w <= 0 || h <= 0) return;
-    // 源裁剪
+    // source clip
     if (sx < 0) { w += sx; dx -= sx; sx = 0; }
     if (sy < 0) { h += sy; dy -= sy; sy = 0; }
     if (sx + w > src.width) w = src.width - sx;
     if (sy + h > src.height) h = src.height - sy;
-    // 目标裁剪
+    // dest clip
     if (dx < 0) { w += dx; sx -= dx; dx = 0; }
     if (dy < 0) { h += dy; sy -= dy; dy = 0; }
     if (dx + w > dst.width) w = dst.width - dx;
@@ -213,7 +213,7 @@ void fillcircle(Surface& s, int cx, int cy, int r, uint32_t c) {
     }
 }
 
-// 整数平方根（不含浮点）
+// integer sqrt（no floats）
 int sqrti(int v) {
     if (v <= 0) return 0;
     int x = v, y = (x + 1) / 2;

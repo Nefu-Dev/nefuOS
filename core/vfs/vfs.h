@@ -1,4 +1,4 @@
-// nefuOS 虚拟文件树（VFS）
+// nefuOS （VFS）
 #pragma once
 #include "../klib/klib.h"
 
@@ -8,11 +8,11 @@ struct FSNode {
     String name;
     bool is_dir;
     uint32_t size;
-    uint32_t mtime;              // 秒（伪时钟）
+    uint32_t mtime;              // sec（）
     FSNode* parent;
-    List<FSNode*> children;      // 目录使用
-    uint8_t* data;               // 文件使用
-    bool expanded;               // 树视图展开状态
+    List<FSNode*> children;
+    uint8_t* data;
+    bool expanded;
     FSNode() : is_dir(false), size(0), mtime(0), parent(0), data(0), expanded(false) {}
 };
 
@@ -22,7 +22,7 @@ public:
     ~VFS();
     FSNode* root() { return &root_; }
 
-    FSNode* resolve(const char* path);                    // 相对 cwd 或绝对
+    FSNode* resolve(const char* path);                    // cwd
     FSNode* resolve_from(FSNode* base, const char* path);
     FSNode* mkdir(const char* path);
     FSNode* create_file(const char* path);
@@ -34,16 +34,17 @@ public:
     FSNode* trash_dir();
     FSNode* trash_file(FSNode* n);
     FSNode* restore_file(FSNode* n, FSNode* dst_dir);
-    int     empty_trash(); // 移动/改名
+    int     empty_trash(); // move/
 
     FSNode* cwd;
     void set_cwd(FSNode* n);
 
     void create_default_tree();
-    void cleanup_stray_nodes();                            // remove legacy broken nodes
-    bool save(uint8_t** out, uint32_t* out_size);         // 调用方负责 kfree
+    void ensure_standard_dirs();                          // idempotent dir fix-up
+    void cleanup_stray_nodes();                           // remove legacy broken nodes
+    bool save(uint8_t** out, uint32_t* out_size);         // kfree
     bool load(const uint8_t* data, uint32_t size);
-    uint32_t total_bytes();                               // 全部文件字节数
+    uint32_t total_bytes();
     int node_count();
 
 private:

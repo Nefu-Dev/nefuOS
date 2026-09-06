@@ -1,4 +1,4 @@
-// nefuOS 系统信息
+// nefuOS system info
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -48,7 +48,7 @@ void sysinfo_launch() {
     cascade_pos(&x, &y);
     Window* w = g_wm->create_window("System Info", x, y, 400, 260);
     if (!w) return;
-    w->userdata = (void*)1; // 占位
+    w->userdata = (void*)1; // placeholder
     w->on_paint = si_paint;
     w->on_close = si_close;
 }

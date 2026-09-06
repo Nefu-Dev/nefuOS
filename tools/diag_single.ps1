@@ -1,4 +1,4 @@
-﻿# 最小诊断：单点 File Manager，捕获 stdout 与截图
+﻿# ： File Manager， stdout
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

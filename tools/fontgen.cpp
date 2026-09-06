@@ -1,5 +1,5 @@
-// nefuOS 字体生成工具（仅宿主使用）
-// 从系统固定宽度字体提取 8x16 ASCII(32..127) 位图字模，生成 core/gui/font.h
+// nefuOS （）
+// 8x16 ASCII(32..127) ， core/gui/font.h
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -22,7 +22,7 @@ int main() {
 
     for (int c = 0; c < 96; c++) {
         char ch = (char)(c + 32);
-        // 32bpp DIB，负高度 = 自上而下，行 0 为顶部
+        // 32bpp DIB， = ，line 0
         BITMAPINFO bi;
         memset(&bi, 0, sizeof(bi));
         bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -43,7 +43,7 @@ int main() {
         SetTextColor(dc, RGB(0, 0, 0));
         SetBkMode(dc, OPAQUE);
         TextOutA(dc, 0, 0, &ch, 1);
-        // 读像素：32bpp DIB 字节序 BGRA，白=0x00FFFFFF，黑=0x00000000；按亮度阈值判黑（防抗锯齿灰阶）
+        // ：32bpp DIB BGRA，=0x00FFFFFF，=0x00000000；（）
         const uint32_t* px = (const uint32_t*)bits;
         for (int y = 0; y < CH; y++) {
             unsigned char row = 0;
@@ -63,8 +63,8 @@ int main() {
 
     FILE* f = fopen("../core/gui/font.h", "wb");
     if (!f) { fprintf(stderr, "cannot open ../core/gui/font.h\n"); return 1; }
-    fprintf(f, "// 自动生成：8x16 ASCII 位图字体（32..127），每字符 16 字节，每字节一行 8 像素，MSB=左侧\n");
-    fprintf(f, "// 生成工具：tools/fontgen.cpp，请勿手改\n");
+    fprintf(f, "// auto-generated：8x16 ASCII bitmap font（32..127），per char 16 bytes，one row per byte 8 pixel，MSB=left side\n");
+    fprintf(f, "// generator tool：tools/fontgen.cpp，do not edit manually\n");
     fprintf(f, "#pragma once\n");
     fprintf(f, "namespace nefu { extern const unsigned char font8x16[96][16]; }\n");
     fprintf(f, "const unsigned char nefu::font8x16[96][16] = {\n");

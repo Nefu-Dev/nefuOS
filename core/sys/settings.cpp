@@ -1,4 +1,4 @@
-// nefuOS 系统设置实现
+// nefuOS
 #include "settings.h"
 #include "../klib/klib.h"
 #include "../platform.h"
@@ -9,22 +9,22 @@ SysSettings g_settings;
 
 uint32_t accent_color(int idx) {
     switch (idx) {
-    case 1: return 0x002E8B57;  // 绿
-    case 2: return 0x006A5ACD;  // 紫
-    case 3: return 0x00D2691E;  // 橙
-    default: return 0x003E87B5; // 蓝
+    case 1: return 0x002E8B57;  // green
+    case 2: return 0x006A5ACD;  // purple
+    case 3: return 0x00D2691E;  // orange
+    default: return 0x003E87B5; // blue
     }
 }
 
 void wallpaper_colors(int idx, uint32_t* top, uint32_t* bottom, uint32_t* base) {
     switch (idx) {
-    case 1: // 落日
+    case 1: // sunset
         *top = 0x00C0563C; *bottom = 0x00F5C86A; *base = 0x00FAEBD7;
         break;
-    case 2: // 深色
+    case 2: // dark
         *top = 0x00141A24; *bottom = 0x0030475E; *base = 0x00223035;
         break;
-    default: // 默认：蓝 → 奶油
+    default: // ：blue →
         *top = 0x00345C86; *bottom = 0x0088B7D8; *base = 0x00F2EFE8;
         break;
     }

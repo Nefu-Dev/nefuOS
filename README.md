@@ -1,11 +1,15 @@
 # nefuOS
 
+![nefuOS logo](docs/nefuos-logo.svg)
+
 A tiny hobby operating system written in C++/C with **two backends**:
 
 1. **Win32 host** — runs as a native Windows desktop app (`dist\nefuOS.exe`)
 2. **Bare-metal x86_64 kernel** — boots from an El Torito ISO in QEMU / VirtualBox / real hardware
 
 Everything is real: the GUI, the Unix-like VFS, the networking stack, and the apps.
+
+![architecture](docs/architecture.svg)
 
 ---
 

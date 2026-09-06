@@ -1,4 +1,4 @@
-// nefuOS 设置：主题色 / 壁纸 / 时钟 / 任务栏，改动立即生效并持久化
+// nefuOS settings：primary color / wallpaper / clock / taskbar，changes take effect and persist
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"

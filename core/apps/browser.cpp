@@ -221,8 +221,8 @@ void browser_search(BrowserState* st, const char* q) {
     if (ctx.hits == 0) {
         add_line(st->lines, "No results in the file system.", 0);
         add_line(st->lines, "", 0);
-        add_line(st->lines, "Try: file:///home/user/Documents/nefuos.txt", 2);
-        add_line(st->lines, "     http://10.0.2.2:8000/  (host web server)", 2);
+        add_line(st->lines, "Try: file:// /home/user/Documents/nefuos.txt", 2);
+        add_line(st->lines, "     http:// 10.0.2.2:8000/ (host web server)", 2);
     } else {
         char s[64];
         ksprintf(s, sizeof(s), "%d result(s). Click a line to open.", ctx.hits);
@@ -239,7 +239,7 @@ bool browser_save_page(BrowserState* st) {
     g_vfs->mkdir("/usr/downloads");
     // sanitize only the file-name part; keep the leading directory intact.
     // (older versions flattened the whole path and created stray nodes
-    //  like "_usr_downloads_page_..." in the cwd)
+    // like "_usr_downloads_page_..." in the cwd)
     String name = "page_";
     name += st->url;
     String clean;
@@ -278,6 +278,7 @@ void browser_load(BrowserState* st, const char* url) {
     st->url = url;
     st->status = 1;
     st->busy = true;
+
     if (strncmp(url, "file://", 7) == 0) {
         const char* path = url + 7;
         if (path[0] == 0) path = "/";
@@ -285,7 +286,33 @@ void browser_load(BrowserState* st, const char* url) {
         st->busy = false;
         return;
     }
-    if (strncmp(url, "http://", 7) == 0) {
+
+    if (strncmp(url, "http://", 7) == 0 || strncmp(url, "https://", 8) == 0) {
+        // host backend: real HTTP(S) via WinINet (DNS + TLS included).
+        // bare metal falls back to the in-house TCP stack (IP literals only).
+        uint8_t* body = 0;
+        uint32_t body_len = 0;
+        if (platform_http_get(url, &body, &body_len) && body && body_len > 0) {
+            st->lines.erase_all();
+            add_line(st->lines, "HTTP fetch: ", 0);
+            add_line(st->lines, url, 1);
+            char hdr[80];
+            ksprintf(hdr, sizeof(hdr), "%u bytes received", (unsigned)body_len);
+            add_line(st->lines, hdr, 0);
+            // render a rough text view of the body
+            char* txt = (char*)kalloc((size_t)body_len + 1);
+            if (txt) {
+                memcpy(txt, body, body_len);
+                txt[body_len] = 0;
+                html_to_lines(txt, (int)body_len, st->lines);
+                kfree(txt);
+            }
+            kfree(body);
+            st->status = 2;
+            st->busy = false;
+            st->scroll = 0;
+            return;
+        }
         const char* p = url + 7;
         char host[64];
         char path[256];
@@ -306,7 +333,7 @@ void browser_load(BrowserState* st, const char* url) {
         }
         uint32_t ip;
         if (!parse_ip(host, &ip)) {
-            // hostname not resolvable (no DNS) -> try search
+            // hostname not resolvable (no DNS on bare) -> local search
             browser_search(st, url);
             st->busy = false;
             return;
@@ -315,12 +342,14 @@ void browser_load(BrowserState* st, const char* url) {
         st->busy = false;
         return;
     }
+
     if (strncmp(url, "search:", 7) == 0) {
         browser_search(st, url + 7);
         st->busy = false;
         return;
     }
-    // plain word -> search; path-like -> file
+
+    // plain word -> Bing on host, VFS search on bare; path-like -> file
     if (url[0] == '/' || url[0] == '.') {
         load_file(st, url);
     } else {
@@ -450,9 +479,9 @@ void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
     if (l.style != 2) return;
     // link text: open if looks like path/url, else search
     const char* t = l.s.c_str();
-    if (strncmp(t, "file://", 7) == 0 || strncmp(t, "http://", 7) == 0 ||
+    if (strncmp(t, "file:// ", 7) == 0 || strncmp(t, "http://", 7) == 0 ||
         t[0] == '/' || strncmp(t, "Bing", 4) == 0 || strncmp(t, "Try:", 4) == 0) {
-        // strip trailing "  (folder)" / "  (N bytes)"
+        // strip trailing " (folder)" / " (N bytes)"
         String clean = l.s;
         int sp = clean.find("  (");
         if (sp >= 0) clean = clean.substr(0, sp);
@@ -484,7 +513,7 @@ void on_close(Window* w) {
 
 void browser_launch() {
     BrowserState* st = new BrowserState();
-    st->input = "file:///home/user/Documents/nefuos.txt";
+    st->input = "file:// /home/user/Documents/nefuos.txt";
     Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);
     w->userdata = st;
     w->on_paint = on_paint;

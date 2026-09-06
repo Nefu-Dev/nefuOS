@@ -1,7 +1,8 @@
-// nefuOS Win32 宿主后端
-// 编译：g++ ... backends/win32/win32.cpp -lgdi32 -luser32
+// nefuOS Win32
+// compile：g++ ... backends/win32/win32.cpp -lgdi32 -luser32
 #include <windows.h>
 #include <winsock2.h>
+#include <wininet.h>
 #include <iphlpapi.h>
 #include <wlanapi.h>
 #include <icmpapi.h>
@@ -25,7 +26,7 @@ static void* s_bits = 0;
 static uint32_t s_heap_used = 0;
 static uint8_t s_mouse_buttons = 0;
 
-// ---------------- 平台实现 ----------------
+// ---------------- platform implementation ----------------
 namespace nefu {
 
 // ---- GDI+ image decode (host): real jpg/png/gif/bmp decoding ----
@@ -157,7 +158,7 @@ void platform_poweroff() {
 
 void platform_mem_stats(uint32_t* used, uint32_t* total) {
     *used = s_heap_used;
-    *total = 64u * 1024u * 1024u; // 演示用堆上限
+    *total = 64u * 1024u * 1024u;
 }
 
 const char* platform_name() { return "win32"; }
@@ -246,9 +247,42 @@ bool platform_ping(uint32_t ip, int timeout_ms) {
     return r != 0 && buf.rep.Status == IP_SUCCESS;
 }
 
+// ---- real HTTP(S) GET (host): WinINet with DNS + TLS ----
+bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
+    if (!out || !out_size) return false;
+    *out = 0; *out_size = 0;
+    if (!url) return false;
+    HINTERNET h = InternetOpenA("nefuOS/0.2", INTERNET_OPEN_TYPE_PRECONFIG, 0, 0, 0);
+    if (!h) return false;
+    HINTERNET u = InternetOpenUrlA(h, url, 0, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+    if (!u) { InternetCloseHandle(h); return false; }
+    uint32_t cap = 65536, len = 0;
+    uint8_t* buf = (uint8_t*)malloc(cap);
+    if (!buf) { InternetCloseHandle(u); InternetCloseHandle(h); return false; }
+    char tmp[4096];
+    DWORD rd = 0;
+    for (;;) {
+        if (!InternetReadFile(u, tmp, sizeof(tmp), &rd) || rd == 0) break;
+        if (len + rd > cap) {
+            cap *= 2;
+            uint8_t* nb = (uint8_t*)realloc(buf, cap);
+            if (!nb) { free(buf); buf = 0; break; }
+            buf = nb;
+        }
+        memcpy(buf + len, tmp, rd);
+        len += rd;
+    }
+    InternetCloseHandle(u);
+    InternetCloseHandle(h);
+    if (!buf || len == 0) { if (buf) free(buf); return false; }
+    *out = buf;
+    *out_size = len;
+    return true;
+}
+
 } // namespace nefu
 
-// ---------------- 键码映射 ----------------
+// ---------------- ----------------
 static int translate_key(int vk) {
     switch (vk) {
     case VK_RETURN: return KEY_ENTER;
@@ -288,17 +322,17 @@ static int translate_key(int vk) {
 static char translate_ascii(int vk) {
     UINT ch = MapVirtualKeyA((UINT)vk, MAPVK_VK_TO_CHAR);
     char c = (ch & 0x80000000) ? 0 : (char)(ch & 0xFF);
-    // 无 Shift/Caps 时字母按键输出小写（MapVirtualKey 默认给大写）
+    // none Shift/Caps （MapVirtualKey ）
     if (c >= 'A' && c <= 'Z') {
         bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
         bool caps = (GetAsyncKeyState(VK_CAPITAL) & 0x0001) != 0;
-        if (shift != caps) return c;   // 大写
-        return (char)(c + 32);         // 小写
+        if (shift != caps) return c;
+        return (char)(c + 32);
     }
     return c;
 }
 
-// ---------------- 窗口过程 ----------------
+// ---------------- ----------------
 static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_TIMER: {
@@ -353,7 +387,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
 }
 
-// ---------------- 崩溃捕获（调试用） ----------------
+// ---------------- （） ----------------
 #include <windows.h>
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
     FILE* f = fopen("crash.txt", "a");
@@ -366,14 +400,14 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-// ---------------- 入口 ----------------
+// ---------------- entry ----------------
 int main() {
     SetUnhandledExceptionFilter(crash_handler);
     printf("nefuOS host backend (win32) starting...\n");
 
     HINSTANCE hInst = GetModuleHandleA(0);
 
-    // 创建 800x600 32bpp DIB 作为帧缓冲
+    // create 800x600 32bpp DIB
     BITMAPINFO bi;
     memset(&bi, 0, sizeof(bi));
     bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);

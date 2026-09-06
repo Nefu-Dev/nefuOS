@@ -1,4 +1,4 @@
-// klib 字符串实现
+// klib
 #include "klib.h"
 
 namespace nefu {

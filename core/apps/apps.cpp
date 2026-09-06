@@ -1,4 +1,4 @@
-// nefuOS 应用注册与公共工具
+// nefuOS app registration & common utils
 #include "apps.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -103,7 +103,7 @@ int nefud_name_to_app_id(const char* name) {
     return -1;
 }
 
-// ---------- 安装状态 ----------
+// ---------- install state ----------
 static bool s_installed[APP_COUNT];
 
 // store apps that ship pre-installed (like a real OS ships its apps)
@@ -137,7 +137,7 @@ int app_installed_list(int* ids, int max) {
     return n;
 }
 
-// ---------- 关于窗口 ----------
+// ---------- about window ----------
 static void about_paint(Window* w) {
     (void)w;
     Surface& s = w->back;
@@ -167,7 +167,7 @@ void app_show_about() {
     w->on_close = about_close;
 }
 
-// ---------- 未安装提示 ----------
+// ---------- not-installed notice ----------
 static void notinst_paint(Window* w) {
     Surface& s = w->back;
     s.fill(color::WHITE);
@@ -189,7 +189,7 @@ void app_show_not_installed(const char* name) {
     w->on_close = 0;
 }
 
-// ---------- 启动 ----------
+// ---------- boot ----------
 void app_launch(int id) {
     klogf("app_launch(%d) name=%s\n", id, app_name(id));
     switch (id) {
@@ -199,7 +199,7 @@ void app_launch(int id) {
     case APP_TEXTVIEW: {
         FSNode* f = g_vfs->resolve("/home/user/Documents/nefuos.txt");
         if (!f) {
-            // 确保示例文件存在，避免点了没反应
+            // ensure sample files exist，avoid dead clicks
             g_vfs->mkdir("/home/user/Documents");
             f = g_vfs->create_file("/home/user/Documents/nefuos.txt");
             if (f) {

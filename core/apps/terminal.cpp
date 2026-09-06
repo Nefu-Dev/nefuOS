@@ -1,4 +1,4 @@
-// nefuOS 终端应用
+// nefuOS terminal app
 #include "apps.h"
 #include "nefvm.h"
 #include "../gui/gfx.h"
@@ -133,7 +133,7 @@ static void term_cat(TermState* t, const char* path) {
     if (!buf) return;
     memcpy(buf, f->data, f->size);
     buf[f->size] = 0;
-    // 逐行输出
+    // line output
     char* line = buf;
     for (uint32_t i = 0; i < f->size; i++) {
         if (buf[i] == '\n') { buf[i] = 0; term_print(t, line); line = buf + i + 1; }
@@ -288,7 +288,7 @@ static void term_nefud_run(TermState* t, FSNode* f) {
 static void term_run(TermState* t, const char* cmd) {
     if (!cmd || !*cmd) return;
     hist_add(cmd);
-    // 拆分参数（就地修改输入缓冲）
+    // split args（modify input buffer in place）
     char* buf = t->input.data();
     const char* argv[8];
     int argc = 0;
@@ -357,7 +357,7 @@ static void term_run(TermState* t, const char* cmd) {
         }
     }
     else if (strcmp(a0, "echo") == 0) {
-        // 检查重定向
+        // check redirect
         int redir = -1;
         for (int i = 1; i < argc; i++) if (strcmp(argv[i], ">") == 0) { redir = i; break; }
         if (redir > 0 && redir + 1 < argc) {

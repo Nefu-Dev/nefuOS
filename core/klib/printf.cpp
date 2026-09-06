@@ -1,4 +1,4 @@
-// klib 格式化输出
+// klib formatted output
 #include "klib.h"
 #include "../platform.h"
 #include <stdarg.h>
@@ -18,7 +18,7 @@ static void pnum(char*& p, char* end, unsigned int v, int base, bool upper, bool
     char tmp[40];
     int n = 0;
     if (sign) {
-        // 用于 %d
+        // for %d
     }
     do {
         int d = v % base;
@@ -40,7 +40,7 @@ static void kvfmt(char* buf, size_t bufsz, const char* fmt, va_list ap) {
         if (*fmt == '-') { minus = true; fmt++; }
         int width = 0;
         while (*fmt >= '0' && *fmt <= '9') { width = width * 10 + (*fmt - '0'); fmt++; }
-        if (*fmt == 'l') fmt++; // 忽略 long 前缀
+        if (*fmt == 'l') fmt++; // ignore long prefix
         int pad = 0; char pc = ' ';
         if (minus) { /* 不做左对齐 */ (void)minus; }
         switch (*fmt) {

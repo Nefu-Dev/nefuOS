@@ -1,10 +1,10 @@
-// nefuOS 基础库：内存、字符串、列表、格式化
-// 同时支持宿主（Win32）与裸机（freestanding）编译
+// nefuOS base library：memory、string、list、format
+// supports both host（Win32）and bare（freestanding）compile
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
 
-// ===================== 全局 new/delete（走 kalloc/kfree，须在全局作用域） =====================
+// ===================== global new/delete（use kalloc/kfree，） =====================
 void* operator new(size_t sz);
 void* operator new[](size_t sz);
 void  operator delete(void* p) noexcept;
@@ -16,7 +16,7 @@ inline void  operator delete[](void* p, void* place) noexcept { (void)p; (void)p
 
 namespace nefu {
 
-// ===================== 内存（extern "C"，供编译器与库使用） =====================
+// ===================== memory（extern "C"，for compiler and library） =====================
 extern "C" {
 void*  memcpy(void* dst, const void* src, size_t n);
 void*  memmove(void* dst, const void* src, size_t n);
@@ -33,7 +33,7 @@ char*  strstr(const char* hay, const char* needle);
 int    atoi(const char* s);
 }
 
-// ===================== 内存（extern "C"，供编译器与库使用） =====================
+// ===================== memory（extern "C"，for compiler and library） =====================
 class String {
 public:
     String();
@@ -72,7 +72,7 @@ bool operator==(const String& a, const char* b);
 bool operator!=(const String& a, const String& b);
 bool operator!=(const String& a, const char* b);
 
-// ===================== 列表 =====================
+// ===================== list =====================
 template <typename T>
 class List {
 public:
@@ -129,8 +129,8 @@ private:
     int cap_;
 };
 
-// ===================== 格式化 =====================
+// ===================== format =====================
 int  ksprintf(char* buf, size_t bufsz, const char* fmt, ...);
-void klogf(const char* fmt, ...);   // 格式化后输出到调试通道
+void klogf(const char* fmt, ...);   // format then output to debug channel
 
 } // namespace nefu
