@@ -269,6 +269,12 @@ static void put_bytes(VFS* v, const char* path, const uint8_t* bytes, uint32_t n
 // left by an older browser_save_page (e.g. "_usr_downloads_page_foo_html").
 static bool is_stray_name(const String& name) {
     if (name.len() == 0) return true;
+    // illegal filenames: path separators and dot entries
+    if (name == "/" || name == "\\" || name == "." || name == "..") return true;
+    // any name containing a path separator is invalid as a single node
+    for (int i = 0; i < name.len(); i++) {
+        if (name[i] == '/' || name[i] == '\\') return true;
+    }
     // non-printable or high-bit bytes are never valid in our VFS names
     for (int i = 0; i < name.len(); i++) {
         unsigned char c = (unsigned char)name[i];

@@ -384,8 +384,9 @@ void on_paint(Window* w) {
     gfx::rect(s, 3, 3, w->content_w - 6 - 150, BAR_H - 6, color::BORDER);
     String disp = st->input.empty() ? st->url : st->input;
     draw_text_clip(s, 8, 7, disp.c_str(), color::TEXT, color::PANEL, w->content_w - 170);
-    int tw = gfx::text_width(disp.c_str());
-    gfx::char8x16(s, 8 + tw, 7, '|', color::TEXT2, color::PANEL);
+    int cur_x = 8 + st->cursor * 8;
+    if (cur_x > w->content_w - 170) cur_x = w->content_w - 170;
+    gfx::char8x16(s, cur_x, 7, '|', color::TEXT2, color::PANEL);
     // buttons: Go / Search / Save
     const char* labs[3] = { "Go", "S", "DL" };
     for (int i = 0; i < 3; i++) {
@@ -445,15 +446,47 @@ void on_key(Window* w, const KeyEvent* e) {
     // Note: no busy guard here -- browser_load() snapshots st->url into its own
     // copy, so typing while a page is loading is safe and never gets swallowed.
     if (e->ascii >= 32 && e->ascii < 127) {
-        if (st->input.len() < 120) st->input += e->ascii;
+        if (st->input.len() < 120) {
+            String ns = st->input.substr(0, st->cursor);
+            ns += (char)e->ascii;
+            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
+            st->input = ns;
+            st->cursor++;
+        }
     } else if (e->keycode == KEY_SPACE) {
-        if (st->input.len() < 120) st->input += ' ';
+        if (st->input.len() < 120) {
+            String ns = st->input.substr(0, st->cursor);
+            ns += ' ';
+            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
+            st->input = ns;
+            st->cursor++;
+        }
     } else if (e->keycode == KEY_BACKSPACE) {
-        if (st->input.len() > 0) st->input = st->input.substr(0, st->input.len() - 1);
+        if (st->cursor > 0) {
+            String ns = st->input.substr(0, st->cursor - 1);
+            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
+            st->input = ns;
+            st->cursor--;
+        }
+    } else if (e->keycode == KEY_DEL) {
+        if (st->cursor < st->input.len()) {
+            String ns = st->input.substr(0, st->cursor);
+            ns += st->input.substr(st->cursor + 1, st->input.len() - st->cursor - 1);
+            st->input = ns;
+        }
+    } else if (e->keycode == KEY_LEFT) {
+        if (st->cursor > 0) st->cursor--;
+    } else if (e->keycode == KEY_RIGHT) {
+        if (st->cursor < st->input.len()) st->cursor++;
+    } else if (e->keycode == KEY_HOME) {
+        st->cursor = 0;
+    } else if (e->keycode == KEY_END) {
+        st->cursor = st->input.len();
     } else if (e->keycode == KEY_ENTER) {
         if (!st->input.empty()) browser_load(st, st->input.c_str());
     } else if (e->keycode == KEY_ESC) {
         st->input.clear();
+        st->cursor = 0;
     }
 }
 
@@ -477,6 +510,15 @@ void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
         }
     }
     st->cur = 0;
+
+    // address bar click: place the text cursor at the clicked column
+    if (pressed && my >= 3 && my < BAR_H - 3 && mx >= 3 && mx < w->content_w - 150) {
+        int pos = (mx - 8) / 8;
+        if (pos < 0) pos = 0;
+        if (pos > st->input.len()) pos = st->input.len();
+        st->cursor = pos;
+    }
+
     if (!pressed) return;
     if (my < BAR_H || my >= w->content_h - STAT_H) return;
     // click a link line
@@ -522,6 +564,7 @@ void on_close(Window* w) {
 void browser_launch() {
     BrowserState* st = new BrowserState();
     st->input = "file:///home/user/Documents/nefuos.txt";
+    st->cursor = st->input.len();
     Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);
     w->userdata = st;
     w->on_paint = on_paint;
