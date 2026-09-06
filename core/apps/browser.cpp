@@ -274,13 +274,20 @@ bool browser_save_page(BrowserState* st) {
     return ok;
 }
 
+// trim leading whitespace from a URL/path (users often type "file:// /path")
+static const char* ltrim_ws(const char* s) {
+    while (*s == ' ' || *s == '\t') s++;
+    return s;
+}
+
 void browser_load(BrowserState* st, const char* url) {
+    url = ltrim_ws(url);
     st->url = url;
     st->status = 1;
     st->busy = true;
 
     if (strncmp(url, "file://", 7) == 0) {
-        const char* path = url + 7;
+        const char* path = ltrim_ws(url + 7);
         if (path[0] == 0) path = "/";
         load_file(st, path);
         st->busy = false;
@@ -313,7 +320,8 @@ void browser_load(BrowserState* st, const char* url) {
             st->scroll = 0;
             return;
         }
-        const char* p = url + 7;
+        int off = (strncmp(url, "http://", 7) == 0) ? 7 : 8;
+        const char* p = ltrim_ws(url + off);
         char host[64];
         char path[256];
         int hi = 0;
@@ -513,7 +521,7 @@ void on_close(Window* w) {
 
 void browser_launch() {
     BrowserState* st = new BrowserState();
-    st->input = "file:// /home/user/Documents/nefuos.txt";
+    st->input = "file:///home/user/Documents/nefuos.txt";
     Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);
     w->userdata = st;
     w->on_paint = on_paint;
@@ -521,6 +529,7 @@ void browser_launch() {
     w->on_mouse = on_mouse;
     w->on_scroll = on_scroll;
     w->on_close = on_close;
+    g_wm->raise(w);   // auto-focus so the address bar accepts input immediately
     browser_load(st, st->input.c_str());
 }
 

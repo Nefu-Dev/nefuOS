@@ -265,19 +265,41 @@ static void put_bytes(VFS* v, const char* path, const uint8_t* bytes, uint32_t n
 // Remove legacy nodes created by an older browser_save_page that flattened
 // the full path into one name (e.g. "_usr_downloads_page_search_file.html").
 // They were created in the cwd, so scan every directory one level deep.
-void VFS::cleanup_stray_nodes() {
-    for (int i = root_.children.size() - 1; i >= 0; i--) {
-        FSNode* c = root_.children[i];
-        if (strncmp(c->name.c_str(), "_usr_downloads_page_", 20) == 0) {
-            remove_node(c);
-        } else if (c->is_dir) {
-            for (int j = c->children.size() - 1; j >= 0; j--) {
-                FSNode* g = c->children[j];
-                if (strncmp(g->name.c_str(), "_usr_downloads_page_", 20) == 0)
-                    remove_node(g);
-            }
+// Returns true when a node name looks like a legacy flattened-path artifact
+// left by an older browser_save_page (e.g. "_usr_downloads_page_foo_html").
+static bool is_stray_name(const String& name) {
+    if (name.len() == 0) return true;
+    // non-printable or high-bit bytes are never valid in our VFS names
+    for (int i = 0; i < name.len(); i++) {
+        unsigned char c = (unsigned char)name[i];
+        if (c < 32 || c > 126) return true;
+    }
+    // flattened-path patterns: starts with "_<dir>_" and is long
+    static const char* prefixes[] = {
+        "_usr_", "_home_", "_etc_", "_tmp_", "_bin_", "_var_", "_root_", "_mnt_", 0
+    };
+    for (int i = 0; prefixes[i]; i++) {
+        int pl = (int)strlen(prefixes[i]);
+        if (name.len() > pl + 8 && strncmp(name.c_str(), prefixes[i], pl) == 0) return true;
+    }
+    return false;
+}
+
+// Recursively remove legacy broken nodes from the whole tree.
+static void cleanup_recursive(VFS* vfs, FSNode* n) {
+    if (!n || !n->is_dir) return;
+    for (int i = n->children.size() - 1; i >= 0; i--) {
+        FSNode* c = n->children[i];
+        if (is_stray_name(c->name)) {
+            vfs->remove_node(c);
+        } else {
+            cleanup_recursive(vfs, c);
         }
     }
+}
+
+void VFS::cleanup_stray_nodes() {
+    cleanup_recursive(this, &root_);
 }
 
 // Make sure the standard Unix-like hierarchy exists. Idempotent: existing
