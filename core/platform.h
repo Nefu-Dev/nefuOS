@@ -37,7 +37,7 @@ uint32_t nefuos_uptime_ms();        // ms since nefuOS started (bare: uptime)
 void platform_dbg(const char* s);
 
 // ===================== core callbacks (called by backends) =====================
-void nefuos_handle_key(int keycode, char ascii, bool down);
+void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8 = 0);
 void nefuos_handle_mouse(int x, int y, uint8_t buttons);
 void nefuos_handle_scroll(int delta);
 void nefuos_tick();     // periodic heartbeat (clock/animation)

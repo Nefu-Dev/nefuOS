@@ -207,6 +207,27 @@ static void walk_search(FSNode* n, WalkCtx* c) {
 }
 
 void browser_search(BrowserState* st, const char* q) {
+    // try real Bing first (host backend via WinINet); bare metal falls back to VFS scan
+    char surl[512];
+    ksprintf(surl, sizeof(surl), "https://www.bing.com/search?q=%s", q ? q : "");
+    for (char* p = surl; *p; p++) if (*p == ' ') *p = '+';
+    uint8_t* body = 0; uint32_t body_len = 0;
+    if (platform_http_get(surl, &body, &body_len) && body && body_len > 0) {
+        st->lines.erase_all();
+        add_line(st->lines, "Bing search: ", 0);
+        char head[96]; ksprintf(head, sizeof(head), "'%s'", q ? q : "");
+        add_line(st->lines, head, 1);
+        add_line(st->lines, "", 0);
+        char* txt = (char*)kalloc((size_t)body_len + 1);
+        if (txt) {
+            memcpy(txt, body, body_len); txt[body_len] = 0;
+            html_to_lines(txt, (int)body_len, st->lines);
+            kfree(txt);
+        }
+        kfree(body);
+        st->scroll = 0; st->status = 2; st->url = "search:";
+        return;
+    }
     st->lines.erase_all();
     add_line(st->lines, "Bing search: ", 0);
     char head[96];
@@ -443,6 +464,19 @@ void on_paint(Window* w) {
 
 void on_key(Window* w, const KeyEvent* e) {
     BrowserState* st = (BrowserState*)w->userdata;
+    // UTF-8 IME input (CJK, etc.) -- insert multi-byte sequence at cursor
+    if (e->utf8[0]) {
+        int n = 0;
+        while (n < 7 && e->utf8[n]) n++;
+        if (st->input.len() + n <= 120) {
+            String ns = st->input.substr(0, st->cursor);
+            for (int i = 0; i < n; i++) ns += e->utf8[i];
+            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
+            st->input = ns;
+            st->cursor += n;
+        }
+        return;
+    }
     // Note: no busy guard here -- browser_load() snapshots st->url into its own
     // copy, so typing while a page is loading is safe and never gets swallowed.
     if (e->ascii >= 32 && e->ascii < 127) {

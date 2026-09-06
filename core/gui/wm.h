@@ -10,6 +10,7 @@ struct KeyEvent {
     int keycode;
     char ascii;
     bool down;
+    char utf8[8];   // multi-byte UTF-8 for IME input (CJK etc.), empty for raw keys
 };
 
 struct Window {

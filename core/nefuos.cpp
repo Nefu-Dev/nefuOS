@@ -124,7 +124,7 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
     }
 }
 
-void nefuos_handle_key(int keycode, char ascii, bool down) {
+void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     if (!s_inited || !s_booted) return;
     if (!down) return;
     if (desktop_handle_key(keycode, ascii)) return;
@@ -132,6 +132,7 @@ void nefuos_handle_key(int keycode, char ascii, bool down) {
     e.keycode = keycode;
     e.ascii = ascii;
     e.down = true;
+    for (int i = 0; i < 8; i++) e.utf8[i] = (utf8 && utf8[i]) ? utf8[i] : 0;
     g_wm->handle_key(&e);
 }
 

@@ -344,7 +344,24 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         int kc = translate_key((int)wp);
         char ac = translate_ascii((int)wp);
         if (kc == KEY_SPACE) ac = ' ';
-        nefuos_handle_key(kc, ac, true);
+        nefuos_handle_key(kc, ac, true, 0);
+        return 0;
+    }
+    case WM_CHAR: {
+        // IME / Unicode input: convert UTF-16 wchar to UTF-8
+        wchar_t wc = (wchar_t)wp;
+        if (wc > 127) {
+            char buf[8] = {0};
+            if (wc < 0x800) {
+                buf[0] = (char)(0xC0 | (wc >> 6));
+                buf[1] = (char)(0x80 | (wc & 0x3F));
+            } else {
+                buf[0] = (char)(0xE0 | (wc >> 12));
+                buf[1] = (char)(0x80 | ((wc >> 6) & 0x3F));
+                buf[2] = (char)(0x80 | (wc & 0x3F));
+            }
+            nefuos_handle_key(KEY_NONE, 0, true, buf);
+        }
         return 0;
     }
     case WM_KEYUP: {
