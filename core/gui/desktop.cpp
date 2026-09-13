@@ -10,29 +10,30 @@ static const int TASKBAR_H = 30;
 static const int ICON_W = 96, ICON_H = 92;
 static const int TILE = 52;
 
+// NOTE: aggregate-only (no ctor).  The bare kernel never runs C++ static
+// constructors (.init_array), so any object with a ctor would live in .bss
+// and stay all-zero -> icons would all collapse onto (0,0).
 struct DesktopIcon {
     int x, y;
     const char* label;
     int app;
     bool deleted;          // shortcut removed (app still installed)
-    DesktopIcon(int px, int py, const char* pl, int pa)
-        : x(px), y(py), label(pl), app(pa), deleted(false) {}
 };
 
 static DesktopIcon s_icons[] = {
-    DesktopIcon(14, 14, "文件管理器", APP_FILEMGR),
-    DesktopIcon(14 + ICON_W + 8, 14, "终端", APP_TERMINAL),
-    DesktopIcon(14 + 2 * (ICON_W + 8), 14, "计算器", APP_CALC),
-    DesktopIcon(14, 14 + ICON_H + 10, "文本查看器", APP_TEXTVIEW),
-    DesktopIcon(14 + ICON_W + 8, 14 + ICON_H + 10, "系统信息", APP_SYSINFO),
-    DesktopIcon(14, 14 + 2 * (ICON_H + 10), "设置", APP_SETTINGS),
-    DesktopIcon(14 + ICON_W + 8, 14 + 2 * (ICON_H + 10), "软件商店", APP_STORE),
-    DesktopIcon(14 + 2 * (ICON_W + 8), 14 + 2 * (ICON_H + 10), "图片查看器", APP_IMAGEVIEWER),
-    DesktopIcon(14, 14 + 3 * (ICON_H + 10), "音乐播放器", APP_MUSIC),
-    DesktopIcon(14 + ICON_W + 8, 14 + 3 * (ICON_H + 10), "系统监视器", APP_MONITOR),
-    DesktopIcon(14 + 2 * (ICON_W + 8), 14 + 3 * (ICON_H + 10), "浏览器", APP_BROWSER),
-    DesktopIcon(14, 14 + 4 * (ICON_H + 10), "网络", APP_NETCFG),
-    DesktopIcon(14 + ICON_W + 8, 14 + 4 * (ICON_H + 10), "应用启动器", APP_NEFUD),
+    {14, 14, "文件管理器", APP_FILEMGR, false},
+    {14 + ICON_W + 8, 14, "终端", APP_TERMINAL, false},
+    {14 + 2 * (ICON_W + 8), 14, "计算器", APP_CALC, false},
+    {14, 14 + ICON_H + 10, "文本查看器", APP_TEXTVIEW, false},
+    {14 + ICON_W + 8, 14 + ICON_H + 10, "数据库维基", APP_WIKI, false},
+    {14, 14 + 2 * (ICON_H + 10), "设置", APP_SETTINGS, false},
+    {14 + ICON_W + 8, 14 + 2 * (ICON_H + 10), "软件商店", APP_STORE, false},
+    {14 + 2 * (ICON_W + 8), 14 + 2 * (ICON_H + 10), "图片查看器", APP_IMAGEVIEWER, false},
+    {14, 14 + 3 * (ICON_H + 10), "音乐播放器", APP_MUSIC, false},
+    {14 + ICON_W + 8, 14 + 3 * (ICON_H + 10), "系统监视器", APP_MONITOR, false},
+    {14 + 2 * (ICON_W + 8), 14 + 3 * (ICON_H + 10), "浏览器", APP_BROWSER, false},
+    {14, 14 + 4 * (ICON_H + 10), "网络", APP_NETCFG, false},
+    {14 + ICON_W + 8, 14 + 4 * (ICON_H + 10), "应用启动器", APP_NEFUD, false},
 };
 static const int s_icon_count = (int)(sizeof(s_icons) / sizeof(s_icons[0]));
 
@@ -43,6 +44,7 @@ static const char* icon_label(int app) {
     case APP_TERMINAL:   return T("终端", "Terminal");
     case APP_CALC:       return T("计算器", "Calculator");
     case APP_TEXTVIEW:   return T("文本查看器", "Text View");
+    case APP_WIKI:       return T("数据库维基", "Wiki");
     case APP_SYSINFO:    return T("系统信息", "System Info");
     case APP_SETTINGS:   return T("设置", "Settings");
     case APP_STORE:      return T("软件商店", "Store");

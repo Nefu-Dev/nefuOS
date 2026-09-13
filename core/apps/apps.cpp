@@ -62,6 +62,7 @@ const char* app_name(int id) {
     case APP_TEXTVIEW: return T("文本查看器", "Text Viewer");
     case APP_SYSINFO: return T("系统信息", "System Info");
     case APP_ABOUT: return T("关于 nefuOS", "About nefuOS");
+    case APP_WIKI: return T("数据库维基", "Wiki");
     case APP_SETTINGS: return T("设置", "Settings");
     case APP_STORE: return T("软件商店", "Software Store");
     case APP_SNAKE: return T("贪吃蛇", "Snake");
@@ -99,6 +100,7 @@ int nefud_name_to_app_id(const char* name) {
     if (strcmp(name, "Network") == 0) return APP_NETCFG;
     if (strcmp(name, "System Info") == 0) return APP_SYSINFO;
     if (strcmp(name, "About nefuOS") == 0) return APP_ABOUT;
+    if (strcmp(name, "Wiki") == 0) return APP_WIKI;
     if (strcmp(name, "App Launcher") == 0) return APP_NEFUD;
     return -1;
 }
@@ -224,6 +226,7 @@ void app_launch(int id) {
     }
     case APP_SYSINFO: sysinfo_launch(); break;
     case APP_ABOUT: app_show_about(); break;
+    case APP_WIKI: wiki_launch(); break;
     case APP_SETTINGS: settings_launch(); break;
     case APP_STORE: store_launch(); break;
     case APP_SNAKE:

@@ -12,6 +12,7 @@ enum AppId {
     APP_TEXTVIEW,
     APP_SYSINFO,
     APP_ABOUT,
+    APP_WIKI,
     // system-level
     APP_SETTINGS,
     APP_STORE,
@@ -70,6 +71,7 @@ void monitor_launch();
 void browser_launch();
 void netcfg_launch();
 void nefud_launch();
+void wiki_launch();
 
 // tool：cascade window position
 void cascade_pos(int* x, int* y);

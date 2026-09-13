@@ -5,29 +5,36 @@
 #include "../platform.h"
 #include "../net/net.h"
 #include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (hash only, no plaintext)
+#include "../sys/sha256.h"
 
 namespace nefu {
 
-// FNV-1a 64 (matches tools/admin_hash.py); used by `su` to verify admin.
-static uint64_t fnv1a64(const char* s) {
-    uint64_t h = 14695981039346656037ULL;
-    while (*s) {
-        h ^= (uint8_t)*s++;
-        h *= 1099511628211ULL;
-    }
-    return h;
+// ---- admin auth: salted SHA-256 (matches tools/admin_hash.py) ----
+// Only a hash is ever stored/compared; the plaintext password never appears
+// in source, README, ISO or logs.  `su` and the Wiki editor both use this.
+static const char* ADMIN_SALT = "nefuos-admin-salt-v1";
+static bool s_admin = false;      // set by admin_login() (hash verified)
+
+bool admin_is_admin() { return s_admin; }
+
+bool admin_login(const char* pw) {
+    if (!pw) return false;
+    char buf[192];
+    int n = (int)strlen(ADMIN_SALT);
+    if (n > 160) n = 160;
+    memcpy(buf, ADMIN_SALT, (size_t)n);
+    int p = (int)strlen(pw);
+    if (n + p > 191) p = 191 - n;
+    memcpy(buf + n, pw, (size_t)p);
+    uint8_t dig[32];
+    nefu_sha256(buf, (uint32_t)(n + p), dig);
+    char hex[65];
+    nefu_sha256_hex(dig, hex);
+    if (strcmp(hex, NEFU_ADMIN_HASH) == 0) { s_admin = true; return true; }
+    return false;
 }
 
-static void hex64(uint64_t v, char* out) {
-    for (int i = 15; i >= 0; i--) {
-        int d = (int)(v & 0xF);
-        out[i] = (char)(d < 10 ? '0' + d : 'a' + d - 10);
-        v >>= 4;
-    }
-    out[16] = 0;
-}
-
-static bool s_admin = false;      // set by `su` (password hash verified)
+void admin_logout() { s_admin = false; }
 
 struct TermState {
     List<String> lines;
@@ -737,15 +744,10 @@ static void term_run(TermState* t, const char* cmd) {
         if (argc == 3) pw = argv[2];
         else if (argc == 2) pw = argv[1];
         if (!pw) { term_print(t, "usage: su <password>   (admin: lbinm)"); }
-        else {
-            char hex[17];
-            hex64(fnv1a64(pw), hex);
-            if (strcmp(hex, NEFU_ADMIN_HASH) == 0) {
-                s_admin = true;
-                term_print(t, "password verified - admin shell (lbinm)");
-            } else {
-                term_print(t, "su: authentication failure");
-            }
+        else if (admin_login(pw)) {
+            term_print(t, "password verified - admin shell (lbinm)");
+        } else {
+            term_print(t, "su: authentication failure");
         }
     }
     else if (strcmp(a0, "selftest") == 0) {

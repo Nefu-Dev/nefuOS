@@ -43,6 +43,14 @@ static bool parse_int(const char* key, const char* line, int* out) {
 }
 
 void settings_load() {
+    // The bare kernel never runs C++ static ctors, so g_settings starts
+    // all-zero in .bss. Re-apply the defaults before reading the config so
+    // booleans (show_clock / show_taskbar) are true instead of false.
+    g_settings.accent = 0;
+    g_settings.wallpaper = 0;
+    g_settings.show_clock = true;
+    g_settings.show_taskbar = true;
+    g_settings.lang = 0;
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f || f->is_dir || f->size == 0) return;
     char* buf = (char*)kalloc((size_t)f->size + 1);

@@ -27,7 +27,8 @@ $coreSrc = @(
   "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\monitor.cpp",
   "core\apps\browser.cpp", "core\apps\netcfg.cpp",
   "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\net\net.cpp",
-  "core\sys\settings.cpp",
+  "core\sys\settings.cpp", "core\sys\sha256.cpp",
+  "core\apps\wiki.cpp",
   "third_party\stb_image_wrap.cpp"
 )
 
