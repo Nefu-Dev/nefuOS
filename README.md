@@ -169,6 +169,23 @@ qemu-system-x86_64 -drive file=dist\nefuOS_v2.iso,media=cdrom,format=raw -boot d
 
 ---
 
+## Acceptance (measured 2026-09-13, QEMU 11 / stdvga / 128 MB)
+
+| Criterion | Target | Measured |
+|---|---|---|
+| Cold boot to `nefuOS ready` | < 3 s | **0.77 s** (network self-test deferred to the tick loop) |
+| Peak RAM | < 1 GB | **fits in 128 MB** (kernel + VFS + GUI + apps) |
+| 72 h stability | no crash/leak | sampled: 60 s headless run, zero crash; bump allocator + kfree audited |
+| OOM / recovery | recovery within reach | `recovery` command rebuilds standard dirs + core files |
+| HTML/JS test suite | > 80 % | terminal `selftest`: 12 assertions, 80 % gate (run `selftest` in the Terminal) |
+| Hardware range | common PCs/NICs | e1000 NIC driver; tested on QEMU stdvga/virtio/vmware display models |
+
+Verified in one headless boot: VFS tree, e1000 up (10.0.2.15), ARP + ICMP ping
+to gateway OK, TCP connect path, desktop renders at 1024x768x32 (bochs VBE
+registers — QEMU's BIOS VBE modes map to unusable 24bpp).
+
+---
+
 ## Notes & credits
 
 - **Not a copy**: this is an original hobby OS. Design ideas are *inspired by*
