@@ -14,6 +14,7 @@ namespace nefu {
 static bool s_inited = false;
 static bool s_booted = false;
 static uint32_t s_boot_start = 0;
+static bool s_net_selftest_done = false;
 static int s_mx = -8, s_my = -8;
 
 // （8x13，MSB=left）
@@ -61,31 +62,6 @@ void nefuos_init() {
     if (platform_name()[0] == 'b') {
         if (net_init()) {
             klogf("net: e1000 up, ip=10.0.2.15\n");
-            // link self-test: ARP resolve + ICMP echo to gateway
-            uint32_t t0 = platform_tick_ms();
-            bool pong = net_ping(g_net.gw, 2000);
-            klogf("net: ping gateway %s (%u ms)\n", pong ? "OK" : "FAIL",
-                  (unsigned)(platform_tick_ms() - t0));
-            klogf("net: rx=%u tx=%u arp=%u icmp=%u tcp=%u\n",
-                  g_net.rx_count, g_net.tx_count, g_net.arp_reqs, g_net.icmp_reqs, g_net.tcp_conns);
-            // TCP HTTP self-test: fetch "/" from the host web server (10.0.2.2:8000)
-            {
-                int sock = tcp_connect(g_net.gw, 8000, 3000);
-                if (sock >= 0) {
-                    tcp_send(sock, "GET / HTTP/1.0\r\n\r\n", 18);
-                    char tbuf[512];
-                    int got = tcp_recv(sock, tbuf, sizeof(tbuf) - 1, 3000);
-                    if (got > 0) {
-                        tbuf[got] = 0;
-                        if (got > 60) tbuf[60] = 0;
-                        klogf("net: http %d bytes: %s\n", got, tbuf);
-                    }
-                    else klogf("net: http recv empty\n");
-                    tcp_close(sock);
-                } else {
-                    klogf("net: tcp connect FAIL (no listener on 10.0.2.2:8000)\n");
-                }
-            }
         } else {
             klogf("net: no e1000 found\n");
         }
@@ -140,8 +116,38 @@ void nefuos_handle_scroll(int delta) {
 }
 
 void nefuos_tick() {
-    if (g_net.up) net_poll();   // drain NIC
-    // ：animation/
+    if (g_net.up) {
+        net_poll();   // drain NIC
+        // deferred link self-test: run once a few seconds after boot so the
+        // cold-start path stays fast (ping/tcp waits must not block init)
+        if (!s_net_selftest_done && s_booted &&
+            platform_tick_ms() - s_boot_start > 3000) {
+            s_net_selftest_done = true;
+            uint32_t t0 = platform_tick_ms();
+            bool pong = net_ping(g_net.gw, 2000);
+            klogf("net: ping gateway %s (%u ms)\n", pong ? "OK" : "FAIL",
+                  (unsigned)(platform_tick_ms() - t0));
+            klogf("net: rx=%u tx=%u arp=%u icmp=%u tcp=%u\n",
+                  g_net.rx_count, g_net.tx_count, g_net.arp_reqs, g_net.icmp_reqs, g_net.tcp_conns);
+            int sock = tcp_connect(g_net.gw, 8000, 3000);
+            if (sock >= 0) {
+                tcp_send(sock, "GET / HTTP/1.0\r\n\r\n", 18);
+                char tbuf[512];
+                int got = tcp_recv(sock, tbuf, sizeof(tbuf) - 1, 3000);
+                if (got > 0) {
+                    tbuf[got] = 0;
+                    if (got > 60) tbuf[60] = 0;
+                    klogf("net: http %d bytes: %s\n", got, tbuf);
+                } else {
+                    klogf("net: http recv empty\n");
+                }
+                tcp_close(sock);
+            } else {
+                klogf("net: tcp connect FAIL (no listener on 10.0.2.2:8000)\n");
+            }
+        }
+    }
+    // animation /
 }
 
 void nefuos_frame() {
