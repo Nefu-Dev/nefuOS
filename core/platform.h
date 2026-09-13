@@ -108,6 +108,18 @@ bool platform_play_wav(const char* path);
 bool platform_play_wav_mem(const uint8_t* data, uint32_t size);
 void platform_stop_sound();
 
+// ===================== disk / block devices =====================
+// Real block-device enumeration. bare: ATA IDENTIFY probe on the legacy
+// primary/secondary controllers. host: Windows logical drives (model is
+// the drive letter / label). Returns the number of entries written.
+struct DiskInfo {
+    char     name[16];    // kernel name, e.g. "sda" / "C:"
+    char     model[44];   // model string or label
+    uint64_t sectors;     // total 512-byte sectors (0 = unknown)
+    bool     removable;   // removable media?
+};
+int platform_disk_scan(DiskInfo* list, int max);
+
 // ===================== keycodes =====================
 enum {
     KEY_NONE = 0,

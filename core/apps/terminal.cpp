@@ -98,8 +98,9 @@ static void term_help(TermState* t) {
     term_print(t, "  tree [path]       - show file tree");
     term_print(t, "  find [path]       - recursive listing");
     term_print(t, "  run <file.nefud>  - launch a .nefud app");
-    term_print(t, "  whoami            - current user");
-    term_print(t, "  uname             - system info");
+    term_print(t, "  whoami            - current user (root/guest)");
+    term_print(t, "  uname [-a]        - system info");
+    term_print(t, "  lsblk / disks     - list block devices");
     term_print(t, "  date              - uptime date");
     term_print(t, "  uptime            - time since boot");
     term_print(t, "  free              - memory status");
@@ -403,8 +404,38 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, text.c_str());
         }
     }
-    else if (strcmp(a0, "whoami") == 0) term_print(t, "nefu");
-    else if (strcmp(a0, "uname") == 0) term_print(t, "nefuOS 0.2.0 x86_64");
+    else if (strcmp(a0, "whoami") == 0) {
+        term_print(t, admin_is_admin() ? "root" : "guest");
+    }
+    else if (strcmp(a0, "uname") == 0) {
+        if (argc > 1 && argv[1][0] == '-' && strchr(argv[1], 'a'))
+            term_print(t, "nefuOS 0.2.0 x86_64 nefuos 5.0.0-nefu SMP");
+        else
+            term_print(t, "nefuOS 0.2.0 x86_64");
+    }
+    else if (strcmp(a0, "lsblk") == 0 || strcmp(a0, "disks") == 0) {
+        DiskInfo di[8];
+        int dn = platform_disk_scan(di, 8);
+        if (dn == 0) { term_print(t, "no block devices found"); }
+        else {
+            term_print(t, "NAME  SIZE      REMOV  MODEL");
+            for (int i = 0; i < dn; i++) {
+                char buf[96];
+                if (di[i].sectors > 0)
+                    ksprintf(buf, sizeof(buf), "%s  %5u MB  %s    %s",
+                             di[i].name,
+                             (unsigned)(di[i].sectors / 2048),
+                             di[i].removable ? "yes" : "no ",
+                             di[i].model);
+                else
+                    ksprintf(buf, sizeof(buf), "%s  ?        %s    %s",
+                             di[i].name,
+                             di[i].removable ? "yes" : "no ",
+                             di[i].model);
+                term_print(t, buf);
+            }
+        }
+    }
     else if (strcmp(a0, "date") == 0) {
         char buf[64];
         uint32_t s = nefuos_uptime_ms() / 1000;

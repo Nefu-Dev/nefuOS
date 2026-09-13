@@ -41,6 +41,7 @@ public:
 
     void create_default_tree();
     void ensure_standard_dirs();                          // idempotent dir fix-up
+    void ensure_default_files();                          // idempotent file fix-up (never clobbers)
     void cleanup_stray_nodes();                           // remove legacy broken nodes
     bool save(uint8_t** out, uint32_t* out_size);         // kfree
     bool load(const uint8_t* data, uint32_t size);

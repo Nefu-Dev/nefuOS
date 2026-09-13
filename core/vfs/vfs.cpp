@@ -332,6 +332,42 @@ void VFS::ensure_standard_dirs() {
     for (unsigned i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) mkdir(dirs[i]);
 }
 
+// Default user/system files, created only when missing so a persisted
+// snapshot is never clobbered. Idempotent - run after ensure_standard_dirs
+// so a snapshot loaded from storage still shows the standard contents.
+void VFS::ensure_default_files() {
+    struct { const char* path; const char* text; } files[] = {
+        { "/etc/passwd",
+          "root:x:0:0:root:/root:/bin/sh\n"
+          "guest:x:1000:1000:guest:/home/user:/bin/sh\n" },
+        { "/etc/group",
+          "root:x:0:\nusers:x:100:\nguest:x:1000:\n" },
+        { "/etc/hostname", "nefuos\n" },
+        { "/etc/os-release",
+          "NAME=nefuOS\nVERSION=0.2.0\nID=nefuos\nPRETTY_NAME=nefuOS 0.2.0\n" },
+        { "/etc/nefu.conf",
+          "# nefuOS configuration\nhostname=nefuos\nuser=guest\nversion=0.2.0\n" },
+        { "/var/log/boot.log",
+          "nefuOS boot log\n[ok] vfs mounted\n[ok] settings loaded\n"
+          "[ok] disk scan done\n[ok] network up\n" },
+        { "/var/log/syslog",
+          "Sep 6 00:00:00 nefuos kernel: nefuOS 0.2.0 booting\n" },
+        { "/var/log/honeypot.log",
+          "# passive honeypot: records decoy-service connection attempts\n"
+          "# (no decoy ports open by default)\n" },
+        { "/home/user/Documents/hello.txt",
+          "Hello from nefuOS!\nWelcome to your virtual file system.\n" },
+        { "/home/user/Documents/todo.txt",
+          "TODO\n 1. explore the file tree\n 2. try the terminal\n 3. install apps\n" },
+        { "/usr/share/banner.txt", "nefuOS 0.2 - a tiny operating system\n" },
+        { "/README.txt",
+          "nefuOS v0.2 - dual-backend hobby OS (host exe + bootable ISO)\n" },
+    };
+    for (unsigned i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
+        if (!resolve(files[i].path)) put_text(this, files[i].path, files[i].text);
+    }
+}
+
 void VFS::create_default_tree() {
     mkdir("/bin");
     mkdir("/boot");

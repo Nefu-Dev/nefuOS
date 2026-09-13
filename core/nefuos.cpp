@@ -48,6 +48,7 @@ void nefuos_init() {
     }
     // even after loading an old snapshot the standard hierarchy must exist
     g_vfs->ensure_standard_dirs();
+    g_vfs->ensure_default_files();
     // remove stray nodes left by an older browser_save_page that flattened
     // the whole path into a single name (e.g. "_usr_downloads_page_...")
     g_vfs->cleanup_stray_nodes();
@@ -67,6 +68,17 @@ void nefuos_init() {
         }
     }
     s_boot_start = platform_tick_ms();
+    // real block-device enumeration (ATA probe on bare metal, Windows
+    // logical drives on the host) - logged so it is visible in headless runs
+    {
+        DiskInfo di[8];
+        int dn = platform_disk_scan(di, 8);
+        klogf("disk: %d block device(s)\n", dn);
+        for (int i = 0; i < dn; i++)
+            klogf("  %s %u MB %s\n", di[i].name,
+                  (unsigned)(di[i].sectors / 2048),
+                  di[i].removable ? "removable" : "fixed");
+    }
     s_inited = true;
     if (platform_name()[0] == 'b') __asm__ volatile("sti");   // enable IRQs for tick/input
     klogf("nefuOS ready on %s\n", platform_name());

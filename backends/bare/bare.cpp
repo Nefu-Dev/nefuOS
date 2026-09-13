@@ -509,6 +509,116 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     return false;   // bare uses the in-house TCP stack (IP literals only)
 }
 
+// ===================== disk / ATA probe =====================
+// Minimal ATA IDENTIFY over the legacy controllers (no DMA, PIO only).
+// Returns the number of drives found. Safe on real hardware and QEMU.
+static inline uint8_t inb_p(uint16_t port) {
+    uint8_t v;
+    __asm__ volatile("inb %1, %0" : "=a"(v) : "Nd"(port));
+    return v;
+}
+static inline uint16_t inw_p(uint16_t port) {
+    uint16_t v;
+    __asm__ volatile("inw %1, %0" : "=a"(v) : "Nd"(port));
+    return v;
+}
+static inline void outb_p(uint16_t port, uint8_t v) {
+    __asm__ volatile("outb %0, %1" : : "a"(v), "Nd"(port));
+}
+static inline void outw_p(uint16_t port, uint16_t v) {
+    __asm__ volatile("outw %0, %1" : : "a"(v), "Nd"(port));
+}
+
+static bool ata_wait_not_busy(uint16_t base, int timeout_loops) {
+    for (int i = 0; i < timeout_loops; i++) {
+        if (!(inb_p(base + 7) & 0x80)) return true;   // BSY clear
+    }
+    return false;
+}
+
+static int ata_identify(uint16_t base, uint8_t devsel, char* model, int model_sz,
+                        uint64_t* sectors_out, bool* removable_out) {
+    // devsel: 0xA0 = master, 0xB0 = slave
+    // ATA drives answer IDENTIFY DEVICE (0xEC); ATAPI (CD-ROM) answers
+    // IDENTIFY PACKET DEVICE (0xA1) and raises the error bit for 0xEC.
+    static const uint8_t cmds[2] = { 0xEC, 0xA1 };
+    for (int attempt = 0; attempt < 2; attempt++) {
+        outb_p(base + 6, devsel);
+        outb_p(base + 2, 0);
+        outb_p(base + 3, 0);
+        outb_p(base + 4, 0);
+        outb_p(base + 5, 0);
+        outb_p(base + 7, cmds[attempt]);
+        if (!ata_wait_not_busy(base, 200000)) continue;
+        uint8_t st = inb_p(base + 7);
+        if (st == 0 || (st & 1)) continue;            // no device / error -> try next cmd
+        if (!(st & 0x40)) continue;                    // DRDY not set
+        int i = 0;
+        while (i < 200000) {
+            st = inb_p(base + 7);
+            if (st & 1) break;                          // error
+            if (st & 8) break;                          // DRQ
+            i++;
+        }
+        if (!(st & 8)) continue;
+        uint16_t id[256];
+        for (int j = 0; j < 256; j++) id[j] = inw_p(base);
+        if (removable_out) *removable_out = (id[0] & 0x0080) != 0;
+        if (model && model_sz > 0) {
+            int m = 0;
+            for (int w = 27; w <= 46 && m < model_sz - 1; w++) {
+                char c1 = (char)(id[w] >> 8);
+                char c0 = (char)(id[w] & 0xFF);
+                if (c1 != ' ') model[m++] = c1;
+                if (c0 != ' ' && m < model_sz - 1) model[m++] = c0;
+            }
+            model[m] = 0;
+        }
+        uint64_t lba48 = (uint64_t)id[100] | ((uint64_t)id[101] << 16) |
+                         ((uint64_t)id[102] << 32) | ((uint64_t)id[103] << 48);
+        uint64_t lba28 = (uint64_t)id[60] | ((uint64_t)id[61] << 16);
+        if (sectors_out) *sectors_out = (lba48 != 0) ? lba48 : lba28;
+        return 1;
+    }
+    return 0;
+}
+
+int platform_disk_scan(DiskInfo* list, int max) {
+    if (!list || max <= 0) return 0;
+    int n = 0;
+    struct Chan { uint16_t base; const char* dev; } chans[] = {
+        { 0x1F0, "sda" }, { 0x170, "sdb" },
+    };
+    for (unsigned c = 0; c < 2 && n < max; c++) {
+        for (int sel = 0; sel < 2 && n < max; sel++) {
+            DiskInfo d;
+            d.name[0] = 0; d.model[0] = 0; d.sectors = 0; d.removable = false;
+            // name: sda/sdb (primary), sdc/sdd (secondary)
+            char nm[16];
+            ksprintf(nm, sizeof(nm), "sd%c", 'a' + (int)(c * 2 + sel));
+            uint64_t sectors = 0;
+            bool rem = false;
+            if (ata_identify(chans[c].base, (uint8_t)(sel ? 0xB0 : 0xA0),
+                             d.model, sizeof(d.model), &sectors, &rem)) {
+                // de-dup: an empty slave slot can echo the master's identify
+                // response on some emulated controllers
+                bool dup = false;
+                for (int k = 0; k < n; k++) {
+                    if (strcmp(list[k].model, d.model) == 0 && list[k].sectors == sectors) { dup = true; break; }
+                }
+                if (dup) continue;
+                ksprintf(d.name, sizeof(d.name), "%s", nm);
+                d.sectors = sectors;
+                d.removable = rem;
+                if (d.model[0] == 0) ksprintf(d.model, sizeof(d.model), "ATA device");
+                list[n++] = d;
+            }
+        }
+    }
+    return n;
+}
+
+
 // ---- threading (bare: cooperative, run synchronously) ----
 void* platform_thread_create(void (*func)(void*), void* arg) {
     func(arg);   // bare metal: run synchronously (no preemptive scheduler yet)

@@ -349,8 +349,7 @@ bool platform_ping(uint32_t ip, int timeout_ms) {
 }
 
 // ---- real HTTP(S) GET (host): WinINet with DNS + TLS ----
-bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
-    if (!out || !out_size) return false;
+bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {    if (!out || !out_size) return false;
     *out = 0; *out_size = 0;
     if (!url) return false;
     HINTERNET h = InternetOpenA("nefuOS/0.2", INTERNET_OPEN_TYPE_PRECONFIG, 0, 0, 0);
@@ -381,6 +380,38 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     *out = buf;
     *out_size = len;
     return true;
+}
+
+// ---- real disk enumeration (host): Windows logical drives ----
+int platform_disk_scan(DiskInfo* list, int max) {
+    if (!list || max <= 0) return 0;
+    DWORD mask = GetLogicalDrives();
+    int n = 0;
+    for (int i = 0; i < 26 && n < max; i++) {
+        if (!(mask & (1u << i))) continue;
+        char letter = (char)('A' + i);
+        DiskInfo d;
+        d.name[0] = 0; d.model[0] = 0; d.sectors = 0; d.removable = false;
+        ksprintf(d.name, sizeof(d.name), "%c:", letter);
+        // detect removable (floppy / USB stick) via GetDriveType
+        char root[4] = { letter, ':', '\\', 0 };
+        UINT t = GetDriveTypeA(root);
+        d.removable = (t == DRIVE_REMOVABLE);
+        // try to read the volume label; fall back to the type string
+        char vbuf[64];
+        DWORD vsn = 0, vmax = 63, flags = 0;
+        if (GetVolumeInformationA(root, vbuf, vmax, &vsn, 0, &flags, 0, 0) && vbuf[0]) {
+            ksprintf(d.model, sizeof(d.model), "volume %s", vbuf);
+        } else {
+            const char* ty = "fixed";
+            if (t == DRIVE_REMOVABLE) ty = "removable";
+            else if (t == DRIVE_CDROM) ty = "cd-rom";
+            else if (t == DRIVE_REMOTE) ty = "network";
+            ksprintf(d.model, sizeof(d.model), "%s drive", ty);
+        }
+        list[n++] = d;
+    }
+    return n;
 }
 
 } // namespace nefu
