@@ -475,4 +475,20 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     return false;   // bare uses the in-house TCP stack (IP literals only)
 }
 
+// ---- threading (bare: cooperative, run synchronously) ----
+void* platform_thread_create(void (*func)(void*), void* arg) {
+    func(arg);   // bare metal: run synchronously (no preemptive scheduler yet)
+    return (void*)1;
+}
+
+void platform_thread_sleep(uint32_t ms) {
+    uint32_t start = platform_tick_ms();
+    while (platform_tick_ms() - start < ms) { /* busy wait */ }
+}
+
+// ---- audio (bare: no sound driver yet) ----
+bool platform_play_wav(const char* path) { (void)path; return false; }
+bool platform_play_wav_mem(const uint8_t* data, uint32_t size) { (void)data; (void)size; return false; }
+void platform_stop_sound() {}
+
 } // namespace nefu

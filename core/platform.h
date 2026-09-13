@@ -89,6 +89,15 @@ bool platform_ping(uint32_t ip, int timeout_ms);
 // On success *out is a malloc'd buffer (caller frees), *out_size its length.
 bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size);
 
+// ===================== threading =====================
+void* platform_thread_create(void (*func)(void*), void* arg);
+void  platform_thread_sleep(uint32_t ms);
+
+// ===================== audio (host) =====================
+bool platform_play_wav(const char* path);
+bool platform_play_wav_mem(const uint8_t* data, uint32_t size);
+void platform_stop_sound();
+
 // ===================== keycodes =====================
 enum {
     KEY_NONE = 0,

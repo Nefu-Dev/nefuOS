@@ -8,6 +8,16 @@ $objcopy = "D:\CLion\bin\mingw\bin\objcopy.exe"
 $xorriso = "C:\msys64\usr\bin\xorriso.exe"
 Set-Location $root
 
+# 0) Admin hash injection (FNV-1a 64, hex). The plain password is read from
+#    the NEFU_ADMIN_PASSWORD env var, hashed, and ONLY the hash is embedded in
+#    the build. The password never appears in source, ISO, or logs.
+#    If the env var is unset, a random placeholder hash is used (login denied).
+$python3 = "C:\Users\huawei\AppData\Local\Programs\Python\Python311\python.exe"
+if (-not (Test-Path $python3)) { $python3 = "python" }
+$adminPw = [Environment]::GetEnvironmentVariable("NEFU_ADMIN_PASSWORD")
+& $python3 "tools\admin_hash.py" $adminPw | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "admin hash gen failed" }
+
 $coreSrc = @(
   "core\nefuos.cpp", "core\klib\memory.cpp", "core\klib\string.cpp", "core\klib\printf.cpp",
   "core\vfs\vfs.cpp", "core\gui\gfx.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
@@ -21,7 +31,7 @@ $coreSrc = @(
 )
 
 # 1) （win32）
-& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -o dist\nefuOS.exe ($coreSrc + @("backends\win32\win32.cpp")) -lgdi32 -luser32 -lgdiplus -lole32 -lws2_32 -liphlpapi -lwlanapi -lwininet
+& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -o dist\nefuOS.exe ($coreSrc + @("backends\win32\win32.cpp")) -lgdi32 -luser32 -lgdiplus -lole32 -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lwinmm
 if ($LASTEXITCODE -ne 0) { throw "host build failed" }
 Write-Output "host exe OK: $((Get-Item dist\nefuOS.exe).Length) bytes"
 
@@ -91,13 +101,17 @@ function Rebin-Kernel {
         }
         $maxEnd = 0
         foreach ($s in $secs) {
+            # .bss has no raw data (zeroed by entry.s at runtime); .reloc is
+            # not needed for a flat kernel image. Skip both so kernel.bin
+            # stays compact (no 42KB zero padding).
+            if ($s.Name -eq ".reloc") { continue }
+            if ($s.RawSize -eq 0) { continue }
             $end = $s.RVA + $s.RawSize
             if ($end -gt $maxEnd) { $maxEnd = $end }
-            $bssEnd = $s.RVA + $s.VSize
-            if ($bssEnd -gt $maxEnd) { $maxEnd = $bssEnd }
         }
         $out = New-Object byte[] $maxEnd
         foreach ($s in $secs) {
+            if ($s.Name -eq ".reloc") { continue }
             if ($s.RawSize -eq 0 -or $s.RawPtr -eq 0) { continue }
             $fs.Seek($s.RawPtr, 0) | Out-Null
             $data = $br.ReadBytes($s.RawSize)
@@ -122,16 +136,15 @@ $kSectors = [Math]::Ceiling($kSize / 512)
 $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
 # 0x58（0x7C58，）：
 $fs.Position = 0x58
-$fs.Position = 0x58
 $fs.WriteByte([byte]($kSectors -band 0xFF))
 $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
-# note： 0xFC/0x194 —— 0xFC floppy CHS of jb ，
-# DAP count boot.s （kernel_count@0x7C58 -> 2048B sector count）。
-# cdap4 count @0x172: remaining kernel bytes beyond 0x30000, in 2048B CD sectors.
-# Reading past the ISO end (LBA150+) makes ATAPI silently fail and leaves
-# .data (at 0x50020+) zeroed -> kalloc from address 0 -> page-table corruption.
-$kTail = [Math]::Max(0, $kSize - 196608)
-$cdap4Count = [Math]::Max(1, [Math]::Ceiling($kTail / 2048))
+# cdap4 count @0x1A2: remaining kernel bytes beyond 0x50000, in 2048B CD
+# sectors. Chunks 1-3 are fixed 32 sectors (LBA24..119 -> 0x20000..0x50000);
+# chunk 4 (LBA120, seg 0x5000) is capped at 32 (int13 EDD 64KB limit).
+$kTotal = [Math]::Ceiling($kSize / 2048)
+$cdap4Count = $kTotal - 96
+if ($cdap4Count -lt 0) { $cdap4Count = 0 }
+if ($cdap4Count -gt 32) { $cdap4Count = 32 }
 $fs.Position = 0x1A2
 $fs.WriteByte([byte]($cdap4Count -band 0xFF))
 $fs.WriteByte([byte](($cdap4Count -shr 8) -band 0xFF))

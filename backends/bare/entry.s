@@ -109,6 +109,17 @@ kernel_start:
     movw $0xE9, %dx
     movb $'L', %al
     outb %al, %dx
+    # ---- clear .bss (kernel.bin carries no zero padding) ----
+    movq $__bss_start, %rdi
+    movq $__bss_end, %rcx
+    subq %rdi, %rcx
+    shrq $3, %rcx
+    xorl %eax, %eax
+    rep stosq
+    # debugcon 探针：'B' = bss cleared
+    movw $0xE9, %dx
+    movb $'B', %al
+    outb %al, %dx
     movq $0x7000, %rcx           # boot info（mingw x64 ABI：首参 RCX）
     call nefuos_kernel_main
 .halt:

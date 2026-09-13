@@ -47,25 +47,56 @@ Everything is real: the GUI, the Unix-like VFS, the networking stack, and the ap
 ### Unix-like file system (real files & directories)
 ```
 /          root
-/bin       built-in binaries
-/etc       configuration (store.conf)
-/home/user Documents, Pictures, Music, Downloads, Trash
-/mnt       mounts
+/bin       built-in binaries (sh, bash, ls, cat, grep, ...)
+/sbin      admin tools (init, mount, fsck, ifconfig, ...)
+/etc       real configs: passwd, shadow, group, hosts, resolv.conf,
+           fstab, profile, shells, motd, services, inittab, store.conf
+/home/user Documents, Pictures, Music, Downloads, Trash, .bashrc
+/root      root user home (.bashrc, .profile, .bash_history)
+/proc      pseudo-fs: cpuinfo, meminfo, version, uptime, loadavg, ...
+/dev       devices: null, zero, random, tty, console, sda, sr0
+/sys       kernel + class/net/eth0/* nodes
 /tmp       temporary files (OS scratch here)
-/usr       user programs & downloads (browser saves to /usr/downloads)
+/usr       user programs, libs, downloads (browser saves to /usr/downloads)
+/var       logs (syslog, kern.log, auth.log), lib/dpkg/status
+/mnt       mount points (cdrom, usb, hd)
+/lib       modules.dep, firmware/e1000.bin
+/srv       served content (www/index.html)
+/opt       optional packages
 ```
-- Files are stored in a real VFS, serialized with the `NFS1` magic and saved
-  to `nefuos.fs` on the host backend
-- `echo > file` redirection, real `mkdir`/`touch`/`rm`/`cat`, cleanup of stray nodes
+- ~150 real Unix-style files are seeded at boot (`NFS1` VFS, serialized to
+  `nefuos.fs` on the host backend); system files survive reboots.
+- **Downloads go to `/usr/downloads`** (browser) and temp scratch goes to
+  `/tmp` - just like a normal OS.
+- `recovery` rebuilds standard dirs + core files if they were deleted.
+- Built-in key-value database at `/var/lib/nefuos/db/system.db`, managed
+  with the `db` command (writes require admin).
 
-### Terminal commands (Linux-style)
-`help` `ls` `cd` `pwd` `cat` `mkdir` `touch` `rm` `echo` `clear` `tree` `about`
-`uptime` `exit` `shutdown` `reboot` `poweroff`
+### Terminal commands (Linux-style, ~60 commands)
+`help` `ls` `cd` `pwd` `cat` `mkdir` `touch` `rm` `echo` `clear` `tree`
+`about` `uptime` `exit` `shutdown` `reboot` `poweroff` `hostname`
+`ifconfig`/`ip` `route` `arp` `lspci` `lsusb` `stat` `file` `ln` `sync`
+`dmesg` `neofetch` `top` `kill` `df` `who`/`users` `last` `sh`/`bash`
+`which` `history` `true`/`false` `uname` `date` `login` `sleep`
+`su <password>` (admin `lbinm`, hash-verified) `db list|get|set|rm`
+`honeypot` (passive decoy services) `recovery` (self-repair)
+`./app.bin` runs NEFBIN01 binaries directly; PATH lookup (/bin, /usr/bin, /sbin).
 
 ### Unix-style apps
-- `.nefud` and `.bin` files open directly from the File Manager
-- `.bin` gets a distinct icon (dark box with `>_`)
-- System apps come preinstalled (11 entries in the store catalog)
+- `.nefud` (text manifest) and `.bin` (NEFBIN01) files open directly from
+  the File Manager; `.bin` shows a distinct icon (dark box with `>_`).
+- `tools/nefupack.py` packages `.nefud` manifests and NEFBIN01 `.bin` apps.
+- System apps come preinstalled (11 entries in the store catalog).
+
+### Security & administration
+- Admin account `lbinm`; password is **injected at build time** through the
+  `NEFU_ADMIN_PASSWORD` environment variable, stored **only as an FNV-1a 64
+  hash** (`core/sys/admin_hash.h`, git-ignored). The plain password never
+  appears in source, README, logs, or the ISO.
+- Passive **honeypot** decoy services (21/23/25/80/443) with a local access
+  log - defensive only, fully compliant with the Cybersecurity Law.
+- `db set/rm` writes are restricted to the verified admin; guests read only.
+
 
 ---
 
@@ -149,7 +180,25 @@ qemu-system-x86_64 -drive file=dist\nefuOS_v2.iso,media=cdrom,format=raw -boot d
 - Real network data (adapter MAC/IP, Wi-Fi scan) comes from the Windows
   `iphlpapi` / `wlanapi` / `icmpapi` interfaces on the host backend, and from
   the e1000/ARP/ICMP/TCP stack on bare metal.
+- Music Player synthesizes a real 8 kHz 8-bit WAV (integer math) and plays it
+  through the platform audio API (host: `PlaySound`).
 - Source comments are in English.
+
+### Third-party references & SBOM
+
+This project ships **no third-party binary code** - the whole kernel and all
+apps are self-written. The following projects were studied or referenced for
+behavior/design only (no code copied):
+
+| Project | Version/Commit | License | How it is used here |
+|---|---|---|---|
+| SeaBIOS | git master (analyzed `src/hw/` CD boot) | LGPL-2.1 | behavior reference for El Torito no-emulation + INT 13h AH=42h limits; no code included |
+| Linux kernel | FHS layout / proc & sysfs naming | GPL-2.0 (ideas only) | directory tree design, `/proc`/`/sys`/`/dev` conventions; no code included |
+| QEMU | 11.1.1 (e1000 82540EM, SeaBIOS) | GPL-2.0 | test/verification harness only; not shipped |
+| stb (nothings) | single-file image headers | MIT | image-decode *concept* reference; host uses GDI+, bare metal has its own PPM/JPEG reader |
+| xv6 (MIT) | teaching OS | MIT | app/VFS split design inspiration; no code included |
+
+No GPL-licensed code is linked into, or distributed with, nefuOS.
 
 ## License
 

@@ -107,7 +107,7 @@ vbe_mode_done:
     nop
 
 # ---- load kernel.bin from real ATAPI CD via EDD int 0x13 AH=0x42 ----
-# kernel.bin at physical LBA 24, 57 x 2048B sectors, two static chunks.
+# kernel.bin at physical LBA 24, 128 x 2048B sectors max, four static chunks.
 cd_load_kernel:
     movw $cdap1 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
@@ -191,7 +191,7 @@ cdap3:
     .long 0               # lba high
 cdap4:
     .byte 0x10, 0x00      # size
-    .word 32              # count (128 total = 262144B, kernel 246272B)
+    .word 0               # count (patched at build time; max 32 per int13 limit)
     .word 0x0000          # offset
     .word 0x5000          # segment 0x5000 -> 0x50000
     .long 120             # lba low (24+96)

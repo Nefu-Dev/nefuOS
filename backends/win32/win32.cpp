@@ -8,6 +8,7 @@
 #include <icmpapi.h>
 #include <gdiplus.h>
 #include <objbase.h>
+#include <mmsystem.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -89,6 +90,30 @@ void kfree(void* p) {
     uint32_t* h = (uint32_t*)p - 2;
     s_heap_used -= h[0];
     free(h);
+}
+
+// ===================== threading =====================
+void* platform_thread_create(void (*func)(void*), void* arg) {
+    DWORD tid;
+    HANDLE h = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)func, arg, 0, &tid);
+    return (void*)h;
+}
+
+void platform_thread_sleep(uint32_t ms) {
+    Sleep(ms);
+}
+
+// ===================== audio (host) =====================
+bool platform_play_wav(const char* path) {
+    return PlaySoundA(path, 0, SND_FILENAME | SND_ASYNC) != 0;
+}
+
+bool platform_play_wav_mem(const uint8_t* data, uint32_t size) {
+    return PlaySoundA((LPCSTR)data, 0, SND_MEMORY | SND_ASYNC) != 0;
+}
+
+void platform_stop_sound() {
+    PlaySoundA(0, 0, 0);
 }
 
 Screen* platform_screen() {
@@ -257,7 +282,7 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     HINTERNET u = InternetOpenUrlA(h, url, 0, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
     if (!u) { InternetCloseHandle(h); return false; }
     uint32_t cap = 65536, len = 0;
-    uint8_t* buf = (uint8_t*)malloc(cap);
+    uint8_t* buf = (uint8_t*)kalloc(cap);
     if (!buf) { InternetCloseHandle(u); InternetCloseHandle(h); return false; }
     char tmp[4096];
     DWORD rd = 0;
@@ -265,8 +290,10 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
         if (!InternetReadFile(u, tmp, sizeof(tmp), &rd) || rd == 0) break;
         if (len + rd > cap) {
             cap *= 2;
-            uint8_t* nb = (uint8_t*)realloc(buf, cap);
-            if (!nb) { free(buf); buf = 0; break; }
+            uint8_t* nb = (uint8_t*)kalloc(cap);
+            if (!nb) { kfree(buf); buf = 0; break; }
+            memcpy(nb, buf, len);
+            kfree(buf);
             buf = nb;
         }
         memcpy(buf + len, tmp, rd);
@@ -274,7 +301,7 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     }
     InternetCloseHandle(u);
     InternetCloseHandle(h);
-    if (!buf || len == 0) { if (buf) free(buf); return false; }
+    if (!buf || len == 0) { if (buf) kfree(buf); return false; }
     *out = buf;
     *out_size = len;
     return true;

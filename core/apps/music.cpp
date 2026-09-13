@@ -40,6 +40,68 @@ static const char* BUILTIN_SONGS[6] = {
     "Rainy Window", "Neon City", "Golden Hour"
 };
 
+// Real audio: synthesize a tiny WAV (8kHz 8-bit mono) for the current track
+// and hand it to platform_play_wav_mem (host: PlaySound SND_MEMORY).
+// Bare backend returns false (no sound hardware) -> visualizer still runs.
+static const int WAV_SR = 8000;
+static const int WAV_DUR_MS = 1200;
+static const int WAV_N = WAV_SR * WAV_DUR_MS / 1000;
+static uint8_t s_wav_buf[44 + 1200 * 8]; // header + samples
+
+static const uint16_t TRACK_HZ[6] = { 440, 494, 523, 587, 659, 698 };
+
+static void synth_wav(int idx, uint32_t* out_size) {
+    int n = WAV_N;
+    int total = 44 + n;
+    if (total > (int)sizeof(s_wav_buf)) total = (int)sizeof(s_wav_buf);
+    n = total - 44;
+    // RIFF header
+    memcpy(s_wav_buf + 0, "RIFF", 4);
+    s_wav_buf[4] = (uint8_t)(total - 8); s_wav_buf[5] = (uint8_t)((total - 8) >> 8);
+    s_wav_buf[6] = (uint8_t)((total - 8) >> 16); s_wav_buf[7] = (uint8_t)((total - 8) >> 24);
+    memcpy(s_wav_buf + 8, "WAVE", 4);
+    memcpy(s_wav_buf + 12, "fmt ", 4);
+    s_wav_buf[16] = 16; s_wav_buf[17] = 0; s_wav_buf[18] = 0; s_wav_buf[19] = 0;
+    s_wav_buf[20] = 1; s_wav_buf[21] = 0;           // PCM
+    s_wav_buf[22] = 1; s_wav_buf[23] = 0;           // mono
+    s_wav_buf[24] = (uint8_t)(WAV_SR & 0xFF); s_wav_buf[25] = (uint8_t)((WAV_SR >> 8) & 0xFF);
+    s_wav_buf[26] = (uint8_t)((WAV_SR >> 16) & 0xFF); s_wav_buf[27] = (uint8_t)((WAV_SR >> 24) & 0xFF);
+    int brate = WAV_SR;
+    s_wav_buf[28] = (uint8_t)(brate & 0xFF); s_wav_buf[29] = (uint8_t)((brate >> 8) & 0xFF);
+    s_wav_buf[30] = (uint8_t)((brate >> 16) & 0xFF); s_wav_buf[31] = (uint8_t)((brate >> 24) & 0xFF);
+    s_wav_buf[32] = 1; s_wav_buf[33] = 0;           // block align
+    s_wav_buf[34] = 8; s_wav_buf[35] = 0;           // bits/sample
+    memcpy(s_wav_buf + 36, "data", 4);
+    s_wav_buf[40] = (uint8_t)(n & 0xFF); s_wav_buf[41] = (uint8_t)((n >> 8) & 0xFF);
+    s_wav_buf[42] = (uint8_t)((n >> 16) & 0xFF); s_wav_buf[43] = (uint8_t)((n >> 24) & 0xFF);
+    // sine + soft envelope (integer math only)
+    uint32_t ph = 0;
+    uint32_t step = (uint32_t)((uint64_t)TRACK_HZ[idx] * 65536 * 16 / WAV_SR);
+    for (int i = 0; i < n; i++) {
+        ph += step;
+        uint32_t a = ph >> 16;               // 0..65535
+        // sin lookup via 8-bit table-free approx: use 4th-order parabola
+        int32_t ang = (int32_t)(a & 65535);
+        int32_t v = (ang * (65536 - ang)) >> 9;  // ~sin scaled (0..~2^22)
+        v = (v * 3) >> 3;                         // 0..~3*2^18
+        if (v > 255) v = 255;
+        // envelope: 20ms fade in/out
+        int env = 255;
+        if (i < 160) env = i * 255 / 160;
+        int rem = n - i;
+        if (rem < 160) env = rem * 255 / 160;
+        s_wav_buf[44 + i] = (uint8_t)((v * env) >> 8);
+    }
+    *out_size = (uint32_t)(44 + n);
+}
+
+static void play_current_track(MusicState* st) {
+    if (st->songs.empty()) return;
+    uint32_t sz = 0;
+    synth_wav(st->cur_song % 6, &sz);
+    platform_play_wav_mem(s_wav_buf, sz);
+}
+
 static void ensure_music_lib() {
     FSNode* d = g_vfs->resolve(MUSIC_DIR);
     bool has = false;
@@ -118,11 +180,13 @@ static void music_click(void* ud) {
         if (!st->playing) {
             st->play_start = platform_tick_ms();
             st->playing = true;
+            play_current_track(st);
         }
     } else if (strcmp(lab, "Pause") == 0) {
         if (st->playing) {
             st->pause_offset += platform_tick_ms() - st->play_start;
             st->playing = false;
+            platform_stop_sound();
         }
     } else if (strcmp(lab, "Prev") == 0) {
         if (st->songs.size() > 0) {
@@ -130,6 +194,7 @@ static void music_click(void* ud) {
             st->pause_offset = 0;
             st->play_start = platform_tick_ms();
             st->playing = true;
+            play_current_track(st);
         }
     } else if (strcmp(lab, "Next") == 0) {
         if (st->songs.size() > 0) {
@@ -137,10 +202,12 @@ static void music_click(void* ud) {
             st->pause_offset = 0;
             st->play_start = platform_tick_ms();
             st->playing = true;
+            play_current_track(st);
         }
     } else if (strcmp(lab, "Stop") == 0) {
         st->playing = false;
         st->pause_offset = 0;
+        platform_stop_sound();
     }
 }
 
@@ -191,6 +258,7 @@ static void music_paint(Window* w) {
             st->cur_song = (st->cur_song + 1) % st->songs.size();
             st->pause_offset = 0;
             st->play_start = platform_tick_ms();
+            play_current_track(st);
         }
     }
 

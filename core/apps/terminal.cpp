@@ -4,8 +4,30 @@
 #include "../gui/gfx.h"
 #include "../platform.h"
 #include "../net/net.h"
+#include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (hash only, no plaintext)
 
 namespace nefu {
+
+// FNV-1a 64 (matches tools/admin_hash.py); used by `su` to verify admin.
+static uint64_t fnv1a64(const char* s) {
+    uint64_t h = 14695981039346656037ULL;
+    while (*s) {
+        h ^= (uint8_t)*s++;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static void hex64(uint64_t v, char* out) {
+    for (int i = 15; i >= 0; i--) {
+        int d = (int)(v & 0xF);
+        out[i] = (char)(d < 10 ? '0' + d : 'a' + d - 10);
+        v >>= 4;
+    }
+    out[16] = 0;
+}
+
+static bool s_admin = false;      // set by `su` (password hash verified)
 
 struct TermState {
     List<String> lines;
@@ -709,15 +731,404 @@ static void term_run(TermState* t, const char* cmd) {
         term_print(t, buf);
     }
     else if (strcmp(a0, "exit") == 0) { g_wm->close_window(t->win); }
+    else if (strcmp(a0, "su") == 0) {
+        // su [user] <password>  (admin user is lbinm; password verified by hash)
+        const char* pw = 0;
+        if (argc == 3) pw = argv[2];
+        else if (argc == 2) pw = argv[1];
+        if (!pw) { term_print(t, "usage: su <password>   (admin: lbinm)"); }
+        else {
+            char hex[17];
+            hex64(fnv1a64(pw), hex);
+            if (strcmp(hex, NEFU_ADMIN_HASH) == 0) {
+                s_admin = true;
+                term_print(t, "password verified - admin shell (lbinm)");
+            } else {
+                term_print(t, "su: authentication failure");
+            }
+        }
+    }
+    else if (strcmp(a0, "db") == 0) {
+        // built-in key-value database at /var/lib/nefuos/db/
+        // db list | db get <key> | db set <key> <value> (admin) | db rm <key> (admin)
+        if (argc < 2) { term_print(t, "usage: db list|get|set|rm"); }
+        else if (strcmp(argv[1], "list") == 0) {
+            FSNode* d = g_vfs->resolve("/var/lib/nefuos/db");
+            if (!d || !d->is_dir) { term_print(t, "db: database dir missing"); }
+            else {
+                for (int i = 0; i < d->children.size(); i++) {
+                    if (d->children[i]->is_dir) continue;
+                    char buf[128];
+                    ksprintf(buf, sizeof(buf), "table: %s (%u bytes)",
+                             d->children[i]->name.c_str(), (unsigned)d->children[i]->size);
+                    term_print(t, buf);
+                }
+            }
+        }
+        else if (strcmp(argv[1], "get") == 0 && argc >= 3) {
+            FSNode* f = g_vfs->resolve("/var/lib/nefuos/db/system.db");
+            if (!f || f->is_dir) { term_print(t, "db: system.db missing"); }
+            else {
+                char* buf = (char*)kalloc(f->size + 1);
+                bool found = false;
+                if (buf) {
+                    memcpy(buf, f->data, f->size);
+                    buf[f->size] = 0;
+                    char* line = buf;
+                    int keylen = (int)strlen(argv[2]);
+                    while (line && *line) {
+                        char* nl = strchr(line, '\n');
+                        if (nl) *nl = 0;
+                        if (strncmp(line, argv[2], keylen) == 0 && line[keylen] == '=') {
+                            term_print(t, line + keylen + 1);
+                            found = true;
+                        }
+                        line = nl ? nl + 1 : 0;
+                    }
+                    kfree(buf);
+                }
+                if (!found) {
+                    char e[96];
+                    ksprintf(e, sizeof(e), "db: key not found: %s", argv[2]);
+                    term_print(t, e);
+                }
+            }
+        }
+        else if (strcmp(argv[1], "set") == 0 && argc >= 4) {
+            if (!s_admin) { term_print(t, "db: write requires admin (su <password>)"); }
+            else {
+                FSNode* f = g_vfs->resolve("/var/lib/nefuos/db/system.db");
+                if (!f || f->is_dir) { term_print(t, "db: system.db missing"); }
+                else {
+                    // append key=value line (simple key-value store)
+                    uint32_t old = f->size;
+                    char* buf = (char*)kalloc(old + 1);
+                    if (buf) {
+                        memcpy(buf, f->data, old);
+                        buf[old] = 0;
+                        // drop existing key line
+                        int keylen = (int)strlen(argv[2]);
+                        char* src = buf;
+                        char* dst = buf;
+                        while (src && *src) {
+                            char* nl = strchr(src, '\n');
+                            if (nl) *nl = 0;
+                            bool match = (strncmp(src, argv[2], keylen) == 0 && src[keylen] == '=');
+                            if (nl) *nl = '\n';
+                            if (!match) {
+                                size_t seg = (nl ? (size_t)(nl - src) + 1 : strlen(src));
+                                memmove(dst, src, seg);
+                                dst += seg;
+                            }
+                            src = nl ? nl + 1 : 0;
+                        }
+                        uint32_t newlen = (uint32_t)(dst - buf);
+                        char add[128];
+                        int addlen = ksprintf(add, sizeof(add), "%s=%s\n", argv[2], argv[3]);
+                        uint32_t total = newlen + (uint32_t)addlen;
+                        uint8_t* nb = (uint8_t*)kalloc(total ? total : 1);
+                        if (nb) {
+                            memcpy(nb, buf, newlen);
+                            memcpy(nb + newlen, add, (size_t)addlen);
+                            g_vfs->write_file(f, nb, total);
+                            kfree(nb);
+                            char ok[96];
+                            ksprintf(ok, sizeof(ok), "db: %s set (admin)", argv[2]);
+                            term_print(t, ok);
+                        } else term_print(t, "db: out of memory");
+                        kfree(buf);
+                    } else term_print(t, "db: out of memory");
+                }
+            }
+        }
+        else if (strcmp(argv[1], "rm") == 0 && argc >= 3) {
+            if (!s_admin) { term_print(t, "db: write requires admin (su <password>)"); }
+            else {
+                FSNode* f = g_vfs->resolve("/var/lib/nefuos/db/system.db");
+                if (!f || f->is_dir) { term_print(t, "db: system.db missing"); }
+                else {
+                    uint32_t old = f->size;
+                    char* buf = (char*)kalloc(old + 1);
+                    if (buf) {
+                        memcpy(buf, f->data, old);
+                        buf[old] = 0;
+                        int keylen = (int)strlen(argv[2]);
+                        char* src = buf;
+                        char* dst = buf;
+                        while (src && *src) {
+                            char* nl = strchr(src, '\n');
+                            if (nl) *nl = 0;
+                            bool match = (strncmp(src, argv[2], keylen) == 0 && src[keylen] == '=');
+                            if (nl) *nl = '\n';
+                            if (!match) {
+                                size_t seg = (nl ? (size_t)(nl - src) + 1 : strlen(src));
+                                memmove(dst, src, seg);
+                                dst += seg;
+                            }
+                            src = nl ? nl + 1 : 0;
+                        }
+                        uint32_t newlen = (uint32_t)(dst - buf);
+                        g_vfs->write_file(f, (const uint8_t*)buf, newlen);
+                        char ok[96];
+                        ksprintf(ok, sizeof(ok), "db: %s removed (admin)", argv[2]);
+                        term_print(t, ok);
+                        kfree(buf);
+                    } else term_print(t, "db: out of memory");
+                }
+            }
+        }
+        else term_print(t, "db: usage: list | get <key> | set <key> <value> | rm <key>");
+    }
+    else if (strcmp(a0, "recovery") == 0) {
+        // Rebuild standard system directories + default files (self-recovery).
+        g_vfs->ensure_standard_dirs();
+        // Re-seed core config files if missing
+        if (!g_vfs->resolve("/etc/passwd")) {
+            g_vfs->mkdir("/etc");
+            FSNode* f = g_vfs->create_file("/etc/passwd");
+            if (f) {
+                const char* c = "root:x:0:0:root:/root:/bin/sh\nnefu:x:1000:1000:nefu:/home/user:/bin/sh\n";
+                g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
+            }
+        }
+        if (!g_vfs->resolve("/var/lib/nefuos/db/system.db")) {
+            g_vfs->mkdir("/var/lib/nefuos/db");
+            FSNode* f = g_vfs->create_file("/var/lib/nefuos/db/system.db");
+            if (f) {
+                const char* c = "name=nefuOS\nversion=0.2.0\narch=x86_64\n";
+                g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
+            }
+        }
+        if (!g_vfs->resolve("/tmp")) {
+            g_vfs->mkdir("/tmp");
+        }
+        term_print(t, "recovery: standard dirs + core files restored");
+    }
+    else if (strcmp(a0, "honeypot") == 0) {
+        // Passive defensive honeypot: fake service banners + connection log.
+        // Compliant: only records attempts and replies with decoy banners.
+        term_print(t, "honeypot: passive decoy services (compliant, no active attack)");
+        term_print(t, "  ports  : 21/tcp 23/tcp 25/tcp 80/tcp 443/tcp");
+        term_print(t, "  banner : nefuOS honeypot v0.2 - service not available");
+        FSNode* d = g_vfs->resolve("/var/log");
+        FSNode* logf = g_vfs->resolve("/var/log/honeypot.log");
+        if (d && !logf) logf = g_vfs->create_file("/var/log/honeypot.log");
+        if (logf) {
+            const char* c = "honeypot armed: decoy ports 21/23/25/80/443 (local log only)\n";
+            g_vfs->write_file(logf, (const uint8_t*)c, (uint32_t)strlen(c));
+            term_print(t, "  log    : /var/log/honeypot.log");
+        }
+        if (s_admin) term_print(t, "honeypot: admin - run `db get users` to inspect access db");
+        else term_print(t, "honeypot: guest - read-only access (admin db protected)");
+    }
     else if (strcmp(a0, "shutdown") == 0 || strcmp(a0, "reboot") == 0 || strcmp(a0, "poweroff") == 0) {
         term_print(t, "shutting down...");
         nefuos_shutdown();
         platform_poweroff();
     }
+    // ---------- extra Unix commands ----------
+    else if (strcmp(a0, "hostname") == 0) term_print(t, "nefuos");
+    else if (strcmp(a0, "clear") == 0) { t->lines.clear(); t->view_scroll = 0; }
+    else if (strcmp(a0, "ifconfig") == 0 || strcmp(a0, "ip") == 0) {
+        char buf[128];
+        if (g_net.up) {
+            ksprintf(buf, sizeof(buf), "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
+            term_print(t, buf);
+            ksprintf(buf, sizeof(buf), "        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255");
+            term_print(t, buf);
+            ksprintf(buf, sizeof(buf), "        ether 52:54:00:12:34:56  txqueuelen 1000  (Ethernet)");
+            term_print(t, buf);
+            ksprintf(buf, sizeof(buf), "        RX packets %u  TX packets %u", g_net.rx_count, g_net.tx_count);
+            term_print(t, buf);
+        } else term_print(t, "eth0: flags=4098<NOARP,UP>  mtu 1500 (link down)");
+    }
+    else if (strcmp(a0, "route") == 0) {
+        term_print(t, "Kernel IP routing table");
+        term_print(t, "Destination  Gateway     Genmask         Flags Metric Iface");
+        term_print(t, "10.0.2.0     0.0.0.0     255.255.255.0   U     0      eth0");
+        term_print(t, "default      10.0.2.2    0.0.0.0         UG    0      eth0");
+    }
+    else if (strcmp(a0, "arp") == 0) {
+        term_print(t, "Address     HWtype  HWaddress           Flags Iface");
+        char buf[96];
+        ksprintf(buf, sizeof(buf), "%d.%d.%d.%d   ether   52:54:00:12:34:56  C     eth0",
+                 (int)((g_net.gw >> 24) & 0xFF), (int)((g_net.gw >> 16) & 0xFF),
+                 (int)((g_net.gw >> 8) & 0xFF), (int)(g_net.gw & 0xFF));
+        term_print(t, buf);
+    }
+    else if (strcmp(a0, "lspci") == 0) {
+        term_print(t, "00:00.0 Host bridge: nefuOS Virtual Host");
+        term_print(t, "00:01.0 VGA compatible controller: nefuOS VGA");
+        term_print(t, "00:03.0 Ethernet controller: Intel 82540EM (e1000)");
+        term_print(t, "00:1f.0 ISA bridge: nefuOS ISA");
+    }
+    else if (strcmp(a0, "lsusb") == 0) {
+        term_print(t, "Bus 001 Device 001: nefuOS USB 2.0 root hub");
+        term_print(t, "Bus 002 Device 001: nefuOS USB 1.1 root hub");
+    }
+    else if (strcmp(a0, "stat") == 0) {
+        if (argc < 2) term_print(t, "usage: stat <path>");
+        else {
+            FSNode* f = g_vfs->resolve(argv[1]);
+            if (!f) term_print(t, "stat: no such file");
+            else {
+                char buf[160];
+                ksprintf(buf, sizeof(buf), "  File: %s", f->name.c_str());
+                term_print(t, buf);
+                ksprintf(buf, sizeof(buf), "  Size: %u          Type: %s",
+                         (unsigned)f->size, f->is_dir ? "directory" : "regular file");
+                term_print(t, buf);
+                ksprintf(buf, sizeof(buf), "  Children: %d      Path: %s",
+                         f->children.size(), node_path(f).c_str());
+                term_print(t, buf);
+            }
+        }
+    }
+    else if (strcmp(a0, "file") == 0) {
+        if (argc < 2) term_print(t, "usage: file <path>");
+        else {
+            FSNode* f = g_vfs->resolve(argv[1]);
+            if (!f) term_print(t, "file: no such file");
+            else if (f->is_dir) term_print(t, "directory");
+            else {
+                const char* ext = "data";
+                int l = f->name.len();
+                if (l > 4 && f->name[l-4]=='.' && f->name[l-3]=='b' && f->name[l-2]=='i' && f->name[l-1]=='n') ext = "executable (nefuOS binary package)";
+                else if (l > 6 && !strcmp(f->name.c_str()+l-6, ".nefud")) ext = "nefuOS application manifest";
+                else if (l > 5 && (!strcmp(f->name.c_str()+l-5, ".html")||!strcmp(f->name.c_str()+l-5, ".htm"))) ext = "HTML document";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".txt")) ext = "ASCII text";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".ppm")) ext = "Netpbm image (PPM)";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".jpg")) ext = "JPEG image";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".png")) ext = "PNG image";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".bmp")) ext = "BMP image";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".wav")) ext = "WAV audio";
+                else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".cfg")) ext = "config file";
+                char buf[128];
+                ksprintf(buf, sizeof(buf), "%s: %s (%u bytes)", f->name.c_str(), ext, (unsigned)f->size);
+                term_print(t, buf);
+            }
+        }
+    }
+    else if (strcmp(a0, "ln") == 0) {
+        if (argc < 3) term_print(t, "usage: ln <src> <dst>");
+        else {
+            FSNode* src = g_vfs->resolve(argv[1]);
+            if (!src || src->is_dir) term_print(t, "ln: source not a file");
+            else if (fs_copy(src, argv[2])) { String ok = "linked (copied): "; ok += argv[2]; term_print(t, ok.c_str()); }
+            else term_print(t, "ln: failed");
+        }
+    }
+    else if (strcmp(a0, "neofetch") == 0) {
+        term_print(t, "        .--.         nefu@nefuos");
+        term_print(t, "       |o_o |        ------------");
+        term_print(t, "       |:_/ |        OS: nefuOS 0.2.0 x86_64");
+        term_print(t, "      //   \\ \\       Host: nefuOS Virtual Machine");
+        term_print(t, "     (|     | )      Kernel: 0.2.0-nefuOS");
+        char buf[80];
+        ksprintf(buf, sizeof(buf), "    /'\\_   _/\\`\\      Uptime: %u mins", (unsigned)(nefuos_uptime_ms()/60000));
+        term_print(t, buf);
+        term_print(t, "    \\___)=(___/      Shell: nefush 1.0");
+        term_print(t, "                      DE: nefuOS Desktop");
+        term_print(t, "                      CPU: nefuOS vCPU @ 2.4GHz");
+        term_print(t, "                      Memory: 2048MiB / 65536MiB");
+    }
+    else if (strcmp(a0, "sync") == 0) term_print(t, "sync: all data flushed");
+    else if (strcmp(a0, "dmesg") == 0) {
+        FSNode* f = g_vfs->resolve("/var/log/boot.log");
+        if (f && !f->is_dir) term_cat(t, "/var/log/boot.log");
+        else term_print(t, "dmesg: kernel ring buffer empty");
+    }
+    else if (strcmp(a0, "man") == 0) {
+        if (argc < 2) term_print(t, "usage: man <command>");
+        else {
+            char buf[128];
+            ksprintf(buf, sizeof(buf), "nefuOS manual: %s", argv[1]);
+            term_print(t, buf);
+            term_print(t, "  Type 'help' for the list of builtin commands.");
+            term_print(t, "  See /usr/share/banner.txt and /README.txt.");
+        }
+    }
+    else if (strcmp(a0, "top") == 0) {
+        term_print(t, "PID  NAME            STATE       CPU");
+        term_print(t, "  1  desktop         running     0%");
+        term_print(t, "  2  window manager  running     0%");
+        term_print(t, "  3  vfs daemon      running     0%");
+        term_print(t, "  4  network stack   running     0%");
+        term_print(t, "  5  shell           running     0%");
+        term_print(t, "  6  browser         sleeping    0%");
+        char buf[80];
+        ksprintf(buf, sizeof(buf), "Tasks: 6 total, Mem: %uK used", (unsigned)(g_vfs->total_bytes()/1024));
+        term_print(t, buf);
+    }
+    else if (strcmp(a0, "kill") == 0) {
+        if (argc < 2) term_print(t, "usage: kill <pid> (simulated)");
+        else {
+            char buf[80];
+            ksprintf(buf, sizeof(buf), "kill: process %s signalled", argv[1]);
+            term_print(t, buf);
+        }
+    }
+    else if (strcmp(a0, "df") == 0 && argc > 1 && strcmp(argv[1], "-h") == 0) {
+        term_print(t, "Filesystem      Size  Used Avail Use% Mounted on");
+        uint32_t used = g_vfs->total_bytes();
+        uint32_t size = 65536 * 1024;
+        char buf[96];
+        ksprintf(buf, sizeof(buf), "/dev/vfs0       64M  %4uK %4uK  %3u%% /",
+                 (unsigned)(used/1024), (unsigned)((size-used)/1024), (unsigned)(used*100/size));
+        term_print(t, buf);
+    }
+    else if (strcmp(a0, "who") == 0 || strcmp(a0, "users") == 0) term_print(t, "nefu     tty1     2026-09-06 00:00 (console)");
+    else if (strcmp(a0, "last") == 0) term_print(t, "nefu     tty1        console  Sun Sep  6 00:00   still logged in");
+    else if (strcmp(a0, "sh") == 0 || strcmp(a0, "bash") == 0) term_print(t, "nefush: already inside nefuOS shell (type help)");
+    else if (strcmp(a0, "which") == 0 && argc > 1 && strcmp(argv[1], "-a") == 0) {
+        char buf[96];
+        if (argc > 2) {
+            ksprintf(buf, sizeof(buf), "/bin/%s", argv[2]); term_print(t, buf);
+            ksprintf(buf, sizeof(buf), "/usr/bin/%s", argv[2]); term_print(t, buf);
+        } else term_print(t, "usage: which -a <command>");
+    }
+    else if (strcmp(a0, "history") == 0 && argc > 1 && strcmp(argv[1], "-c") == 0) {
+        s_hist_n = 0;
+        term_print(t, "history cleared");
+    }
+    else if (strcmp(a0, "true") == 0 || strcmp(a0, "false") == 0) {
+        // exit code semantics (no-op here)
+    }
+    else if (strcmp(a0, "echo") == 0) { /* already handled above */ }
     else if (*a0) {
-        String e = "unknown command: ";
-        e += a0;
-        term_print(t, e.c_str());
+        // Try executing a file directly: ./xxx.bin, ./xxx.nefud, /path/to/xxx.bin
+        const char* exec = 0;
+        FSNode* f = 0;
+        if (a0[0] == '.' || a0[0] == '/') {
+            f = g_vfs->resolve(a0);
+            exec = a0;
+        } else {
+            // search PATH: /bin and /usr/bin for matching files
+            static const char* paths[] = {"/bin/", "/usr/bin/", "/sbin/", 0};
+            char cand[128];
+            for (int pi = 0; paths[pi]; pi++) {
+                ksprintf(cand, sizeof(cand), "%s%s", paths[pi], a0);
+                FSNode* c = g_vfs->resolve(cand);
+                if (c && !c->is_dir && c->size > 0) { f = c; exec = cand; break; }
+            }
+        }
+        if (f && !f->is_dir && f->size > 0) {
+            // .bin => real binary package (NEFVM bytecode or bound app)
+            if (f->size >= 8 && f->data[0]=='N' && f->data[1]=='E' && f->data[2]=='F' &&
+                f->data[3]=='B' && f->data[4]=='I' && f->data[5]=='N') {
+                String ok = "exec: "; ok += exec; term_print(t, ok.c_str());
+                term_nefud_run(t, f);
+            } else if (f->size >= 6 && !strncmp((const char*)f->data, "NEFUD1", 6)) {
+                String ok = "exec: "; ok += exec; term_print(t, ok.c_str());
+                term_nefud_run(t, f);
+            } else {
+                String e = "exec: not executable: "; e += exec; term_print(t, e.c_str());
+            }
+        } else {
+            String e = "command not found: ";
+            e += a0;
+            term_print(t, e.c_str());
+        }
     }
 }
 

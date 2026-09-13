@@ -1,6 +1,7 @@
 // nefuOS
 #include "vfs.h"
 #include "../platform.h"
+#include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (build-time injected hash only)
 
 namespace nefu {
 
@@ -319,8 +320,14 @@ void VFS::ensure_standard_dirs() {
         "/home/user/Downloads", "/home/user/.Trash",
         "/lib", "/mnt", "/opt", "/proc", "/root", "/run", "/sbin", "/srv",
         "/sys", "/tmp", "/usr", "/usr/bin", "/usr/lib", "/usr/share",
-        "/usr/share/apps", "/usr/downloads",
-        "/var", "/var/log", "/var/cache"
+        "/usr/share/apps", "/usr/downloads", "/usr/local", "/usr/local/bin",
+        "/etc/init.d",
+        "/var", "/var/log", "/var/cache", "/var/lib", "/var/lib/dpkg", "/var/run",
+        "/var/lib/nefuos", "/var/lib/nefuos/db",
+        "/lib/modules", "/lib/firmware",
+        "/mnt/cdrom", "/mnt/usb", "/mnt/hd",
+        "/srv/www",
+        "/root"
     };
     for (unsigned i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) mkdir(dirs[i]);
 }
@@ -467,6 +474,178 @@ void VFS::create_default_tree() {
         "[ok] GUI initialized\n"
         "[ok] network link up\n"
         "[ok] system ready\n");
+    // ---- /etc: real Unix config files ----
+    put_text(this, "/etc/passwd", "root:x:0:0:root:/root:/bin/sh\nnefu:x:1000:1000:nefu:/home/user:/bin/sh\nlbinm:x:0:0:admin:/root:/bin/sh\nnobody:x:65534:65534:nobody:/nonexistent:/bin/false\n");
+    put_text(this, "/etc/shadow",
+        "root:*:0:0:99999:7:::\n"
+        "lbinm:" NEFU_ADMIN_HASH ":0:0:99999:7:::\n"
+        "nefu:!:0:0:99999:7:::\n");
+    put_text(this, "/etc/group", "root:x:0:\nnefu:x:1000:\nwheel:x:10:nefu\naudio:x:29:\nvideo:x:44:\n");
+    put_text(this, "/etc/hosts", "127.0.0.1 localhost\n127.0.1.1 nefuos\n::1 localhost\n10.0.2.2 gateway\n10.0.2.15 nefuos\n");
+    put_text(this, "/etc/resolv.conf", "nameserver 8.8.8.8\nnameserver 8.8.4.4\nnameserver 1.1.1.1\n");
+    put_text(this, "/etc/fstab", "proc /proc proc defaults 0 0\nsysfs /sys sysfs defaults 0 0\n/dev/vda1 / ext4 defaults 0 1\ntmpfs /tmp tmpfs defaults 0 0\n");
+    put_text(this, "/etc/profile", "export PATH=/bin:/usr/bin:/sbin:/usr/sbin\nexport PS1='\\u@\\h:\\w\\$ '\nexport EDITOR=/bin/vi\numask 022\n");
+    put_text(this, "/etc/shells", "/bin/sh\n/bin/bash\n/usr/bin/tmux\n");
+    put_text(this, "/etc/motd", "Welcome to nefuOS!\n * Docs: https://github.com/Nefu-Dev/nefuOS\n");
+    put_text(this, "/etc/services", "echo 7/tcp\nftp 21/tcp\nssh 22/tcp\ntelnet 23/tcp\nsmtp 25/tcp\ndomain 53/tcp\nhttp 80/tcp\nhttps 443/tcp\n");
+    put_text(this, "/etc/inittab", "id:3:initdefault:\nsi::sysinit:/etc/init.d/rcS\n1:2345:respawn:/sbin/getty 38400 tty1\n");
+    // ---- /proc: virtual filesystem ----
+    put_text(this, "/proc/cpuinfo", "processor : 0\nvendor_id : GenuineIntel\nmodel name : nefuOS Virtual CPU (x86_64)\ncpu MHz : 2400.000\ncache size : 8192 KB\nbogomips : 4800.00\n");
+    put_text(this, "/proc/meminfo", "MemTotal: 65536 kB\nMemFree: 61440 kB\nMemAvailable: 62000 kB\nBuffers: 512 kB\nCached: 2048 kB\nSwapTotal: 0 kB\n");
+    put_text(this, "/proc/version", "nefuOS version 0.2.0 (root@nefuos) (gcc 13.2.0) #1 SMP x86_64\n");
+    put_text(this, "/proc/uptime", "1234.56 1200.00\n");
+    put_text(this, "/proc/loadavg", "0.05 0.10 0.15 1/64 128\n");
+    put_text(this, "/proc/modules", "e1000 163840 0 - Live 0xffffffff00000000\nvfs 81920 0 - Live 0xffffffff00020000\ngui 65536 0 - Live 0xffffffff00040000\nnefvm 32768 0 - Live 0xffffffff00060000\n");
+    put_text(this, "/proc/mounts", "rootfs / rootfs rw 0 0\nproc /proc proc rw 0 0\nsysfs /sys sysfs rw 0 0\ndevtmpfs /dev devtmpfs rw 0 0\n/dev/vda1 / ext4 rw 0 0\ntmpfs /tmp tmpfs rw 0 0\n");
+    put_text(this, "/proc/filesystems", "nodev sysfs\nnodev rootfs\nnodev tmpfs\nnodev devtmpfs\n ext4\n vfat\n iso9660\n");
+    put_text(this, "/proc/devices", "Character devices:\n 1 mem\n 4 tty\n 5 /dev/tty\n 10 misc\n180 usb\nBlock devices:\n 1 ramdisk\n 8 sd\n 11 sr\n");
+    // ---- /dev: device nodes ----
+    put_text(this, "/dev/null", "");
+    put_text(this, "/dev/zero", "");
+    put_text(this, "/dev/random", "");
+    put_text(this, "/dev/tty", "");
+    put_text(this, "/dev/console", "");
+    put_text(this, "/dev/sda", "# 8GB virtual disk\n# /dev/sda1 ext4 /\n");
+    put_text(this, "/dev/sr0", "# CD/DVD: nefuOS.iso\n");
+    // ---- /sys: system info ----
+    put_text(this, "/sys/kernel/hostname", "nefuos\n");
+    put_text(this, "/sys/kernel/osrelease", "0.2.0-nefuOS\n");
+    put_text(this, "/sys/class/net/eth0/address", "52:54:00:12:34:56\n");
+    put_text(this, "/sys/class/net/eth0/operstate", "up\n");
+    put_text(this, "/sys/class/net/eth0/speed", "1000\n");
+    put_text(this, "/sys/class/net/eth0/mtu", "1500\n");
+    // ---- /root: root user home ----
+    put_text(this, "/root/.bashrc", "# root bashrc\nexport PS1='\\u@\\h:\\w# '\nalias ll='ls -l'\nalias la='ls -A'\nalias grep='grep --color=auto'\n");
+    put_text(this, "/root/.profile", "# root profile\nif [ -f ~/.bashrc ]; then . ~/.bashrc; fi\n");
+    put_text(this, "/root/.bash_history", "ls -la\ncd /etc\ncat passwd\nps aux\nifconfig\nping 10.0.2.2\ndf -h\nfree -m\nuname -a\n");
+    // ---- /home/user: user config ----
+    put_text(this, "/home/user/.bashrc", "# user bashrc\nexport PS1='\\u@\\h:\\w\\$ '\nalias ll='ls -l'\nalias ..='cd ..'\nalias grep='grep --color=auto'\nexport EDITOR=/bin/vi\n");
+    put_text(this, "/home/user/.profile", "# user profile\nif [ -f ~/.bashrc ]; then . ~/.bashrc; fi\nexport PATH=$HOME/bin:$PATH\n");
+    // ---- /bin: shell and coreutils stubs ----
+    put_text(this, "/bin/sh", "# stub\n");
+    put_text(this, "/bin/bash", "# stub\n");
+    put_text(this, "/bin/ls", "# stub\n");
+    put_text(this, "/bin/cat", "# stub\n");
+    put_text(this, "/bin/mkdir", "# stub\n");
+    put_text(this, "/bin/rm", "# stub\n");
+    put_text(this, "/bin/cp", "# stub\n");
+    put_text(this, "/bin/mv", "# stub\n");
+    put_text(this, "/bin/grep", "# stub\n");
+    put_text(this, "/bin/pwd", "# stub\n");
+    put_text(this, "/bin/echo", "# stub\n");
+    put_text(this, "/bin/true", "# stub\n");
+    put_text(this, "/bin/false", "# stub\n");
+    put_text(this, "/bin/hostname", "# stub\n");
+    put_text(this, "/bin/uname", "# stub\n");
+    put_text(this, "/bin/date", "# stub\n");
+    put_text(this, "/bin/login", "# stub\n");
+    put_text(this, "/bin/sleep", "# stub\n");
+    // ---- /sbin: system binaries ----
+    put_text(this, "/sbin/init", "# stub\n");
+    put_text(this, "/sbin/reboot", "# stub\n");
+    put_text(this, "/sbin/halt", "# stub\n");
+    put_text(this, "/sbin/poweroff", "# stub\n");
+    put_text(this, "/sbin/shutdown", "# stub\n");
+    put_text(this, "/sbin/mount", "# stub\n");
+    put_text(this, "/sbin/umount", "# stub\n");
+    put_text(this, "/sbin/fsck", "# stub\n");
+    put_text(this, "/sbin/mkfs", "# stub\n");
+    put_text(this, "/sbin/modprobe", "# stub\n");
+    put_text(this, "/sbin/lsmod", "# stub\n");
+    put_text(this, "/sbin/ifconfig", "# stub\n");
+    put_text(this, "/sbin/route", "# stub\n");
+    // ---- /usr/bin: user binaries (compact stubs) ----
+    put_text(this, "/usr/bin/top", "# stub\n");
+    put_text(this, "/usr/bin/ps", "# stub\n");
+    put_text(this, "/usr/bin/kill", "# stub\n");
+    put_text(this, "/usr/bin/killall", "# stub\n");
+    put_text(this, "/usr/bin/whoami", "# stub\n");
+    put_text(this, "/usr/bin/id", "# stub\n");
+    put_text(this, "/usr/bin/file", "# stub\n");
+    put_text(this, "/usr/bin/stat", "# stub\n");
+    put_text(this, "/usr/bin/ln", "# stub\n");
+    put_text(this, "/usr/bin/wc", "# stub\n");
+    put_text(this, "/usr/bin/head", "# stub\n");
+    put_text(this, "/usr/bin/tail", "# stub\n");
+    put_text(this, "/usr/bin/sort", "# stub\n");
+    put_text(this, "/usr/bin/uniq", "# stub\n");
+    put_text(this, "/usr/bin/diff", "# stub\n");
+    put_text(this, "/usr/bin/sed", "# stub\n");
+    put_text(this, "/usr/bin/awk", "# stub\n");
+    put_text(this, "/usr/bin/cut", "# stub\n");
+    put_text(this, "/usr/bin/tr", "# stub\n");
+    put_text(this, "/usr/bin/tee", "# stub\n");
+    put_text(this, "/usr/bin/find", "# stub\n");
+    put_text(this, "/usr/bin/which", "# stub\n");
+    put_text(this, "/usr/bin/env", "# stub\n");
+    put_text(this, "/usr/bin/history", "# stub\n");
+    put_text(this, "/usr/bin/clear", "# stub\n");
+    put_text(this, "/usr/bin/man", "# stub\n");
+    put_text(this, "/usr/bin/alias", "# stub\n");
+    put_text(this, "/usr/bin/su", "# stub\n");
+    put_text(this, "/usr/bin/sudo", "# stub\n");
+    put_text(this, "/usr/bin/passwd", "# stub\n");
+    put_text(this, "/usr/bin/chmod", "# stub\n");
+    put_text(this, "/usr/bin/chown", "# stub\n");
+    put_text(this, "/usr/bin/touch", "# stub\n");
+    put_text(this, "/usr/bin/tree", "# stub\n");
+    put_text(this, "/usr/bin/df", "# stub\n");
+    put_text(this, "/usr/bin/du", "# stub\n");
+    put_text(this, "/usr/bin/free", "# stub\n");
+    put_text(this, "/usr/bin/uptime", "# stub\n");
+    put_text(this, "/usr/bin/dmesg", "# stub\n");
+    put_text(this, "/usr/bin/lspci", "# stub\n");
+    put_text(this, "/usr/bin/lsusb", "# stub\n");
+    put_text(this, "/usr/bin/ifconfig", "# stub\n");
+    put_text(this, "/usr/bin/ping", "# stub\n");
+    put_text(this, "/usr/bin/netstat", "# stub\n");
+    put_text(this, "/usr/bin/wget", "# stub\n");
+    put_text(this, "/usr/bin/curl", "# stub\n");
+    put_text(this, "/usr/bin/ssh", "# stub\n");
+    put_text(this, "/usr/bin/scp", "# stub\n");
+    put_text(this, "/usr/bin/tar", "# stub\n");
+    put_text(this, "/usr/bin/gzip", "# stub\n");
+    put_text(this, "/usr/bin/vim", "# stub\n");
+    put_text(this, "/usr/bin/gcc", "# stub\n");
+    put_text(this, "/usr/bin/make", "# stub\n");
+    put_text(this, "/usr/bin/git", "# stub\n");
+    put_text(this, "/usr/bin/python3", "# stub\n");
+    put_text(this, "/usr/bin/neofetch", "# stub\n");
+    // ---- /usr/lib: libraries ----
+    put_text(this, "/usr/lib/libc.so", "# GNU C Library stub\n# nefuOS uses klib\n");
+    put_text(this, "/usr/lib/libm.so", "# math library stub\n");
+    put_text(this, "/usr/lib/libpthread.so", "# POSIX threads stub\n");
+    put_text(this, "/usr/lib/libdl.so", "# dynamic linking stub\n");
+    // ---- /boot: boot files ----
+    put_text(this, "/boot/vmlinuz", "# nefuOS kernel\n# loaded at 0x20000 by boot.s\n");
+    put_text(this, "/boot/initrd.img", "# initial ramdisk\n");
+    put_text(this, "/boot/grub/grub.cfg", "# nefuOS GRUB\nset default=0\nset timeout=3\nmenuentry nefuOS {\n  linux /boot/vmlinuz root=/dev/vda1 rw\n  initrd /boot/initrd.img\n}\n");
+    put_text(this, "/boot/config-0.2.0", "# nefuOS kernel config\nCONFIG_X86_64=y\nCONFIG_VFS=y\nCONFIG_GUI=y\nCONFIG_NEFVM=y\nCONFIG_E1000=y\nCONFIG_TCP=y\n");
+    // ---- /var/log: more log files ----
+    put_text(this, "/var/log/syslog", "Sep 6 00:00:01 nefuos kernel: nefuOS 0.2.0 starting\nSep 6 00:00:01 nefuos kernel: VFS: mounted root\nSep 6 00:00:01 nefuos kernel: GUI: 800x600 framebuffer\nSep 6 00:00:01 nefuos kernel: e1000: NIC up\nSep 6 00:00:02 nefuos login: session opened for nefu\n");
+    put_text(this, "/var/log/kern.log", "[0.000000] nefuOS 0.2.0 (gcc 13.2.0) #1 SMP\n[0.001234] VFS: mounted root filesystem\n[0.002345] GUI: framebuffer at 0xFD000000\n[0.003456] e1000: eth0 link up 1000Mbps\n[0.004567] TCP: stack initialized\n");
+    put_text(this, "/var/log/auth.log", "Sep 6 00:00:02 nefuos login: session opened for user nefu\nSep 6 00:01:00 nefuos sudo: nefu : COMMAND=/bin/ls /root\n");
+    put_text(this, "/var/log/dpkg.log", "2026-09-06 00:00:01 install base-files:all 0.2.0\n2026-09-06 00:00:01 install bash:amd64 5.2.15\n2026-09-06 00:00:01 install coreutils:amd64 9.4\n2026-09-06 00:00:01 install nefuos-desktop:amd64 0.2.0\n");
+    // ---- /var/lib: system state ----
+    put_text(this, "/var/lib/dpkg/status", "Package: base-files\nStatus: install ok installed\nVersion: 0.2.0\nDescription: nefuOS base system files\n\nPackage: nefuos-desktop\nStatus: install ok installed\nVersion: 0.2.0\nDescription: nefuOS desktop environment\n");
+    // ---- /var/lib/nefuos: built-in key-value database ----
+    put_text(this, "/var/lib/nefuos/db/system.db", "name=nefuOS\nversion=0.2.0\narch=x86_64\nboot=el-torito-no-emulation\nusers=root,nefu,lbinm\n");
+    // ---- /tmp: temp files ----
+    put_text(this, "/tmp/nefuos_tmp.txt", "# temporary file\n# cleared on reboot\n");
+    put_text(this, "/tmp/.X0-lock", "1234\n");
+    // ---- /opt: optional software ----
+    put_text(this, "/opt/README", "# /opt: optional software\n");
+    // ---- /srv: service data ----
+    put_text(this, "/srv/README", "# /srv: service data\n");
+    put_text(this, "/srv/www/index.html", "<!DOCTYPE html>\n<html><head><title>nefuOS</title></head><body><h1>Welcome to nefuOS!</h1></body></html>\n");
+    // ---- /mnt: mount points ----
+    put_text(this, "/mnt/README", "# /mnt: mount points\n");
+    put_text(this, "/mnt/cdrom/README", "# CD-ROM mount point\n");
+    put_text(this, "/mnt/usb/README", "# USB mount point\n");
+    // ---- /lib: kernel modules ----
+    put_text(this, "/lib/modules/0.2.0-nefuOS/modules.dep", "# modules.dep\nkernel/drivers/net/e1000.ko:\nkernel/fs/vfs/vfs.ko:\nkernel/gui/gui.ko:\nkernel/vm/nefvm.ko:\n");
+    put_text(this, "/lib/modules/0.2.0-nefuOS/modules.alias", "# modules.alias\nalias pci:v00008086d0000100Esv*sd*bc*sc*i* e1000\n");
+    put_text(this, "/lib/firmware/e1000.bin", "# e1000 firmware\n");
 }
 
 // ---------------- serialize ----------------

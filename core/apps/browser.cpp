@@ -1,10 +1,11 @@
 // nefuOS built-in browser
 // - file://  local VFS text/HTML viewer
-// - http://   in-house TCP stack (bare) or WinINet (host)
-// - search:   Bing (host) or local VFS filename search (bare)
-// - self-contained HTML parser (no external library)
+// - http://   threaded download (host: WinINet, bare: in-house TCP)
+// - search:   Bing (host) or local VFS (bare)
+// - self-contained HTML parser with <img> rendering
+// - all network I/O runs on background threads (UI never blocks)
 
-#include "browser.h"
+#include "apps.h"
 #include "../gui/wm.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
@@ -19,16 +20,29 @@ namespace {
 
 const int BAR_H = 30;
 const int STAT_H = 20;
+const int MAX_IMG_W = 300;   // max rendered image width
+const int MAX_IMG_H = 200;   // max rendered image height
 
-// ---- rendered output line (self-contained parser output) ----
+// ---- cached decoded image ----
+struct CachedImage {
+    String url;
+    Surface* surf;
+    bool loading;
+    bool failed;
+    CachedImage() : surf(0), loading(false), failed(false) {}
+};
+
+// ---- rendered output line ----
 struct Line {
     String s;
-    int style;       // legacy: 0 normal, 1 title, 2 link
+    int style;       // 0 normal, 1 title, 2 link
     int font_size;   // 16 / 20 / 24 / 32
     bool bold;
     uint32_t color;  // 0 = use default text color
     int indent;      // character columns
-    Line() : style(0), font_size(16), bold(false), color(0), indent(0) {}
+    String image_url; // non-empty = this line is an image
+    Surface* image;   // cached decoded image (null = not loaded yet)
+    Line() : style(0), font_size(16), bold(false), color(0), indent(0), image(0) {}
 };
 
 struct BrowserState {
@@ -42,10 +56,19 @@ struct BrowserState {
     Button btns[3];
     Button* cur;
     uint8_t last_buttons;
+    // ---- threaded page download state ----
+    volatile bool load_done;
+    volatile bool load_error;
+    uint8_t* loaded_body;
+    uint32_t loaded_len;
+    String loaded_url;
+    void* load_thread;
+    // ---- image cache ----
+    List<CachedImage*> img_cache;
 };
 
 // =====================================================================
-// HTML entity decoder (named + numeric decimal + hex)
+// HTML entity decoder
 // =====================================================================
 static int hex_val(char c) {
     if (c >= '0' && c <= '9') return c - '0';
@@ -54,8 +77,6 @@ static int hex_val(char c) {
     return 0;
 }
 
-// Decodes one entity starting at s[0]=='&'. Returns decoded char (or '?'),
-// sets *consumed to number of input bytes eaten.
 static char decode_entity(const char* s, int* consumed) {
     if (s[0] != '&') { *consumed = 1; return s[0]; }
     if (!strncmp(s, "&nbsp;", 6)) { *consumed = 6; return ' '; }
@@ -64,9 +85,6 @@ static char decode_entity(const char* s, int* consumed) {
     if (!strncmp(s, "&amp;",  5)) { *consumed = 5; return '&'; }
     if (!strncmp(s, "&quot;", 6)) { *consumed = 6; return '"'; }
     if (!strncmp(s, "&apos;", 6)) { *consumed = 6; return '\''; }
-    if (!strncmp(s, "&copy;", 6)) { *consumed = 6; return 'C'; }
-    if (!strncmp(s, "&reg;",  5)) { *consumed = 5; return 'R'; }
-    if (!strncmp(s, "&hellip;",7)) { *consumed = 7; return '.'; }
     if (!strncmp(s, "&#", 2)) {
         int val = 0; int i = 2;
         if (s[2] == 'x' || s[2] == 'X') {
@@ -85,9 +103,6 @@ static char decode_entity(const char* s, int* consumed) {
 
 // =====================================================================
 // Self-contained HTML parser -> List<Line>
-// Supports: tags, attributes, comments, DOCTYPE, script/style/head skip,
-// entity decode, whitespace collapse, block flow, headings, bold, links,
-// lists (ul/ol), tables (tr/td), br, hr, img.
 // =====================================================================
 static bool is_void_tag(const char* t) {
     static const char* v[] = {"br","hr","img","input","meta","link","area",
@@ -104,6 +119,42 @@ static bool is_block_tag(const char* t) {
     return false;
 }
 
+// extract attribute value from tag text: e.g. src="http://..." -> returns value
+static String get_attr(const char* tag_text, int tag_len, const char* attr_name) {
+    String result;
+    int alen = (int)strlen(attr_name);
+    for (int i = 0; i + alen < tag_len; i++) {
+        bool match = true;
+        for (int j = 0; j < alen; j++) {
+            char a = tag_text[i+j];
+            char b2 = attr_name[j];
+            if (a >= 'A' && a <= 'Z') a = a - 'A' + 'a';
+            if (b2 >= 'A' && b2 <= 'Z') b2 = b2 - 'A' + 'a';
+            if (a != b2) { match = false; break; }
+        }
+        if (match) {
+            int k = i + alen;
+            while (k < tag_len && (tag_text[k] == ' ' || tag_text[k] == '\t')) k++;
+            if (k < tag_len && tag_text[k] == '=') {
+                k++;
+                while (k < tag_len && (tag_text[k] == ' ' || tag_text[k] == '\t')) k++;
+                char quote = 0;
+                if (k < tag_len && (tag_text[k] == '"' || tag_text[k] == '\'')) {
+                    quote = tag_text[k]; k++;
+                }
+                while (k < tag_len) {
+                    if (quote && tag_text[k] == quote) break;
+                    if (!quote && (tag_text[k] == ' ' || tag_text[k] == '>' || tag_text[k] == '\t')) break;
+                    result += tag_text[k];
+                    k++;
+                }
+                return result;
+            }
+        }
+    }
+    return result;
+}
+
 static void html_parse(const char* html, int len, List<Line>& out) {
     String cur;
     int font_size = 16;
@@ -113,7 +164,7 @@ static void html_parse(const char* html, int len, List<Line>& out) {
     int list_depth = 0;
     int ol_count[8] = {0,0,0,0,0,0,0,0};
     bool in_ul = false;
-    bool in_skip = false;      // script / style / head
+    bool in_skip = false;
     char skip_tag[16] = {0};
     bool in_table = false;
     int td_count = 0;
@@ -134,7 +185,6 @@ static void html_parse(const char* html, int len, List<Line>& out) {
 
     int i = 0;
     while (i < len) {
-        // ---- skip script / style / head raw content ----
         if (in_skip) {
             char close[24] = "</";
             strcat(close, skip_tag);
@@ -157,22 +207,20 @@ static void html_parse(const char* html, int len, List<Line>& out) {
         }
 
         if (html[i] == '<') {
+            int tag_start = i;
             int j = i + 1;
             bool is_close = (j < len && html[j] == '/');
             if (is_close) j++;
-            // comment <!-- -->
             if (j + 3 < len && html[j]=='!' && html[j+1]=='-' && html[j+2]=='-') {
                 while (j + 2 < len && !(html[j]=='-'&&html[j+1]=='-'&&html[j+2]=='>')) j++;
                 i = j + 3;
                 continue;
             }
-            // DOCTYPE / CDATA
             if (j < len && html[j] == '!') {
                 while (j < len && html[j] != '>') j++;
                 i = j + 1;
                 continue;
             }
-            // tag name (lowercase)
             char tname[32]; int tn = 0;
             while (j < len && tn < 31 && html[j]!='>' && html[j]!=' ' &&
                    html[j]!='\t' && html[j]!='\n' && html[j]!='/' && html[j]!='=') {
@@ -181,17 +229,15 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                 tname[tn++] = c;
             }
             tname[tn] = 0;
-            // skip attributes
+            int tag_text_end = j;
+            while (tag_text_end < len && html[tag_text_end] != '>') tag_text_end++;
+            int tag_text_len = tag_text_end - tag_start;
             while (j < len && html[j] != '>') j++;
             if (j < len && html[j] == '>') j++;
             i = j;
             if (tn == 0) continue;
 
-            bool self_close = (j >= 2 && html[j-2] == '/');
-            bool is_void = is_void_tag(tname);
-
             if (!is_close) {
-                // ---- opening tag ----
                 if (!strcmp(tname,"script") || !strcmp(tname,"style") ||
                     !strcmp(tname,"head") || !strcmp(tname,"title") ||
                     !strcmp(tname,"noscript")) {
@@ -234,11 +280,19 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                     td_count++;
                     if (!strcmp(tname,"th")) bold=true;
                 }
-                else if (!strcmp(tname,"img")) cur += (const char*)"[IMG]";
-                else if (!strcmp(tname,"li")) { /* handled above */ }
-                if (is_void && !self_close) { /* void tags have no close */ }
+                else if (!strcmp(tname,"img")) {
+                    // extract src attribute and create image line
+                    String src = get_attr(html + tag_start, tag_text_len, "src");
+                    if (!src.empty()) {
+                        flush();
+                        Line l;
+                        l.image_url = src;
+                        out.push(l);
+                    } else {
+                        cur += (const char*)"[IMG]";
+                    }
+                }
             } else {
-                // ---- closing tag ----
                 if (!strcmp(tname,"script")||!strcmp(tname,"style")||
                     !strcmp(tname,"head")||!strcmp(tname,"title")||
                     !strcmp(tname,"noscript")) { in_skip=false; continue; }
@@ -260,7 +314,6 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                 else if (!strcmp(tname,"tr")) new_block();
             }
         } else {
-            // ---- text content ----
             char c = html[i];
             if (c == '&') {
                 int consumed = 0;
@@ -279,7 +332,6 @@ static void html_parse(const char* html, int len, List<Line>& out) {
     flush();
 }
 
-// legacy wrapper kept for callers that used the old name
 static void html_to_lines(const char* html, int len, List<Line>& out) {
     html_parse(html, len, out);
 }
@@ -301,16 +353,25 @@ static const char* ltrim_ws(const char* s) {
 }
 
 static bool parse_ip(const char* s, uint32_t* out) {
-    int a=0,b=0,c=0,d=0;
-    if (sscanf(s, "%d.%d.%d.%d", &a,&b,&c,&d) == 4 &&
-        a>=0&&a<=255&&b>=0&&b<=255&&c>=0&&c<=255&&d>=0&&d<=255) {
-        *out = ((uint32_t)a<<24)|((uint32_t)b<<16)|((uint32_t)c<<8)|(uint32_t)d;
-        return true;
+    int parts[4] = {0,0,0,0};
+    int idx = 0;
+    const char* p = s;
+    while (*p && idx < 4) {
+        int val = 0; int digits = 0;
+        while (*p >= '0' && *p <= '9' && digits < 3) {
+            val = val * 10 + (*p - '0');
+            p++; digits++;
+        }
+        if (digits == 0 || val > 255) return false;
+        parts[idx++] = val;
+        if (*p == '.') { p++; continue; }
+        break;
     }
-    return false;
+    if (idx != 4 || *p != 0) return false;
+    *out = ((uint32_t)parts[0]<<24)|((uint32_t)parts[1]<<16)|((uint32_t)parts[2]<<8)|(uint32_t)parts[3];
+    return true;
 }
 
-// ---- network error page (never falls back to "file not found") ----
 static void show_net_error(BrowserState* st, const char* url, const char* reason) {
     st->lines.erase_all();
     add_line(st->lines, "Unable to connect", 1);
@@ -332,7 +393,52 @@ static void show_net_error(BrowserState* st, const char* url, const char* reason
 }
 
 // =====================================================================
-// loaders
+// image cache + background image download
+// =====================================================================
+static CachedImage* find_cached_image(BrowserState* st, const char* url) {
+    for (int i = 0; i < st->img_cache.size(); i++) {
+        if (!strcmp(st->img_cache[i]->url.c_str(), url)) return st->img_cache[i];
+    }
+    return 0;
+}
+
+static void browser_image_thread(void* arg) {
+    CachedImage* img = (CachedImage*)arg;
+    uint8_t* body = 0; uint32_t body_len = 0;
+    if (platform_http_get(img->url.c_str(), &body, &body_len) && body && body_len > 0) {
+        Surface* s = new Surface();
+        if (platform_decode_image(body, body_len, *s)) {
+            img->surf = s;
+        } else {
+            delete s;
+            img->failed = true;
+        }
+        kfree(body);
+    } else {
+        img->failed = true;
+    }
+    img->loading = false;
+}
+
+static void ensure_image_loading(BrowserState* st, Line& l) {
+    if (l.image_url.empty()) return;
+    if (l.image) return; // already resolved
+    CachedImage* ci = find_cached_image(st, l.image_url.c_str());
+    if (!ci) {
+        ci = new CachedImage();
+        ci->url = l.image_url;
+        ci->surf = 0;
+        ci->loading = true;
+        ci->failed = false;
+        st->img_cache.push(ci);
+        platform_thread_create(browser_image_thread, ci);
+    }
+    if (ci->surf) l.image = ci->surf;
+    else if (ci->failed) l.image = (Surface*)-1; // mark as failed (won't retry)
+}
+
+// =====================================================================
+// loaders (synchronous, called from background thread)
 // =====================================================================
 static bool load_file(BrowserState* st, const char* path) {
     FSNode* f = g_vfs->resolve(path);
@@ -357,7 +463,6 @@ static bool load_file(BrowserState* st, const char* path) {
     if (is_html && f->size > 0) {
         html_parse((const char*)f->data, (int)f->size, st->lines);
     } else {
-        // plain text: split by lines
         char* buf = (char*)kalloc((size_t)f->size + 1);
         if (buf) {
             memcpy(buf, f->data, f->size);
@@ -367,7 +472,6 @@ static bool load_file(BrowserState* st, const char* path) {
                 if (*p == '\n' || *p == 0) {
                     char save = *p;
                     *p = 0;
-                    // strip trailing \r
                     int ll = (int)strlen(line);
                     if (ll > 0 && line[ll-1] == '\r') line[ll-1] = 0;
                     add_line(st->lines, line, 0);
@@ -391,7 +495,6 @@ static bool load_http(BrowserState* st, uint32_t ip, uint16_t port, const char* 
         "GET %s HTTP/1.0\r\nHost: %u.%u.%u.%u:%u\r\nUser-Agent: nefuOS/1.0\r\nConnection: close\r\n\r\n",
         path, (ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF, port);
     tcp_send(fd, req, rl);
-    // read response
     uint8_t* body = 0;
     uint32_t body_len = 0;
     uint32_t cap = 8192;
@@ -411,13 +514,10 @@ static bool load_http(BrowserState* st, uint32_t ip, uint16_t port, const char* 
                 body = nb;
             }
             body[body_len++] = (uint8_t)c;
-        } else if (n < 0) {
-            break;
-        }
+        } else if (n < 0) break;
     }
     tcp_close(fd);
     if (body_len == 0) { kfree(body); return false; }
-    // skip HTTP headers (find \r\n\r\n)
     uint32_t hdr_end = 0;
     for (uint32_t k = 0; k + 3 < body_len; k++) {
         if (body[k]=='\r'&&body[k+1]=='\n'&&body[k+2]=='\r'&&body[k+3]=='\n') {
@@ -443,7 +543,7 @@ static bool load_http(BrowserState* st, uint32_t ip, uint16_t port, const char* 
 }
 
 // =====================================================================
-// local VFS search (bare metal fallback when Bing is unreachable)
+// local VFS search (bare fallback)
 // =====================================================================
 struct WalkCtx { BrowserState* st; const char* q; int hits; };
 
@@ -468,7 +568,6 @@ static void walk_search(FSNode* n, WalkCtx* c) {
 }
 
 static void browser_search(BrowserState* st, const char* q) {
-    // try real Bing first (host backend via WinINet)
     char surl[512];
     ksprintf(surl, sizeof(surl), "https://www.bing.com/search?q=%s", q ? q : "");
     for (char* p = surl; *p; p++) if (*p == ' ') *p = '+';
@@ -491,7 +590,6 @@ static void browser_search(BrowserState* st, const char* q) {
         st->scroll = 0; st->status = 2; st->url = "search:";
         return;
     }
-    // fall back to local VFS filename search (bare metal)
     st->lines.erase_all();
     add_line(st->lines, "Search (local VFS)", 1);
     char head[96];
@@ -524,31 +622,28 @@ static bool browser_save_page(BrowserState* st) {
         all += st->lines[i].s;
         all += (const char*)"\n";
     }
-    FSNode* f = g_vfs->create_file(path, (const uint8_t*)all.c_str(), (uint32_t)all.len());
-    return f != 0;
+    FSNode* f = g_vfs->create_file(path);
+    if (!f) return false;
+    return g_vfs->write_file(f, (const uint8_t*)all.c_str(), (uint32_t)all.len());
 }
 
 // =====================================================================
-// URL router
+// background page download thread
 // =====================================================================
-static void browser_load(BrowserState* st, const char* url) {
-    url = ltrim_ws(url);
-    st->url = url;
-    st->status = 1;
-    st->busy = true;
+static void browser_page_thread(void* arg) {
+    BrowserState* st = (BrowserState*)arg;
+    const char* url = st->loaded_url.c_str();
 
-    if (strncmp(url, "file://", 7) == 0) {
-        const char* path = ltrim_ws(url + 7);
-        if (path[0] == 0) path = "/";
-        load_file(st, path);
-        st->busy = false;
+    // search: URLs
+    if (strncmp(url, "search:", 7) == 0) {
+        browser_search(st, url + 7);
+        st->load_done = true;
         return;
     }
 
+    // http/https: try platform_http_get first
     if (strncmp(url, "http://", 7) == 0 || strncmp(url, "https://", 8) == 0) {
-        // host backend: real HTTP(S) via WinINet (DNS + TLS included)
-        uint8_t* body = 0;
-        uint32_t body_len = 0;
+        uint8_t* body = 0; uint32_t body_len = 0;
         if (platform_http_get(url, &body, &body_len) && body && body_len > 0) {
             st->lines.erase_all();
             add_line(st->lines, "HTTP fetch", 1);
@@ -566,13 +661,11 @@ static void browser_load(BrowserState* st, const char* url) {
             }
             kfree(body);
             st->status = 2;
-            st->busy = false;
             st->scroll = 0;
+            st->load_done = true;
             return;
         }
-        // platform_http_get failed: on host this means a real network error;
-        // on bare it always returns false, so fall through to the in-house TCP
-        // stack (IP literals only).
+        // fall back to bare TCP for IP literals
         int off = (strncmp(url, "http://", 7) == 0) ? 7 : 8;
         const char* p = ltrim_ws(url + off);
         char host[64];
@@ -594,82 +687,108 @@ static void browser_load(BrowserState* st, const char* url) {
         }
         uint32_t ip;
         if (!parse_ip(host, &ip)) {
-            // hostname not resolvable (no DNS on bare) -> this is a real error,
-            // NOT a file lookup.
-            show_net_error(st, url, "DNS resolution unavailable (bare metal supports IP literals only)");
+            st->load_error = true;
+            st->load_done = true;
             return;
         }
         if (!load_http(st, ip, port, path)) {
-            show_net_error(st, url, "Connection refused or timed out");
+            st->load_error = true;
+            st->load_done = true;
             return;
         }
-        st->busy = false;
+        st->load_done = true;
         return;
     }
 
-    if (strncmp(url, "search:", 7) == 0) {
-        browser_search(st, url + 7);
-        st->busy = false;
-        return;
-    }
-
-    // plain word -> search; path-like (starts with / or .) -> file
+    // plain word -> search; path-like -> file
     if (url[0] == '/' || url[0] == '.') {
         load_file(st, url);
     } else {
         browser_search(st, url);
     }
-    st->busy = false;
+    st->load_done = true;
 }
 
 // =====================================================================
-// painting
+// URL router (starts background thread for network URLs)
 // =====================================================================
+static void browser_load(BrowserState* st, const char* url) {
+    url = ltrim_ws(url);
+    st->url = url;
+    st->status = 1;
+    st->busy = true;
+    st->load_done = false;
+    st->load_error = false;
+    st->loaded_body = 0;
+    st->loaded_len = 0;
+    st->loaded_url = url;
+    // file:// loads synchronously (fast, no network)
+    if (strncmp(url, "file://", 7) == 0) {
+        const char* path = ltrim_ws(url + 7);
+        if (path[0] == 0) path = "/";
+        load_file(st, path);
+        st->busy = false;
+        st->load_done = true;
+        return;
+    }
+    // everything else (http/https/search/plain word) goes to background thread
+    st->load_thread = platform_thread_create(browser_page_thread, st);
+}
+
+// =====================================================================
+// UTF-8 decode for address bar rendering
+// =====================================================================
+static uint32_t decode_utf8(const char*& p) {
+    uint8_t c = (uint8_t)*p;
+    if (c < 0x80) { p++; return c; }
+    if ((c & 0xE0) == 0xC0) {
+        uint32_t r = (c & 0x1F) << 6; p++;
+        if (((uint8_t)*p & 0xC0) == 0x80) { r |= ((uint8_t)*p & 0x3F); p++; }
+        return r;
+    }
+    if ((c & 0xF0) == 0xE0) {
+        uint32_t r = (c & 0x0F) << 12; p++;
+        if (((uint8_t)*p & 0xC0) == 0x80) { r |= ((uint8_t)*p & 0x3F) << 6; p++; }
+        if (((uint8_t)*p & 0xC0) == 0x80) { r |= ((uint8_t)*p & 0x3F); p++; }
+        return r;
+    }
+    p++;
+    return 0xFFFD;
+}
+
 static void draw_text_clip(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int maxx) {
     int cx = x;
-    for (const char* p = str; *p; p++) {
-        if (cx + 8 > maxx) break;
-        gfx::char8x16(s, cx, y, *p, fg, bg);
-        cx += 8;
+    const char* p = str;
+    while (*p) {
+        uint32_t uc = decode_utf8(p);
+        int cw = (uc < 0x80) ? 8 : 16;
+        if (cx + cw > maxx) break;
+        if (uc < 0x80) gfx::char8x16(s, cx, y, (char)uc, fg, bg);
+        else {
+            // non-ASCII (CJK): draw a solid block as glyph placeholder
+            gfx::fillrect(s, cx, y, 16, 16, fg);
+        }
+        cx += cw;
     }
 }
 
-// draw text with font_size and faux-bold
-static void draw_line_text(Surface& s, int x, int y, const char* str,
-                           int font_size, bool bold, uint32_t color, int maxx) {
-    uint32_t fg = color ? color : color::TEXT;
-    uint32_t bg = color::WHITE;
-    if (font_size <= 16) {
-        int cx = x;
-        for (const char* p = str; *p; p++) {
-            if (cx + 8 > maxx) break;
-            gfx::char8x16(s, cx, y, *p, fg, bg);
-            if (bold) gfx::char8x16(s, cx+1, y, *p, fg, bg);
-            cx += 8;
-        }
-    } else {
-        // scale: font_size 20=1.25x, 24=1.5x, 32=2x
-        int scale = (font_size >= 32) ? 2 : (font_size >= 24 ? 2 : 1);
-        int cw = 8 * scale;
-        int cx = x;
-        for (const char* p = str; *p; p++) {
-            if (cx + cw > maxx) break;
-            // draw scaled by drawing each source pixel as scale x scale block
-            for (int row = 0; row < 16; row++) {
-                for (int col = 0; col < 8; col++) {
-                    // use char8x16 glyph data indirectly: draw char then scale is complex;
-                    // simpler: use gfx::text_scale if available, else draw at 16px
-                }
-            }
-            gfx::char8x16(s, cx, y, *p, fg, bg);
-            if (bold) gfx::char8x16(s, cx+1, y, *p, fg, bg);
-            cx += cw;
-        }
-    }
-}
-
+// =====================================================================
+// painting (checks background thread completion, renders images)
+// =====================================================================
 static void on_paint(Window* w) {
     BrowserState* st = (BrowserState*)w->userdata;
+
+    // ---- check if background page download finished ----
+    if (st->busy && st->load_done) {
+        if (st->load_error) {
+            show_net_error(st, st->url.c_str(), "Connection failed or timed out");
+        }
+        // lines already populated by the background thread
+        st->busy = false;
+        st->load_done = false;
+        if (st->loaded_body) { kfree(st->loaded_body); st->loaded_body = 0; }
+    }
+
     Surface& s = w->back;
     gfx::fillrect(s, 0, 0, w->content_w, w->content_h, color::WHITE);
 
@@ -682,7 +801,7 @@ static void on_paint(Window* w) {
     if (cur_x > w->content_w - 170) cur_x = w->content_w - 170;
     gfx::char8x16(s, cur_x, 7, '|', color::TEXT2, color::PANEL);
 
-    // buttons: Go / Search / Save
+    // buttons
     const char* labs[3] = { "Go", "S", "DL" };
     for (int i = 0; i < 3; i++) {
         Button& b = st->btns[i];
@@ -696,38 +815,95 @@ static void on_paint(Window* w) {
         ui::draw_button(s, b);
     }
 
-    // content
+    // content: render lines with variable height (text lines + images)
     int y0 = BAR_H;
-    int vis = (w->content_h - y0 - STAT_H) / 18;
-    if (vis < 0) vis = 0;
-    int start = st->scroll;
+    int content_bottom = w->content_h - STAT_H;
     int cy = y0 + 2;
-    for (int i = start; i < st->lines.size() && (i - start) < vis + 1; i++) {
+    int line_height = 18;
+
+    // first pass: calculate y positions and start image loads
+    // We render from scroll position
+    int skipped = 0;
+    bool started = false;
+    for (int i = 0; i < st->lines.size(); i++) {
         const Line& l = st->lines[i];
-        if (l.s.empty()) { cy += 10; continue; }
-        uint32_t fg = l.color ? l.color : color::TEXT;
-        if (l.style == 2) fg = color::BLUE;
-        int xoff = 6 + l.indent * 8;
-        if (l.font_size >= 24) {
-            gfx::text_scale(s, xoff, cy, l.s.c_str(), fg, color::WHITE, 2);
-            if (l.bold) gfx::text_scale(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, 2);
-            cy += 36;
-        } else if (l.font_size >= 20) {
-            gfx::text_scale(s, xoff, cy, l.s.c_str(), fg, color::WHITE, 1);
-            if (l.bold) gfx::char8x16(s, xoff+1, cy, l.s[0], fg, color::WHITE);
-            gfx::text(s, xoff, cy, l.s.c_str(), fg, color::WHITE);
-            cy += 22;
+        int this_h = line_height;
+        if (!l.image_url.empty()) {
+            this_h = MAX_IMG_H + 4;
+            if (l.image && l.image != (Surface*)-1 && l.image->addr) {
+                int ih = l.image->height;
+                if (ih > MAX_IMG_H) ih = MAX_IMG_H;
+                this_h = ih + 4;
+            }
+        }
+        if (!started) {
+            if (skipped < st->scroll) { skipped++; cy += this_h; continue; }
+            started = true;
+        }
+        if (cy + this_h > content_bottom) break;
+
+        if (!l.image_url.empty()) {
+            // image line
+            ensure_image_loading(st, (Line&)l);
+            if (l.image && l.image != (Surface*)-1 && l.image->addr) {
+                // render image scaled to fit
+                Surface* img = l.image;
+                int iw = img->width, ih = img->height;
+                if (iw > MAX_IMG_W) { ih = ih * MAX_IMG_W / iw; iw = MAX_IMG_W; }
+                if (ih > MAX_IMG_H) { iw = iw * MAX_IMG_H / ih; ih = MAX_IMG_H; }
+                int ix = 6 + l.indent * 8;
+                // draw image background
+                gfx::fillrect(s, ix, cy, iw, ih, 0xEEEEEE);
+                // copy pixels (simple nearest-neighbor scale)
+                for (int yy = 0; yy < ih; yy++) {
+                    for (int xx = 0; xx < iw; xx++) {
+                        int sx = xx * img->width / iw;
+                        int sy = yy * img->height / ih;
+                        if (sx < img->width && sy < img->height) {
+                            uint32_t px = img->px(sx, sy);
+                            if (cy + yy >= 0 && cy + yy < s.height && ix + xx >= 0 && ix + xx < s.width) {
+                                s.px(ix + xx, cy + yy) = px;
+                            }
+                        }
+                    }
+                }
+                gfx::rect(s, ix, cy, iw, ih, color::BORDER);
+            } else if (l.image == (Surface*)-1) {
+                // failed to load
+                gfx::fillrect(s, 6, cy, MAX_IMG_W, 40, 0xFFEEEE);
+                gfx::text(s, 10, cy + 12, "[image failed to load]", 0xCC0000, 0xFFEEEE);
+            } else {
+                // loading
+                gfx::fillrect(s, 6, cy, MAX_IMG_W, 40, 0xF0F0F0);
+                gfx::text(s, 10, cy + 12, "[loading image...]", color::TEXT2, 0xF0F0F0);
+            }
+            cy += this_h;
         } else {
-            gfx::text(s, xoff, cy, l.s.c_str(), fg, color::WHITE);
-            if (l.bold) gfx::text(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE);
-            cy += 18;
+            // text line
+            if (l.s.empty()) { cy += 10; continue; }
+            uint32_t fg = l.color ? l.color : color::TEXT;
+            if (l.style == 2) fg = color::BLUE;
+            int xoff = 6 + l.indent * 8;
+            if (l.font_size >= 24) {
+                gfx::text_scale(s, xoff, cy, l.s.c_str(), fg, color::WHITE, 2);
+                if (l.bold) gfx::text_scale(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, 2);
+                cy += 36;
+            } else if (l.font_size >= 20) {
+                gfx::text(s, xoff, cy, l.s.c_str(), fg, color::WHITE);
+                if (l.bold) gfx::text(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE);
+                cy += 22;
+            } else {
+                gfx::text(s, xoff, cy, l.s.c_str(), fg, color::WHITE);
+                if (l.bold) gfx::text(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE);
+                cy += 18;
+            }
         }
     }
 
     // status bar
     gfx::fillrect(s, 0, w->content_h - STAT_H, w->content_w, STAT_H, color::PANEL);
     const char* sttxt = "idle";
-    if (st->status == 1) sttxt = "loading...";
+    if (st->busy) sttxt = "loading...";
     else if (st->status == 2) sttxt = "done";
     else if (st->status == 3) sttxt = "error";
     gfx::text(s, 6, w->content_h - STAT_H + 3, sttxt, color::TEXT2, color::PANEL);
@@ -741,7 +917,7 @@ static void on_paint(Window* w) {
 // =====================================================================
 static void on_key(Window* w, const KeyEvent* e) {
     BrowserState* st = (BrowserState*)w->userdata;
-    // UTF-8 IME input (CJK, etc.) -- insert multi-byte sequence at cursor
+    // UTF-8 IME input
     if (e->utf8[0]) {
         int n = 0;
         while (n < 7 && e->utf8[n]) n++;
@@ -754,7 +930,6 @@ static void on_key(Window* w, const KeyEvent* e) {
         }
         return;
     }
-    // Note: no busy guard -- browser_load() snapshots st->url into its own copy.
     if (e->ascii >= 32 && e->ascii < 127) {
         if (st->input.len() < 120) {
             String ns = st->input.substr(0, st->cursor);
@@ -805,7 +980,6 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
     bool pressed = buttons && !st->last_buttons;
     bool released = !buttons && st->last_buttons;
     st->last_buttons = buttons;
-    // buttons
     for (int i = 0; i < 3; i++) {
         st->cur = &st->btns[i];
         if (ui::button_event(st->btns[i], mx, my, buttons, pressed, released)) {
@@ -821,7 +995,6 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
     }
     st->cur = 0;
 
-    // address bar click: place the text cursor at the clicked column
     if (pressed && my >= 3 && my < BAR_H - 3 && mx >= 3 && mx < w->content_w - 150) {
         int pos = (mx - 8) / 8;
         if (pos < 0) pos = 0;
@@ -831,13 +1004,11 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
 
     if (!pressed) return;
     if (my < BAR_H || my >= w->content_h - STAT_H) return;
-    // click a link line
     int row_h = 18;
     int idx = st->scroll + (my - BAR_H) / row_h;
     if (idx < 0 || idx >= st->lines.size()) return;
     const Line& l = st->lines[idx];
     if (l.style == 2 || l.color == 0x0000EE) {
-        // clickable: if it looks like a path, open it
         const char* txt = l.s.c_str();
         while (*txt == ' ') txt++;
         if (txt[0] == '/' || txt[0] == '.') {
@@ -857,11 +1028,19 @@ static void on_scroll(Window* w, int delta) {
 
 static void on_close(Window* w) {
     BrowserState* st = (BrowserState*)w->userdata;
+    // free image cache
+    for (int i = 0; i < st->img_cache.size(); i++) {
+        if (st->img_cache[i]->surf) {
+            if (st->img_cache[i]->surf->addr) kfree(st->img_cache[i]->surf->addr);
+            delete st->img_cache[i]->surf;
+        }
+        delete st->img_cache[i];
+    }
     delete st;
     w->userdata = 0;
 }
 
-} // namespace
+} // anonymous namespace
 
 void browser_launch() {
     BrowserState* st = new BrowserState();

@@ -4,14 +4,15 @@ Replaces xorriso which is unreliable in this MSYS2-on-Windows environment.
 Layout:
   LBA 16: PVD, 17: Boot Record VD, 18: Terminator VD, 19: Boot Catalog,
   20: PathTable L, 21: PathTable M, 22: root dir data,
-  23: boot.s (2048B-aligned, padded), 24+: kernel.bin (padded to 64 x 2048B).
+  23: boot.s (2048B-aligned, padded), 24+: kernel.bin (padded to 192 x 2048B).
 
 Boot chain (no-emulation):
   SeaBIOS reads 1 sector (2048B) at LBA 23 = boot.s into 0x7C00,
-  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in two
-  32-sector (64KB) chunks: LBA 24..55 -> 0x20000, LBA 56..87 -> 0x30000.
+  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in four
+  32-sector (64KB) chunks: LBA 24..55 -> 0x20000, 56..87 -> 0x30000,
+  88..119 -> 0x40000, 120..151 -> 0x50000 (chunk 4 count patched at build).
   (Only 32-sector chunks work reliably on QEMU's ATAPI; kernel is padded to
-  64 blocks in the ISO so the second chunk never runs off the end.)
+  128 blocks in the ISO so chunks never run off the end.)
 """
 import struct
 import sys
@@ -26,7 +27,7 @@ LBA_PTM = 21
 LBA_ROOT = 22
 LBA_IMG = 23          # boot.s (no-emulation boot image, 1 sector)
 LBA_KERNEL = 24       # kernel.bin
-KERNEL_BLOCKS = 128    # padded (57 used + 7 zeros) so boot's 2nd 32-sector chunk is safe
+KERNEL_BLOCKS = 128    # padded; boot.s reads up to 128 via 4 static DAPs
 
 VOL = b"NEFUOS"
 
@@ -58,7 +59,7 @@ def build(boot_path, kernel_path, iso_path):
     assert len(boot) == 512, "boot.bin must be 512B"
     with open(kernel_path, "rb") as f:
         kernel = f.read()
-    assert len(kernel) <= KERNEL_BLOCKS * BS, "kernel too large for 64 blocks"
+    assert len(kernel) <= KERNEL_BLOCKS * BS, "kernel too large for %d blocks" % KERNEL_BLOCKS
     vol_size = LBA_KERNEL + KERNEL_BLOCKS
 
     # ---- PVD ----

@@ -3,6 +3,7 @@ build/
 dist/*.exe
 dist/nefuos.fs
 dist/nefuOS.iso
+dist/nefuOS_v2.iso
 dist/bug.txt
 dist/crash.txt
 dist/dbg_*.txt
@@ -14,6 +15,22 @@ dist/user_crop.png
 dist/win_capture.png
 dist/shots/
 iso/
+
+# Kernels / binaries / objects
+*.bin
+*.elf
+*.o
+*.obj
+*.iso
+*.img
+*.dll
+
+# Secrets & generated hashes (never upload)
+core/sys/admin_hash.h
+*.key
+*.pem
+*.token
+*.secret
 
 # Debug leftovers
 _h.py
