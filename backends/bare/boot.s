@@ -67,76 +67,79 @@ start_code:
     movb %dl, BOOT_DRIVE
     sti
 
-    # ---- set VBE 800x600x32 (0x4118) ----
-    movw $0x4F02, %ax
-    movw $0x4118, %bx
-    int $0x10
-    cmpw $0x004F, %ax
-    jne vbe_fail
+    # ---- VBE: program the display controller directly through the bochs
+    # VBE registers (0x1CE/0x1CF).  QEMU's stdvga maps BIOS VBE modes to
+    # 24bpp (unusable pixel layout); direct register setup yields a true
+    # 32bpp linear framebuffer.  LFB base is QEMU stdvga BAR0.
+    movl $0xFD000000, %eax
+    movl %eax, 0x7000
     call dbg_char
     .byte 'V'
-    movw $0x4F01, %ax
-    movw $0x4118, %cx
-    xorw %di, %di
-    movw %di, %es
-    movw $0x6000, %di
-    int $0x10
-    cmpw $0x004F, %ax
-    jne vbe_fail
-    xorw %ax, %ax
-    movw %ax, %es
-    movl 0x6028, %eax            # phys base ptr (LFB)
-    movl %eax, 0x7000
-    movl $800, 0x7004
-    movl $600, 0x7008
-    movl $3200, 0x700C
-    # query current VBE mode (0x4F03) -> probe '1' if 0x118 took, else '0'
-    movw $0x4F03, %ax
-    xorw %bx, %bx
-    int $0x10
-    andw $0x0FFF, %bx
-    cmpw $0x0118, %bx
-    jne vbe_mode_nok
-    call dbg_char
-    .byte '1'
-    jmp vbe_mode_done
-vbe_mode_nok:
-    call dbg_char
-    .byte '0'
-vbe_mode_done:
-    nop
+    # bochs VBE register set (index 0x1CE, data 0x1CF); QEMU stdvga keeps
+    # these live without an ID enable write.
+    movw $0x1CE, %dx
+    movw $0x0001, %ax
+    outw %ax, %dx              # index XRES
+    movw $0x1CF, %dx
+    movw $1024, %ax
+    outw %ax, %dx
+    movw $0x1CE, %dx
+    movw $0x0002, %ax
+    outw %ax, %dx              # index YRES
+    movw $0x1CF, %dx
+    movw $768, %ax
+    outw %ax, %dx
+    movw $0x1CE, %dx
+    movw $0x0003, %ax
+    outw %ax, %dx              # index BPP
+    movw $0x1CF, %dx
+    movw $32, %ax
+    outw %ax, %dx
+    movw $0x1CE, %dx
+    movw $0x0004, %ax
+    outw %ax, %dx              # index ENABLE
+    movw $0x1CF, %dx
+    movw $0x0081, %ax          # display enabled + linear framebuffer
+    outw %ax, %dx
+    # bootinfo: X=1024 Y=768 pitch=4096 bpp=32
+    movl $1024, 0x7004
+    movl $768, 0x7008
+    movl $4096, 0x700C
+    movb $32, 0x7010
 
 # ---- load kernel.bin from real ATAPI CD via EDD int 0x13 AH=0x42 ----
-# kernel.bin at physical LBA 24, 128 x 2048B sectors max, four static chunks.
+# kernel.bin at physical LBA 24, up to 192 x 2048B sectors, six static chunks.
 cd_load_kernel:
     movw $cdap1 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
     movb $0x42, %ah
     int $0x13
     jc cd_retry
-    call dbg_char
-    .byte '1'
     movw $cdap2 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
     movb $0x42, %ah
     int $0x13
     jc cd_retry
-    call dbg_char
-    .byte '2'
     movw $cdap3 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
     movb $0x42, %ah
     int $0x13
     jc cd_retry
-    call dbg_char
-    .byte '3'
     movw $cdap4 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
     movb $0x42, %ah
     int $0x13
     jc cd_retry
-    call dbg_char
-    .byte '4'
+    movw $cdap5 + 0x7C00, %si
+    movb BOOT_DRIVE, %dl
+    movb $0x42, %ah
+    int $0x13
+    jc cd_retry
+    movw $cdap6 + 0x7C00, %si
+    movb BOOT_DRIVE, %dl
+    movb $0x42, %ah
+    int $0x13
+    jc cd_retry
     call dbg_char
     .byte 'L'                 # all chunks ok
     jmp kernel_loaded
@@ -167,7 +170,7 @@ kernel_loaded:
     ljmp $0x08, $0x7C04
 
 # ---- EDD DAPs (static; fully clear of BIOS clobber zone 0x7DAA+) ----
-.org 0x170
+.org 0x160
 cdap1:
     .byte 0x10, 0x00      # size
     .word 32              # count (2048B sectors, 64KB)
@@ -191,11 +194,33 @@ cdap3:
     .long 0               # lba high
 cdap4:
     .byte 0x10, 0x00      # size
-    .word 0               # count (patched at build time; max 32 per int13 limit)
+    .word 32              # count (chunk4, fixed)
     .word 0x0000          # offset
     .word 0x5000          # segment 0x5000 -> 0x50000
     .long 120             # lba low (24+96)
     .long 0               # lba high
+cdap5:
+    .byte 0x10, 0x00      # size
+    .word 32              # count (chunk5, fixed)
+    .word 0x0000          # offset
+    .word 0x6000          # segment 0x6000 -> 0x60000
+    .long 152             # lba low (24+128)
+    .long 0               # lba high
+cdap6:
+    .byte 0x10, 0x00      # size
+    .word 0               # count (patched at build time; max 32 per int13 limit)
+    .word 0x0000          # offset
+    .word 0x7000          # segment 0x7000 -> 0x70000
+    .long 184             # lba low (24+160)
+    .long 0               # lba high
+
+# ---- bss zero-fill info (patched at build time) ----
+# entry.s reads these to know where to rep stosq the kernel .bss.
+# mingw ld PE symbols for __bss_start/__bss_end are RVAs (0), so the
+# runtime address is patched here from the PE section table instead.
+.org 0x1C0
+bss_start: .long 0        # absolute runtime address of .bss (0x20000 + RVA)
+bss_size:  .long 0        # .bss VirtualSize in bytes
 
 .org 0x1FE
     .word 0xAA55

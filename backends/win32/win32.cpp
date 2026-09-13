@@ -69,13 +69,77 @@ bool platform_decode_image(const uint8_t* data, uint32_t size, Surface& out) {
                 g  = (uint32_t)(((int)g  * (int)a + 255 * (255 - (int)a)) / 255);
                 b  = (uint32_t)(((int)b  * (int)a + 255 * (255 - (int)a)) / 255);
             }
-            out.px(x, y) = (rr << 16) | (g << 8) | b;
+            out.setpx(x, y, (rr << 16) | (g << 8) | b);
         }
     }
     bmp.UnlockBits(&bd);
     return true;
 }
 
+
+void platform_ttf_free(uint8_t* p) {
+    if (p) kfree(p);
+}
+
+bool platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_t*& out_rgba) {
+    out_rgba = 0; out_w = 0; out_h = 0;
+    if (!utf8 || !*utf8 || px <= 0 || px > 256) return false;
+    if (!s_gp_init) {
+        Gdiplus::GdiplusStartupInput in;
+        if (Gdiplus::GdiplusStartup(&s_gp_token, &in, 0) != Gdiplus::Ok) return false;
+        s_gp_init = true;
+    }
+    // UTF-8 -> UTF-16
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, 0, 0);
+    if (wlen <= 0) return false;
+    wchar_t* wbuf = (wchar_t*)malloc((size_t)wlen * 2);
+    if (!wbuf) return false;
+    MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wbuf, wlen);
+    Gdiplus::FontFamily fam(L"Segoe UI");
+    Gdiplus::Font font(&fam, (Gdiplus::REAL)px, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+    Gdiplus::RectF box(0, 0, 4096, 1024);
+    Gdiplus::StringFormat fmt(Gdiplus::StringFormat::GenericTypographic());
+    fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoClip | Gdiplus::StringFormatFlagsNoFitBlackBox);
+    fmt.SetLineAlignment(Gdiplus::StringAlignmentNear);
+    // measure
+    Gdiplus::GraphicsPath path;
+    path.AddString(wbuf, -1, &fam, Gdiplus::FontStyleRegular, (Gdiplus::REAL)px, Gdiplus::PointF(0.0f, 0.0f), &fmt);
+    Gdiplus::RectF bounds;
+    path.GetBounds(&bounds, 0, 0);
+    int w = (int)(bounds.Width + 2.5f);
+    int h = (int)(bounds.Height + 2.5f);
+    if (w <= 0 || h <= 0) { free(wbuf); return false; }
+    if (w > 4096) w = 4096;
+    if (h > 2048) h = 2048;
+    int ox = (int)(-bounds.X + 1), oy = (int)(-bounds.Y + 1);
+    // render into ARGB bitmap
+    Gdiplus::Bitmap bmp(w, h, PixelFormat32bppARGB);
+    Gdiplus::Graphics g(&bmp);
+    g.Clear(Gdiplus::Color(0, 0, 0, 0));
+    g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAlias);
+    Gdiplus::SolidBrush br(Gdiplus::Color(255, 255, 255, 255));
+    g.DrawString(wbuf, -1, &font, Gdiplus::PointF((Gdiplus::REAL)ox, (Gdiplus::REAL)oy), &fmt, &br);
+    free(wbuf);
+    Gdiplus::BitmapData bd;
+    Gdiplus::Rect r(0, 0, w, h);
+    if (bmp.LockBits(&r, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bd) != Gdiplus::Ok) return false;
+    uint8_t* out = (uint8_t*)kalloc((size_t)w * (size_t)h * 4);
+    if (!out) { bmp.UnlockBits(&bd); return false; }
+    const uint8_t* src = (const uint8_t*)bd.Scan0;
+    for (int y = 0; y < h; y++) {
+        const uint8_t* row = src + (size_t)y * bd.Stride;
+        for (int x = 0; x < w; x++) {
+            uint8_t* d = out + ((size_t)y * (size_t)w + (size_t)x) * 4;
+            d[0] = row[x * 4 + 2];       // R
+            d[1] = row[x * 4 + 1];       // G
+            d[2] = row[x * 4];           // B
+            d[3] = row[x * 4 + 3];       // A
+        }
+    }
+    bmp.UnlockBits(&bd);
+    out_w = w; out_h = h; out_rgba = out;
+    return true;
+}
 
 void* kalloc(size_t sz) {
     uint32_t* h = (uint32_t*)malloc(sz + 8);
@@ -90,6 +154,18 @@ void kfree(void* p) {
     uint32_t* h = (uint32_t*)p - 2;
     s_heap_used -= h[0];
     free(h);
+}
+
+void* krealloc(void* p, size_t sz) {
+    if (!p) return kalloc(sz);
+    uint32_t* h = (uint32_t*)p - 2;
+    uint32_t old = h[0];
+    if ((uint32_t)sz <= old) return p;
+    void* np = kalloc(sz);
+    if (!np) return 0;
+    memcpy(np, p, old);
+    kfree(p);
+    return np;
 }
 
 // ===================== threading =====================

@@ -67,7 +67,7 @@ static bool ppm_decode(const uint8_t* data, uint32_t size, Surface& out) {
         for (int x = 0; x < w; x++) {
             uint32_t c = ((uint32_t)data[i] << 16) | ((uint32_t)data[i + 1] << 8) | data[i + 2];
             i += 3;
-            out.px(x, y) = c;
+            out.setpx(x, y, c);
         }
     }
     return true;
@@ -106,7 +106,7 @@ static bool bmp_decode(const uint8_t* data, uint32_t size, Surface& out) {
                 uint32_t b = row[x * 4], g = row[x * 4 + 1], r = row[x * 4 + 2];
                 c = (r << 16) | (g << 8) | b;
             }
-            out.px(x, y) = c;
+            out.setpx(x, y, c);
         }
     }
     return true;
@@ -153,17 +153,31 @@ static void image_recalc_scale(ImageViewState* st, int avail_w, int avail_h) {
     st->dirty = false;
 }
 
+// stb_image decode hook (JPG/PNG/GIF/TGA/BMP from memory, RGBA8 out)
+bool stbi_decode_mem(const uint8_t* data, int len, int* w, int* h, uint8_t** out);
+static bool stbi_decode(const uint8_t* data, uint32_t size, Surface& out) {
+    int w = 0, h = 0;
+    uint8_t* buf = 0;
+    if (!nefu::stbi_decode_mem(data, (int)size, &w, &h, &buf)) return false;
+    if (w <= 0 || h <= 0) { kfree(buf); return false; }
+    out.width = w; out.height = h; out.pitch = w * 4;
+    out.addr = buf;
+    return true;
+}
+
 static void image_load_current(ImageViewState* st) {
     if (st->src.addr) { kfree(st->src.addr); st->src.addr = 0; }
     st->src_ok = false;
     if (st->index < 0 || st->index >= st->files.size()) return;
     FSNode* f = st->files[st->index];
     if (!f || f->is_dir || f->size == 0) return;
-    // platform decoder first (host: GDI+ for jpg/png/gif), then built-ins
+    // platform decoder first (host: GDI+ for jpg/png/gif), then stb_image
+    // (JPG/PNG/GIF/TGA/... on both backends), then built-in PPM/BMP/JPEG
     if (!platform_decode_image(f->data, f->size, st->src))
-        if (!ppm_decode(f->data, f->size, st->src))
-            if (!bmp_decode(f->data, f->size, st->src))
-                jpeg_decode(f->data, f->size, st->src);
+        if (!stbi_decode(f->data, f->size, st->src))
+            if (!ppm_decode(f->data, f->size, st->src))
+                if (!bmp_decode(f->data, f->size, st->src))
+                    jpeg_decode(f->data, f->size, st->src);
     st->src_ok = st->src.addr != 0;
     st->dirty = true;
     st->scroll_y = 0;

@@ -62,6 +62,80 @@ kernel_start:
     jmp .pd_loop
 .pd_done:
 
+    # ---- remap the LFB 2MB block to 4KB pages ----
+    # TCG cannot treat PCI MMIO as a 2MB large page; a large page there
+    # is cached as plain RAM and writes never reach the VGA card, which
+    # shows up as garbage stripes in the emulated display.  The boot
+    # sector stored the VBE physical LFB at 0x7000.  Map LFB..LFB+4MB
+    # (two 2MB blocks) through 4KB page tables at 0x13000/0x14000 (+
+    # PD*0x1000 so a LFB above 3GB uses tables 3/4 -> 0x16000/0x17000).
+    movl 0x7000, %eax
+    shrl $21, %eax               # pd index (0..2047)
+    movl %eax, %ebx              # save pd index
+    movl %eax, %ecx
+    shrl $9, %ecx                # pd table 0..3
+    shll $13, %ecx
+    addl $0xB000, %ecx           # PD base for this table
+    movl %eax, %esi
+    andl $511, %esi
+    shll $3, %esi                # entry offset in PD
+    # PT base for block 1
+    movl %ebx, %edx
+    shrl $9, %edx
+    shll $12, %edx
+    addl $0x13000, %edx          # PT1
+    # fill PT1: 512 x 4KB pages, phys = (LFB & ~2MB) + i*4K, UC
+    movl 0x7000, %esi
+    andl $0xFFE00000, %esi
+    movl $512, %edi
+.pt4_fill:
+    movl %esi, %eax
+    orl $0x13, %eax              # P+RW+CD+WT (uncached, device memory)
+    movl %eax, (%edx)
+    addl $4096, %esi
+    addl $8, %edx
+    decl %edi
+    jnz .pt4_fill
+    # PD entry 1 -> PT1 | P,RW
+    movl %ebx, %eax
+    shrl $9, %eax
+    shll $12, %eax
+    addl $0x13000, %eax          # PT1 base (0x13000 + table*0x1000)
+    orl $3, %eax
+    movl %ebx, %edi
+    andl $511, %edi
+    shll $3, %edi
+    movl %eax, (%ecx,%edi)
+    # second 2MB block (covers LFB+2MB .. LFB+4MB for big framebuffers)
+    movl %ebx, %edx
+    shrl $9, %edx
+    shll $12, %edx
+    addl $0x13000, %edx
+    addl $0x1000, %edx           # PT2 = PT1 + 0x1000
+    movl 0x7000, %esi
+    andl $0xFFE00000, %esi
+    addl $0x200000, %esi
+    movl $512, %edi
+.pt4_fill2:
+    movl %esi, %eax
+    orl $0x13, %eax
+    movl %eax, (%edx)
+    addl $4096, %esi
+    addl $8, %edx
+    decl %edi
+    jnz .pt4_fill2
+    movl %ebx, %eax
+    shrl $9, %eax
+    shll $12, %eax
+    addl $0x13000, %eax          # PT1 base
+    addl $0x1000, %eax           # PT2 = PT1 + 0x1000
+    orl $3, %eax
+    movl %ebx, %edi
+    andl $511, %edi
+    shll $3, %edi
+    addl $8, %edi
+    movl %eax, (%ecx,%edi)
+
     # ---- GDT64 ----
     lgdt gdt64_ptr
     # 探针 a：LGDT 完成
@@ -110,10 +184,15 @@ kernel_start:
     movb $'L', %al
     outb %al, %dx
     # ---- clear .bss (kernel.bin carries no zero padding) ----
-    movq $__bss_start, %rdi
-    movq $__bss_end, %rcx
-    subq %rdi, %rcx
-    shrq $3, %rcx
+    # Read bss_start/bss_size from the boot sector slots (0x7C00+0x1C0),
+    # patched at build time from the PE section table.  The __bss_start
+    # linker symbol is unusable: mingw ld emits PE symbol values as RVAs
+    # (0 for .bss), which would zero-fill low memory and destroy the
+    # page tables at 0x9000-0x13000.
+    movq $0x7C00, %rax
+    movl 0x1C0(%rax), %edi      # bss_start (absolute runtime address)
+    movl 0x1C4(%rax), %ecx      # bss_size (bytes)
+    shrq $3, %rcx               # qword count
     xorl %eax, %eax
     rep stosq
     # debugcon 探针：'B' = bss cleared

@@ -261,7 +261,7 @@ static void paint_taskbar(Surface& fb) {
     uint32_t sbc = s_start_btn_hover ? 0x004A90C2 : accent;
     gfx::fillrect(fb, sx, sy, sw, sh, sbc);
     gfx::rect(fb, sx, sy, sw, sh, 0x002F6FB6);
-    gfx::text(fb, sx + 8, sy + 4, "Start", color::WHITE, sbc);
+    gfx::text_ttf(fb, sx + 8, sy + 2, "Start", color::WHITE, sbc, 16);  // TTF (falls back to bitmap)
     if (s_start_open) gfx::fillrect(fb, sx, sy, sw, 2, color::WHITE);
     // task button
     int bx = sx + sw + 8;
@@ -286,8 +286,7 @@ static void paint_taskbar(Surface& fb) {
         uint32_t sec = platform_seconds_of_day();
         char buf[16];
         ksprintf(buf, sizeof(buf), "%02u:%02u", (sec / 3600) % 24, (sec / 60) % 60);
-        int tw = gfx::text_width(buf);
-        gfx::text(fb, W - tw - 10, y0 + 7, buf, color::WHITE, 0x00262A31);
+        gfx::text_ttf(fb, W - 56, y0 + 4, buf, color::WHITE, 0x00262A31, 16);  // TTF clock
     }
 }
 

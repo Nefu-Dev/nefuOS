@@ -41,8 +41,6 @@ void nefuos_init() {
     uint32_t sz = 0;
     if (platform_fs_load(&data, &sz) && data && g_vfs->load(data, sz)) {
         klogf("VFS loaded from storage (%u bytes)\n", sz);
-        g_vfs->ensure_standard_dirs();   // an old save must never hide /usr /tmp ...
-        klogf("VFS standard dirs ensured\n");
     } else {
         g_vfs->create_default_tree();
         klogf("VFS default tree created\n");

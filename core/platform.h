@@ -12,9 +12,18 @@ namespace nefu {
 struct Surface;
 bool platform_decode_image(const uint8_t* data, uint32_t size, struct Surface& out);
 
+// ===================== TTF text =====================
+// Renders a UTF-8 string with a real TrueType font into a freshly allocated
+// RGBA buffer (alpha = glyph coverage). Host backend implements with GDI+;
+// bare backend returns false and the caller falls back to the bitmap font.
+// Caller frees the buffer with platform_ttf_free().
+bool  platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_t*& out_rgba);
+void  platform_ttf_free(uint8_t* p);
+
 // ===================== memory =====================
 void* kalloc(size_t sz);
 void  kfree(void* p);
+void* krealloc(void* p, size_t sz);
 
 // ===================== screen =====================
 // Software pixel buffer, 32bpp, little-endian BGRA (uint32 = 0x00RRGGBB)
@@ -23,6 +32,7 @@ struct Screen {
     int width;
     int height;
     int pitch;      // bytes per row (>= width*4)
+    int bpp = 32;   // 24 for QEMU stdvga VBE modes (3-byte pixels, 4-byte stride)
 };
 Screen* platform_screen();
 // Host backend blits the buffer to the real screen each frame (bare: no-op)

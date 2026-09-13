@@ -154,8 +154,24 @@ static void store_paint(Window* w) {
         }
         y += 58;
     }
-    gfx::text(s, 12, y + 2, T("已安装应用会出现在开始菜单中。", "Installed apps appear in the Start menu."), color::BLUE_LT, color::WHITE);
+    // scrollbar (visible whenever the catalog overflows the window)
+    int vis = (s.height - 34) / 58;
+    if (vis < 1) vis = 1;
+    int max_scroll = CATALOG_N - vis;
+    if (max_scroll < 0) max_scroll = 0;
+    if (max_scroll > 0) {
+        int sb_x = s.width - 10;
+        int sb_h = s.height - 34 - 24;
+        gfx::fillrect(s, sb_x, 34, 4, sb_h, 0x00E0DFD9);
+        int thumb_h = sb_h * vis / CATALOG_N;
+        if (thumb_h < 16) thumb_h = 16;
+        int thumb_y = 34 + (sb_h - thumb_h) * st->scroll / max_scroll;
+        gfx::fillrect(s, sb_x, thumb_y, 4, thumb_h, 0x003E87B5);
+    }
+    gfx::text(s, 12, y + 2, T("已安装应用会出现在开始菜单中。PGUP/PGDN 或点击右侧滚动条翻页。", "Installed apps appear in the Start menu. PGUP/PGDN or click the scrollbar."), color::BLUE_LT, color::WHITE);
 }
+
+static void store_scroll(Window* w, int delta);   // forward
 
 static void store_mouse(Window* w, int mx, int my, uint8_t buttons) {
     StoreState* st = (StoreState*)w->userdata;
@@ -168,6 +184,18 @@ static void store_mouse(Window* w, int mx, int my, uint8_t buttons) {
     }
     st->cur = 0;
     if (!pressed) return;
+    // scrollbar click: step one page per click
+    int vis = (w->content_h - 34) / 58;
+    if (vis < 1) vis = 1;
+    int max_scroll = CATALOG_N - vis;
+    if (max_scroll < 0) max_scroll = 0;
+    if (max_scroll > 0 && mx >= w->content_w - 10 && mx < w->content_w - 4) {
+        if (my < 34 + (w->content_h - 34 - 24) * (st->scroll + 1) / (max_scroll + 1))
+            store_scroll(w, -1);
+        else
+            store_scroll(w, 1);
+        return;
+    }
     // double-click card opens app
     static int s_last_card = -1;
     static uint32_t s_last_card_t = 0;
@@ -184,8 +212,6 @@ static void store_mouse(Window* w, int mx, int my, uint8_t buttons) {
         y += 58;
     }
 }
-
-static void store_scroll(Window* w, int delta);   // forward
 
 static void store_key(Window* w, const KeyEvent* e) {
     (void)w;

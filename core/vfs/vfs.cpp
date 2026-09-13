@@ -363,7 +363,6 @@ void VFS::create_default_tree() {
     mkdir("/var");
     mkdir("/var/log");
     mkdir("/var/cache");
-
     put_text(this, "/etc/nefu.conf",
         "# nefuOS configuration\n"
         "hostname=nefuos\n"

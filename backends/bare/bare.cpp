@@ -67,7 +67,13 @@ void* kalloc(size_t sz) {
         }
         pp = &(*pp)->next;
     }
-    return alloc_from_bump(need);
+    void* r = alloc_from_bump(need);
+    // diagnostic: bump pointer must stay inside the arena; anything else
+    // means s_arena_next (in .data) was clobbered by an out-of-bounds write
+    if (s_arena_next < ARENA_BASE || s_arena_next > ARENA_BASE + ARENA_SIZE) {
+        klogf("KALLOC BAD bump=0x%x need=0x%x\n", (unsigned)s_arena_next, (unsigned)need);
+    }
+    return r;
 }
 
 void kfree(void* p) {
@@ -75,6 +81,18 @@ void kfree(void* p) {
     Blk* b = (Blk*)p - 1;
     b->next = s_free;
     s_free = b;
+}
+
+void* krealloc(void* p, size_t sz) {
+    if (!p) return kalloc(sz);
+    Blk* b = (Blk*)p - 1;
+    uint32_t old = b->size;
+    if ((uint32_t)sz <= old) return p;
+    void* np = kalloc(sz);
+    if (!np) return 0;
+    memcpy(np, p, old);
+    kfree(p);
+    return np;
 }
 
 // ===================== screen =====================
@@ -94,6 +112,13 @@ uint32_t platform_tick_ms() { return s_tick_ms; }
 bool platform_decode_image(const uint8_t* data, uint32_t size, Surface& out) {
     (void)data; (void)size; out.addr = 0; return false;
 }
+
+// bare kernel has no TrueType font data; caller falls back to bitmap font
+bool platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_t*& out_rgba) {
+    (void)utf8; (void)px; out_w = 0; out_h = 0; out_rgba = 0; return false;
+}
+
+void platform_ttf_free(uint8_t* p) { (void)p; }
 
 // ===================== IDT / PIC / PIT =====================
 struct IDTEntry {
@@ -371,18 +396,26 @@ extern "C" void nefuos_kernel_main(void* info) {
     s_screen.width = (int)bi[1];
     s_screen.height = (int)bi[2];
     s_screen.pitch = (int)bi[3];
+    s_screen.bpp = (int)bi[4];
+    if (s_screen.bpp != 24) s_screen.bpp = 32;
     __asm__ volatile("movw $0xE9, %%dx; movb $'2', %%al; outb %%al, %%dx" ::: "dx", "ax");
 
     uart_init();
     platform_dbg("\nnefuOS bare kernel: LFB=0x");
+    {
+        char tmp[64];
+        ksprintf(tmp, sizeof(tmp), " arena0=0x%x\n", (unsigned)s_arena_next);
+        platform_dbg(tmp);
+    }
     for (int i = 28; i >= 0; i -= 4) {
         int d = (int)((s_lfb >> i) & 0xF);
         uart_putc((char)(d < 10 ? '0' + d : 'A' + d - 10));
     }
+    // diag removed: solid-fill test was for LFB debugging only
     __asm__ volatile("movw $0xE9, %%dx; movb $'X', %%al; outb %%al, %%dx" ::: "dx", "ax");
     {
         char tmp[48];
-        ksprintf(tmp, sizeof(tmp), " screen=%dx%dx32\n", s_screen.width, s_screen.height);
+        ksprintf(tmp, sizeof(tmp), " screen=%dx%dx%d pitch=%d\n", s_screen.width, s_screen.height, (int)bi[4] ? (int)bi[4] : 32, s_screen.pitch);
         platform_dbg(tmp);
     }
     __asm__ volatile("movw $0xE9, %%dx; movb $'Y', %%al; outb %%al, %%dx" ::: "dx", "ax");
@@ -403,6 +436,7 @@ extern "C" void nefuos_kernel_main(void* info) {
     __asm__ volatile("movw $0xE9, %%dx; movb $'D', %%al; outb %%al, %%dx" ::: "dx", "ax");
     nefuos_frame();   // manual first frame before interrupts
     __asm__ volatile("movw $0xE9, %%dx; movb $'E', %%al; outb %%al, %%dx" ::: "dx", "ax");
+    // diag removed: solid-fill freeze was for LFB debugging only
 
     __asm__ volatile("sti");
 

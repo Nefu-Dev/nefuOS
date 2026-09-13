@@ -2,13 +2,14 @@
 #include "gfx.h"
 #include "font.h"
 #include "font16.h"
+#include "../platform.h"   // platform_ttf_text / platform_ttf_free
 
 namespace nefu {
 namespace gfx {
 
 void pixel(Surface& s, int x, int y, uint32_t c) {
     if (x < 0 || y < 0 || x >= s.width || y >= s.height) return;
-    s.px(x, y) = c;
+    s.setpx(x, y, c);
 }
 
 void fillrect(Surface& s, int x, int y, int w, int h, uint32_t c) {
@@ -18,8 +19,12 @@ void fillrect(Surface& s, int x, int y, int w, int h, uint32_t c) {
     int x1 = x + w; if (x1 > s.width) x1 = s.width;
     int y1 = y + h; if (y1 > s.height) y1 = s.height;
     for (int yy = y0; yy < y1; yy++) {
-        uint32_t* row = (uint32_t*)(s.addr + (size_t)yy * (size_t)s.pitch);
-        for (int xx = x0; xx < x1; xx++) row[xx] = c;
+        if (s.bpp == 24) {
+            for (int xx = x0; xx < x1; xx++) s.setpx(xx, yy, c);
+        } else {
+            uint32_t* row = (uint32_t*)(s.addr + (size_t)yy * (size_t)s.pitch);
+            for (int xx = x0; xx < x1; xx++) row[xx] = c;
+        }
     }
 }
 
@@ -36,8 +41,7 @@ void hline(Surface& s, int x0, int x1, int y, uint32_t c) {
     if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
     if (x0 < 0) x0 = 0;
     if (x1 >= s.width) x1 = s.width - 1;
-    uint32_t* row = (uint32_t*)(s.addr + (size_t)y * (size_t)s.pitch);
-    for (int x = x0; x <= x1; x++) row[x] = c;
+    for (int x = x0; x <= x1; x++) s.setpx(x, y, c);
 }
 
 void vline(Surface& s, int x, int y0, int y1, uint32_t c) {
@@ -45,7 +49,7 @@ void vline(Surface& s, int x, int y0, int y1, uint32_t c) {
     if (y0 > y1) { int t = y0; y0 = y1; y1 = t; }
     if (y0 < 0) y0 = 0;
     if (y1 >= s.height) y1 = s.height - 1;
-    for (int y = y0; y <= y1; y++) s.px(x, y) = c;
+    for (int y = y0; y <= y1; y++) s.setpx(x, y, c);
 }
 
 void line(Surface& s, int x0, int y0, int x1, int y1, uint32_t c) {
@@ -72,7 +76,7 @@ void char8x16(Surface& s, int x, int y, char ch, uint32_t fg, uint32_t bg) {
         for (int col = 0; col < 8; col++) {
             int xx = x + col;
             if (xx < 0 || xx >= s.width) continue;
-            s.px(xx, y + row) = (b & (0x80 >> col)) ? fg : bg;
+            s.setpx(xx, y + row, (b & (0x80 >> col)) ? fg : bg);
         }
     }
 }
@@ -114,7 +118,7 @@ void char16x16(Surface& s, int x, int y, uint32_t uc, uint32_t fg, uint32_t bg) 
         for (int col = 0; col < 16; col++) {
             int xx = x + col;
             if (xx < 0 || xx >= s.width) continue;
-            s.px(xx, y + row) = (b & (0x8000 >> col)) ? fg : bg;
+            s.setpx(xx, y + row, (b & (0x8000 >> col)) ? fg : bg);
         }
     }
 }
@@ -130,6 +134,35 @@ void text(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg) {
         else if (uc != 0xFFFD) { char16x16(s, x, y, uc, fg, bg); x += 16; }
         else { char8x16(s, x, y, '?', fg, bg); x += 8; }
     }
+}
+
+// TrueType text with graceful fallback to the bitmap font. The platform layer
+// (GDI+ on the host) renders UTF-8 into an RGBA buffer; alpha is used to blend
+// the requested color over the background.
+void text_ttf(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int px) {
+    if (!str || !*str) return;
+    int w = 0, h = 0;
+    uint8_t* rgba = 0;
+    if (!platform_ttf_text(str, px, w, h, rgba)) { text(s, x, y, str, fg, bg); return; }
+    if (!rgba) { text(s, x, y, str, fg, bg); return; }
+    int fr = (int)((fg >> 16) & 0xFF), fg2 = (int)((fg >> 8) & 0xFF), fb = (int)(fg & 0xFF);
+    int br = (int)((bg >> 16) & 0xFF), bg2 = (int)((bg >> 8) & 0xFF), bb = (int)(bg & 0xFF);
+    for (int yy = 0; yy < h; yy++) {
+        int sy = y + yy;
+        if (sy < 0 || sy >= s.height) continue;
+        for (int xx = 0; xx < w; xx++) {
+            int sx = x + xx;
+            if (sx < 0 || sx >= s.width) continue;
+            int a = rgba[((size_t)yy * (size_t)w + (size_t)xx) * 4 + 3];
+            if (a <= 0) continue;
+            if (a >= 255) { s.setpx(sx, sy, fg); continue; }
+            int r = (fr * a + br * (255 - a)) / 255;
+            int g = (fg2 * a + bg2 * (255 - a)) / 255;
+            int b = (fb * a + bb * (255 - a)) / 255;
+            s.setpx(sx, sy, ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b);
+        }
+    }
+    platform_ttf_free(rgba);
 }
 
 void text_scale(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int scale) {
@@ -186,8 +219,15 @@ void blit_clip(Surface& dst, Surface& src, int dx, int dy, int sx, int sy, int w
     if (w <= 0 || h <= 0) return;
     for (int y = 0; y < h; y++) {
         const uint8_t* sp = src.addr + (size_t)(sy + y) * (size_t)src.pitch + (size_t)sx * 4;
-        uint8_t* dp = dst.addr + (size_t)(dy + y) * (size_t)dst.pitch + (size_t)dx * 4;
-        memcpy(dp, sp, (size_t)w * 4);
+        if (dst.bpp == 24) {
+            for (int x = 0; x < w; x++) {
+                uint32_t c = *(const uint32_t*)(sp + (size_t)x * 4);
+                dst.setpx(dx + x, dy + y, c);
+            }
+        } else {
+            uint8_t* dp = dst.addr + (size_t)(dy + y) * (size_t)dst.pitch + (size_t)dx * 4;
+            memcpy(dp, sp, (size_t)w * 4);
+        }
     }
 }
 

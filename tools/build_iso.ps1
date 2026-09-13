@@ -27,7 +27,8 @@ $coreSrc = @(
   "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\monitor.cpp",
   "core\apps\browser.cpp", "core\apps\netcfg.cpp",
   "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\net\net.cpp",
-  "core\sys\settings.cpp"
+  "core\sys\settings.cpp",
+  "third_party\stb_image_wrap.cpp"
 )
 
 # 1) （win32）
@@ -54,6 +55,10 @@ foreach ($s in $coreSrc) {
 & $g @bareFlags "backends\bare\bare.cpp" -o "$bareOut\bare_bare.o"
 if ($LASTEXITCODE -ne 0) { throw "bare.cpp failed" }
 $objs += "$bareOut\bare_bare.o"
+# minimal soft-float (IEEE-754 single precision) for the bare kernel
+& $g @bareFlags "backends\bare\softfloat.cpp" -o "$bareOut\bare_softfloat.o"
+if ($LASTEXITCODE -ne 0) { throw "softfloat.cpp failed" }
+$objs += "$bareOut\bare_softfloat.o"
 
 # 3) ：boot sector + kernel entry
 & $as "backends\bare\boot.s" -o "$bareOut\boot.o"
@@ -100,7 +105,13 @@ function Rebin-Kernel {
             $secs += [pscustomobject]@{ Name = $name; RVA = $rva; RawSize = $rawSize; RawPtr = $rawPtr; VSize = $vs }
         }
         $maxEnd = 0
+        $bssRva = 0
+        $bssVSize = 0
         foreach ($s in $secs) {
+            if ($s.Name -eq ".bss") {
+                $bssRva = $s.RVA
+                $bssVSize = $s.VSize
+            }
             # .bss has no raw data (zeroed by entry.s at runtime); .reloc is
             # not needed for a flat kernel image. Skip both so kernel.bin
             # stays compact (no 42KB zero padding).
@@ -108,6 +119,22 @@ function Rebin-Kernel {
             if ($s.RawSize -eq 0) { continue }
             $end = $s.RVA + $s.RawSize
             if ($end -gt $maxEnd) { $maxEnd = $end }
+        }
+        if ($bssVSize -gt 0 -and $bssRva -gt 0) {
+            # bss runtime address = load base (0x20000) + RVA. Store it with
+            # the size so entry.s can zero-fill the correct region.
+            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x20000) -Scope Script
+            Set-Variable -Name kernelBssSize -Value $bssVSize -Scope Script
+        } elseif ($bssRva -gt 0) {
+            # mingw ld may leave VirtualSize=0 for .bss; derive the size from
+            # the next section's VirtualAddress instead.
+            $next = 0x7FFFFFFF
+            foreach ($s2 in $secs) {
+                if ($s2.RVA -gt $bssRva -and $s2.RVA -lt $next) { $next = $s2.RVA }
+            }
+            if ($next -eq 0x7FFFFFFF) { $next = $maxEnd }
+            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x20000) -Scope Script
+            Set-Variable -Name kernelBssSize -Value ($next - $bssRva) -Scope Script
         }
         $out = New-Object byte[] $maxEnd
         foreach ($s in $secs) {
@@ -123,6 +150,8 @@ function Rebin-Kernel {
     }
 }
 Rebin-Kernel "$bareOut\kernel.exe" "$bareOut\kernel.bin"
+if (-not $kernelBssStart) { $kernelBssStart = 0x93020 }
+if (-not $kernelBssSize) { $kernelBssSize = 0 }
 $kSize = (Get-Item "$bareOut\kernel.bin").Length
 Write-Output "kernel.bin OK: $kSize bytes"
 if ($kSize -gt 720000) { throw "kernel too large for floppy image" }
@@ -138,18 +167,25 @@ $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
 $fs.Position = 0x58
 $fs.WriteByte([byte]($kSectors -band 0xFF))
 $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
-# cdap4 count @0x1A2: remaining kernel bytes beyond 0x50000, in 2048B CD
-# sectors. Chunks 1-3 are fixed 32 sectors (LBA24..119 -> 0x20000..0x50000);
-# chunk 4 (LBA120, seg 0x5000) is capped at 32 (int13 EDD 64KB limit).
+# cdap6 count @0x1B2: remaining kernel bytes beyond 0x60000, in 2048B CD
+# sectors. Chunks 1-5 are fixed 32 sectors (LBA24..183 -> 0x20000..0x60000);
+# chunk 6 (LBA184, seg 0x7000) is capped at 32 (int13 EDD 64KB limit).
+# NOTE: cdap6 DAP starts at .org 0x1B0; its 16-byte layout is
+#   [0]=size [1]=reserved [2..3]=count [4..5]=offset [6..7]=seg [8..15]=lba
+# so count lives at 0x1B2, NOT 0x1B4 (0x1B4 is the offset field).
 $kTotal = [Math]::Ceiling($kSize / 2048)
-$cdap4Count = $kTotal - 96
-if ($cdap4Count -lt 0) { $cdap4Count = 0 }
-if ($cdap4Count -gt 32) { $cdap4Count = 32 }
-$fs.Position = 0x1A2
-$fs.WriteByte([byte]($cdap4Count -band 0xFF))
-$fs.WriteByte([byte](($cdap4Count -shr 8) -band 0xFF))
+$cdap6Count = $kTotal - 160
+if ($cdap6Count -lt 0) { $cdap6Count = 0 }
+if ($cdap6Count -gt 32) { $cdap6Count = 32 }
+$fs.Position = 0x1B2
+$fs.WriteByte([byte]($cdap6Count -band 0xFF))
+$fs.WriteByte([byte](($cdap6Count -shr 8) -band 0xFF))
+# bss zero-fill slots @0x1C0/0x1C4 (entry.s reads them at 0x7C00+0x1C0)
+$fs.Position = 0x1C0
+$fs.Write([BitConverter]::GetBytes([uint32]$kernelBssStart), 0, 4)
+$fs.Write([BitConverter]::GetBytes([uint32]$kernelBssSize), 0, 4)
 $fs.Close()
-Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58), cdap4=$cdap4Count"
+Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58), cdap6=$cdap6Count"
 
 # 6) （1.44MB，2880 sectors）
 $floppy = "$bareOut\floppy.img"
@@ -172,3 +208,4 @@ if (-not (Test-Path $python)) { $python = "python" }
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
 Write-Output "ISO OK: $((Get-Item dist\nefuOS_v2.iso).Length) bytes"
 Write-Output "BUILD DONE"
+

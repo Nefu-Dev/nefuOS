@@ -8,11 +8,12 @@ Layout:
 
 Boot chain (no-emulation):
   SeaBIOS reads 1 sector (2048B) at LBA 23 = boot.s into 0x7C00,
-  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in four
+  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in six
   32-sector (64KB) chunks: LBA 24..55 -> 0x20000, 56..87 -> 0x30000,
-  88..119 -> 0x40000, 120..151 -> 0x50000 (chunk 4 count patched at build).
+  88..119 -> 0x40000, 120..151 -> 0x50000, 152..183 -> 0x60000,
+  184..215 -> 0x70000 (chunk 6 count patched at build).
   (Only 32-sector chunks work reliably on QEMU's ATAPI; kernel is padded to
-  128 blocks in the ISO so chunks never run off the end.)
+  192 blocks in the ISO so chunks never run off the end.)
 """
 import struct
 import sys
@@ -27,7 +28,7 @@ LBA_PTM = 21
 LBA_ROOT = 22
 LBA_IMG = 23          # boot.s (no-emulation boot image, 1 sector)
 LBA_KERNEL = 24       # kernel.bin
-KERNEL_BLOCKS = 128    # padded; boot.s reads up to 128 via 4 static DAPs
+KERNEL_BLOCKS = 192    # padded; boot.s reads up to 192 via 6 static DAPs
 
 VOL = b"NEFUOS"
 

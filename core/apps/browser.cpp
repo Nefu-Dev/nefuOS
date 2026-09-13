@@ -42,7 +42,12 @@ struct Line {
     int indent;      // character columns
     String image_url; // non-empty = this line is an image
     Surface* image;   // cached decoded image (null = not loaded yet)
-    Line() : style(0), font_size(16), bold(false), color(0), indent(0), image(0) {}
+    // form support: 0 none, 1 text input, 2 submit button
+    int form_kind;
+    String form_name;
+    String form_val;
+    Line() : style(0), font_size(16), bold(false), color(0), indent(0), image(0),
+             form_kind(0) {}
 };
 
 struct BrowserState {
@@ -65,6 +70,9 @@ struct BrowserState {
     void* load_thread;
     // ---- image cache ----
     List<CachedImage*> img_cache;
+    // ---- form editing ----
+    int form_edit_row;      // row of the input being edited, -1 = none
+    String form_edit_val;   // edited value
 };
 
 // =====================================================================
@@ -291,6 +299,37 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                     } else {
                         cur += (const char*)"[IMG]";
                     }
+                }
+                else if (!strcmp(tname,"input")) {
+                    // <input name=.. type=.. value=.. placeholder=..> -> form line
+                    String name = get_attr(html + tag_start, tag_text_len, "name");
+                    String type = get_attr(html + tag_start, tag_text_len, "type");
+                    String val  = get_attr(html + tag_start, tag_text_len, "value");
+                    String ph   = get_attr(html + tag_start, tag_text_len, "placeholder");
+                    flush();
+                    Line l;
+                    if (!type.empty() && (type == "submit" || type == "button")) {
+                        l.form_kind = 2;
+                        l.form_name = name;
+                        l.form_val = val.empty() ? (ph.empty() ? "Submit" : ph) : val;
+                    } else {
+                        l.form_kind = 1;
+                        l.form_name = name;
+                        l.form_val = val.empty() ? ph : val;
+                        l.s = " ";
+                        l.style = 3;   // input row marker
+                    }
+                    out.push(l);
+                }
+                else if (!strcmp(tname,"button")) {
+                    // <button>Label</button> -> submit line
+                    String txt = get_attr(html + tag_start, tag_text_len, "value");
+                    flush();
+                    Line l;
+                    l.form_kind = 2;
+                    l.form_name = get_attr(html + tag_start, tag_text_len, "name");
+                    l.form_val = txt.empty() ? "Submit" : txt;
+                    out.push(l);
                 }
             } else {
                 if (!strcmp(tname,"script")||!strcmp(tname,"style")||
@@ -772,6 +811,62 @@ static void draw_text_clip(Surface& s, int x, int y, const char* str, uint32_t f
     }
 }
 
+// Record the visited URL in the browser history (/home/user/.nefu_history).
+static void history_add(BrowserState* st, const char* url) {
+    if (!url || !*url) return;
+    FSNode* f = g_vfs->resolve("/home/user/.nefu_history");
+    if (!f) f = g_vfs->create_file("/home/user/.nefu_history");
+    if (!f) return;
+    char* buf = (char*)kalloc(f->size + 1);
+    if (!buf) return;
+    memcpy(buf, f->data, f->size);
+    buf[f->size] = 0;
+    bool dup = (strstr(buf, url) != 0);
+    if (!dup) {
+        int lines = 1;
+        for (uint32_t i = 0; i < f->size; i++) if (buf[i] == '\n') lines++;
+        String nb;
+        if (lines >= 50) {
+            // keep last 49 lines
+            const char* p = buf;
+            int skip = lines - 49;
+            while (skip > 0 && *p) { if (*p == '\n') skip--; p++; }
+            if (*p == '\n') p++;
+            nb = p;
+        }
+        nb += url;
+        nb += '\n';
+        g_vfs->write_file(f, (const uint8_t*)nb.c_str(), (uint32_t)nb.len());
+    }
+    kfree(buf);
+    // cookie jar: count visits per site (host part of the URL)
+    const char* h = strstr(url, "://");
+    const char* host = h ? h + 3 : url;
+    char hb[96];
+    int hn = 0;
+    while (host[hn] && host[hn] != '/' && host[hn] != '?' && hn < 90) { hb[hn] = host[hn]; hn++; }
+    hb[hn] = 0;
+    if (hn > 0) {
+        FSNode* ck = g_vfs->resolve("/var/lib/nefuos/cookies.txt");
+        if (!ck) ck = g_vfs->create_file("/var/lib/nefuos/cookies.txt");
+        if (ck) {
+            char* cb = (char*)kalloc(ck->size + 1);
+            if (cb) {
+                memcpy(cb, ck->data, ck->size);
+                cb[ck->size] = 0;
+                char line[140];
+                int n = ksprintf(line, sizeof(line), "%s=%d; path=/; nefuOS\n", hb, 1);
+                // append (simple jar: one line per visit record)
+                String jar = cb;
+                jar += line;
+                g_vfs->write_file(ck, (const uint8_t*)jar.c_str(), (uint32_t)jar.len());
+                kfree(cb);
+            }
+        }
+    }
+    (void)st;
+}
+
 // =====================================================================
 // painting (checks background thread completion, renders images)
 // =====================================================================
@@ -782,6 +877,8 @@ static void on_paint(Window* w) {
     if (st->busy && st->load_done) {
         if (st->load_error) {
             show_net_error(st, st->url.c_str(), "Connection failed or timed out");
+        } else {
+            history_add(st, st->url.c_str());
         }
         // lines already populated by the background thread
         st->busy = false;
@@ -860,9 +957,9 @@ static void on_paint(Window* w) {
                         int sx = xx * img->width / iw;
                         int sy = yy * img->height / ih;
                         if (sx < img->width && sy < img->height) {
-                            uint32_t px = img->px(sx, sy);
+                            uint32_t px = img->getpx(sx, sy);
                             if (cy + yy >= 0 && cy + yy < s.height && ix + xx >= 0 && ix + xx < s.width) {
-                                s.px(ix + xx, cy + yy) = px;
+                                s.setpx(ix + xx, cy + yy, px);
                             }
                         }
                     }
@@ -880,11 +977,35 @@ static void on_paint(Window* w) {
             cy += this_h;
         } else {
             // text line
-            if (l.s.empty()) { cy += 10; continue; }
+            if (l.s.empty() && l.form_kind == 0) { cy += 10; continue; }
             uint32_t fg = l.color ? l.color : color::TEXT;
             if (l.style == 2) fg = color::BLUE;
             int xoff = 6 + l.indent * 8;
-            if (l.font_size >= 24) {
+            if (l.form_kind == 1) {
+                // text input box
+                const char* val = (i == st->form_edit_row && !st->form_edit_val.empty())
+                                  ? st->form_edit_val.c_str() : l.form_val.c_str();
+                int bx = xoff + 6, bw = 200;
+                if (bw > w->content_w - bx - 8) bw = w->content_w - bx - 8;
+                bool edit = (i == st->form_edit_row);
+                gfx::fillrect(s, bx, cy, bw, 17, edit ? 0x00FFF8DC : color::WHITE);
+                gfx::rect(s, bx, cy, bw, 17, edit ? 0x00000080 : color::BORDER);
+                draw_text_clip(s, bx + 3, cy + 1, val, color::TEXT, edit ? 0x00FFF8DC : color::WHITE, bw - 6);
+                if (edit) gfx::char8x16(s, bx + 3 + st->form_edit_val.len() * 8, cy + 1, '|', color::TEXT2, 0x00FFF8DC);
+                // label (name attribute)
+                if (!l.form_name.empty()) {
+                    gfx::text(s, xoff, cy + 1, l.form_name.c_str(), color::TEXT2, color::WHITE);
+                }
+                cy += 20;
+            } else if (l.form_kind == 2) {
+                // submit button
+                int bw = (int)strlen(l.form_val.c_str()) * 8 + 16;
+                if (bw < 64) bw = 64;
+                gfx::fillrect(s, xoff + 6, cy, bw, 20, 0x003E7CB1);
+                gfx::rect(s, xoff + 6, cy, bw, 20, 0x002F6FB6);
+                gfx::text(s, xoff + 14, cy + 3, l.form_val.c_str(), color::WHITE, 0x003E7CB1);
+                cy += 24;
+            } else if (l.font_size >= 24) {
                 gfx::text_scale(s, xoff, cy, l.s.c_str(), fg, color::WHITE, 2);
                 if (l.bold) gfx::text_scale(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, 2);
                 cy += 36;
@@ -917,6 +1038,32 @@ static void on_paint(Window* w) {
 // =====================================================================
 static void on_key(Window* w, const KeyEvent* e) {
     BrowserState* st = (BrowserState*)w->userdata;
+    // ---- form field editing takes priority over the address bar ----
+    if (st->form_edit_row >= 0) {
+        if (e->utf8[0]) {
+            int n = 0;
+            while (n < 7 && e->utf8[n]) n++;
+            if (st->form_edit_val.len() + n <= 200) {
+                for (int i = 0; i < n; i++) st->form_edit_val += e->utf8[i];
+            }
+        } else if (e->ascii >= 32 && e->ascii < 127) {
+            if (st->form_edit_val.len() < 200) st->form_edit_val += (char)e->ascii;
+        } else if (e->keycode == KEY_SPACE) {
+            if (st->form_edit_val.len() < 200) st->form_edit_val += ' ';
+        } else if (e->keycode == KEY_BACKSPACE) {
+            if (st->form_edit_val.len() > 0) {
+                st->form_edit_val = st->form_edit_val.substr(0, st->form_edit_val.len() - 1);
+            }
+        } else if (e->keycode == KEY_ENTER) {
+            // blur field
+            st->form_edit_row = -1;
+            st->form_edit_val.clear();
+        } else if (e->keycode == KEY_ESC) {
+            st->form_edit_row = -1;
+            st->form_edit_val.clear();
+        }
+        return;
+    }
     // UTF-8 IME input
     if (e->utf8[0]) {
         int n = 0;
@@ -975,6 +1122,31 @@ static void on_key(Window* w, const KeyEvent* e) {
     }
 }
 
+// Build a GET query from the form fields and navigate to it.
+static void browser_submit_form(BrowserState* st, int submit_row) {
+    (void)submit_row;
+    if (st->loaded_url.empty()) return;
+    String q;
+    for (int i = 0; i < st->lines.size(); i++) {
+        const Line& l = st->lines[i];
+        if (l.form_kind != 1 || l.form_name.empty()) continue;
+        if (!q.empty()) q += '&';
+        q += l.form_name;
+        q += '=';
+        String v = (i == st->form_edit_row && !st->form_edit_val.empty())
+                   ? st->form_edit_val : l.form_val;
+        q += v;
+    }
+    st->form_edit_row = -1;
+    st->form_edit_val.clear();
+    String target = st->loaded_url;
+    if (!q.empty()) {
+        target += (target.find('?') >= 0) ? '&' : '?';
+        target += q;
+    }
+    browser_load(st, target.c_str());
+}
+
 static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
     BrowserState* st = (BrowserState*)w->userdata;
     bool pressed = buttons && !st->last_buttons;
@@ -1008,6 +1180,17 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
     int idx = st->scroll + (my - BAR_H) / row_h;
     if (idx < 0 || idx >= st->lines.size()) return;
     const Line& l = st->lines[idx];
+    // ---- form interactions ----
+    if (l.form_kind == 1) {
+        st->form_edit_row = idx;
+        st->form_edit_val = l.form_val;
+        st->cursor = 0;
+        return;
+    }
+    if (l.form_kind == 2) {
+        browser_submit_form(st, idx);
+        return;
+    }
     if (l.style == 2 || l.color == 0x0000EE) {
         const char* txt = l.s.c_str();
         while (*txt == ' ') txt++;
@@ -1046,6 +1229,7 @@ void browser_launch() {
     BrowserState* st = new BrowserState();
     st->input = "file:///home/user/Documents/nefuos.txt";
     st->cursor = st->input.len();
+    st->form_edit_row = -1;
     Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);
     w->userdata = st;
     w->on_paint = on_paint;

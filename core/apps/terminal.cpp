@@ -748,6 +748,57 @@ static void term_run(TermState* t, const char* cmd) {
             }
         }
     }
+    else if (strcmp(a0, "selftest") == 0) {
+        // Acceptance test suite (bare-metal). Prints pass/fail + rate.
+        int pass = 0, fail = 0;
+        char msg[160];
+        // ---- klib ----
+        if (strlen("nefuos") == 6) pass++; else { fail++; term_print(t, "FAIL strlen"); }
+        if (strcmp("abc", "abc") == 0 && strcmp("abc", "abd") != 0) pass++; else { fail++; term_print(t, "FAIL strcmp"); }
+        {
+            char mb[16];
+            memset(mb, 0xAB, 16);
+            if (mb[0] == 0xAB && mb[15] == 0xAB) pass++; else { fail++; term_print(t, "FAIL memset"); }
+        }
+        {
+            char mc[8];
+            memcpy(mc, "hello", 6);
+            if (strcmp(mc, "hello") == 0) pass++; else { fail++; term_print(t, "FAIL memcpy"); }
+        }
+        // ---- memory ----
+        void* p1 = kalloc(4096);
+        if (p1) { memset(p1, 0, 4096); kfree(p1); pass++; } else { fail++; term_print(t, "FAIL kalloc"); }
+        // ---- VFS ----
+        FSNode* d = g_vfs->mkdir("/tmp/selftest");
+        if (d && d->is_dir) pass++; else { fail++; term_print(t, "FAIL mkdir"); }
+        FSNode* f = d ? g_vfs->create_file("/tmp/selftest/t.txt") : 0;
+        if (f) {
+            const char* c = "selftest-data";
+            g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
+            if (f->size == 12 && memcmp(f->data, c, 12) == 0) pass++; else { fail++; term_print(t, "FAIL vfs write/read"); }
+            if (g_vfs->remove_node(f)) pass++; else { fail++; term_print(t, "FAIL vfs remove"); }
+        } else { fail++; term_print(t, "FAIL create_file"); }
+        if (g_vfs->remove_node(d)) pass++; else { fail++; term_print(t, "FAIL rm dir"); }
+        // ---- net state (informational) ----
+        ksprintf(msg, sizeof(msg), "selftest: net %s (rx=%u tx=%u)",
+                 g_net.up ? "up" : "down",
+                 (unsigned)g_net.rx_count, (unsigned)g_net.tx_count);
+        term_print(t, msg);
+        // ---- render ----
+        Surface tmp;
+        tmp.addr = (uint8_t*)kalloc(64 * 64 * 4);
+        if (tmp.addr) {
+            tmp.width = 64; tmp.height = 64; tmp.pitch = 64 * 4;
+            tmp.fill(0x00FF00FF);
+            if (tmp.getpx(0, 0) == 0x00FF00FF) pass++; else { fail++; term_print(t, "FAIL surface fill"); }
+            kfree(tmp.addr);
+        } else { fail++; term_print(t, "FAIL surface alloc"); }
+        int total = pass + fail;
+        int rate = total > 0 ? pass * 100 / total : 0;
+        ksprintf(msg, sizeof(msg), "selftest: %d/%d passed (%d%%)", pass, total, rate);
+        term_print(t, msg);
+        term_print(t, rate >= 80 ? "selftest: ACCEPTED (>= 80%)" : "selftest: NOT ACCEPTED");
+    }
     else if (strcmp(a0, "db") == 0) {
         // built-in key-value database at /var/lib/nefuos/db/
         // db list | db get <key> | db set <key> <value> (admin) | db rm <key> (admin)

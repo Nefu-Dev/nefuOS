@@ -16,6 +16,9 @@ struct MonitorState {
     int head;                 // latest data index（ring）
     uint32_t last_push;
     Window* win;
+    int proc_scroll;          // process list scroll
+    uint8_t last_buttons;
+    int last_click_y;         // window-relative y of last click (proc list)
 };
 
 static const int HIST = 80;
@@ -116,6 +119,68 @@ static void mo_paint(Window* w) {
     gfx::text(s, px + 8, y, "Refresh: 400ms", color::TEXT2, 0x00F5F5F0); y += 18;
     gfx::text(s, px + 8, y, "CPU curve is simulated;", color::TEXT2, 0x00F5F5F0); y += 18;
     gfx::text(s, px + 8, y, "RAM/DISK are real values.", color::TEXT2, 0x00F5F5F0);
+
+    // ---- process list: every open window is a process ----
+    int py0 = 34 + ch * 3 + 6;
+    if (py0 + 20 < H - 8) {
+        gfx::hline(s, 8, W - 8, py0 - 3, color::BORDER);
+        gfx::text(s, 10, py0, "Processes (open windows)", color::BLUE, color::WHITE);
+        int ly = py0 + 16;
+        List<Window*>& ws = g_wm->windows();
+        int vis = (H - ly - 8) / 16;
+        if (vis < 1) vis = 1;
+        for (int i = st->proc_scroll; i < ws.size() && i < st->proc_scroll + vis; i++) {
+            Window* p = ws[i];
+            if (p->closed) continue;
+            bool foc = (g_wm->focus() == p);
+            uint32_t bg = foc ? 0x00E3EEF8 : color::WHITE;
+            gfx::fillrect(s, 10, ly, W - 90, 15, bg);
+            char line[120];
+            uint32_t est = (uint32_t)((uint64_t)(p->back.width * p->back.height) * 4);
+            ksprintf(line, sizeof(line), "%s  [%u KB]",
+                     p->title.c_str(), (unsigned)(est / 1024));
+            gfx::text(s, 14, ly + 1, line, foc ? color::BLUE : color::TEXT, bg);
+            // kill button
+            gfx::fillrect(s, W - 76, ly + 1, 62, 13, 0x00E84C4C);
+            gfx::text(s, W - 70, ly + 2, "End", color::WHITE, 0x00E84C4C);
+            ly += 16;
+        }
+        gfx::text(s, 10, ly + 2, "Click End to close a process.", color::TEXT2, color::WHITE);
+    }
+}
+
+static void mo_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    MonitorState* st = (MonitorState*)w->userdata;
+    bool pressed = buttons && !st->last_buttons;
+    st->last_buttons = buttons;
+    if (!pressed) return;
+    int W = w->back.width, H = w->back.height;
+    int ch = (H - 40) / 3;
+    int py0 = 34 + ch * 3 + 6;
+    if (my < py0 + 16) return;
+    int row = (my - py0 - 16) / 16;
+    List<Window*>& ws = g_wm->windows();
+    // find nth visible non-closed window
+    int visible = 0;
+    for (int i = 0; i < ws.size(); i++) {
+        if (ws[i]->closed) continue;
+        if (visible == row + st->proc_scroll) {
+            // End button hit box
+            if (mx >= W - 76 && mx <= W - 14) {
+                g_wm->close_window(ws[i]);
+                st->last_click_y = my;
+            }
+            return;
+        }
+        visible++;
+    }
+}
+
+static void mo_scroll(Window* w, int delta) {
+    MonitorState* st = (MonitorState*)w->userdata;
+    st->proc_scroll += delta > 0 ? -1 : 1;
+    if (st->proc_scroll < 0) st->proc_scroll = 0;
+    (void)w;
 }
 
 static void mo_close(Window* w) {
@@ -132,11 +197,16 @@ void monitor_launch() {
     st->win = w;
     st->head = 0;
     st->last_push = 0;
+    st->proc_scroll = 0;
+    st->last_buttons = 0;
+    st->last_click_y = 0;
     for (int i = 0; i < HIST; i++) { st->cpu[i] = 0; st->mem[i] = 0; st->disk[i] = 0; }
 
     for (int i = 0; i < HIST; i++) mo_push(st);
     w->userdata = st;
     w->on_paint = mo_paint;
+    w->on_mouse = mo_mouse;
+    w->on_scroll = mo_scroll;
     w->on_close = mo_close;
 }
 

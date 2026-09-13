@@ -5,16 +5,34 @@
 
 namespace nefu {
 
-// ：32bpp，memory byte order BGRA
+// ：32bpp，memory byte order BGRA; 24bpp supported via bpp flag
+// (QEMU's stdvga "24bpp" VBE modes store 24-bit pixels with a 32-bit stride).
 struct Surface {
     uint8_t* addr;
     int width, height, pitch;
-    inline uint32_t& px(int x, int y) {
+    int bpp = 32;
+    inline void setpx(int x, int y, uint32_t c) {
+        if (bpp == 24) {
+            // QEMU stdvga 24bpp VBE modes: 4-byte slot per pixel (pitch = w*4),
+            // only the first 3 bytes (BGR) are displayed.
+            uint8_t* p = addr + (size_t)y * (size_t)pitch + (size_t)x * 4;
+            p[0] = (uint8_t)c;
+            p[1] = (uint8_t)(c >> 8);
+            p[2] = (uint8_t)(c >> 16);
+        } else {
+            *(uint32_t*)(addr + (size_t)y * (size_t)pitch + (size_t)x * 4) = c;
+        }
+    }
+    inline uint32_t getpx(int x, int y) {
+        if (bpp == 24) {
+            const uint8_t* p = addr + (size_t)y * (size_t)pitch + (size_t)x * 4;
+            return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16);
+        }
         return *(uint32_t*)(addr + (size_t)y * (size_t)pitch + (size_t)x * 4);
     }
     void fill(uint32_t c) {
         for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++) px(x, y) = c;
+            for (int x = 0; x < width; x++) setpx(x, y, c);
     }
 };
 
@@ -52,6 +70,9 @@ int sqrti(int v);
 void char8x16(Surface& s, int x, int y, char ch, uint32_t fg, uint32_t bg);
 void text(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg);
 void text_scale(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int scale);
+// TrueType text via the platform layer; falls back to the bitmap font when
+// the platform cannot render TTF (bare kernel has no font data).
+void text_ttf(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int px = 18);
 void blit(Surface& dst, Surface& src, int dx, int dy);
 void blit_clip(Surface& dst, Surface& src, int dx, int dy, int sx, int sy, int w, int h);
 int  text_width(const char* s);
