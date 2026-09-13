@@ -200,6 +200,18 @@ registers — QEMU's BIOS VBE modes map to unusable 24bpp).
 - Music Player synthesizes a real 8 kHz 8-bit WAV (integer math) and plays it
   through the platform audio API (host: `PlaySound`).
 - Source comments are in English.
+- **Bare-metal C++ gotcha (fixed)**: the kernel never runs `.init_array`, so
+  any static object with a constructor silently stays all-zero in `.bss`.
+  `DesktopIcon` was converted to POD aggregate init (icons render at their
+  real positions) and `settings_load()` re-applies defaults so the taskbar /
+  clock are shown. All app catalogs use aggregate or `const` init for the
+  same reason.
+- **Wiki & admin auth**: the built-in Wiki stores entries in
+  `/var/lib/nefuos/db/wiki.db`; guests are read-only. Admin (`lbinm`) logs in
+  through the Wiki's password prompt (or terminal `su`) and the password is
+  checked against a salted SHA-256 hash injected at build time via the
+  `NEFU_ADMIN_PASSWORD` env var — the plaintext never appears in source,
+  README, ISO or logs.
 
 ### Third-party references & SBOM
 
