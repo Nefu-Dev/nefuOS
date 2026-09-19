@@ -24,12 +24,11 @@
 .globl stub_start
 stub_start:
     # Move stack ABOVE the decompression output window.
-    # boot.s set esp=0x1F000, but inflate writes the kernel to 0x100000..0x216200
-    # (kernel.bin = 1,139,200 = 0x116200), so output reaches 0x1F000 and would
-    # clobber the boot stack mid-inflate (observed: error code 0x3F + truncated
-    # output past ~0x1B0000).  Put esp at 0x220000 (kernel end + slack, still
-    # well inside 128MB RAM).
-    movl $0x220000, %esp
+    # boot.s set esp=0x1F000, but inflate writes the kernel to 0x100000..0x220200
+    # (kernel.bin = 1,180,160 = 0x120200 with minijs + FHS usr seed), so output
+    # reaches 0x1F000 and would clobber the boot stack mid-inflate.  Put esp at
+    # 0x280000 (kernel end 0x220200 + slack, still well inside 128MB RAM).
+    movl $0x280000, %esp
     # debugcon probe 'S': stub entered (32-bit PM, payload loaded)
     movw $0xE9, %dx
     movb $'S', %al
