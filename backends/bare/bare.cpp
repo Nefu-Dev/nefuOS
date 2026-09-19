@@ -273,7 +273,7 @@ static void mouse_byte(uint8_t b) {
     if (b0 & 0x80) dy += (s_mouse_buf[2] < 128) ? 256 : -256;
     s_mouse_dx += dx;
     s_mouse_dy += dy;
-    s_mb = (uint8_t)(((b0 & 1) ? 0 : 1) | ((b0 & 2) ? 0 : 2) | ((b0 & 4) ? 0 : 4));
+    s_mb = (uint8_t)(b0 & 0x07);   // PS/2 byte0: bit0=left, bit1=right, bit2=middle (1=pressed)
     s_mouse_dirty = true;
 }
 
