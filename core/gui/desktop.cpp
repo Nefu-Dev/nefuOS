@@ -195,6 +195,11 @@ void desktop_redraw() {
 
 // ---- icon events ----
 static void on_icon_click(lv_event_t* e) {
+    // keyboard Enter on a focused icon must not launch apps: only a real
+    // pointer click should. Otherwise pressing Enter inside an open window
+    // accidentally launches the first desktop icon.
+    lv_indev_t* indev = lv_event_get_indev(e);
+    if (indev == s_kb_indev) return;
     int i = (int)(intptr_t)lv_event_get_user_data(e);
     if (i >= 0 && i < s_icon_count && !s_icons[i].deleted) app_launch(s_icons[i].app);
 }
@@ -796,6 +801,7 @@ bool desktop_handle_key(int keycode, char ascii) {
     if (keycode == KEY_F3) { app_launch(APP_FILEMGR); return true; }
     if (keycode == KEY_F4) { app_launch(APP_MUSIC); return true; }
     if (keycode == KEY_F5) { app_launch(APP_SETTINGS); return true; }
+    if (keycode == KEY_F6) { app_launch(APP_BROWSER); return true; }
     return false;
 }
 

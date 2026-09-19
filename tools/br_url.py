@@ -5,8 +5,7 @@ def send(mon, cmd, wait=0.4):
     time.sleep(wait)
 
 def main(port, out):
-    mode = os.environ.get('WIN_MODE', 'open')
-    key = os.environ.get('WIN_KEY', 'f3')
+    url = os.environ.get('BR_URL', 'nefu')
     s = socket.create_connection(('127.0.0.1', port), timeout=5)
     time.sleep(0.5)
     for ch in 'user':
@@ -23,21 +22,16 @@ def main(port, out):
     send(s, 'sendkey ret', 1.2)
     for ch in 'pass123':
         send(s, 'sendkey %s' % ch, 0.15)
-    send(s, 'sendkey ret', 1.2)
-    if mode == 'open':
-        send(s, 'sendkey %s' % key, 1.2)
-        send(s, 'pmemsave 0xFD000000 3145728 ' + out, 1.5)
-    else:
-        cx = int(os.environ.get('CLOSE_X', '0'))
-        cy = int(os.environ.get('CLOSE_Y', '0'))
-        send(s, 'mouse_move -2000 -2000', 0.6)
-        send(s, 'mouse_move %d %d' % (cx, cy), 0.5)
-        send(s, 'mouse_button 1', 0.3)
-        send(s, 'mouse_button 0', 1.0)
-        send(s, 'pmemsave 0xFD000000 3145728 ' + out, 1.5)
+    send(s, 'sendkey ret', 1.5)
+    send(s, 'sendkey f6', 2.5)          # open browser
+    # type into address bar (appends), then Enter
+    for ch in url:
+        send(s, 'sendkey %s' % ch, 0.12)
+    send(s, 'sendkey ret', 2.0)
+    send(s, 'pmemsave 0xFD000000 3145728 ' + out, 1.5)
     send(s, 'quit')
     s.close()
-    print(mode, key, 'frame saved', out)
+    print('browser input frame saved', out)
 
 if __name__ == '__main__':
     main(int(sys.argv[1]), sys.argv[2])
