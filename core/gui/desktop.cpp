@@ -50,7 +50,6 @@ static DesktopIcon s_icons[] = {
     {14 + 2 * (ICON_W + 8), 14 + 3 * (ICON_H + 10), "浏览器", APP_BROWSER, false},
     {14, 14 + 4 * (ICON_H + 10), "网络", APP_NETCFG, false},
     {14 + ICON_W + 8, 14 + 4 * (ICON_H + 10), "应用启动器", APP_NEFUD, false},
-    {14 + 2 * (ICON_W + 8), 14 + 4 * (ICON_H + 10), "LVGL桌面", APP_LVGLDESKTOP, false},
 };
 static const int s_icon_count = (int)(sizeof(s_icons) / sizeof(s_icons[0]));
 
@@ -70,7 +69,6 @@ static const char* icon_label(int app) {
     case APP_BROWSER:    return T("浏览器", "Browser");
     case APP_NETCFG:     return T("网络", "Network");
     case APP_NEFUD:      return T("应用启动器", "Launcher");
-    case APP_LVGLDESKTOP:return T("LVGL桌面", "LVGL Desktop");
     default: return "?";
     }
 }
@@ -331,7 +329,6 @@ static uint32_t icon_color(int app) {
     case APP_BROWSER:    return 0x5A9BD4;
     case APP_NETCFG:     return 0x3FA45A;
     case APP_NEFUD:      return 0xE67E22;
-    case APP_LVGLDESKTOP:return 0x7A5AA6;
     default:             return 0x8899AA;
     }
 }
@@ -644,14 +641,87 @@ void desktop_paint_lock(Surface& fb) {
         gfx::text(fb, px + 16, py + 104, "Wrong password - try again", color::RED, 0xFF161C28);
 }
 
+// First-boot setup wizard: full-screen account + browser-engine setup.
+// Runs once after the boot splash when /var/lib/nefuos/firstboot is absent.
+void desktop_paint_setup(Surface& fb) {
+    uint32_t top, bottom, base;
+    wallpaper_colors(g_settings.wallpaper_boot, &top, &bottom, &base);
+    fb.fill(top);
+    int W = fb.width, H = fb.height;
+    // panel
+    int pw = 560, ph = 396, px = W / 2 - pw / 2, py = H / 2 - ph / 2;
+    gfx::fillrect(fb, px, py, pw, ph, 0xFF161C28);
+    gfx::rect(fb, px, py, pw, ph, 0xFF3A4458);
+    gfx::text_scale(fb, px + 24, py + 18, "nefuOS First Boot Setup", color::WHITE, 0xFF161C28, 2);
+    gfx::text(fb, px + 24, py + 52, "Create your account and choose the browser engine.",
+              color::TEXT2, 0xFF161C28);
+
+    int fy = py + 88;                 // first field top
+    int fh = 46, fw = pw - 48;
+    const char* labels[4] = {
+        "Username", "Password", "Confirm password", "Browser engine"
+    };
+    int cur = nefuos_setup_field();
+    for (int f = 0; f < 4; f++) {
+        int yy = fy + f * (fh + 10);
+        gfx::text(fb, px + 24, yy, labels[f], color::BLUE_LT, 0xFF161C28);
+        int vx = px + 24, vy = yy + 18, vw = fw - 48, vh = 22;
+        uint32_t frame = (f == cur) ? color::BLUE : 0xFF3A4458;
+        gfx::fillrect(fb, vx, vy, vw, vh, 0xFF0D1117);
+        gfx::rect(fb, vx, vy, vw, vh, frame);
+        char val[96];
+        val[0] = 0;
+        if (f == 0) {
+            strncpy(val, nefuos_setup_user(), 31);
+            val[31] = 0;
+        } else if (f == 1 || f == 2) {
+            int n = nefuos_setup_pwd_len(f);
+            if (n > 40) n = 40;
+            for (int i = 0; i < n; i++) val[i] = '*';
+            val[n] = 0;
+        } else {
+            strcpy(val, nefuos_setup_engine() == 1 ? "No Script (HTML only)"
+                                                   : "Mini JS (execute <script>)");
+        }
+        gfx::text(fb, vx + 6, vy + 5, val, color::WHITE, 0xFF0D1117);
+        // blinking caret in the active text field
+        if (f == cur && f < 3 && ((platform_tick_ms() / 500) & 1)) {
+            int clen = (f == 0) ? (int)strlen(nefuos_setup_user()) : nefuos_setup_pwd_len(f);
+            int cx = vx + 8 + clen * 8;
+            if (cx < vx + vw - 4) gfx::fillrect(fb, cx, vy + 4, 2, vh - 8, color::BLUE_LT);
+        }
+        // engine selector hint
+        if (f == 3) {
+            gfx::text(fb, vx + 6 + (int)strlen(val) * 8 + 10, vy + 5,
+                      "<  /  >", color::TEXT2, 0xFF0D1117);
+        }
+    }
+    gfx::text(fb, px + 24, fy + 4 * (fh + 10) + 6,
+              "Tab = next field   Enter = continue   <-  -> = choose   ESC = finish",
+              color::TEXT2, 0xFF161C28);
+    uint32_t fm = nefuos_setup_fail_ms();
+    if (fm && platform_tick_ms() - fm < 2500) {
+        gfx::text(fb, px + 24, fy + 4 * (fh + 10) + 26,
+                  "Passwords do not match or are empty - try again",
+                  color::RED, 0xFF161C28);
+    }
+}
+
 bool desktop_handle_mouse(int x, int y, uint8_t buttons) {
+    static int s_dhdbg = 0;
+    if (s_dhdbg < 20) { s_dhdbg++; klogf("dh m=%d,%d b=%u\n", x, y, (unsigned)buttons); }
     int H = platform_screen()->height;
     bool pressed = (buttons & 1) != 0;
     bool r_pressed = (buttons & 2) != 0 && (s_last_buttons & 2) == 0;
     s_last_buttons = buttons;
-    // windows take priority: never feed clicks under a window to LVGL
+    // windows take priority: never feed clicks under a window to LVGL.
+    // BUT still update s_mx/s_my/s_btn so the LVGL indev sees the real
+    // cursor position: otherwise the LVGL close (X) button in the window
+    // header never receives a click and windows cannot be closed by it.
     if (g_wm->hit(x, y)) {
-        s_btn = false;
+        s_mx = x;
+        s_my = y;
+        s_btn = pressed;
         return false;
     }
     // idle pointer moves only trigger LVGL-local hover repaints; the full

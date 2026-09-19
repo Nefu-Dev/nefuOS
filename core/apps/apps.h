@@ -76,8 +76,6 @@ void browser_launch();
 void netcfg_launch();
 void nefud_launch();
 void fontview_launch();
-void lvgl_demo_launch();
-void lvgl_desktop_launch();
 void wiki_launch();
 
 // tool：cascade window position

@@ -4,14 +4,14 @@
 
 extern "C" {
 
-void* memcpy(void* dst, const void* src, size_t n) {
+__attribute__((noinline)) void* memcpy(void* dst, const void* src, size_t n) {
     uint8_t* d = (uint8_t*)dst;
     const uint8_t* s = (const uint8_t*)src;
     while (n--) *d++ = *s++;
     return dst;
 }
 
-void* memmove(void* dst, const void* src, size_t n) {
+__attribute__((noinline)) void* memmove(void* dst, const void* src, size_t n) {
     uint8_t* d = (uint8_t*)dst;
     const uint8_t* s = (const uint8_t*)src;
     if (d < s) { while (n--) *d++ = *s++; }
@@ -19,13 +19,13 @@ void* memmove(void* dst, const void* src, size_t n) {
     return dst;
 }
 
-void* memset(void* dst, int c, size_t n) {
+__attribute__((noinline)) void* memset(void* dst, int c, size_t n) {
     uint8_t* d = (uint8_t*)dst;
     while (n--) *d++ = (uint8_t)c;
     return dst;
 }
 
-int memcmp(const void* a, const void* b, size_t n) {
+__attribute__((noinline)) int memcmp(const void* a, const void* b, size_t n) {
     const uint8_t* x = (const uint8_t*)a;
     const uint8_t* y = (const uint8_t*)b;
     while (n--) {
@@ -35,38 +35,42 @@ int memcmp(const void* a, const void* b, size_t n) {
     return 0;
 }
 
-size_t strlen(const char* s) {
+__attribute__((noinline)) size_t strlen(const char* s) {
     size_t n = 0;
     while (s[n]) n++;
     return n;
 }
 
-int strcmp(const char* a, const char* b) {
+__attribute__((noinline)) int strcmp(const char* a, const char* b) {
     while (*a && *a == *b) { a++; b++; }
     return (uint8_t)*a - (uint8_t)*b;
 }
 
-int strncmp(const char* a, const char* b, size_t n) {
+__attribute__((noinline)) int strncmp(const char* a, const char* b, size_t n) {
     while (n-- && *a && *a == *b) { a++; b++; }
     if (n == (size_t)-1) return 0;
     return (uint8_t)*a - (uint8_t)*b;
 }
 
-char* strcpy(char* dst, const char* src) {
+__attribute__((noinline)) char* strcpy(char* dst, const char* src) {
     char* d = dst;
     while ((*d++ = *src++)) {}
     return dst;
 }
 
-char* strncpy(char* dst, const char* src, size_t n) {
-    
-    char* d = dst;
-    while (n-- && *src) *d++ = *src++;
-    while (n-- > 0) *d++ = 0;
+__attribute__((noinline)) char* strncpy(char* dst, const char* src, size_t n) {
+    // NOTE: a plain while() version is mis-optimized by mingw g++ -O2 into an
+    // infinite zero-fill loop (terminator rdx=r9-1 never reached) whenever src
+    // has no NUL within n bytes.  volatile stores defeat that expansion.
+    volatile char* d = dst;
+    const char* s = src;
+    size_t m = n;
+    while (m > 0 && *s) { *d++ = *s++; m--; }
+    while (m > 0) { *d++ = 0; m--; }
     return dst;
 }
 
-char* strcat(char* dst, const char* src) {
+__attribute__((noinline)) char* strcat(char* dst, const char* src) {
     char* d = dst;
     while (*d) d++;
     while ((*d++ = *src++)) {}

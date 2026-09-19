@@ -24,6 +24,82 @@ static char s_lock_pwd[65] = "";
 static int s_lock_len = 0;
 static uint32_t s_lock_fail_ms = 0;
 static uint32_t s_last_activity = 0;
+// ---- first-boot setup wizard state ----
+static bool s_setup = false;
+static char s_setup_user[33] = "user";
+static char s_setup_pwd1[65] = "";
+static char s_setup_pwd2[65] = "";
+static int  s_setup_field = 0;    // 0=user 1=password 2=confirm 3=engine
+static int  s_setup_engine = 0;   // 0=minijs 1=noscript
+static int  s_setup_len[3] = {0, 0, 0};
+static uint32_t s_setup_fail_ms = 0;
+
+bool nefuos_setup_active() { return s_setup; }
+int  nefuos_setup_field() { return s_setup_field; }
+int  nefuos_setup_engine() { return s_setup_engine; }
+const char* nefuos_setup_user() { return s_setup_user; }
+int  nefuos_setup_pwd_len(int field) {
+    if (field < 0 || field > 2) return 0;
+    return s_setup_len[field];
+}
+uint32_t nefuos_setup_fail_ms() { return s_setup_fail_ms; }
+
+static bool first_boot_pending() {
+    return (g_vfs->resolve("/var/lib/nefuos/firstboot") == 0);
+}
+
+static void finish_setup() {
+    if (s_setup_len[1] == 0 || strcmp(s_setup_pwd1, s_setup_pwd2) != 0) {
+        s_setup_fail_ms = platform_tick_ms();
+        s_setup_pwd1[0] = 0; s_setup_pwd2[0] = 0;
+        s_setup_len[1] = 0; s_setup_len[2] = 0;
+        s_setup_field = 1;
+        return;
+    }
+    if (s_setup_len[0] == 0) strcpy(s_setup_user, "user");
+    strncpy(g_uefi.username, s_setup_user, 31);
+    g_uefi.username[31] = 0;
+    uint8_t h[32];
+    nefu_sha256((const uint8_t*)s_setup_pwd1, (uint32_t)s_setup_len[1], h);
+    char hex[65];
+    nefu_sha256_hex(h, hex);
+    strncpy(g_uefi.password_hash, hex, 64);
+    g_uefi.password_hash[64] = 0;
+    platform_uefi_save(&g_uefi);
+    // persist browser engine choice into /etc/nefu.conf
+    FSNode* conf = g_vfs->resolve("/etc/nefu.conf");
+    if (conf) {
+        char buf[1024];
+        uint32_t n = conf->size < 1023 ? conf->size : 1023;
+        memcpy(buf, conf->data, n);
+        buf[n] = 0;
+        char* p = strstr(buf, "browser_engine=");
+        char line[48];
+        ksprintf(line, sizeof(line), "browser_engine=%s\n",
+                 s_setup_engine == 1 ? "noscript" : "minijs");
+        if (p) {
+            char* nl = strchr(p, '\n');
+            size_t old_len = nl ? (size_t)(nl + 1 - p) : strlen(p);
+            size_t rest = strlen(p + old_len);
+            memmove(p + strlen(line), p + old_len, rest + 1);
+            memcpy(p, line, strlen(line));
+        } else {
+            size_t cl = strlen(buf);
+            if (cl + strlen(line) < sizeof(buf) - 1) {
+                memcpy(buf + cl, line, strlen(line) + 1);
+            }
+        }
+        g_vfs->write_file(conf, (const uint8_t*)buf, (uint32_t)strlen(buf));
+    }
+    // firstboot marker so the setup wizard does not run again
+    FSNode* d0 = g_vfs->mkdir("/var/lib/nefuos");
+    FSNode* m = g_vfs->create_file("/var/lib/nefuos/firstboot");
+    if (m) g_vfs->write_file(m, (const uint8_t*)"done", 4);
+    s_setup = false;
+    s_locked = true;
+    s_lock_len = 0;
+    s_lock_pwd[0] = 0;
+}
 
 bool nefuos_is_locked() { return s_locked; }
 int nefuos_lock_len() { return s_lock_len; }
@@ -146,6 +222,8 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
     s_my = y;
     if (!s_inited || !s_booted) return;
     s_last_activity = platform_tick_ms();
+    static int s_nhdbg = 0;
+    if (s_nhdbg < 20) { s_nhdbg++; klogf("nh m=%d,%d b=%u locked=%d\n", x, y, (unsigned)buttons, (int)s_locked); }
     if (s_locked) return;   // lock screen consumes nothing from the desktop
     if (!desktop_handle_mouse(x, y, buttons)) {
         g_wm->handle_mouse(x, y, buttons);
@@ -156,6 +234,27 @@ void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     if (!s_inited || !s_booted) return;
     if (!down) return;
     s_last_activity = platform_tick_ms();
+    if (s_setup) {
+        char* dst = (s_setup_field == 0) ? s_setup_user
+                  : (s_setup_field == 1) ? s_setup_pwd1 : s_setup_pwd2;
+        if (ascii >= 32 && ascii < 127 && s_setup_len[s_setup_field] < 63 && s_setup_field < 3) {
+            dst[s_setup_len[s_setup_field]++] = ascii;
+            dst[s_setup_len[s_setup_field]] = 0;
+        } else if (keycode == KEY_BACKSPACE && s_setup_field < 3 && s_setup_len[s_setup_field] > 0) {
+            s_setup_len[s_setup_field]--;
+            dst[s_setup_len[s_setup_field]] = 0;
+        } else if (keycode == KEY_TAB) {
+            s_setup_field = (s_setup_field + 1) % 4;
+        } else if (keycode == KEY_ENTER) {
+            if (s_setup_field == 3) finish_setup();
+            else s_setup_field++;
+        } else if ((keycode == KEY_LEFT || keycode == KEY_RIGHT) && s_setup_field == 3) {
+            s_setup_engine = 1 - s_setup_engine;
+        } else if (keycode == KEY_ESC) {
+            s_setup_field = 3;   // jump straight to Finish
+        }
+        return;
+    }
     if (s_locked) {
         if (ascii >= 32 && ascii < 127 && s_lock_len < 63) {
             s_lock_pwd[s_lock_len++] = ascii;
@@ -230,9 +329,21 @@ void nefuos_frame() {
         desktop_paint_boot(fb);
         if (now - s_boot_start > 1600) {
             s_booted = true;
-            s_locked = true;      // boot splash -> lock screen
             s_last_activity = now;
+            if (first_boot_pending()) {
+                // first boot: run the setup wizard (user/password/browser)
+                s_setup = true;
+                s_locked = false;
+                s_setup_field = 0;
+                s_setup_engine = 0;
+                s_setup_user[0] = 0; s_setup_pwd1[0] = 0; s_setup_pwd2[0] = 0;
+                s_setup_len[0] = 0; s_setup_len[1] = 0; s_setup_len[2] = 0;
+            } else {
+                s_locked = true;  // boot splash -> lock screen
+            }
         }
+    } else if (s_setup) {
+        desktop_paint_setup(fb);
     } else if (s_locked) {
         desktop_paint_lock(fb);
     } else {

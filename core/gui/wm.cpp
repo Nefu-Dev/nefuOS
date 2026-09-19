@@ -1,6 +1,7 @@
 // nefuOS WM implementation
 #include "wm.h"
 #include "../klib/klib.h"
+#include "../platform.h"
 #include "lvgl_win.h"
 
 namespace nefu {
@@ -81,7 +82,7 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h) {
             lv_obj_t* cb = lv_win_add_button(lvw->win, LV_SYMBOL_CLOSE, 34);
             lv_obj_set_style_bg_color(cb, lv_color_hex(0x3D4B66), 0);
             lv_obj_set_style_bg_color(cb, lv_color_hex(0xC23B3B), LV_STATE_PRESSED);
-            lv_obj_add_event_cb(cb, wm_lv_close_cb, LV_EVENT_CLICKED, win);
+            lv_obj_add_event_cb(cb, wm_lv_close_cb, LV_EVENT_PRESSED, win);
             lvw->content = lv_win_get_content(lvw->win);
             lv_obj_set_style_bg_color(lvw->content, lv_color_hex(0xEDF0F6), 0);
             lv_obj_set_style_bg_opa(lvw->content, LV_OPA_COVER, 0);
@@ -183,6 +184,9 @@ void WM::paint_all(Surface& fb) {
     }
 }
 
+static uint32_t s_last_title_click = 0;
+static int s_last_title_x = -9999, s_last_title_y = -9999;
+
 void WM::handle_mouse(int x, int y, uint8_t buttons) {
     bool pressed = (buttons != 0) && (last_buttons_ == 0);
     bool released = (buttons == 0) && (last_buttons_ != 0);
@@ -232,13 +236,26 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
 
         // generous close-button hit area (LVGL lv_win places the X button at
         // the right edge of the header with its own padding)
-        if (y >= win->y && y < win->y + hdr &&
-            x >= win->x + win->w - 84 && x < win->x + win->w - 2) {
+        if (y >= win->y && y < win->y + hdr + 4 &&
+            x >= win->x + win->w - 120 && x < win->x + win->w - 2) {
             close_window(win);
             return;
         }
 
         if (y < win->y + hdr) {
+            // double-click on the title bar also closes the window
+            uint32_t now = platform_tick_ms();
+            bool dbl = (now - s_last_title_click < 400) &&
+                       (x - s_last_title_x < 10 && x - s_last_title_x > -10) &&
+                       (y - s_last_title_y < 10 && y - s_last_title_y > -10);
+            s_last_title_click = now;
+            s_last_title_x = x;
+            s_last_title_y = y;
+            if (dbl) {
+                s_last_title_click = 0;
+                close_window(win);
+                return;
+            }
             raise(win);
             win->dragging = true;
             drag_ = win;

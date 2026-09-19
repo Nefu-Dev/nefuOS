@@ -91,7 +91,7 @@ bool platform_hw_info(HwInfo* out);
 // ===================== UEFI/BIOS配置 =====================
 struct UefiConfig {
     char username[32];       // UEFI设置的用户名
-    char password_hash[64];  // 登录密码哈希（SHA256）
+    char password_hash[65];  // login password hash (64 hex chars + NUL)
     uint8_t  boot_timeout;   // 开机等待时间（秒）
     bool     boot_splash;    // 是否显示开机启动页
     char wallpaper_boot[32]; // 开机壁纸

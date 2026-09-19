@@ -180,6 +180,21 @@ static void html_parse(const char* html, int len, List<Line>& out) {
     bool in_table = false;
     int td_count = 0;
 
+    // browser engine choice from first-boot setup (/etc/nefu.conf):
+    //   browser_engine=noscript disables <script> execution (HTML only).
+    bool js_on = true;
+    {
+        FSNode* conf = g_vfs->resolve("/etc/nefu.conf");
+        if (conf && conf->data && conf->size > 0) {
+            char cbuf[1024];
+            uint32_t cn = conf->size < 1023 ? conf->size : 1023;
+            memcpy(cbuf, conf->data, cn);
+            cbuf[cn] = 0;
+            char* bp = strstr(cbuf, "browser_engine=");
+            if (bp && strncmp(bp + 15, "noscript", 8) == 0) js_on = false;
+        }
+    }
+
     auto flush = [&]() {
         if (!cur.empty()) {
             Line l;
@@ -350,7 +365,7 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                             memcpy(sbuf, html + script_start, slen);
                             sbuf[slen] = 0;
                             char jsout[600];
-                            int rc = mini_js_run(sbuf, jsout, sizeof(jsout));
+                            int rc = js_on ? mini_js_run(sbuf, jsout, sizeof(jsout)) : 1;
                             if (!rc && jsout[0]) {
                                 flush();
                                 Line l;
