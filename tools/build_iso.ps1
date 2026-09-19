@@ -1,4 +1,4 @@
-# nefuOS ： exe + + + ISO（-GrubEsp 时额外生成 ESP+GRUB 磁盘镜像）
+﻿# nefuOS ： exe + + + ISO（-GrubEsp 时额外生成 ESP+GRUB 磁盘镜像）
 param(
     [switch]$GrubEsp
 )
@@ -124,12 +124,12 @@ if ($LASTEXITCODE -ne 0) { throw "entry.s failed" }
 $objs = @("$bareOut\entry.o") + $objs
 
 # 4) link（PE ）->
-& $ld -mi386pep --image-base 0x20000 --gc-sections -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
+& $ld -mi386pep --image-base 0x100000 --gc-sections -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
 # mingw ld of PE ： section(.text) of VirtualAddress = absoluteVMA - image_base(=0)，
 # rest section of VirtualAddress = absoluteVMA。 objcopy -O binary，VMA ，
 # loaded to 0x20000 after .rdata/.data/.bss 0x20000（string/，）。
-# ：parse PE section ， section by RVA(absoluteVMA-0x20000) ，bss 0。
+# ：parse PE section ， section by RVA(absoluteVMA-0x100000) ，bss 0。
 function Rebin-Kernel {
     param([string]$InExe, [string]$OutBin)
     $fs = [IO.File]::OpenRead($InExe)
@@ -151,9 +151,9 @@ function Rebin-Kernel {
             $va = $br.ReadUInt32()      # VirtualAddress
             $rawSize = $br.ReadUInt32() # SizeOfRawData
             $rawPtr = $br.ReadUInt32()  # PointerToRawData
-            # PE section VirtualAddress image-base(0x20000) of RVA：
-            # loaded to 0x20000 after， = RVA（.text VA=0 -> 0x20000 ）。
-            # note： >= 0x20000 of VA 0x20000（ .pdata/.data
+            # PE section VirtualAddress image-base(0x100000) of RVA：
+            # loaded to 0x100000 after， = RVA（.text VA=0 -> 0x100000 ）。
+            # note： >= 0x100000 of VA 0x100000（ .pdata/.data
             # 0x40000 ， .text entry）。
             $rva = $va
             $secs += [pscustomobject]@{ Name = $name; RVA = $rva; RawSize = $rawSize; RawPtr = $rawPtr; VSize = $vs }
@@ -175,9 +175,9 @@ function Rebin-Kernel {
             if ($end -gt $maxEnd) { $maxEnd = $end }
         }
         if ($bssVSize -gt 0 -and $bssRva -gt 0) {
-            # bss runtime address = load base (0x20000) + RVA. Store it with
+            # bss runtime address = load base (0x100000) + RVA. Store it with
             # the size so entry.s can zero-fill the correct region.
-            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x20000) -Scope Script
+            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x100000) -Scope Script
             Set-Variable -Name kernelBssSize -Value $bssVSize -Scope Script
         } elseif ($bssRva -gt 0) {
             # mingw ld may leave VirtualSize=0 for .bss; derive the size from
@@ -187,7 +187,7 @@ function Rebin-Kernel {
                 if ($s2.RVA -gt $bssRva -and $s2.RVA -lt $next) { $next = $s2.RVA }
             }
             if ($next -eq 0x7FFFFFFF) { $next = $maxEnd }
-            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x20000) -Scope Script
+            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x100000) -Scope Script
             Set-Variable -Name kernelBssSize -Value ($next - $bssRva) -Scope Script
         }
         $out = New-Object byte[] $maxEnd
@@ -204,7 +204,7 @@ function Rebin-Kernel {
     }
 }
 Rebin-Kernel "$bareOut\kernel.exe" "$bareOut\kernel.bin"
-if (-not $kernelBssStart) { $kernelBssStart = 0x93020 }
+if (-not $kernelBssStart) { $kernelBssStart = 0x1073020 }  # 0x100000 + old 0x73020 RVA fallback
 if (-not $kernelBssSize) { $kernelBssSize = 0 }
 $kSize = (Get-Item "$bareOut\kernel.bin").Length
 Write-Output "kernel.bin OK: $kSize bytes"
@@ -217,12 +217,55 @@ if ($kSize -gt $isoKernelMax) { throw "kernel too large for ISO (max $isoKernelM
 & $python3 "tools\patch_mb2.py" "$bareOut\kernel.bin" $kernelBssStart $kernelBssSize
 if ($LASTEXITCODE -ne 0) { throw "patch_mb2 failed" }
 
+# 4c) compressed payload: stub + gzip(kernel.bin).  The 1.14MB kernel cannot
+#     be loaded at 0x20000 directly (VGA/ROM hole 0xA0000-0xBFFFF + 16-bit
+#     segment wrap + real-mode 1.06MB cap), so boot.s loads a ~507KB payload
+#     (stub + raw-DEFLATE kernel) to 0x20000; the stub inflates the kernel to
+#     0x100000.  kernel.bin itself stays uncompressed for the GRUB/ESP path.
+$stubAs = "D:\CLion\bin\mingw\bin\as.exe"
+$stubLd = "D:\CLion\bin\mingw\bin\ld.exe"
+$stubGcc = "D:\CLion\bin\mingw\bin\gcc.exe"
+& $stubAs --32 "backends\bare\stub.s" -o "$bareOut\stub.o"
+if ($LASTEXITCODE -ne 0) { throw "stub.s failed" }
+& $stubGcc -m32 -ffreestanding -fno-builtin -Os -c "backends\bare\inflate.c" -o "$bareOut\inflate32.o"
+if ($LASTEXITCODE -ne 0) { throw "inflate.c (m32) failed" }
+& $stubLd -mi386pe --image-base 0 -T "backends\bare\stub.ld" "$bareOut\stub.o" "$bareOut\inflate32.o" -o "$bareOut\stub.exe"
+if ($LASTEXITCODE -ne 0) { throw "stub link failed" }
+& $objcopy -O binary -j .text "$bareOut\stub.exe" "$bareOut\stub.bin"
+if ($LASTEXITCODE -ne 0) { throw "stub objcopy failed" }
+$stubLen = (Get-Item "$bareOut\stub.bin").Length
+if ($stubLen -gt 0x2000) { throw "stub too large: $stubLen bytes" }
+Write-Output "stub.bin OK: $stubLen bytes"
+
+# compress kernel.bin -> kernel.gz (raw DEFLATE wbits=-15, zlib level 9)
+& $python3 -c "import zlib; d=open(r'$bareOut\kernel.bin','rb').read(); c=zlib.compressobj(9,zlib.DEFLATED,-15); gz=c.compress(d)+c.flush(); open(r'$bareOut\kernel.gz','wb').write(gz); print('kernel.gz OK:',len(d),'->',len(gz))"
+if ($LASTEXITCODE -ne 0) { throw "kernel.gz compress failed" }
+$gzLen = (Get-Item "$bareOut\kernel.gz").Length
+$gzCap = 0x200000   # decompression capacity (>= kernel.bin size)
+if ($kSize -gt $gzCap) { $gzCap = $kSize }
+# patch stub slots: +0x80 src_off = stub length, +0x84 src_len = gz size,
+#                    +0x88 dst_cap
+$sf = [IO.File]::OpenWrite("$bareOut\stub.bin")
+$sf.Position = 0x80
+$sb = [byte[]]::new(12)
+[BitConverter]::GetBytes([uint32]$stubLen).CopyTo($sb, 0)
+[BitConverter]::GetBytes([uint32]$gzLen).CopyTo($sb, 4)
+[BitConverter]::GetBytes([uint32]$gzCap).CopyTo($sb, 8)
+$sf.Write($sb, 0, 12)
+$sf.Close()
+# payload.bin = stub.bin + kernel.gz
+$payloadBytes = [IO.File]::ReadAllBytes("$bareOut\stub.bin") + [IO.File]::ReadAllBytes("$bareOut\kernel.gz")
+[IO.File]::WriteAllBytes("$bareOut\payload.bin", $payloadBytes)
+$payloadLen = $payloadBytes.Length
+Write-Output "payload.bin OK: $payloadLen bytes (stub $stubLen + gz $gzLen)"
+
 # 5) boot sector ->
 & $objcopy -O binary -j .text "$bareOut\boot.o" "$bareOut\boot.bin"
 if ($LASTEXITCODE -ne 0) { throw "boot objcopy failed" }
 $bootLen = (Get-Item "$bareOut\boot.bin").Length
 if ($bootLen -ne 512) { throw "boot.bin size $bootLen != 512" }
-$kSectors = [Math]::Ceiling($kSize / 512)
+$payloadSize = (Get-Item "$bareOut\payload.bin").Length
+$kSectors = [Math]::Ceiling($payloadSize / 512)
 $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
 # 0x58（0x7C58，）：
 $fs.Position = 0x58
@@ -238,7 +281,7 @@ Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58)"
 $python = "C:\Users\huawei\AppData\Local\Programs\Python\Python311\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
 $isoOut = Join-Path $distOut "nefuOS.iso"
-& $python "tools\make_iso.py" "$bareOut\boot.bin" "$bareOut\kernel.bin" $isoOut
+& $python "tools\make_iso.py" "$bareOut\boot.bin" "$bareOut\payload.bin" $isoOut
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
 Write-Output "ISO OK: $((Get-Item $isoOut).Length) bytes"
 

@@ -26,17 +26,20 @@ if (-not $qemu) { throw "qemu-system-x86_64 not found" }
 Write-Output "QEMU: $qemu"
 
 # ---- OVMF firmware ----
-$ovmfDir = "tools\grub_toolchain\ovmf"
-if (-not (Test-Path "$ovmfDir\OVMF_CODE.4m.fd")) { throw "OVMF_CODE.4m.fd missing (run tools\fetch_grub_toolchain.py)" }
-$varsTmp = Join-Path $env:TEMP "nefu_ovmf_vars.fd"
-Copy-Item "$ovmfDir\OVMF_VARS.4m.fd" $varsTmp -Force
+# NOTE: use the classic full-image OVMF (OVMF.legacy.fd).  The 4M split
+# variant (OVMF_CODE.4m.fd / OVMF_VARS.4m.fd) makes the GRUB multiboot2
+# relocator #PF (its destination page is mapped read-only); the legacy
+# firmware loads the kernel cleanly.
+$legacyFd = "tools\grub_toolchain\ovmf_legacy_x\usr\share\ovmf\OVMF.legacy.fd"
+if (-not (Test-Path $legacyFd)) { throw "OVMF.legacy.fd missing (run tools\fetch_grub_toolchain.py)" }
+$fwTmp = Join-Path $env:TEMP "nefu_ovmf_legacy.fd"
+Copy-Item $legacyFd $fwTmp -Force
 
 if (-not (Test-Path $Img)) { throw "image not found: $Img" }
 
 $args = @(
     "-m", "128M",
-    "-drive", "if=pflash,format=raw,readonly=on,file=$ovmfDir\OVMF_CODE.4m.fd",
-    "-drive", "if=pflash,format=raw,file=$varsTmp",
+    "-drive", "if=pflash,format=raw,file=$fwTmp",
     "-drive", "file=$Img,format=raw,if=ide",
     "-net", "nic,model=e1000",
     "-net", "user",

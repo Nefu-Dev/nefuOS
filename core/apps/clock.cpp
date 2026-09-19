@@ -1,6 +1,6 @@
 // nefuOS analog clock - LVGL GUI (canvas-based, integer math only)
 #include "apps.h"
-#include "../gui/lvgl_win.h"
+#include "../gui/wm.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
 
@@ -16,24 +16,13 @@ static int s_sin(int deg) {
 }
 
 struct ClockLvState {
-    LvglWin* lw;
-    lv_obj_t* canvas;
-    uint8_t* buf;
+    int w, h;
 };
 
-static ClockLvState* s_clock_st = 0;
-
-static void clock_lv_draw(lv_timer_t* t) {
-    (void)t;
-    ClockLvState* st = s_clock_st;
-    if (!st || !st->canvas || !st->buf) return;
-    lv_obj_t* cnv = st->canvas;
-    int w = lv_obj_get_width(cnv), h = lv_obj_get_height(cnv);
-    Surface cs;
-    cs.addr = st->buf;
-    cs.width = w;
-    cs.height = h;
-    cs.pitch = w * 4;
+static void clock_wm_paint(Window* win) {
+    ClockLvState* st = (ClockLvState*)win->userdata;
+    int w = st->w, h = st->h;
+    Surface& cs = win->back;
     cs.fill(color::WHITE);
 
     uint32_t sec = platform_seconds_of_day();
@@ -69,27 +58,18 @@ static void clock_lv_draw(lv_timer_t* t) {
     gfx::fillcircle(cs, cx, cy, 2, color::WHITE);
 
     gfx::text(cs, (w - 120) / 2, cy + R + 16, "nefuOS Clock", color::TEXT2, color::WHITE);
-
-    lv_obj_invalidate(cnv);
 }
 
 void clock_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Clock", x, y, 260, 308);
-    if (!lw) return;
+    Window* w = g_wm->create_window("Clock", x, y, 260, 320);
+    if (!w) return;
     ClockLvState* st = new ClockLvState();
-    st->lw = lw;
-    st->canvas = lv_canvas_create(lw->content);
-    lv_obj_set_pos(st->canvas, 0, 0);
-    lv_obj_set_size(st->canvas, 260, 282);
-    int bufsz = lv_canvas_buf_size(260, 282, 32, 4);
-    st->buf = new uint8_t[bufsz];
-    memset(st->buf, 0xFF, (size_t)bufsz);
-    lv_canvas_set_buffer(st->canvas, st->buf, 260, 282, LV_COLOR_FORMAT_ARGB8888);
-    s_clock_st = st;
-    lv_timer_t* tm = lv_timer_create(clock_lv_draw, 1000, st);
-    lw->userdata = st;
-    clock_lv_draw(tm);   // first frame
+    st->w = w->content_w;
+    st->h = w->content_h;
+    w->userdata = st;
+    w->on_paint = clock_wm_paint;
+    g_wm->raise(w);
 }
 } // namespace nefu

@@ -1,6 +1,6 @@
 // nefuOS music player - LVGL GUI (real synthesized WAV playback via waveOut)
 #include "apps.h"
-#include "../gui/lvgl_win.h"
+#include "../gui/wm.h"
 #include "../gui/desktop.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -91,9 +91,6 @@ static void ensure_music_lib() {
 }
 
 struct MusicLvState {
-    LvglWin* lw;
-    lv_obj_t* canvas;
-    uint8_t* buf;
     int w, h;
     List<Song> songs;
     int cur_song;
@@ -101,7 +98,6 @@ struct MusicLvState {
     uint32_t play_start;
     uint32_t pause_offset;
     int bars[24];
-    lv_obj_t* btns[5];
 };
 
 static void music_scan(MusicLvState* st) {
@@ -146,15 +142,19 @@ static int music_progress_ms(MusicLvState* st) {
     return (int)(elapsed % (uint32_t)dur);
 }
 
-static void music_lv_draw(MusicLvState* st) {
-    if (!st->canvas || !st->buf) return;
+static void music_wm_paint(Window* w) {
+    MusicLvState* st = (MusicLvState*)w->userdata;
     int W = st->w, H = st->h;
-    Surface s;
-    s.addr = st->buf;
-    s.width = W;
-    s.height = H;
-    s.pitch = W * 4;
+    Surface& s = w->back;
     s.fill(0x0014181E);
+    // transport buttons Prev/Play/Pause/Next/Stop
+    const char* labels[5] = { "Prev", "Play", "Pause", "Next", "Stop" };
+    for (int i = 0; i < 5; i++) {
+        int bx = 8 + i * 78;
+        gfx::fillrect(s, bx, 6, 70, 24, 0x003D4B66);
+        gfx::rect(s, bx, 6, 70, 24, 0x002B3347);
+        gfx::text(s, bx + (70 - gfx::text_width(labels[i])) / 2, 11, labels[i], color::WHITE, 0x003D4B66);
+    }
     for (int i = 0; i < 24; i++) {
         int target = st->playing ? (int)(mrand() % 100) : 5;
         st->bars[i] += (target - st->bars[i]) * 35 / 100;
@@ -211,21 +211,17 @@ static void music_lv_draw(MusicLvState* st) {
         if (sel && st->playing) gfx::text(s, W - 92, ly + 1, ">>", color::GREEN, bg);
         ly += 16;
     }
-    lv_obj_invalidate(st->canvas);
 }
 
-static MusicLvState* s_mu_st = 0;
-
-static void music_lv_tick(lv_timer_t* t) {
-    (void)t;
-    if (!s_mu_st) return;
-    music_lv_draw(s_mu_st);
-}
-
-static void music_lv_btn(lv_event_t* e) {
-    MusicLvState* st = s_mu_st;
-    if (!st) return;
-    int action = (int)(intptr_t)lv_event_get_user_data(e);
+static void music_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    MusicLvState* st = (MusicLvState*)w->userdata;
+    if (!st || !buttons) return;
+    if (!(my >= 6 && my < 30)) return;
+    int action = -1;
+    for (int i = 0; i < 5; i++) {
+        int bx = 8 + i * 78;
+        if (mx >= bx && mx < bx + 70) { action = i; break; }
+    }
     if (action == 0) {           // Play
         if (!st->playing) { st->play_start = platform_tick_ms(); st->playing = true; play_current_track(st); }
     } else if (action == 1) {    // Pause
@@ -251,46 +247,20 @@ void music_launch() {
     ensure_music_lib();
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Music Player", x, y, 480, 440);
-    if (!lw) return;
+    Window* w = g_wm->create_window("Music Player", x, y, 480, 460);
+    if (!w) return;
     MusicLvState* st = new MusicLvState();
-    st->lw = lw;
     st->cur_song = 0;
     st->playing = false;
     st->play_start = 0;
     st->pause_offset = 0;
     for (int i = 0; i < 24; i++) st->bars[i] = 0;
-    s_mu_st = st;
-    lw->userdata = st;
-
-    const char* labels[5] = { "Prev", "Play", "Pause", "Next", "Stop" };
-    for (int i = 0; i < 5; i++) {
-        lv_obj_t* b = lv_button_create(lw->content);
-        lv_obj_set_pos(b, 8 + i * 78, 6);
-        lv_obj_set_size(b, 70, 24);
-        lv_obj_set_style_radius(b, 5, 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0x3D4B66), 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0x2B3347), LV_STATE_PRESSED);
-        lv_obj_add_event_cb(b, music_lv_btn, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-        lv_obj_t* lbl = lv_label_create(b);
-        lv_label_set_text(lbl, labels[i]);
-        lv_obj_center(lbl);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
-        st->btns[i] = b;
-    }
-
-    st->w = 464;
-    st->h = 368;
-    st->canvas = lv_canvas_create(lw->content);
-    lv_obj_set_pos(st->canvas, 8, 38);
-    lv_obj_set_size(st->canvas, st->w, st->h);
-    int bufsz = lv_canvas_buf_size(st->w, st->h, 32, 4);
-    st->buf = new uint8_t[bufsz];
-    memset(st->buf, 0xFF, (size_t)bufsz);
-    lv_canvas_set_buffer(st->canvas, st->buf, st->w, st->h, LV_COLOR_FORMAT_ARGB8888);
-
+    st->w = w->content_w;
+    st->h = w->content_h;
+    w->userdata = st;
+    w->on_paint = music_wm_paint;
+    w->on_mouse = music_wm_mouse;
     music_scan(st);
-    lv_timer_create(music_lv_tick, 120, st);
-    music_lv_draw(st);
+    g_wm->raise(w);
 }
 } // namespace nefu

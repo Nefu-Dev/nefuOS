@@ -3,7 +3,7 @@
 // Bare metal is a wired e1000 link, so the network list is empty there and
 // Connect brings the real TCP/IP link up.
 #include "apps.h"
-#include "../gui/lvgl_win.h"
+#include "../gui/wm.h"
 #include "../gui/desktop.h"
 #include "../gui/gfx.h"
 #include "../net/net.h"
@@ -15,23 +15,21 @@ namespace nefu {
 namespace {
 
 struct NetCfgState {
-    LvglWin* lw;
-    lv_obj_t* canvas;
-    lv_obj_t* pwd_ta;
-    uint8_t* buf;
     int w, h;
     int sel_net;
     bool connected;
     bool pwd_show;
     String pwd;
+    bool pwd_edit;
     int ping_result;
     int msg;
     WifiNetInfo nets[16];
     int net_count;
     NetAdapterInfo ai;
     bool ai_ok;
-    NetCfgState() : lw(0), canvas(0), pwd_ta(0), buf(0), w(0), h(0), sel_net(-1),
-                    connected(false), pwd_show(false), ping_result(-1), msg(0),
+    NetCfgState() : w(0), h(0), sel_net(-1),
+                    connected(false), pwd_show(false), pwd_edit(false),
+                    ping_result(-1), msg(0),
                     net_count(0), ai_ok(false) {
         memset(&ai, 0, sizeof(ai));
     }
@@ -45,13 +43,25 @@ void fmt_ip(char* out, uint32_t ip) {
 
 static NetCfgState* s_nc_st = 0;
 
-void net_lv_draw(NetCfgState* st) {
-    if (!st->canvas || !st->buf) return;
+void net_wm_paint(Window* w) {
+    NetCfgState* st = (NetCfgState*)w->userdata;
     int W = st->w, H = st->h;
-    Surface s;
-    s.addr = st->buf;
-    s.width = W; s.height = H; s.pitch = W * 4;
+    Surface& s = w->back;
     gfx::fillrect(s, 0, 0, W, H, color::WHITE);
+    // password field
+    gfx::rect(s, 8, 38, 300, 26, 0x00B0AFA8);
+    gfx::fillrect(s, 9, 39, 298, 24, 0x00F0EFEA);
+    if (st->pwd_edit) gfx::rect(s, 7, 36, 302, 30, color::BLUE_LT);
+    gfx::text(s, 14, 44, st->pwd.len() == 0 ? "Wi-Fi password" : (st->pwd_show ? st->pwd.c_str() : "********"),
+              st->pwd.len() == 0 ? 0x00888D96 : color::TEXT, 0x00F0EFEA);
+    // action buttons
+    const char* blabels[5] = { "Ping", "Connect", "Disconnect", "Show", "Refresh" };
+    for (int i = 0; i < 5; i++) {
+        int bx = 8 + i * 88;
+        gfx::fillrect(s, bx, 6, 80, 24, 0x005A6B8C);
+        gfx::rect(s, bx, 6, 80, 24, 0x00425069);
+        gfx::text(s, bx + (80 - gfx::text_width(blabels[i])) / 2, 11, blabels[i], color::WHITE, 0x005A6B8C);
+    }
     int y = 6;
     gfx::text(s, 8, y, "Network Settings", color::BLUE, color::WHITE);
     y += 22;
@@ -122,13 +132,23 @@ void net_lv_draw(NetCfgState* st) {
     ksprintf(buf, sizeof(buf), "Packets RX %u TX %u | ARP %u ICMP %u TCP %u",
              g_net.rx_count, g_net.tx_count, g_net.arp_reqs, g_net.icmp_reqs, g_net.tcp_conns);
     gfx::text(s, 8, y, buf, color::TEXT2, color::WHITE);
-    lv_obj_invalidate(st->canvas);
 }
 
-void net_lv_btn(lv_event_t* e) {
-    NetCfgState* st = s_nc_st;
-    if (!st) return;
-    int id = (int)(intptr_t)lv_event_get_user_data(e);
+void net_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    NetCfgState* st = (NetCfgState*)w->userdata;
+    if (!st || !buttons) return;
+    int id = -1;
+    if (my >= 6 && my < 30) {
+        for (int i = 0; i < 5; i++) {
+            int bx = 8 + i * 88;
+            if (mx >= bx && mx < bx + 80) { id = i; break; }
+        }
+    }
+    // password field click
+    if (my >= 38 && my < 64 && mx >= 8 && mx < 308) {
+        st->pwd_edit = true;
+        return;
+    }
     if (id == 0) {
         if (st->ai_ok && st->ai.gw != 0) st->ping_result = platform_ping(st->ai.gw, 1500) ? 1 : 0;
         else if (g_net.up) st->ping_result = net_ping(g_net.gw, 1500) ? 1 : 0;
@@ -143,11 +163,7 @@ void net_lv_btn(lv_event_t* e) {
         } else {
             if (st->sel_net < 0) { st->msg = 4; }
             else {
-                if (st->pwd_ta) {
-                    const char* p = lv_textarea_get_text(st->pwd_ta);
-                    st->pwd = p ? p : "";
-                }
-                if (!st->nets[st->sel_net].open && st->pwd.len() < 8) { st->msg = 3; }
+                    if (!st->nets[st->sel_net].open && st->pwd.len() < 8) { st->msg = 3; }
                 else {
                     st->connected = true;
                     st->msg = 2;
@@ -162,35 +178,40 @@ void net_lv_btn(lv_event_t* e) {
         st->ping_result = -1;
     } else if (id == 3) {
         st->pwd_show = !st->pwd_show;
-        if (st->pwd_ta) lv_textarea_set_password_mode(st->pwd_ta, !st->pwd_show);
     } else if (id == 4) {
         st->net_count = platform_wifi_scan(st->nets, 16);
         st->ai_ok = platform_net_get(&st->ai);
         st->msg = 0;
         st->ping_result = -1;
     }
-    net_lv_draw(st);
+    // network list selection (canvas area below y=72)
+    if (my >= 72) {
+        int yy = 6 + 22 + 4 * 18 + 22 + 16;
+        int n = st->net_count > 0 ? st->net_count : 1;
+        for (int i = 0; i < n && i < 8; i++) {
+            if (my >= yy + 72 && my < yy + 72 + 22) {
+                st->sel_net = i;
+                st->msg = 0;
+                st->ping_result = -1;
+                st->pwd = "";
+                break;
+            }
+            yy += 22;
+        }
+    }
 }
 
-void net_lv_click(lv_event_t* e) {
-    NetCfgState* st = (NetCfgState*)lv_event_get_user_data(e);
-    if (!st) return;
-    lv_point_t p;
-    lv_indev_get_point(lv_indev_active(), &p);
-    int my = p.y;
-    int y = 6 + 22 + 4 * 18 + 22 + 16;   // matches canvas layout
-    int n = st->net_count > 0 ? st->net_count : 1;
-    for (int i = 0; i < n && i < 8; i++) {
-        if (my >= y && my < y + 22) {
-            st->sel_net = i;
-            st->msg = 0;
-            st->ping_result = -1;
-            if (st->pwd_ta) lv_textarea_set_text(st->pwd_ta, "");
-            break;
-        }
-        y += 22;
+void net_wm_key(Window* w, const KeyEvent* e) {
+    NetCfgState* st = (NetCfgState*)w->userdata;
+    if (!st || !st->pwd_edit) return;
+    if (!e->down) return;
+    if (e->keycode == KEY_BACKSPACE) {
+        if (st->pwd.len() > 0) st->pwd = st->pwd.substr(0, st->pwd.len() - 1);
+        return;
     }
-    net_lv_draw(st);
+    if (e->ascii >= 32 && e->ascii < 127) {
+        if (st->pwd.len() < 63) st->pwd += e->ascii;
+    }
 }
 
 } // namespace
@@ -198,56 +219,18 @@ void net_lv_click(lv_event_t* e) {
 void netcfg_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Network", x, y, 460, 440);
-    if (!lw) return;
+    Window* w = g_wm->create_window("Network", x, y, 460, 460);
+    if (!w) return;
     NetCfgState* st = new NetCfgState();
-    st->lw = lw;
     st->net_count = platform_wifi_scan(st->nets, 16);
     st->ai_ok = platform_net_get(&st->ai);
-    lw->userdata = st;
-    s_nc_st = st;
-
-    const char* labels[5] = { "Ping", "Connect", "Disconnect", "Show", "Refresh" };
-    for (int i = 0; i < 5; i++) {
-        lv_obj_t* b = lv_button_create(lw->content);
-        lv_obj_set_pos(b, 8 + i * 88, 6);
-        lv_obj_set_size(b, 80, 24);
-        lv_obj_set_style_radius(b, 4, 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0x5A6B8C), 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0x425069), LV_STATE_PRESSED);
-        lv_obj_add_event_cb(b, net_lv_btn, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-        lv_obj_t* lbl = lv_label_create(b);
-        lv_label_set_text(lbl, labels[i]);
-        lv_obj_center(lbl);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
-    }
-
-    st->pwd_ta = lv_textarea_create(lw->content);
-    lv_obj_set_pos(st->pwd_ta, 8, 38);
-    lv_obj_set_size(st->pwd_ta, 300, 26);
-    lv_textarea_set_password_mode(st->pwd_ta, true);
-    lv_textarea_set_placeholder_text(st->pwd_ta, "Wi-Fi password");
-    lv_obj_set_style_radius(st->pwd_ta, 4, 0);
-    lv_obj_set_style_border_width(st->pwd_ta, 1, 0);
-    lv_obj_set_style_border_color(st->pwd_ta, lv_color_hex(0xB0AFA8), 0);
-    lv_obj_set_style_bg_color(st->pwd_ta, lv_color_hex(0xF0EFEA), 0);
-
-    st->w = 444;
-    st->h = 350;
-    st->canvas = lv_canvas_create(lw->content);
-    lv_obj_set_pos(st->canvas, 8, 72);
-    lv_obj_set_size(st->canvas, st->w, st->h);
-    int bufsz = lv_canvas_buf_size(st->w, st->h, 32, 4);
-    st->buf = new uint8_t[bufsz];
-    memset(st->buf, 0xFF, (size_t)bufsz);
-    lv_canvas_set_buffer(st->canvas, st->buf, st->w, st->h, LV_COLOR_FORMAT_ARGB8888);
-    lv_obj_add_flag(st->canvas, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(st->canvas, net_lv_click, LV_EVENT_CLICKED, st);
-
-    lv_group_t* grp = lvgl_kb_group();
-    if (grp) lv_group_add_obj(grp, st->pwd_ta);
-
-    net_lv_draw(st);
+    st->w = w->content_w;
+    st->h = w->content_h;
+    w->userdata = st;
+    w->on_paint = net_wm_paint;
+    w->on_mouse = net_wm_mouse;
+    w->on_key = net_wm_key;
+    g_wm->raise(w);
 }
 
 } // namespace nefu

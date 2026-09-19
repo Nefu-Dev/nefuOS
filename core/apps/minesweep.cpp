@@ -1,7 +1,6 @@
-// nefuOS minesweeper - LVGL GUI (canvas, left-click reveal, F flag, R restart)
+// nefuOS minesweeper - WM window (surface back + direct blit), click reveal, F flag, R restart
 #include "apps.h"
-#include "../gui/lvgl_win.h"
-#include "../gui/desktop.h"
+#include "../gui/wm.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
 
@@ -71,27 +70,20 @@ static void miner_reset(MinerCore* st) {
 }
 
 struct MinerLvState {
-    LvglWin* lw;
-    lv_obj_t* canvas;
-    uint8_t* buf;
     int w, h;
     int ox, oy;
     MinerCore core;
 };
 
-static void miner_lv_draw(MinerLvState* st) {
-    if (!st->canvas || !st->buf) return;
-    int w = st->w, h = st->h;
-    Surface s;
-    s.addr = st->buf;
-    s.width = w;
-    s.height = h;
-    s.pitch = w * 4;
+static void miner_wm_draw(Window* w) {
+    Surface& s = w->back;
+    MinerLvState* st = (MinerLvState*)w->userdata;
+    int ww = s.width, hh = s.height;
     s.fill(0x00E8E8E3);
     MinerCore* c = &st->core;
     int cs = 30;
-    st->ox = (w - cs * MinerCore::N) / 2;
-    st->oy = 34 + (h - 34 - cs * MinerCore::N) / 2;
+    st->ox = (ww - cs * MinerCore::N) / 2;
+    st->oy = 30 + (hh - 30 - cs * MinerCore::N) / 2;
     for (int y = 0; y < MinerCore::N; y++) {
         for (int x = 0; x < MinerCore::N; x++) {
             int px = st->ox + x * cs, py = st->oy + y * cs;
@@ -126,29 +118,25 @@ static void miner_lv_draw(MinerLvState* st) {
     if (c->won) ksprintf(buf, sizeof(buf), "YOU WIN!  mines: %d", MinerCore::MINES);
     else if (c->over) ksprintf(buf, sizeof(buf), "BOOM!  flags: %d/%d  (R restart)", c->flags, MinerCore::MINES);
     else ksprintf(buf, sizeof(buf), "Mines: %d  Flags: %d", MinerCore::MINES, c->flags);
-    gfx::text(s, 10, 8, buf, c->over ? color::RED : color::TEXT, 0x00E8E8E3);
-    if (c->over) gfx::text(s, 10, 22, "Press F to flag, R to restart", color::TEXT2, 0x00E8E8E3);
-    lv_obj_invalidate(st->canvas);
+    gfx::text(s, 10, 6, buf, c->over ? color::RED : color::TEXT, 0x00E8E8E3);
+    if (c->over) gfx::text(s, 10, 20, "Press F to flag, R to restart", color::TEXT2, 0x00E8E8E3);
 }
 
-static void miner_lv_click(lv_event_t* e) {
-    MinerLvState* st = (MinerLvState*)lv_event_get_user_data(e);
-    if (!st) return;
-    lv_point_t p;
-    lv_indev_get_point(lv_indev_active(), &p);
-    int x = (p.x - st->ox) / 30;
-    int y = (p.y - st->oy) / 30;
+static void miner_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    MinerLvState* st = (MinerLvState*)w->userdata;
+    if (!buttons) return;
+    int x = (mx - st->ox) / 30;
+    int y = (my - st->oy) / 30;
     if (x < 0 || y < 0 || x >= MinerCore::N || y >= MinerCore::N) return;
     if (st->core.over || st->core.won) return;
     miner_reveal(&st->core, x, y);
-    miner_lv_draw(st);
 }
 
-static void miner_lv_key(lv_event_t* e) {
-    MinerLvState* st = (MinerLvState*)lv_event_get_user_data(e);
-    if (!st) return;
-    uint32_t k = lv_event_get_key(e);
-    if (k == 'r' || k == 'R') { miner_reset(&st->core); miner_lv_draw(st); }
+static void miner_wm_key(Window* w, const KeyEvent* e) {
+    MinerLvState* st = (MinerLvState*)w->userdata;
+    if (!e->down) return;
+    char k = e->ascii;
+    if (k == 'r' || k == 'R') { miner_reset(&st->core); return; }
     if (k == 'f' || k == 'F') {
         MinerCore* c = &st->core;
         if (c->over || c->won) return;
@@ -161,29 +149,16 @@ static void miner_lv_key(lv_event_t* e) {
 void miner_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Minesweeper", x, y, 330, 380);
-    if (!lw) return;
+    Window* w = g_wm->create_window("Minesweeper", x, y, 340, 420);
+    if (!w) return;
     MinerLvState* st = new MinerLvState();
-    st->lw = lw;
-    st->w = 314;
-    st->h = 328;
-    st->canvas = lv_canvas_create(lw->content);
-    lv_obj_set_pos(st->canvas, 8, 8);
-    lv_obj_set_size(st->canvas, st->w, st->h);
-    int bufsz = lv_canvas_buf_size(st->w, st->h, 32, 4);
-    st->buf = new uint8_t[bufsz];
-    memset(st->buf, 0xFF, (size_t)bufsz);
-    lv_canvas_set_buffer(st->canvas, st->buf, st->w, st->h, LV_COLOR_FORMAT_ARGB8888);
-    lw->userdata = st;
+    st->w = w->content_w;
+    st->h = w->content_h;
+    w->userdata = st;
+    w->on_paint = miner_wm_draw;
+    w->on_mouse = miner_wm_mouse;
+    w->on_key = miner_wm_key;
     miner_reset(&st->core);
-    miner_lv_draw(st);
-    lv_obj_add_flag(st->canvas, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(st->canvas, miner_lv_click, LV_EVENT_CLICKED, st);
-    lv_obj_add_event_cb(st->canvas, miner_lv_key, LV_EVENT_KEY, st);
-    lv_group_t* grp = lvgl_kb_group();
-    if (grp) {
-        lv_group_add_obj(grp, st->canvas);
-        lv_group_focus_obj(st->canvas);
-    }
+    g_wm->raise(w);
 }
 } // namespace nefu

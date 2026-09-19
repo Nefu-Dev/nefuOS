@@ -634,12 +634,48 @@ bool platform_hw_info(HwInfo* out) {
 
 // ---------------- entry ----------------
 static int s_auto_app = -1;
+static const char* s_shot_path = 0;
+static int s_click_x = -1, s_click_y = -1;
+
+// Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
+static void save_bmp(const char* path) {
+    FILE* f = fopen(path, "wb");
+    if (!f) return;
+    BITMAPFILEHEADER fh;
+    memset(&fh, 0, sizeof(fh));
+    fh.bfType = 0x4D42;
+    fh.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    fh.bfSize = (DWORD)(fh.bfOffBits + (uint32_t)SW * (uint32_t)SH * 4u);
+    BITMAPINFOHEADER ih;
+    memset(&ih, 0, sizeof(ih));
+    ih.biSize = sizeof(BITMAPINFOHEADER);
+    ih.biWidth = SW;
+    ih.biHeight = -SH;   // top-down, matches DIB memory order
+    ih.biPlanes = 1;
+    ih.biBitCount = 32;
+    ih.biCompression = BI_RGB;
+    fwrite(&fh, 1, sizeof(fh), f);
+    fwrite(&ih, 1, sizeof(ih), f);
+    fwrite(s_bits, 1, (size_t)SW * (size_t)SH * 4u, f);
+    fclose(f);
+    printf("shot saved: %s\n", path);
+}
 
 int main(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--app") == 0 && i + 1 < argc) s_auto_app = atoi(argv[i + 1]);
+        if (strcmp(argv[i], "--shot") == 0 && i + 2 < argc) {
+            s_auto_app = atoi(argv[i + 1]);
+            s_shot_path = argv[i + 2];
+        }
+        if (strcmp(argv[i], "--click") == 0 && i + 2 < argc) {
+            s_click_x = atoi(argv[i + 1]);
+            s_click_y = atoi(argv[i + 2]);
+        }
     }
     SetUnhandledExceptionFilter(crash_handler);
+    printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
+           s_shot_path ? s_shot_path : "-", s_click_x, s_click_y);
     printf("nefuOS host backend (win32) starting...\n");
 
     HINSTANCE hInst = GetModuleHandleA(0);
@@ -688,6 +724,21 @@ int main(int argc, char** argv) {
     // drive frames until the boot splash finishes so LVGL is fully initialised
     { uint32_t t0 = platform_tick_ms(); while (platform_tick_ms() - t0 < 1800) { nefuos_frame(); Sleep(16); } }
     if (s_auto_app >= 0) app_launch(s_auto_app);
+    if (s_shot_path) {
+        uint32_t t0 = platform_tick_ms();
+        while (platform_tick_ms() - t0 < 2500) {
+            if (s_click_x >= 0 && platform_tick_ms() - t0 > 1000) {
+                int cx = s_click_x, cy = s_click_y;
+                nefuos_handle_mouse(cx, cy, 0x01);
+                nefuos_handle_mouse(cx, cy, 0);
+                s_click_x = -1;
+                printf("clicked %d,%d\n", cx, cy);
+            }
+            nefuos_frame(); Sleep(16);
+        }
+        save_bmp(s_shot_path);
+        return 0;
+    }
     ShowWindow(s_hwnd, SW_SHOW);
     SetTimer(s_hwnd, 1, 10, 0);
 

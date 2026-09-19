@@ -3,7 +3,7 @@
 // plus stb_image handle JPEG/PNG/GIF so real-world images open too.
 #include "apps.h"
 #include "jpeg.h"
-#include "../gui/lvgl_win.h"
+#include "../gui/wm.h"
 #include "../gui/desktop.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -18,9 +18,6 @@ struct ImageViewState {
     Surface scaled;
     bool dirty;
     bool src_ok;
-    LvglWin* lw;
-    lv_obj_t* canvas;
-    uint8_t* buf;
     int w, h;
 };
 
@@ -284,13 +281,21 @@ static void ensure_gallery() {
     put("hills.ppm", 400, 300, gen_hills);
 }
 
-static void img_lv_draw(ImageViewState* st) {
-    if (!st->canvas || !st->buf) return;
+static void img_wm_paint(Window* w) {
+    ImageViewState* st = (ImageViewState*)w->userdata;
     int W = st->w, H = st->h;
-    Surface s;
-    s.addr = st->buf;
-    s.width = W; s.height = H; s.pitch = W * 4;
+    Surface& s = w->back;
     s.fill(color::CREAM);
+    gfx::fillrect(s, 0, 0, W, 30, 0x00E7E6E1);
+    gfx::hline(s, 0, W - 1, 30, color::BORDER);
+    // toolbar buttons < > - 100% + Fit
+    const char* labels[6] = { "<", ">", "-", "100%", "+", "Fit" };
+    for (int i = 0; i < 6; i++) {
+        int bx = 8 + i * 48;
+        gfx::fillrect(s, bx, 6, 40, 22, 0x009AA5B1);
+        gfx::rect(s, bx, 6, 40, 22, 0x007A8591);
+        gfx::text(s, bx + (i == 3 ? 6 : 14), 11, labels[i], color::WHITE, 0x009AA5B1);
+    }
     gfx::fillrect(s, 0, 0, W, 30, 0x00E7E6E1);
     gfx::hline(s, 0, W - 1, 30, color::BORDER);
     const char* name = "";
@@ -319,77 +324,61 @@ static void img_lv_draw(ImageViewState* st) {
         gfx::text(s, 8, H - 18, info, color::TEXT2, 0x00E7E6E1);
     }
     gfx::text(s, W / 2, H - 18, "Open from File Manager (double-click an image)", color::TEXT2, 0x00E7E6E1);
-    lv_obj_invalidate(st->canvas);
 }
 
-static void img_lv_btn(lv_event_t* e) {
-    ImageViewState* st = (ImageViewState*)lv_event_get_user_data(e);
-    if (!st) return;
-    int action = (int)(intptr_t)lv_event_get_user_data(e);
-    if (action == 0 && st->files.size() > 0) {
-        st->index = (st->index - 1 + st->files.size()) % st->files.size();
-        image_load_current(st);
-    } else if (action == 1 && st->files.size() > 0) {
-        st->index = (st->index + 1) % st->files.size();
-        image_load_current(st);
-    } else if (action == 2) {
-        if (st->zoom == 0) st->zoom = 100; else st->zoom -= 25;
-        if (st->zoom < 25) st->zoom = 25;
-        st->dirty = true;
-    } else if (action == 3) {
-        st->zoom = 100;
-        st->dirty = true;
-    } else if (action == 4) {
-        if (st->zoom == 0) st->zoom = 100; else st->zoom += 25;
-        if (st->zoom > 400) st->zoom = 400;
-        st->dirty = true;
-    } else if (action == 5) {
-        st->zoom = 0;
-        st->dirty = true;
+static void img_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    ImageViewState* st = (ImageViewState*)w->userdata;
+    if (!st || !buttons) return;
+    // toolbar buttons < > - 100% + Fit at y 6..28, x 8+i*48
+    if (my >= 6 && my < 28) {
+        for (int i = 0; i < 6; i++) {
+            int bx = 8 + i * 48;
+            if (mx >= bx && mx < bx + 40) {
+                if (i == 0 && st->files.size() > 0) {
+                    st->index = (st->index - 1 + st->files.size()) % st->files.size();
+                    image_load_current(st);
+                } else if (i == 1 && st->files.size() > 0) {
+                    st->index = (st->index + 1) % st->files.size();
+                    image_load_current(st);
+                } else if (i == 2) {
+                    if (st->zoom == 0) st->zoom = 100; else st->zoom -= 25;
+                    if (st->zoom < 25) st->zoom = 25;
+                    st->dirty = true;
+                } else if (i == 3) {
+                    st->zoom = 100;
+                    st->dirty = true;
+                } else if (i == 4) {
+                    if (st->zoom == 0) st->zoom = 100; else st->zoom += 25;
+                    if (st->zoom > 400) st->zoom = 400;
+                    st->dirty = true;
+                } else if (i == 5) {
+                    st->zoom = 0;
+                    st->dirty = true;
+                }
+                return;
+            }
+        }
     }
-    img_lv_draw(st);
 }
 
 static void imageviewer_open(FSNode* target) {
     ensure_gallery();
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Image Viewer", x, y, 620, 460);
-    if (!lw) return;
+    Window* w = g_wm->create_window("Image Viewer", x, y, 620, 460);
+    if (!w) return;
     ImageViewState* st = new ImageViewState();
-    st->lw = lw;
     st->index = 0;
     st->zoom = 0;
     st->dirty = true;
     st->src_ok = false;
     st->src.addr = 0;
     st->scaled.addr = 0;
-    st->w = 604;
-    st->h = 404;
-    lw->userdata = st;
-
-    const char* labels[6] = { "<", ">", "-", "100%", "+", "Fit" };
-    for (int i = 0; i < 6; i++) {
-        lv_obj_t* b = lv_button_create(lw->content);
-        lv_obj_set_pos(b, 8 + i * 48, 6);
-        lv_obj_set_size(b, 40, 22);
-        lv_obj_set_style_radius(b, 4, 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0x9AA5B1), 0);
-        lv_obj_set_style_bg_color(b, lv_color_hex(0x7A8591), LV_STATE_PRESSED);
-        lv_obj_add_event_cb(b, img_lv_btn, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-        lv_obj_t* lbl = lv_label_create(b);
-        lv_label_set_text(lbl, labels[i]);
-        lv_obj_center(lbl);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
-    }
-
-    st->canvas = lv_canvas_create(lw->content);
-    lv_obj_set_pos(st->canvas, 8, 34);
-    lv_obj_set_size(st->canvas, st->w, st->h);
-    int bufsz = lv_canvas_buf_size(st->w, st->h, 32, 4);
-    st->buf = new uint8_t[bufsz];
-    memset(st->buf, 0xFF, (size_t)bufsz);
-    lv_canvas_set_buffer(st->canvas, st->buf, st->w, st->h, LV_COLOR_FORMAT_ARGB8888);
+    st->w = w->content_w;
+    st->h = w->content_h;
+    w->userdata = st;
+    w->on_paint = img_wm_paint;
+    w->on_mouse = img_wm_mouse;
 
     image_scan_dir(st);
     if (target) {
@@ -398,7 +387,7 @@ static void imageviewer_open(FSNode* target) {
         }
     }
     image_load_current(st);
-    img_lv_draw(st);
+    g_wm->raise(w);
 }
 
 void imageviewer_launch() { imageviewer_open(0); }

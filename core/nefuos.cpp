@@ -129,7 +129,8 @@ void nefuos_handle_scroll(int delta) {
 
 void nefuos_tick() {
     if (g_net.up) {
-        net_poll();   // drain NIC
+        // net_poll disabled for RIP profiling experiment
+        // net_poll();   // drain NIC
         // deferred link self-test: run once a few seconds after boot so the
         // cold-start path stays fast (ping/tcp waits must not block init)
         if (!s_net_selftest_done && s_booted &&

@@ -11,7 +11,7 @@ Usage:
     python patch_mb2.py <kernel.bin> <bss_start> <bss_size> [<out.bin>]
 
     bss_start / bss_size: decimal or 0x-prefixed; bss_start is the ABSOLUTE
-    runtime address (0x20000 + RVA).  If <out.bin> is omitted, kernel.bin is
+    runtime address (0x100000 + RVA).  If <out.bin> is omitted, kernel.bin is
     patched in place.
 
 Layout of the header (see backends/bare/entry.s):
@@ -26,7 +26,7 @@ The tool locates everything by walking the tags (robust to layout drift).
 import struct
 import sys
 
-LOAD_BASE = 0x20000
+LOAD_BASE = 0x100000
 MAGIC = 0xE85250D6
 SCAN_LIMIT = 32768  # multiboot2 spec: header within the first 32 KiB
 
@@ -105,7 +105,7 @@ def main():
     load_addr = u32(data, addr_tag + 12)
     print("  address tag @0x%x: header_addr=0x%x load_addr=0x%x" % (addr_tag, hdr_addr, load_addr))
     if load_addr != LOAD_BASE:
-        print("ERROR: load_addr 0x%x != 0x20000" % load_addr)
+        print("ERROR: load_addr 0x%x != 0x100000" % load_addr)
         return 1
     struct.pack_into("<I", data, addr_tag + 16, load_end)
     struct.pack_into("<I", data, addr_tag + 20, bss_end)

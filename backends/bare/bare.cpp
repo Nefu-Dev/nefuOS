@@ -255,6 +255,7 @@ static void kbd_scancode(uint8_t sc) {
 }
 
 static void mouse_byte(uint8_t b) {
+    if (b == 0xFA) return;            // PS/2 ACK - never part of a data packet
     if (s_mouse_pkt == 0) {
         if (!(b & 0x08)) return;      // byte0
         s_mouse_buf[0] = b;
@@ -343,8 +344,12 @@ static void ps2_init() {
 
     outb(0x64, 0xD4); io_wait();
     outb(0x60, 0xF4); io_wait();
-    // ACK
-    for (int i = 0; i < 4; i++) inb(0x60);
+    // Wait for the 0xFA ACK of the enable command (with timeout), so it never
+    // leaks into the motion stream.
+    for (int i = 0; i < 10000; i++) {
+        if (inb(0x64) & 1) { if (inb(0x60) == 0xFA) break; }
+        io_wait();
+    }
 }
 
 // ===================== RTC =====================

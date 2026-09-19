@@ -49,3 +49,5 @@ tools/qemu/
 tools/qemu-*
 tools/grub*/
 
+# Verification screenshots (not source)
+shots/

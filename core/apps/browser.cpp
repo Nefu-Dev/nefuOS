@@ -1394,7 +1394,7 @@ static void on_close(Window* w) {
 
 void browser_launch() {
     BrowserState* st = new BrowserState();
-    st->input = "file:///home/user/Documents/nefuos.txt";
+    st->input = "file:///README.txt";
     st->cursor = st->input.len();
     st->form_edit_row = -1;
     Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);

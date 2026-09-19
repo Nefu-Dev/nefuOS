@@ -1,6 +1,6 @@
 // nefuOS system monitor - LVGL GUI (live curves, real RAM/DISK, process list)
 #include "apps.h"
-#include "../gui/lvgl_win.h"
+#include "../gui/wm.h"
 #include "../gui/desktop.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -61,21 +61,19 @@ static void mo_draw_curve(Surface& s, int x, int y, int w, int h,
 }
 
 struct MonitorLvState {
-    LvglWin* lw;
-    lv_obj_t* canvas;
-    uint8_t* buf;
     int w, h;
     MonitorCore core;
 };
 
-static void mo_lv_draw(MonitorLvState* st) {
-    if (!st->canvas || !st->buf) return;
+static void mo_wm_paint(Window* w) {
+    MonitorLvState* st = (MonitorLvState*)w->userdata;
     int W = st->w, H = st->h;
-    Surface s;
-    s.addr = st->buf;
-    s.width = W;
-    s.height = H;
-    s.pitch = W * 4;
+    Surface& s = w->back;
+    uint32_t now = platform_tick_ms();
+    if (now - st->core.last_push >= 400) {
+        mo_push(&st->core);
+        st->core.last_push = now;
+    }
     s.fill(color::WHITE);
     MonitorCore* c = &st->core;
     gfx::text(s, 10, 8, "System Monitor", color::BLUE, color::WHITE);
@@ -138,29 +136,11 @@ static void mo_lv_draw(MonitorLvState* st) {
         }
         gfx::text(s, 10, ly + 2, "Click End to close a process.", color::TEXT2, color::WHITE);
     }
-    lv_obj_invalidate(st->canvas);
 }
 
-static MonitorLvState* s_mo_st = 0;
-
-static void mo_lv_tick(lv_timer_t* t) {
-    (void)t;
-    MonitorLvState* st = s_mo_st;
-    if (!st) return;
-    uint32_t now = platform_tick_ms();
-    if (now - st->core.last_push >= 400) {
-        mo_push(&st->core);
-        st->core.last_push = now;
-        mo_lv_draw(st);
-    }
-}
-
-static void mo_lv_click(lv_event_t* e) {
-    MonitorLvState* st = (MonitorLvState*)lv_event_get_user_data(e);
-    if (!st) return;
-    lv_point_t p;
-    lv_indev_get_point(lv_indev_active(), &p);
-    int mx = p.x, my = p.y;
+static void mo_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    MonitorLvState* st = (MonitorLvState*)w->userdata;
+    if (!st || !buttons) return;
     int W = st->w, H = st->h;
     int ch = (H - 40) / 3;
     int py0 = 34 + ch * 3 + 6;
@@ -181,28 +161,18 @@ static void mo_lv_click(lv_event_t* e) {
 void monitor_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("System Monitor", x, y, 560, 400);
-    if (!lw) return;
+    Window* w = g_wm->create_window("System Monitor", x, y, 560, 420);
+    if (!w) return;
     MonitorLvState* st = new MonitorLvState();
-    st->lw = lw;
-    st->w = 544;
-    st->h = 348;
-    st->canvas = lv_canvas_create(lw->content);
-    lv_obj_set_pos(st->canvas, 8, 8);
-    lv_obj_set_size(st->canvas, st->w, st->h);
-    int bufsz = lv_canvas_buf_size(st->w, st->h, 32, 4);
-    st->buf = new uint8_t[bufsz];
-    memset(st->buf, 0xFF, (size_t)bufsz);
-    lv_canvas_set_buffer(st->canvas, st->buf, st->w, st->h, LV_COLOR_FORMAT_ARGB8888);
-    lw->userdata = st;
+    st->w = w->content_w;
+    st->h = w->content_h;
+    w->userdata = st;
+    w->on_paint = mo_wm_paint;
+    w->on_mouse = mo_wm_mouse;
     st->core.head = 0;
     st->core.last_push = 0;
     for (int i = 0; i < HIST; i++) { st->core.cpu[i] = 0; st->core.mem[i] = 0; st->core.disk[i] = 0; }
     for (int i = 0; i < HIST; i++) mo_push(&st->core);
-    s_mo_st = st;
-    lv_timer_create(mo_lv_tick, 100, st);
-    mo_lv_draw(st);
-    lv_obj_add_flag(st->canvas, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(st->canvas, mo_lv_click, LV_EVENT_CLICKED, st);
+    g_wm->raise(w);
 }
 } // namespace nefu

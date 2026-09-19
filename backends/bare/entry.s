@@ -1,8 +1,8 @@
-# nefuOS 内核入口 — 链接基址 0x20000（GNU as AT&T 语法）
+# nefuOS 内核入口 — 链接基址 0x100000（GNU as AT&T 语法）
 # 双启动路径：
-#   A) 传统 ISO（El Torito，BIOS）：boot.s 在 32 位保护模式下 ljmp 到 0x20000，
+#   A) 传统 ISO（El Torito，BIOS）：boot.s 加载压缩 payload，stub 解压内核到 0x100000 后 ljmp，
 #      落到本文件偏移 0 的 `jmp kernel_start`；bootinfo 已由 boot.s 写入 0x7000。
-#   B) UEFI ESP + GRUB：GRUB 按 multiboot2 协议把本文件加载到 0x20000，进入内核时
+#   B) UEFI ESP + GRUB：GRUB 按 multiboot2 协议把本文件加载到 0x100000，进入内核时
 #      EAX=0x36D76289（multiboot2 magic）、EBX=multiboot2 信息结构物理地址；
 #      本代码解析 framebuffer 标签，把 LFB/宽/高/pitch/bpp 写入 0x7000 同一布局。
 # 32 位保护模式进入：建页表 -> PAE -> 长模式 -> 64 位 -> 调用 nefuos_kernel_main
@@ -13,11 +13,11 @@
 .section .text
 .code32
 
-# ---- 传统路径入口（boot.s ljmp $0x18, $0x20000 落到这里）----
+# ---- 传统路径入口（stub 解压后 ljmp $0x18, $0x100000 落到这里）----
 .globl _legacy_entry
 _legacy_entry:
     jmp kernel_start          # 跳过 multiboot2 头（EB rel8，2 字节）
-    .org 0x8                  # 填充至 8 字节对齐：multiboot2 头位于 0x20008
+    .org 0x8                  # 填充至 8 字节对齐：multiboot2 头位于 0x100008
 
 # ---- Multiboot2 头（GRUB 在镜像前 32KB 内扫描，须 8 字节对齐）----
 multiboot2_header:
@@ -30,12 +30,12 @@ multiboot2_header:
     .short 5, 0                         # type=5 framebuffer, flags=0
     .long 20
     .long 1024, 768, 32                 # width, height, depth
-    # 地址标签：加载到 0x20000；load_end/bss_end 由构建脚本补丁（GRUB 负责清 .bss）
+    # 地址标签：加载到 0x100000；load_end/bss_end 由构建脚本补丁（GRUB 负责清 .bss）
     .align 8
     .short 2, 0                         # type=2 address, flags=0
     .long 24
     .long multiboot2_header             # header_addr（ld 解析为绝对地址）
-    .long 0x20000                       # load_addr
+    .long 0x100000                       # load_addr
     .long 0                             # load_end_addr  <- 构建时补丁
     .long 0                             # bss_end_addr   <- 构建时补丁
     # 入口地址标签：从 kernel_start 进入
@@ -49,7 +49,7 @@ multiboot2_header:
     .long 8
 mh_end:
     .align 8
-kernel_boot_params:                     # 构建脚本补丁：.bss 起址/大小（两条路径共用）
+kernel_boot_params:                     # 构建脚本补丁：.bss 起址/大小（两条路径共用，0x100000 基址）
     .long 0                             # bss_start（绝对地址）
     .long 0                             # bss_size（字节）
 
@@ -308,6 +308,10 @@ common_init:
     movb $'B', %al
     outb %al, %dx
     movq $0x7000, %rcx           # boot info（mingw x64 ABI：首参 RCX）
+    # debugcon 探针：'J' = about to call kernel_main
+    movw $0xE9, %dx
+    movb $'J', %al
+    outb %al, %dx
     call nefuos_kernel_main
 .halt:
     cli

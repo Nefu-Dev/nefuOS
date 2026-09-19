@@ -5,16 +5,16 @@
 # Key design:
 #  1) SeaBIOS no-emulation: DL=0xE0, physical 2048B sectors. int13 AH=0x42
 #     is served by the real ATAPI stack, single call <= 32 sectors (64KB).
-#  2) kernel.bin is loaded by a dynamic loop: one DAP at 0x7D70 is rewritten
-#     per call (count <= 32 CD sectors = 64KB), advancing LBA/segment/remain
-#     until kernel_count/4 sectors are read.  DAP/state live below the
+#  2) the payload (stub + compressed kernel) is loaded by a dynamic loop:
+#     one DAP at 0x7D70 is rewritten per call (count <= 32 CD sectors = 64KB),
+#     advancing LBA/segment/remain until kernel_count/4 sectors are read.
 #     SeaBIOS clobber zone 0x7DAA.
 #  3) After each chunk, advance state; a CF=1 failure resets and retries the
 #     whole load.
 #  4) Boot sector tail 0x7DAA-0x7DFF gets clobbered by BIOS int 0x10/0x13,
 #     so GDT/kernel_count/DAPs live in the safe zone 0x7C00-0x7DAA.
 # Memory: 0x6000 VBE mode info; 0x7000 boot info; 0x7C00 boot sector;
-# 0x7E00 boot vars; 0x20000 kernel; 0x400000 heap.
+# 0x7E00 boot vars; 0x20000 payload (stub+compressed kernel); 0x100000 kernel; 0x400000 heap.
 .code16
 .org 0
 .section .text
@@ -76,8 +76,9 @@ start_code:
     call dbg_char
     .byte 'V'
     # loop over (index, value) pairs: XRES, YRES, BPP, ENABLE
-    leaw vbe_idx, %si
-    leaw vbe_val, %di
+    # labels are file offsets; add 0x7C00 so DS:SI/DS:DI reach runtime data
+    leaw vbe_idx + 0x7C00, %si
+    leaw vbe_val + 0x7C00, %di
     movw $4, %cx
 vbe_loop:
     movw $0x1CE, %dx
@@ -99,50 +100,53 @@ vbe_idx: .word 1, 2, 3, 4
 vbe_val: .word 1024, 768, 32, 0x0081
 vbe_done:
 
-# ---- load kernel.bin from real ATAPI CD via EDD int 0x13 AH=0x42 ----
-# kernel.bin starts at physical LBA 24 (make_iso.py layout). CD sectors are
+# ---- load payload (stub + compressed kernel) from ATAPI CD via int 0x13 AH=0x42 ----
+# payload starts at physical LBA 24 (make_iso.py layout). CD sectors are
 # 2048B; int13 0x42 is limited to 64KB (32 sectors) per call, so we loop.
 # State lives in memory (0x7D80..), never in BP/SI (int13 0x42 clobbers
 # those); the single DAP at 0x7D70 is rewritten before every call and sits
 # well below SeaBIOS's VBE clobber zone (0x7DAA+).
 cd_load_kernel:
     # rem = ceil(kernel_count / 4)  (512B kernel sectors -> 2048B CD sectors)
-    movw kernel_count, %ax
+    # NOTE: DS=0 and all state labels below are file offsets, so every access
+    # must add +0x7C00 to reach the runtime address (boot.s is loaded at
+    # 0x7C00 by SeaBIOS with CS:IP = 0000:7C00).
+    movw kernel_count + 0x7C00, %ax
     addw $3, %ax
     shrw $2, %ax
-    movw %ax, cd_rem
+    movw %ax, cd_rem + 0x7C00
     movl $24, %eax
-    movl %eax, cd_lba
+    movl %eax, cd_lba + 0x7C00
     movw $0x2000, %ax
-    movw %ax, cd_seg
+    movw %ax, cd_seg + 0x7C00
 cd_loop:
-    cmpw $0, cd_rem
+    cmpw $0, cd_rem + 0x7C00
     jz  cd_done
-    movw cd_rem, %ax
+    movw cd_rem + 0x7C00, %ax
     cmpw $32, %ax
     jbe cd_n_ok
     movw $32, %ax
 cd_n_ok:
-    movw %ax, cdap1_count
-    movw cd_seg, %ax
-    movw %ax, cdap1_seg
-    movl cd_lba, %eax
-    movl %eax, cdap1_lba
+    movw %ax, cdap1_count + 0x7C00
+    movw cd_seg + 0x7C00, %ax
+    movw %ax, cdap1_seg + 0x7C00
+    movl cd_lba + 0x7C00, %eax
+    movl %eax, cdap1_lba + 0x7C00
     movw $cdap1 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
     movb $0x42, %ah
     int $0x13
     jc cd_retry
     # advance: lba += n, seg += n*0x80 (n sectors * 2048B / 16), rem -= n
-    movw cdap1_count, %cx
+    movw cdap1_count + 0x7C00, %cx
     movzwl %cx, %edx
-    movl cd_lba, %eax
+    movl cd_lba + 0x7C00, %eax
     addl %edx, %eax
-    movl %eax, cd_lba
+    movl %eax, cd_lba + 0x7C00
     movw %cx, %ax
     shlw $7, %ax
-    addw %ax, cd_seg
-    subw %cx, cd_rem
+    addw %ax, cd_seg + 0x7C00
+    subw %cx, cd_rem + 0x7C00
     jmp cd_loop
 cd_done:
     call dbg_char
@@ -197,7 +201,7 @@ cd_seg:  .word 0       # current load segment
 # mingw ld PE symbols for __bss_start/__bss_end are RVAs (0), so the
 # runtime address is patched here from the PE section table instead.
 .org 0x1C0
-bss_start: .long 0        # absolute runtime address of .bss (0x20000 + RVA)
+bss_start: .long 0        # absolute runtime address of .bss (0x100000 + RVA)
 bss_size:  .long 0        # .bss VirtualSize in bytes
 
 .org 0x1FE

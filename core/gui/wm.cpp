@@ -1,5 +1,6 @@
 // nefuOS WM implementation
 #include "wm.h"
+#include "../klib/klib.h"
 #include "lvgl_win.h"
 
 namespace nefu {
@@ -120,6 +121,7 @@ void WM::destroy_window(Window* w) {
 
 void WM::close_window(Window* w) {
     if (!w || w->closed) return;
+    klogf("wm: close window %s\n", w->title.c_str());
     if (w->on_close) w->on_close(w);
     w->closed = true;
     if (w->lvw && w->lvw->win) lv_obj_add_flag(w->lvw->win, LV_OBJ_FLAG_HIDDEN);
@@ -160,17 +162,20 @@ void WM::raise(Window* w) {
 }
 
 void WM::paint_all(Surface& fb) {
-    (void)fb;
     for (int i = 0; i < wins_.size(); i++) {
         Window* w = wins_[i];
         if (!w->visible || w->minimized || w->closed) continue;
-        // LVGL owns the frame (title bar + close button). The app repaints its
-        // content into the canvas (backed by w->back); invalidating the canvas
-        // makes LVGL flush it to the desktop in the next refresh.
+        // LVGL owns the frame (title bar + close button). The app content is
+        // drawn by on_paint into w->back and blitted directly onto the
+        // framebuffer over the LVGL content area (canvas rendering proved
+        // unreliable on this LVGL build, so we bypass it entirely).
         w->content_x = w->x;
         w->content_y = w->y + wm_hdr_h(w);
         if (w->on_paint) w->on_paint(w);
-        if (w->lv_canvas) lv_obj_invalidate((lv_obj_t*)w->lv_canvas);
+        if (w->back.addr && w->content_w > 0 && w->content_h > 0) {
+            gfx::blit_clip(fb, w->back, w->content_x, w->content_y,
+                           0, 0, w->content_w, w->content_h);
+        }
         // keep the LVGL window position in sync with drag
         if (w->lvw && w->lvw->win) {
             lv_obj_set_pos(w->lvw->win, w->x, w->y);
@@ -225,8 +230,10 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
 
     if (pressed) {
 
+        // generous close-button hit area (LVGL lv_win places the X button at
+        // the right edge of the header with its own padding)
         if (y >= win->y && y < win->y + hdr &&
-            x >= win->x + win->w - 40 && x < win->x + win->w - 4) {
+            x >= win->x + win->w - 72 && x < win->x + win->w - 2) {
             close_window(win);
             return;
         }
