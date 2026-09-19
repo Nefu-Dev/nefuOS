@@ -6,6 +6,7 @@
 #include "desktop.h"
 #include "../apps/apps.h"
 #include "../sys/settings.h"
+#include "../sys/power.h"
 #include "../platform.h"
 #include "lvgl.h"
 
@@ -16,6 +17,12 @@
 LV_FONT_DECLARE(lv_font_montserrat_16);
 
 namespace nefu {
+
+// lock-screen state owned by nefuos.cpp
+bool nefuos_is_locked();
+int nefuos_lock_len();
+const char* nefuos_lock_pwd();
+uint32_t nefuos_lock_fail_ms();
 
 static const int TASKBAR_H = 30;
 static const int ICON_W = 96, ICON_H = 92;
@@ -170,6 +177,10 @@ static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
     data->point.x = s_mx;
     data->point.y = s_my;
     data->state = s_btn ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    static int s_lvdbg = 0;
+    if (s_lvdbg < 60 && (data->state == LV_INDEV_STATE_PRESSED || s_mx != 10 || s_my != 10)) {
+        s_lvdbg++; klogf("lvgl in=%d,%d st=%d\n", s_mx, s_my, (int)data->state);
+    }
 }
 
 void desktop_redraw() {
@@ -343,6 +354,12 @@ static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
     lv_obj_t* tile = lv_obj_create(card);
     lv_obj_set_size(tile, TILE, TILE);
     lv_obj_align(tile, LV_ALIGN_TOP_MID, 0, 2);
+    // tile must not capture the click: it has no CLICKED handler, and an
+    // lv_obj is clickable+scrollable by default, so a press on the icon art
+    // would never reach the parent card (no event bubbling). Make it inert so
+    // LVGL's hit-test falls through to the card, which owns on_icon_click.
+    lv_obj_remove_flag(tile, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(tile, lv_color_hex(s_icon_color[i]), 0);
     lv_obj_set_style_radius(tile, 6, 0);
     lv_obj_set_style_border_width(tile, 1, 0);
@@ -585,6 +602,46 @@ void desktop_paint_boot(Surface& fb) {
     int p = (platform_tick_ms() / 40) % (bw - 8);
     gfx::fillrect(fb, bx + 3, by + 3, p, 6, color::BLUE_LT);
     gfx::text(fb, W / 2 - 30, by + 18, "Loading...", color::TEXT2, 0x0012141A);
+}
+
+// Lock screen: full-screen wallpaper + UEFI username + password gate. Shown
+// between boot splash and the desktop (and on idle lock / suspend).
+void desktop_paint_lock(Surface& fb) {
+    uint32_t top, bottom, base;
+    wallpaper_colors(g_settings.wallpaper_lock, &top, &bottom, &base);
+    fb.fill(top);
+    int W = fb.width, H = fb.height;
+    // bottom shading band so the panel stands out
+    for (int y = H - 200; y < H; y += 4) {
+        int t = (y - (H - 200)) * 30 / 200;
+        gfx::fillrect(fb, 0, y, W, 2,
+                      ((t >> 3) << 16) | ((t >> 2) << 8) | (t >> 2) | 0xFF000000);
+    }
+    // big clock
+    uint32_t sec = platform_seconds_of_day();
+    char tbuf[24];
+    ksprintf(tbuf, sizeof(tbuf), "%02u:%02u", (sec / 3600) % 24, (sec / 60) % 60);
+    gfx::text_scale(fb, W / 2 - 9 * 8 * 3, H / 2 - 150, tbuf, color::WHITE, top, 3);
+    gfx::text(fb, W / 2 - 40, H / 2 - 104, "nefuOS", color::WHITE, top);
+    // login panel
+    int px = W / 2 - 190, py = H / 2 - 40;
+    gfx::fillrect(fb, px, py, 380, 132, 0xFF161C28);
+    gfx::rect(fb, px, py, 380, 132, 0xFF3A4458);
+    char line[96];
+    ksprintf(line, sizeof(line), "User: %s",
+             g_uefi.username[0] ? g_uefi.username : "user");
+    gfx::text(fb, px + 16, py + 14, line, color::WHITE, 0xFF161C28);
+    gfx::text(fb, px + 16, py + 46, "Password:", color::BLUE_LT, 0xFF161C28);
+    int n = nefuos_lock_len();
+    if (n > 40) n = 40;
+    char stars[48];
+    for (int i = 0; i < n; i++) stars[i] = '*';
+    stars[n] = 0;
+    gfx::text(fb, px + 120, py + 46, stars, color::WHITE, 0xFF161C28);
+    gfx::text(fb, px + 16, py + 80, "Enter = unlock   ESC = reboot", color::TEXT2, 0xFF161C28);
+    uint32_t now = platform_tick_ms();
+    if (nefuos_lock_fail_ms() && now - nefuos_lock_fail_ms() < 1500)
+        gfx::text(fb, px + 16, py + 104, "Wrong password - try again", color::RED, 0xFF161C28);
 }
 
 bool desktop_handle_mouse(int x, int y, uint8_t buttons) {

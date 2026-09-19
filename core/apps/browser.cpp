@@ -6,6 +6,7 @@
 // - all network I/O runs on background threads (UI never blocks)
 
 #include "apps.h"
+#include "minijs.h"
 #include "../gui/wm.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
@@ -175,6 +176,7 @@ static void html_parse(const char* html, int len, List<Line>& out) {
     bool in_ul = false;
     bool in_skip = false;
     char skip_tag[16] = {0};
+    int script_start = -1;
     bool in_table = false;
     int td_count = 0;
 
@@ -252,6 +254,7 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                     !strcmp(tname,"noscript")) {
                     in_skip = true;
                     strncpy(skip_tag, tname, 15); skip_tag[15]=0;
+                    if (!strcmp(tname,"script")) script_start = i;  // i is just past '>'
                     continue;
                 }
                 if (is_block_tag(tname)) new_block();
@@ -339,7 +342,27 @@ static void html_parse(const char* html, int len, List<Line>& out) {
             } else {
                 if (!strcmp(tname,"script")||!strcmp(tname,"style")||
                     !strcmp(tname,"head")||!strcmp(tname,"title")||
-                    !strcmp(tname,"noscript")) { in_skip=false; continue; }
+                    !strcmp(tname,"noscript")) {
+                    if (!strcmp(tname,"script") && script_start >= 0) {
+                        int slen = tag_start - script_start;
+                        if (slen > 0 && slen < 600) {
+                            char sbuf[600];
+                            memcpy(sbuf, html + script_start, slen);
+                            sbuf[slen] = 0;
+                            char jsout[600];
+                            int rc = mini_js_run(sbuf, jsout, sizeof(jsout));
+                            if (!rc && jsout[0]) {
+                                flush();
+                                Line l;
+                                l.s = jsout;
+                                l.font_size = 16;
+                                out.push(l);
+                            }
+                        }
+                        script_start = -1;
+                    }
+                    in_skip=false; continue;
+                }
                 if (!strcmp(tname,"h1")||!strcmp(tname,"h2")||!strcmp(tname,"h3")||
                     !strcmp(tname,"h4")||!strcmp(tname,"h5")||!strcmp(tname,"h6")) {
                     new_block(); font_size=16; bold=false;

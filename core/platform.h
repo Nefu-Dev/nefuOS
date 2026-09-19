@@ -41,6 +41,14 @@ void platform_present();
 // ===================== time =====================
 uint32_t platform_tick_ms();        // ms since boot
 uint32_t platform_seconds_of_day();
+
+struct DateInfo {
+    int year, month, day;   // year full (e.g. 2026), month 1..12, day 1..31
+    int hour, min, sec;     // 0..23 / 0..59
+    int dow;                // 0 = Sunday .. 6 = Saturday
+};
+bool platform_rtc_date(DateInfo* out);   // CMOS RTC on bare, GetLocalTime on host
+
 uint32_t nefuos_uptime_ms();        // ms since nefuOS started (bare: uptime)
 
 // ===================== debug output =====================

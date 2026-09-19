@@ -1,5 +1,6 @@
 // nefuOS terminal app
 #include "apps.h"
+#include "minijs.h"
 #include "nefvm.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -8,6 +9,10 @@
 #include "../sys/sha256.h"
 
 namespace nefu {
+
+// lock-screen API owned by nefuos.cpp
+void nefuos_lock_screen();
+void nefuos_is_locked_decl();
 
 // ---- admin auth: salted SHA-256 (matches tools/admin_hash.py) ----
 // Only a hash is ever stored/compared; the plaintext password never appears
@@ -465,9 +470,16 @@ static void term_run(TermState* t, const char* cmd) {
         }
     }
     else if (strcmp(a0, "date") == 0) {
-        char buf[64];
-        uint32_t s = nefuos_uptime_ms() / 1000;
-        ksprintf(buf, sizeof(buf), "uptime %u s - epoch 2026-09-06 00:00:00 +%us", s, s);
+        char buf[96];
+        DateInfo di;
+        if (platform_rtc_date(&di)) {
+            static const char* WDN[7] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+            ksprintf(buf, sizeof(buf), "%s %04d-%02d-%02d %02d:%02d:%02d",
+                     WDN[di.dow % 7], di.year, di.month, di.day, di.hour, di.min, di.sec);
+        } else {
+            uint32_t s = nefuos_uptime_ms() / 1000;
+            ksprintf(buf, sizeof(buf), "uptime %u s (RTC unavailable)", s);
+        }
         term_print(t, buf);
     }
     else if (strcmp(a0, "free") == 0) {
@@ -1037,6 +1049,208 @@ static void term_run(TermState* t, const char* cmd) {
         term_print(t, "shutting down...");
         nefuos_shutdown();
         platform_poweroff();
+    }
+    else if (strcmp(a0, "lock") == 0) {
+        term_print(t, "lock: screen locked (enter UEFI password)");
+        nefuos_lock_screen();
+    }
+    else if (strcmp(a0, "login") == 0) {
+        term_print(t, "login: already logged in (use `lock` then enter password)");
+    }
+    else if (strcmp(a0, "js") == 0) {
+        if (argc < 2) {
+            term_print(t, "usage: js <code>   (mini JS interpreter)");
+            term_print(t, "  supports: var/let, if/else, while, for, print, alert,");
+            term_print(t, "  document.write, len, int arithmetic and string concat");
+        } else {
+            char out[512];
+            int rc = mini_js_run(argv[1], out, sizeof(out));
+            if (rc) term_print(t, "js: error (syntax or undefined variable)");
+            else if (out[0]) term_print(t, out);
+        }
+    }
+    else if (strcmp(a0, "man") == 0) {
+        if (argc < 2) term_print(t, "usage: man <command>   (built-in manual)");
+        else {
+            const char* m = argv[1];
+            if (strcmp(m, "ls") == 0) term_print(t, "ls [-a] [path]  - list directory contents");
+            else if (strcmp(m, "cd") == 0) term_print(t, "cd <path>  - change working directory");
+            else if (strcmp(m, "cat") == 0) term_print(t, "cat <file>  - print file contents");
+            else if (strcmp(m, "mkdir") == 0) term_print(t, "mkdir <path>  - create directory");
+            else if (strcmp(m, "rm") == 0) term_print(t, "rm <path>  - remove file or empty dir");
+            else if (strcmp(m, "echo") == 0) term_print(t, "echo <text> [> file]  - print or redirect");
+            else if (strcmp(m, "cp") == 0) term_print(t, "cp <src> <dst>  - copy file");
+            else if (strcmp(m, "mv") == 0) term_print(t, "mv <src> <dst>  - move file");
+            else if (strcmp(m, "ping") == 0) term_print(t, "ping [host]  - ICMP echo (gateway by default)");
+            else if (strcmp(m, "grep") == 0) term_print(t, "grep <pattern> <file>  - search lines");
+            else if (strcmp(m, "df") == 0) term_print(t, "df [-h]  - report file system usage");
+            else if (strcmp(m, "free") == 0) term_print(t, "free  - show memory usage");
+            else if (strcmp(m, "ps") == 0) term_print(t, "ps  - list running processes");
+            else if (strcmp(m, "js") == 0) term_print(t, "js <code>  - run mini JavaScript");
+            else if (strcmp(m, "lock") == 0) term_print(t, "lock  - lock the screen");
+            else if (strcmp(m, "shutdown") == 0) term_print(t, "shutdown|reboot|poweroff  - power control");
+            else term_print(t, "no manual entry for this command");
+        }
+    }
+    else if (strcmp(a0, "hostname") == 0) {
+        FSNode* hn = g_vfs->resolve("/etc/hostname");
+        if (hn && hn->data && hn->size > 0) {
+            char hb[64];
+            int hn2 = hn->size;
+            if (hn2 > 63) hn2 = 63;
+            memcpy(hb, hn->data, (size_t)hn2);
+            hb[hn2] = 0;
+            char* nl = (char*)strchr(hb, '\n'); if (nl) *nl = 0;
+            term_print(t, hb);
+        } else term_print(t, "nefuos");
+    }
+    else if (strcmp(a0, "id") == 0) {
+        term_print(t, "uid=1000(guest) gid=1000(users) groups=1000(users),27(sudo)");
+    }
+    else if (strcmp(a0, "mount") == 0) {
+        term_print(t, "nefuosfs on / type nvfs (rw,relatime)");
+        term_print(t, "devtmpfs on /dev type devtmpfs (rw,nosuid)");
+        term_print(t, "proc on /proc type proc (rw,nosuid,nodev)");
+        term_print(t, "sysfs on /sys type sysfs (rw,nosuid,nodev)");
+    }
+    else if (strcmp(a0, "cal") == 0) {
+        DateInfo di;
+        if (!platform_rtc_date(&di)) { term_print(t, "cal: RTC unavailable"); }
+        else {
+            static const int md[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+            int leap = (di.year % 4 == 0 && di.year % 100 != 0) || di.year % 400 == 0;
+            int dim = md[di.month - 1] + (di.month == 2 && leap ? 1 : 0);
+            int yy = di.month < 3 ? di.year - 1 : di.year;
+            int mm = di.month < 3 ? di.month + 12 : di.month;
+            int k = yy % 100, j = yy / 100;
+            int h = (1 + (13 * (mm + 1)) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+            int dow1 = (h + 6) % 7;   // 0 = Sunday
+            char buf[64];
+            ksprintf(buf, sizeof(buf), "%04d-%02d    Su Mo Tu We Th Fr Sa", di.year, di.month);
+            term_print(t, buf);
+            char line[64];
+            int n = 0;
+            for (int i = 0; i < dow1 && n < 60; i++) { line[n++] = ' '; line[n++] = ' '; line[n++] = ' '; }
+            for (int d = 1; d <= dim && n < 60; d++) {
+                if (d == di.day) {
+                    line[n++] = '[';
+                    if (d < 10) line[n++] = ' ';
+                    if (d < 10) { line[n++] = (char)('0' + d); } else { line[n++] = (char)('0' + d / 10); line[n++] = (char)('0' + d % 10); }
+                    line[n++] = ']';
+                    line[n++] = ' ';
+                } else {
+                    if (d < 10) line[n++] = ' ';
+                    if (d < 10) { line[n++] = (char)('0' + d); } else { line[n++] = (char)('0' + d / 10); line[n++] = (char)('0' + d % 10); }
+                    line[n++] = ' ';
+                }
+                if ((dow1 + d) % 7 == 0 || d == dim) {
+                    line[n] = 0;
+                    term_print(t, line);
+                    n = 0;
+                }
+            }
+        }
+    }
+    else if (strcmp(a0, "yes") == 0) {
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+        term_print(t, "y");
+    }
+    else if (strcmp(a0, "seq") == 0) {
+        if (argc < 2) term_print(t, "usage: seq <last>");
+        else {
+            int last = atoi(argv[1]);
+            if (last > 200) last = 200;
+            char buf[64];
+            int n = 0;
+            buf[0] = 0;
+            for (int i = 1; i <= last; i++) {
+                char nb[8];
+                ksprintf(nb, sizeof(nb), i < last ? "%d " : "%d", i);
+                for (char* q = nb; *q && n < 60; q++) buf[n++] = *q;
+                if (n >= 56) { buf[n] = 0; term_print(t, buf); n = 0; }
+            }
+            if (n) { buf[n] = 0; term_print(t, buf); }
+        }
+    }
+    else if (strcmp(a0, "printf") == 0) {
+        if (argc < 2) term_print(t, "usage: printf <format> [args...]");
+        else {
+            char out[256];
+            int oi = 0, ai = 2;
+            for (const char* fp = argv[1]; *fp && oi < 248; fp++) {
+                if (*fp == '%' && fp[1]) {
+                    fp++;
+                    char c = *fp;
+                    if (c == 's') {
+                        if (ai < argc) { const char* a = argv[ai++]; while (*a && oi < 248) out[oi++] = *a++; }
+                    } else if (c == 'd' || c == 'i' || c == 'u') {
+                        if (ai < argc) { int v = atoi(argv[ai++]); char nb[16]; ksprintf(nb, sizeof(nb), "%d", v); for (char* q = nb; *q && oi < 248; q++) out[oi++] = *q; }
+                    } else if (c == 'x' || c == 'X') {
+                        if (ai < argc) { unsigned v = (unsigned)atoi(argv[ai++]); char nb[16]; int ni = 0; int st = 0; for (int sh = 28; sh >= 0; sh -= 4) { int dg = (v >> sh) & 0xF; if (dg || st || sh == 0) { st = 1; nb[ni++] = dg < 10 ? (char)('0' + dg) : (char)((c == 'X' ? 'A' : 'a') + dg - 10); } } nb[ni] = 0; if (!st) nb[0] = '0', nb[1] = 0; for (char* q = nb; *q && oi < 248; q++) out[oi++] = *q; }
+                    } else if (c == 'c') {
+                        if (ai < argc) out[oi++] = argv[ai++][0];
+                    } else if (c == '%') {
+                        out[oi++] = '%';
+                    } else {
+                        out[oi++] = '%'; out[oi++] = c;
+                    }
+                } else if (*fp == '\\' && fp[1] == 'n') {
+                    out[oi++] = '\n'; fp++;
+                } else {
+                    out[oi++] = *fp;
+                }
+            }
+            out[oi] = 0;
+            term_print(t, out);
+        }
+    }
+    else if (strcmp(a0, "basename") == 0) {
+        if (argc < 2) term_print(t, "usage: basename <path>");
+        else {
+            const char* p = argv[1];
+            const char* last = p;
+            for (; *p; p++) if (*p == '/') last = p + 1;
+            term_print(t, last);
+        }
+    }
+    else if (strcmp(a0, "dirname") == 0) {
+        if (argc < 2) term_print(t, "usage: dirname <path>");
+        else {
+            const char* p = argv[1];
+            int len = 0;
+            for (; p[len]; len++) {}
+            while (len > 1 && p[len - 1] == '/') len--;
+            int cut = -1;
+            for (int i = len - 1; i >= 0; i--) if (p[i] == '/') { cut = i; break; }
+            if (cut < 0) term_print(t, ".");
+            else if (cut == 0) term_print(t, "/");
+            else { char buf[128]; int n = 0; for (int i = 0; i < cut && n < 120; i++) buf[n++] = p[i]; buf[n] = 0; term_print(t, buf); }
+        }
+    }
+    else if (strcmp(a0, "sleep") == 0) {
+        if (argc < 2) term_print(t, "usage: sleep <seconds>");
+        else {
+            int secs = atoi(argv[1]);
+            if (secs > 30) secs = 30;
+            uint32_t t0 = platform_tick_ms();
+            while (platform_tick_ms() - t0 < (uint32_t)secs * 1000u) {
+                // busy wait with progress dots
+                char buf[8];
+                ksprintf(buf, sizeof(buf), ".%u", (unsigned)((platform_tick_ms() - t0) / 1000));
+                (void)buf;
+            }
+            char buf[32];
+            ksprintf(buf, sizeof(buf), "sleep: %d s elapsed", secs);
+            term_print(t, buf);
+        }
     }
     // ---------- extra Unix commands ----------
     else if (strcmp(a0, "hostname") == 0) term_print(t, "nefuos");

@@ -7,7 +7,9 @@
 #include "vfs/vfs.h"
 #include "apps/apps.h"
 #include "sys/settings.h"
+#include "sys/power.h"
 #include "net/net.h"
+#include "sys/sha256.h"
 
 namespace nefu {
 
@@ -16,6 +18,44 @@ static bool s_booted = false;
 static uint32_t s_boot_start = 0;
 static bool s_net_selftest_done = false;
 static int s_mx = -8, s_my = -8;
+// ---- lock screen (UEFI password gate) state ----
+static bool s_locked = true;        // desktop starts behind the lock screen
+static char s_lock_pwd[65] = "";
+static int s_lock_len = 0;
+static uint32_t s_lock_fail_ms = 0;
+static uint32_t s_last_activity = 0;
+
+bool nefuos_is_locked() { return s_locked; }
+int nefuos_lock_len() { return s_lock_len; }
+const char* nefuos_lock_pwd() { return s_lock_pwd; }
+uint32_t nefuos_lock_fail_ms() { return s_lock_fail_ms; }
+
+void nefuos_lock_screen() {
+    s_locked = true;
+    s_lock_len = 0;
+    s_lock_pwd[0] = 0;
+}
+
+static void lock_verify() {
+    bool ok = false;
+    if (g_uefi.password_hash[0] == 0) {
+        ok = true;   // no UEFI password configured -> unlock freely
+    } else {
+        uint8_t h[32];
+        nefu_sha256((const uint8_t*)s_lock_pwd, (uint32_t)s_lock_len, h);
+        char hex[65];
+        nefu_sha256_hex(h, hex);
+        ok = (strcmp(hex, g_uefi.password_hash) == 0);
+    }
+    s_lock_len = 0;
+    s_lock_pwd[0] = 0;
+    if (ok) {
+        s_locked = false;
+        s_lock_fail_ms = 0;
+    } else {
+        s_lock_fail_ms = platform_tick_ms();
+    }
+}
 
 // （8x13，MSB=left）
 static const unsigned char CURSOR[13] = { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xF0, 0xF0,
@@ -105,6 +145,8 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
     s_mx = x;
     s_my = y;
     if (!s_inited || !s_booted) return;
+    s_last_activity = platform_tick_ms();
+    if (s_locked) return;   // lock screen consumes nothing from the desktop
     if (!desktop_handle_mouse(x, y, buttons)) {
         g_wm->handle_mouse(x, y, buttons);
     }
@@ -113,6 +155,19 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
 void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     if (!s_inited || !s_booted) return;
     if (!down) return;
+    s_last_activity = platform_tick_ms();
+    if (s_locked) {
+        if (ascii >= 32 && ascii < 127 && s_lock_len < 63) {
+            s_lock_pwd[s_lock_len++] = ascii;
+            s_lock_pwd[s_lock_len] = 0;
+        } else if (keycode == KEY_BACKSPACE && s_lock_len > 0) {
+            s_lock_len--;
+            s_lock_pwd[s_lock_len] = 0;
+        } else if (keycode == KEY_ENTER) {
+            lock_verify();
+        }
+        return;
+    }
     if (desktop_handle_key(keycode, ascii)) return;
     KeyEvent e;
     e.keycode = keycode;
@@ -128,6 +183,11 @@ void nefuos_handle_scroll(int delta) {
 }
 
 void nefuos_tick() {
+    // idle auto-lock (configured in Settings -> idle_lock_sec)
+    if (s_booted && !s_locked && g_settings.idle_lock_sec > 0 &&
+        platform_tick_ms() - s_last_activity > (uint32_t)g_settings.idle_lock_sec * 1000u) {
+        nefuos_lock_screen();
+    }
     if (g_net.up) {
         net_poll();   // drain NIC
         // deferred link self-test: run once a few seconds after boot so the
@@ -168,7 +228,13 @@ void nefuos_frame() {
     uint32_t now = platform_tick_ms();
     if (!s_booted) {
         desktop_paint_boot(fb);
-        if (now - s_boot_start > 1600) s_booted = true;
+        if (now - s_boot_start > 1600) {
+            s_booted = true;
+            s_locked = true;      // boot splash -> lock screen
+            s_last_activity = now;
+        }
+    } else if (s_locked) {
+        desktop_paint_lock(fb);
     } else {
         desktop_paint(fb);
         g_wm->paint_all(fb);

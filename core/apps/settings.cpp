@@ -12,7 +12,7 @@ static const char* WALL_NAMES[4] = { "Classic", "Sunset", "Dark", "Custom" };
 
 struct SettingsLvState {
     LvglWin* lw;
-    lv_obj_t* btns[24];
+    lv_obj_t* btns[28];
 };
 
 static void settings_lv_click(lv_event_t* e) {
@@ -37,6 +37,10 @@ static void settings_lv_click(lv_event_t* e) {
         g_settings.lang = 1;
     } else if (id == 20) {
         g_settings.boot_splash = !g_settings.boot_splash;
+    } else if (id == 24) {
+        g_settings.lock_on_suspend = !g_settings.lock_on_suspend;
+    } else if (id == 25) {
+        g_settings.idle_lock_sec = g_settings.idle_lock_sec ? 0 : 30;
     } else if (id == 21) {
         os_shutdown();
     } else if (id == 22) {
@@ -56,6 +60,14 @@ static void settings_lv_click(lv_event_t* e) {
     if (id == 20) {
         lv_obj_t* lbl = lv_obj_get_child(btn, 0);
         if (lbl) lv_label_set_text(lbl, g_settings.boot_splash ? "[x] Show boot splash" : "[ ] Show boot splash");
+    }
+    if (id == 24) {
+        lv_obj_t* lbl = lv_obj_get_child(btn, 0);
+        if (lbl) lv_label_set_text(lbl, g_settings.lock_on_suspend ? "[x] Lock on suspend" : "[ ] Lock on suspend");
+    }
+    if (id == 25) {
+        lv_obj_t* lbl = lv_obj_get_child(btn, 0);
+        if (lbl) lv_label_set_text(lbl, g_settings.idle_lock_sec ? "[x] Auto-lock after 30s idle" : "[ ] Auto-lock idle (off)");
     }
 }
 
@@ -87,7 +99,7 @@ static lv_obj_t* sec_label(lv_obj_t* parent, const char* text, int x, int y) {
 void settings_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Settings", x, y, 480, 560);
+    LvglWin* lw = lvgl_win_create("Settings", x, y, 480, 640);
     if (!lw) return;
     SettingsLvState* st = new SettingsLvState();
     st->lw = lw;
@@ -118,28 +130,32 @@ void settings_launch() {
                            184, 282, 180, 26, 17, 0x55678A);
     st->btns[20] = make_btn(st, lw->content, g_settings.boot_splash ? "[x] Show boot splash" : "[ ] Show boot splash",
                            12, 314, 180, 26, 20, 0x55678A);
+    st->btns[24] = make_btn(st, lw->content, g_settings.lock_on_suspend ? "[x] Lock on suspend" : "[ ] Lock on suspend",
+                           200, 314, 180, 26, 24, 0x55678A);
+    st->btns[25] = make_btn(st, lw->content, g_settings.idle_lock_sec ? "[x] Auto-lock after 30s idle" : "[ ] Auto-lock idle (off)",
+                           12, 346, 260, 26, 25, 0x55678A);
 
-    sec_label(lw->content, "Language:", 12, 352);
-    st->btns[18] = make_btn(st, lw->content, "English", 12, 376, 84, 26, 18, 0x3D4B66);
-    st->btns[19] = make_btn(st, lw->content, "Chinese", 104, 376, 84, 26, 19, 0x3D4B66);
+    sec_label(lw->content, "Language:", 12, 400);
+    st->btns[18] = make_btn(st, lw->content, "English", 12, 424, 84, 26, 18, 0x3D4B66);
+    st->btns[19] = make_btn(st, lw->content, "Chinese", 104, 424, 84, 26, 19, 0x3D4B66);
 
     // 硬件信息区
     HwInfo hw;
     platform_hw_info(&hw);
     char hw_txt[256];
     ksprintf(hw_txt, sizeof(hw_txt), "CPU: %s @ %dMHz", hw.cpu_model, hw.cpu_mhz);
-    sec_label(lw->content, hw_txt, 12, 414);
+    sec_label(lw->content, hw_txt, 12, 460);
     ksprintf(hw_txt, sizeof(hw_txt), "Memory: %d MB total", (int)hw.mem_total_mb);
-    sec_label(lw->content, hw_txt, 12, 434);
+    sec_label(lw->content, hw_txt, 12, 480);
     ksprintf(hw_txt, sizeof(hw_txt), "BIOS: %s %s", hw.bios_vendor, hw.bios_version);
-    sec_label(lw->content, hw_txt, 12, 454);
+    sec_label(lw->content, hw_txt, 12, 500);
 
     // 电源操作区
-    sec_label(lw->content, "Power:", 12, 482);
-    st->btns[21] = make_btn(st, lw->content, "Shutdown", 12, 506, 100, 30, 21, 0x993333);
-    st->btns[22] = make_btn(st, lw->content, "Reboot", 118, 506, 100, 30, 22, 0x336699);
-    st->btns[23] = make_btn(st, lw->content, "Suspend", 224, 506, 100, 30, 23, 0x555577);
+    sec_label(lw->content, "Power:", 12, 528);
+    st->btns[21] = make_btn(st, lw->content, "Shutdown", 12, 552, 100, 30, 21, 0x993333);
+    st->btns[22] = make_btn(st, lw->content, "Reboot", 118, 552, 100, 30, 22, 0x336699);
+    st->btns[23] = make_btn(st, lw->content, "Suspend", 224, 552, 100, 30, 23, 0x555577);
 
-    sec_label(lw->content, "All settings are saved to /etc/settings.conf and persist across reboots", 12, 542);
+    sec_label(lw->content, "All settings are saved to /etc/settings.conf and persist across reboots", 12, 596);
 }
 } // namespace nefu

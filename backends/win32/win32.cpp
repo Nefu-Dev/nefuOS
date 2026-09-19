@@ -227,6 +227,20 @@ uint32_t platform_seconds_of_day() {
     return (uint32_t)st.wHour * 3600u + (uint32_t)st.wMinute * 60u + (uint32_t)st.wSecond;
 }
 
+bool platform_rtc_date(DateInfo* out) {
+    if (!out) return false;
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    out->year = st.wYear;
+    out->month = st.wMonth;
+    out->day = st.wDay;
+    out->hour = st.wHour;
+    out->min = st.wMinute;
+    out->sec = st.wSecond;
+    out->dow = st.wDayOfWeek;   // 0 = Sunday .. 6 = Saturday
+    return true;
+}
+
 void platform_dbg(const char* s) {
     OutputDebugStringA(s);
     fputs(s, stdout);

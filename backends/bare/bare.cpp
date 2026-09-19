@@ -374,6 +374,39 @@ uint32_t platform_seconds_of_day() {
     return (uint32_t)h * 3600u + (uint32_t)m * 60u + (uint32_t)s;
 }
 
+bool platform_rtc_date(DateInfo* out) {
+    if (!out) return false;
+    uint8_t s = cmos_read(0x00);
+    uint8_t m = cmos_read(0x02);
+    uint8_t h = cmos_read(0x04);
+    uint8_t d = cmos_read(0x06);
+    uint8_t mo = cmos_read(0x07);
+    uint8_t y = cmos_read(0x08);
+    uint8_t c = cmos_read(0x09);
+    uint8_t wd = cmos_read(0x0A);
+    uint8_t b = cmos_read(0x0B);
+    if (!(b & 0x04)) {
+        s = bcd2bin(s); m = bcd2bin(m); h = bcd2bin(h);
+        d = bcd2bin(d); mo = bcd2bin(mo); y = bcd2bin(y); c = bcd2bin(c);
+    }
+    if (!(b & 0x02)) {            // 12-hour mode
+        bool pm = (h & 0x80) != 0;
+        h &= 0x7F;
+        if (h >= 12) h = (uint8_t)(h - 12);
+        if (pm) h += 12;
+    }
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+    out->year = (int)c * 100 + (int)y;
+    out->month = (int)mo;
+    out->day = (int)d;
+    out->hour = (int)h;
+    out->min = (int)m;
+    out->sec = (int)s;
+    // CMOS day-of-week: 1 = Sunday .. 7 = Saturday -> 0 = Sunday
+    out->dow = (int)((wd == 0) ? 0 : (wd - 1) % 7);
+    return true;
+}
+
 // ===================== debug / power off =====================
 void platform_dbg(const char* s) {
     while (*s) uart_putc(*s++);

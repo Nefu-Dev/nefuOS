@@ -320,7 +320,9 @@ void VFS::ensure_standard_dirs() {
         "/home/user/Downloads", "/home/user/.Trash",
         "/lib", "/mnt", "/opt", "/proc", "/root", "/run", "/sbin", "/srv",
         "/sys", "/tmp", "/usr", "/usr/bin", "/usr/lib", "/usr/share",
-        "/usr/share/apps", "/usr/downloads", "/usr/local", "/usr/local/bin",
+        "/usr/share/apps", "/usr/share/man", "/usr/downloads", "/usr/local",
+        "/usr/local/bin", "/usr/local/share", "/usr/local/share/man",
+        "/usr/sbin", "/usr/src", "/usr/include", "/usr/games",
         "/etc/init.d",
         "/var", "/var/log", "/var/cache", "/var/lib", "/var/lib/dpkg", "/var/run",
         "/var/lib/nefuos", "/var/lib/nefuos/db",
@@ -360,6 +362,56 @@ void VFS::ensure_default_files() {
         { "/home/user/Documents/todo.txt",
           "TODO\n 1. explore the file tree\n 2. try the terminal\n 3. install apps\n" },
         { "/usr/share/banner.txt", "nefuOS 0.2 - a tiny operating system\n" },
+        { "/usr/share/apps/README",
+          "Installed applications (launch from the desktop or Store):\n"
+          "  filemgr  - two-pane file manager\n"
+          "  browser  - web browser (file:// and http://)\n"
+          "  terminal - shell with ~40 commands\n"
+          "  settings - system settings and power\n"
+          "  store    - software store (.nefud packages)\n"
+          "  notepad  - text editor\n"
+          "  imageviewer, jpeg, music, monitor, calc, clock,\n"
+          "  minesweep, snake, paint, fontview, wiki, sysinfo\n" },
+        { "/usr/share/man/nefuos.1",
+          "NEFUOS(1)                 nefuOS Manual                NEFUOS(1)\n"
+          "\n"
+          "NAME\n"
+          "       nefuos - a tiny dual-backend hobby operating system\n"
+          "\n"
+          "SYNOPSIS\n"
+          "       nefuOS.exe  (Windows host)\n"
+          "       nefuOS.iso  (bootable image for QEMU / VMs)\n"
+          "\n"
+          "FILESYSTEM\n"
+          "       /usr  system programs and libraries\n"
+          "       /tmp  temporary files (cleared on boot)\n"
+          "       /home/user  user files\n"
+          "\n"
+          "SEE ALSO\n"
+          "       terminal(1), filemgr(1), browser(1)\n" },
+        { "/usr/local/share/nefuos-info.txt",
+          "nefuOS - local additions\n"
+          "This directory tree follows the FHS (Filesystem Hierarchy Standard)\n"
+          "so software installed under /usr/local never mixes with system files.\n" },
+        { "/usr/include/stdio.h",
+          "/* nefuOS stdio.h - standard I/O interface (minimal) */\n"
+          "#ifndef _NEFU_STDIO_H\n"
+          "#define _NEFU_STDIO_H\n"
+          "int printf(const char* fmt, ...);\n"
+          "int puts(const char* s);\n"
+          "#endif\n" },
+        { "/usr/src/hello.c",
+          "/* nefuOS sample C program */\n"
+          "#include <stdio.h>\n"
+          "int main(void) {\n"
+          "    printf(\"Hello from nefuOS!\\n\");\n"
+          "    return 0;\n"
+          "}\n" },
+        { "/opt/nefu/README",
+          "nefuOS optional software directory\n"
+          "Third-party packages are installed here.\n" },
+        { "/var/log/lastlog",
+          "nefuOS last login log (empty on fresh boot)\n" },
         { "/README.txt",
           "nefuOS v0.2 - dual-backend hobby OS (host exe + bootable ISO)\n" },
     };
@@ -395,7 +447,24 @@ void VFS::create_default_tree() {
     mkdir("/usr/lib");
     mkdir("/usr/share");
     mkdir("/usr/share/apps");
+    mkdir("/usr/share/man");
     mkdir("/usr/downloads");
+    mkdir("/usr/local");
+    mkdir("/usr/local/bin");
+    mkdir("/usr/local/share");
+    mkdir("/usr/local/share/man");
+    mkdir("/usr/sbin");
+    mkdir("/usr/src");
+    mkdir("/usr/include");
+    mkdir("/usr/games");
+    mkdir("/opt/nefu");
+    mkdir("/var/tmp");
+    mkdir("/var/spool");
+    mkdir("/var/run");
+    mkdir("/root/.config");
+    mkdir("/home/user/.config");
+    mkdir("/home/user/.local");
+    mkdir("/home/user/.local/share");
     mkdir("/var");
     mkdir("/var/log");
     mkdir("/var/cache");
