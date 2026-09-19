@@ -131,12 +131,18 @@ struct EthHdr {
 
 static void eth_send(const uint8_t* dst, uint16_t type, const void* payload, int plen) {
     if (!s_mmio || !s_tx_desc) return;
-    // wait for a free descriptor
+    // wait for a free descriptor.
+    // Old check "TDH != TDT % TX_RING -> free" was wrong on the very first
+    // send (TDH == TDT == 0, so it never broke) and spun the full
+    // 2,000,000-iteration budget (~1.6 s), freezing the GUI during the boot
+    // network self-test. Correct rule: the ring has room unless every slot
+    // is in flight, i.e. (TDT - TDH) mod TX_RING == TX_RING-1.
     int slot = s_tx_head % TX_RING;
     uint32_t wait = 0;
     while (wait < 2000000u) {
-        if (s_tx_desc[slot].status & 0x01) break;  // DD
-        if (mmio32(REG_TDH) != (uint32_t)(mmio32(REG_TDT) % TX_RING)) break;
+        uint32_t tdh = mmio32(REG_TDH);
+        uint32_t tdt = mmio32(REG_TDT);
+        if (((tdt + TX_RING - tdh) & (TX_RING - 1)) < TX_RING - 1) break;
         wait++;
     }
     uint8_t* p = s_tx_buf[slot];

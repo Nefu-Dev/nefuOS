@@ -233,7 +233,7 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
         // generous close-button hit area (LVGL lv_win places the X button at
         // the right edge of the header with its own padding)
         if (y >= win->y && y < win->y + hdr &&
-            x >= win->x + win->w - 72 && x < win->x + win->w - 2) {
+            x >= win->x + win->w - 84 && x < win->x + win->w - 2) {
             close_window(win);
             return;
         }
@@ -260,6 +260,10 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
 
 void WM::handle_key(const KeyEvent* e) {
     if (focus_ && focus_->on_key) focus_->on_key(focus_, e);
+    // ESC closes the focused window as a keyboard fallback for the X button.
+    if (e && e->down && e->keycode == KEY_ESC && focus_ && !focus_->closed) {
+        close_window(focus_);
+    }
 }
 
 void WM::handle_scroll(int delta) {

@@ -548,7 +548,7 @@ extern "C" void nefuos_kernel_main(void* info) {
         if (s_mouse_dirty) {
             s_mouse_dirty = false;
             s_mx += s_mouse_dx;
-            s_my += s_mouse_dy;          // PS/2 Y =
+            s_my -= s_mouse_dy;          // PS/2 dy>0 = up; screen y grows downward
             s_mouse_dx = 0; s_mouse_dy = 0;
             if (s_mx < 0) s_mx = 0;
             if (s_mx >= s_screen.width) s_mx = s_screen.width - 1;
