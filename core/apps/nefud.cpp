@@ -19,10 +19,24 @@ struct NefudState {
     char ver[16];
     int app_id;
     bool is_bin;          // NEFBIN01 package
+    uint32_t payload_off; // .nefud: offset of the @@PAYLOAD@@ bytes
+    uint32_t payload_size;
+    bool crc_ok;
     char outbuf[600];     // VM output buffer
     int outlen;
     Button btn;           // main action (Launch / Run)
 };
+
+// standard CRC-32 (IEEE 802.3), table-free bitwise version (small kernel)
+static uint32_t crc32_bytes(const uint8_t* d, uint32_t n) {
+    uint32_t c = 0xFFFFFFFF;
+    for (uint32_t i = 0; i < n; i++) {
+        c ^= d[i];
+        for (int b = 0; b < 8; b++)
+            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1)));
+    }
+    return ~c;
+}
 
 // VM output callback: append chunks into the window buffer
 static void vm_out(const char* s, void* ud) {
@@ -41,6 +55,7 @@ static void nefud_parse(NefudState* st) {
     FSNode* f = st->file;
     st->name[0] = 0; st->desc[0] = 0; st->author[0] = 0; st->ver[0] = 0;
     st->app_id = -1; st->is_bin = false;
+    st->payload_off = 0; st->payload_size = 0; st->crc_ok = true;
     if (!f || f->is_dir || f->size == 0) return;
     const uint8_t* d = f->data;
     // .bin package: fixed binary header
@@ -75,6 +90,22 @@ static void nefud_parse(NefudState* st) {
     else if (strncmp(line, "desc=", 5) == 0) strncpy(st->desc, line + 5, sizeof(st->desc) - 1);
     else if (strncmp(line, "author=", 7) == 0) strncpy(st->author, line + 7, sizeof(st->author) - 1);
     else if (strncmp(line, "ver=", 4) == 0) strncpy(st->ver, line + 4, sizeof(st->ver) - 1);
+    // payload section: "@@PAYLOAD@@\n<bytes><crc32be>" (nefupack format)
+    const char* mark = strstr(buf, "@@PAYLOAD@@\n");
+    if (mark && f->size >= 8) {
+        uint32_t po = (uint32_t)(mark - buf) + 12;   // strlen("@@PAYLOAD@@\n")
+        if (po + 4 <= f->size) {
+            uint32_t psz = f->size - po - 4;         // trailing 4-byte CRC32
+            st->payload_off = po;
+            st->payload_size = psz;
+            uint32_t calc = crc32_bytes(f->data + po, psz);
+            uint32_t stored = ((uint32_t)f->data[f->size - 4] << 24) |
+                              ((uint32_t)f->data[f->size - 3] << 16) |
+                              ((uint32_t)f->data[f->size - 2] << 8) |
+                              ((uint32_t)f->data[f->size - 1]);
+            st->crc_ok = (calc == stored);
+        }
+    }
     kfree(buf);
     if (st->name[0]) st->app_id = nefud_name_to_app_id(st->name);
 }
@@ -94,7 +125,14 @@ static void nefud_paint(Window* w) {
     gfx::text(s, 14, y, "Author :", color::TEXT2, color::WHITE);
     gfx::text(s, 90, y, st->author[0] ? st->author : "(unknown)", color::TEXT, color::WHITE); y += 20;
     gfx::text(s, 14, y, "Version:", color::TEXT2, color::WHITE);
-    gfx::text(s, 90, y, st->ver[0] ? st->ver : "(?)", color::TEXT, color::WHITE); y += 26;
+    gfx::text(s, 90, y, st->ver[0] ? st->ver : "(?)", color::TEXT, color::WHITE); y += 20;
+    if (st->payload_size > 0) {
+        ksprintf(buf, sizeof(buf), "payload: %u bytes  CRC: %s",
+                 (unsigned)st->payload_size, st->crc_ok ? "OK" : "MISMATCH");
+        gfx::text(s, 14, y, buf, st->crc_ok ? color::GREEN : color::RED, color::WHITE);
+        y += 6;
+    }
+    y += 20;
 
     if (st->app_id >= 0) {
         st->btn.x = 14; st->btn.y = y; st->btn.w = 120; st->btn.h = 28;

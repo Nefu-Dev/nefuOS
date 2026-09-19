@@ -9,12 +9,14 @@
 #include <gdiplus.h>
 #include <objbase.h>
 #include <mmsystem.h>
+#include <intrin.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include "../../core/klib/klib.h"
 #include "../../core/platform.h"
 #include "../../core/gui/gfx.h"   // full Surface definition
+#include "../../core/apps/apps.h"  // app_launch for --app
 
 using namespace nefu;
 
@@ -180,6 +182,8 @@ void platform_thread_sleep(uint32_t ms) {
 }
 
 // ===================== audio (host) =====================
+bool platform_audio_available() { return waveOutGetNumDevs() > 0; }
+
 bool platform_play_wav(const char* path) {
     return PlaySoundA(path, 0, SND_FILENAME | SND_ASYNC) != 0;
 }
@@ -543,16 +547,98 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
     FILE* f = fopen("crash.txt", "a");
     if (f) {
-        fprintf(f, "CRASH code=0x%lX addr=0x%p\n",
+        HMODULE m = 0;
+        GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                           (LPCSTR)ep->ExceptionRecord->ExceptionAddress, &m);
+        fprintf(f, "CRASH code=0x%lX addr=0x%p mod=0x%p off=0x%lX\n",
                 (unsigned long)ep->ExceptionRecord->ExceptionCode,
-                ep->ExceptionRecord->ExceptionAddress);
+                ep->ExceptionRecord->ExceptionAddress, m,
+                (unsigned long)((char*)ep->ExceptionRecord->ExceptionAddress - (char*)m));
+        CONTEXT* c = ep->ContextRecord;
+        fprintf(f, "  rax=%016llX rbx=%016llX rcx=%016llX rdx=%016llX rsi=%016llX rdi=%016llX rbp=%016llX rsp=%016llX rip=%016llX\n",
+                (unsigned long long)c->Rax, (unsigned long long)c->Rbx,
+                (unsigned long long)c->Rcx, (unsigned long long)c->Rdx,
+                (unsigned long long)c->Rsi, (unsigned long long)c->Rdi,
+                (unsigned long long)c->Rbp, (unsigned long long)c->Rsp,
+                (unsigned long long)c->Rip);
         fclose(f);
     }
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+// ---------------- reboot / suspend / uefi / hw info ----------------
+namespace nefu {
+void platform_reboot() {
+    printf("nefuOS reboot requested (host)\n");
+    nefuos_shutdown();
+    ExitProcess(0);
+}
+
+void platform_suspend() {
+    printf("nefuOS suspend requested (host: no-op)\n");
+}
+
+bool platform_uefi_load(UefiConfig* out) {
+    if (!out) return false;
+    memset(out, 0, sizeof(*out));
+    // host: no real UEFI NVRAM; defaults only
+    strncpy(out->username, "user", sizeof(out->username) - 1);
+    out->boot_timeout = 5;
+    out->boot_splash = true;
+    return true;
+}
+
+bool platform_uefi_save(const UefiConfig* cfg) {
+    (void)cfg;
+    return false;   // host: no NVRAM to write
+}
+
+bool platform_hw_info(HwInfo* out) {
+    if (!out) return false;
+    memset(out, 0, sizeof(*out));
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    out->cpu_cores = (uint8_t)si.dwNumberOfProcessors;
+    int regs[4];
+    __cpuid(regs, 0x80000000);
+    if ((unsigned)regs[0] >= 0x80000004u) {
+        char brand[49];
+        __cpuid(regs, 0x80000002);
+        memcpy(brand, regs, 16);
+        __cpuid(regs, 0x80000003);
+        memcpy(brand + 16, regs, 16);
+        __cpuid(regs, 0x80000004);
+        memcpy(brand + 32, regs, 16);
+        brand[48] = 0;
+        // trim leading/trailing spaces
+        char* b = brand;
+        while (*b == ' ') b++;
+        int len = (int)strlen(b);
+        while (len > 0 && (b[len - 1] == ' ' || b[len - 1] == 0)) len--;
+        if (len > 63) len = 63;
+        memcpy(out->cpu_model, b, (size_t)len);
+        out->cpu_model[len] = 0;
+    } else {
+        strncpy(out->cpu_model, "x86_64", sizeof(out->cpu_model) - 1);
+    }
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (GlobalMemoryStatusEx(&ms)) out->mem_total_mb = (uint64_t)(ms.ullTotalPhys / (1024 * 1024));
+    out->cpu_mhz = 0;   // not exposed via a stable API; leave 0
+    strncpy(out->bios_vendor, "NEFU-HOST", sizeof(out->bios_vendor) - 1);
+    strncpy(out->bios_version, "0.1", sizeof(out->bios_version) - 1);
+    return true;
+}
+
+} // namespace nefu
+
 // ---------------- entry ----------------
-int main() {
+static int s_auto_app = -1;
+
+int main(int argc, char** argv) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--app") == 0 && i + 1 < argc) s_auto_app = atoi(argv[i + 1]);
+    }
     SetUnhandledExceptionFilter(crash_handler);
     printf("nefuOS host backend (win32) starting...\n");
 
@@ -599,6 +685,9 @@ int main() {
     }
 
     nefuos_init();
+    // drive frames until the boot splash finishes so LVGL is fully initialised
+    { uint32_t t0 = platform_tick_ms(); while (platform_tick_ms() - t0 < 1800) { nefuos_frame(); Sleep(16); } }
+    if (s_auto_app >= 0) app_launch(s_auto_app);
     ShowWindow(s_hwnd, SW_SHOW);
     SetTimer(s_hwnd, 1, 10, 0);
 

@@ -1,8 +1,19 @@
-// nefuOS ：wallpaper、icon、taskbar、start menu、
+// nefuOS desktop - LVGL 9.2.0 (MIT) is now the GUI engine for the desktop
+// layer: wallpaper, icon grid, taskbar, live clock, start menu and context
+// menus are all LVGL objects flushed through the nefuOS Surface. stb_truetype
+// (MIT) stays available for TTF text via core/gui/ttfont.cpp.
+// The native window manager keeps running on top of the LVGL desktop.
 #include "desktop.h"
 #include "../apps/apps.h"
 #include "../sys/settings.h"
 #include "../platform.h"
+#include "lvgl.h"
+
+#if !defined(NEFU_BARE) && defined(_WIN32)
+#include <cstdio>
+#endif
+
+LV_FONT_DECLARE(lv_font_montserrat_16);
 
 namespace nefu {
 
@@ -10,9 +21,7 @@ static const int TASKBAR_H = 30;
 static const int ICON_W = 96, ICON_H = 92;
 static const int TILE = 52;
 
-// NOTE: aggregate-only (no ctor).  The bare kernel never runs C++ static
-// constructors (.init_array), so any object with a ctor would live in .bss
-// and stay all-zero -> icons would all collapse onto (0,0).
+// aggregate-only (no ctor): bare kernel never runs C++ static ctors
 struct DesktopIcon {
     int x, y;
     const char* label;
@@ -34,10 +43,10 @@ static DesktopIcon s_icons[] = {
     {14 + 2 * (ICON_W + 8), 14 + 3 * (ICON_H + 10), "浏览器", APP_BROWSER, false},
     {14, 14 + 4 * (ICON_H + 10), "网络", APP_NETCFG, false},
     {14 + ICON_W + 8, 14 + 4 * (ICON_H + 10), "应用启动器", APP_NEFUD, false},
+    {14 + 2 * (ICON_W + 8), 14 + 4 * (ICON_H + 10), "LVGL桌面", APP_LVGLDESKTOP, false},
 };
 static const int s_icon_count = (int)(sizeof(s_icons) / sizeof(s_icons[0]));
 
-// desktop icon labels follow the system UI language
 static const char* icon_label(int app) {
     switch (app) {
     case APP_FILEMGR:    return T("文件管理器", "Files");
@@ -54,302 +63,523 @@ static const char* icon_label(int app) {
     case APP_BROWSER:    return T("浏览器", "Browser");
     case APP_NETCFG:     return T("网络", "Network");
     case APP_NEFUD:      return T("应用启动器", "Launcher");
+    case APP_LVGLDESKTOP:return T("LVGL桌面", "LVGL Desktop");
     default: return "?";
     }
 }
 
-static bool s_start_open = false;
-static int s_sel_icon = -1;
-static int s_last_click_icon = -1;
-static uint32_t s_last_click_time = 0;
-static int s_start_hover = -1;
-static int s_start_btn_hover = 0;
-static uint8_t s_last_buttons = 0;
-// desktop icon context menu
-static bool s_rmenu_open = false;
-static int s_rmenu_x = 0, s_rmenu_y = 0;
+// ---- LVGL desktop engine state ----
+static lv_display_t* s_disp = 0;
+static lv_indev_t* s_indev = 0;
+static lv_color_t* s_fb_buf = 0;
+static Surface* s_surf = 0;
+static lv_obj_t* s_clock_label = 0;
+static lv_obj_t* s_start_menu = 0;
+static lv_obj_t* s_rmenu = 0;
+static lv_obj_t* s_icon_objs[32];
+static lv_obj_t* s_rmenu_items[2];
 static int s_rmenu_icon = -1;
-static int s_rmenu_hover = -1;
-// icon drag
-static int s_drag_icon = -1;
+static bool s_start_open = false;
+static bool s_rmenu_open = false;
+static int s_mx = 10, s_my = 10;
+static bool s_btn = false;
+static bool s_initialized = false;
+static uint8_t s_last_buttons = 0;
+static uint32_t s_icon_color[32];
+static bool s_dirty = false;
+static uint32_t s_last_sig = 0;
+static int s_menu_apps[32];
+static int s_menu_count = 0;
 
-static uint32_t lerp_color(uint32_t a, uint32_t b, int t, int max) {
-    if (max <= 0) return b;
-    int ar = (a >> 16) & 0xFF, ag = (a >> 8) & 0xFF, ab = a & 0xFF;
-    int br = (b >> 16) & 0xFF, bg = (b >> 8) & 0xFF, bb = b & 0xFF;
-    int r = ar + ((br - ar) * t) / max;
-    int g = ag + ((bg - ag) * t) / max;
-    int bl = ab + ((bb - ab) * t) / max;
-    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)bl;
+// ---- LVGL keyboard input (keypad indev + shared group) ----
+static uint32_t s_lv_keys[32];
+static uint8_t s_lv_key_n = 0;
+static lv_indev_t* s_kb_indev = 0;
+static lv_group_t* s_kb_group = 0;
+
+static void lvgl_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
+    (void)disp;
+    if (!s_surf) {
+        lv_display_flush_ready(disp);
+        return;
+    }
+    Surface& s = *s_surf;
+    int w = area->x2 - area->x1 + 1;
+    int h = area->y2 - area->y1 + 1;
+    // px_map is ARGB8888 (4 bytes/px) for LV_COLOR_DEPTH=32; read as uint32
+    const uint32_t* cmap = (const uint32_t*)px_map;
+    for (int y = 0; y < h; y++) {
+        int fy = area->y1 + y;
+        if (fy < 0 || fy >= s.height) continue;
+        for (int x = 0; x < w; x++) {
+            int fx = area->x1 + x;
+            if (fx < 0 || fx >= s.width) continue;
+            uint32_t c = cmap[(size_t)y * (size_t)w + (size_t)x];  // 0xAARRGGBB little-endian
+            s.setpx(fx, fy, c);
+        }
+    }
+    lv_display_flush_ready(disp);
 }
 
-static void paint_wallpaper(Surface& fb) {
-    int W = fb.width, H = fb.height;
+
+static uint32_t keycode_to_lv(int kc, char ascii) {
+    switch (kc) {
+        case KEY_UP: return LV_KEY_UP;
+        case KEY_DOWN: return LV_KEY_DOWN;
+        case KEY_LEFT: return LV_KEY_LEFT;
+        case KEY_RIGHT: return LV_KEY_RIGHT;
+        case KEY_ENTER: return LV_KEY_ENTER;
+        case KEY_ESC: return LV_KEY_ESC;
+        case KEY_BACKSPACE: return LV_KEY_BACKSPACE;
+        case KEY_DEL: return LV_KEY_DEL;
+        case KEY_TAB: return LV_KEY_NEXT;
+        case KEY_HOME: return LV_KEY_HOME;
+        case KEY_END: return LV_KEY_END;
+        case KEY_PGUP: return LV_KEY_PREV;
+        case KEY_PGDN: return LV_KEY_NEXT;
+        default: break;
+    }
+    if (ascii == '\r' || ascii == '\n') return LV_KEY_ENTER;
+    if (ascii == 27) return LV_KEY_ESC;
+    if (ascii >= 32 && ascii < 127) return (uint32_t)ascii;
+    return 0;
+}
+
+static void lvgl_key_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
+    (void)indev;
+    if (s_lv_key_n) {
+        data->key = s_lv_keys[0];
+        data->state = LV_INDEV_STATE_PRESSED;
+        for (uint8_t i = 0; i + 1 < s_lv_key_n; i++) s_lv_keys[i] = s_lv_keys[i + 1];
+        s_lv_key_n--;
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
+}
+void lvgl_key_push(int keycode, char ascii) {
+    uint32_t k = keycode_to_lv(keycode, ascii);
+    if (k && s_lv_key_n < 32) s_lv_keys[s_lv_key_n++] = k;
+}
+
+lv_group_t* lvgl_kb_group() {
+    return s_kb_group;
+}
+
+static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
+    (void)indev;
+    data->point.x = s_mx;
+    data->point.y = s_my;
+    data->state = s_btn ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+
+void desktop_redraw() {
+    Screen* scr = platform_screen();
+    if (!scr) return;
+    Surface fb;
+    fb.addr = scr->addr;
+    fb.width = scr->width;
+    fb.height = scr->height;
+    fb.pitch = scr->pitch;
+    desktop_paint(fb);
+    platform_present();
+}
+
+// ---- icon events ----
+static void on_icon_click(lv_event_t* e) {
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i >= 0 && i < s_icon_count && !s_icons[i].deleted) app_launch(s_icons[i].app);
+}
+
+static void on_icon_release(lv_event_t* e) {
+    // snap dragged icon back to the grid, never overlapping
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i < 0 || i >= s_icon_count) return;
+    DesktopIcon& ic = s_icons[i];
+    lv_obj_t* obj = s_icon_objs[i];
+    lv_obj_update_layout(obj);
+    lv_area_t a;
+    lv_obj_get_coords(obj, &a);
+    ic.x = a.x1;
+    ic.y = a.y1;
+    int col = (ic.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
+    int row = (ic.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
+    if (col < 0) col = 0;
+    if (row < 0) row = 0;
+    int best_c = col, best_r = row, best_d2 = 0x7FFFFFFF;
+    for (int r = 0; r < 8; r++) {
+        for (int c = 0; c < 8; c++) {
+            bool taken = false;
+            for (int k = 0; k < s_icon_count; k++) {
+                if (k == i || s_icons[k].deleted) continue;
+                DesktopIcon& o = s_icons[k];
+                int oc = (o.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
+                int orw = (o.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
+                if (oc == c && orw == r) { taken = true; break; }
+            }
+            if (!taken) {
+                int d2 = (c - col) * (c - col) + (r - row) * (r - row);
+                if (d2 < best_d2) { best_d2 = d2; best_c = c; best_r = r; }
+            }
+        }
+    }
+    ic.x = 14 + best_c * (ICON_W + 8);
+    ic.y = 14 + best_r * (ICON_H + 10);
+    lv_obj_set_pos(obj, ic.x, ic.y);
+}
+
+// ---- start menu ----
+static void start_menu_toggle() {
+    if (!s_start_menu) return;
+    if (lv_obj_has_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_remove_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+        s_start_open = true;
+    } else {
+        lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+        s_start_open = false;
+    }
+}
+
+static void on_start_click(lv_event_t* e) {
+    (void)e;
+    start_menu_toggle();
+}
+
+static void on_menu_launch(lv_event_t* e) {
+    int idx = (int)(intptr_t)lv_event_get_user_data(e);
+    if (s_start_menu) lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+    s_start_open = false;
+    if (idx >= 0 && idx < s_menu_count) app_launch(s_menu_apps[idx]);
+}
+
+// ---- desktop context menu ----
+static void show_rmenu(int icon_idx) {
+    if (!s_rmenu) return;
+    s_rmenu_icon = icon_idx;
+    s_rmenu_open = true;
+    lv_obj_remove_flag(s_rmenu, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void hide_rmenu() {
+    if (s_rmenu) lv_obj_add_flag(s_rmenu, LV_OBJ_FLAG_HIDDEN);
+    s_rmenu_open = false;
+    s_rmenu_icon = -1;
+}
+
+static void on_rmenu_open(lv_event_t* e) {
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i >= 0 && i < s_icon_count && !s_icons[i].deleted) app_launch(s_icons[i].app);
+    hide_rmenu();
+}
+
+static void on_rmenu_del(lv_event_t* e) {
+    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    if (i >= 0 && i < s_icon_count) {
+        s_icons[i].deleted = true;      // shortcut only; app stays installed
+        if (s_icon_objs[i]) lv_obj_add_flag(s_icon_objs[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    hide_rmenu();
+}
+
+// ---- wallpaper ----
+static void build_wallpaper(lv_obj_t* scr, int W, int H) {
     uint32_t top = 0x00345C86, bottom = 0x0088B7D8, base = color::CREAM;
     wallpaper_colors(g_settings.wallpaper, &top, &bottom, &base);
-    for (int y = 0; y < H; y++) {
-        uint32_t c;
-        if (y < 180) c = lerp_color(top, bottom, y, 180);
-        else if (y < 220) c = lerp_color(bottom, base, y - 180, 40);
-        else c = base;
-        uint32_t* row = (uint32_t*)(fb.addr + (size_t)y * (size_t)fb.pitch);
-        for (int x = 0; x < W; x++) row[x] = c;
-    }
-    // bottom-right watermark
-    gfx::text(fb, W - 132, H - 52, "nefuOS 0.1", 0x00C9C8C2, 0x00000000);
+    lv_obj_set_style_bg_color(scr, lv_color_hex(base & 0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+    // top gradient band (wallpaper)
+    lv_obj_t* gband = lv_obj_create(scr);
+    lv_obj_set_size(gband, W, H - TASKBAR_H);
+    lv_obj_set_pos(gband, 0, 0);
+    lv_obj_set_style_bg_color(gband, lv_color_hex(top & 0xFFFFFF), 0);
+    lv_obj_set_style_bg_grad_color(gband, lv_color_hex(bottom & 0xFFFFFF), 0);
+    lv_obj_set_style_bg_grad_dir(gband, LV_GRAD_DIR_VER, 0);
+    lv_obj_set_style_bg_grad_stop(gband, 235, 0);
+    lv_obj_set_style_bg_opa(gband, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(gband, 0, 0);
+    lv_obj_set_style_radius(gband, 0, 0);
+    // title watermark
+    lv_obj_t* wm = lv_label_create(scr);
+    lv_label_set_text(wm, "nefuOS 0.1  (LVGL GUI)");
+    lv_obj_set_style_text_color(wm, lv_color_hex(0x60FFFFFF), 0);
+    lv_obj_align(wm, LV_ALIGN_BOTTOM_RIGHT, -14, -TASKBAR_H - 16);
 }
 
-static void draw_icon_tile(Surface& fb, int tx, int ty, int app) {
-    gfx::fillrect(fb, tx, ty, TILE, TILE, color::WHITE);
-    gfx::rect(fb, tx, ty, TILE, TILE, 0x00B0AFA8);
+// ---- icon tile color helper ----
+static uint32_t icon_color(int app) {
     switch (app) {
-    case APP_FILEMGR: {
-        gfx::fillrect(fb, tx + 8, ty + 18, 36, 24, color::YELLOW);
-        gfx::fillrect(fb, tx + 8, ty + 12, 18, 8, color::YELLOW);
-        gfx::rect(fb, tx + 8, ty + 18, 36, 24, 0x008C7A20);
-        gfx::rect(fb, tx + 8, ty + 12, 18, 8, 0x008C7A20);
-        break;
-    }
-    case APP_TERMINAL: {
-        gfx::fillrect(fb, tx + 8, ty + 10, 36, 32, 0x00101418);
-        gfx::rect(fb, tx + 8, ty + 10, 36, 32, 0x00505A66);
-        gfx::text(fb, tx + 12, ty + 18, ">_", color::GREEN, 0x00101418);
-        break;
-    }
-    case APP_CALC: {
-        gfx::fillrect(fb, tx + 10, ty + 8, 32, 36, color::BLUE);
-        gfx::fillrect(fb, tx + 14, ty + 12, 24, 6, color::WHITE);
-        gfx::hline(fb, tx + 12, tx + 39, ty + 26, color::WHITE);
-        gfx::hline(fb, tx + 12, tx + 39, ty + 32, color::WHITE);
-        gfx::vline(fb, tx + 25, ty + 22, ty + 38, color::WHITE);
-        break;
-    }
-    case APP_TEXTVIEW: {
-        gfx::fillrect(fb, tx + 14, ty + 8, 26, 36, color::WHITE);
-        gfx::rect(fb, tx + 14, ty + 8, 26, 36, color::BORDER);
-        gfx::hline(fb, tx + 16, tx + 38, ty + 18, 0x00C9C8C2);
-        gfx::hline(fb, tx + 16, tx + 38, ty + 24, 0x00C9C8C2);
-        gfx::hline(fb, tx + 16, tx + 38, ty + 30, 0x00C9C8C2);
-        break;
-    }
-    case APP_SYSINFO: {
-        gfx::fillrect(fb, tx + 12, ty + 10, 28, 32, color::TEAL);
-        gfx::rect(fb, tx + 12, ty + 10, 28, 32, 0x00207A6C);
-        gfx::text(fb, tx + 24, ty + 16, "i", color::WHITE, color::TEAL);
-        break;
-    }
-    case APP_SETTINGS: {
-
-        gfx::fillcircle(fb, tx + 26, ty + 26, 10, 0x00666C74);
-        gfx::fillcircle(fb, tx + 26, ty + 26, 6, color::WHITE);
-        gfx::fillrect(fb, tx + 23, ty + 13, 6, 8, 0x00666C74);
-        gfx::fillrect(fb, tx + 23, ty + 31, 6, 8, 0x00666C74);
-        gfx::fillrect(fb, tx + 13, ty + 23, 8, 6, 0x00666C74);
-        gfx::fillrect(fb, tx + 31, ty + 23, 8, 6, 0x00666C74);
-        break;
-    }
-    case APP_STORE: {
-        // shopping bag
-        gfx::fillrect(fb, tx + 10, ty + 16, 32, 24, 0x00E67E22);
-        gfx::fillrect(fb, tx + 17, ty + 12, 18, 8, 0x00E67E22);
-        gfx::rect(fb, tx + 10, ty + 16, 32, 24, 0x00A85E15);
-        gfx::rect(fb, tx + 17, ty + 12, 18, 8, 0x00A85E15);
-        gfx::text(fb, tx + 20, ty + 24, "S", color::WHITE, 0x00E67E22);
-        break;
-    }
-    case APP_IMAGEVIEWER: {
-        // photo frame + mountain +
-        gfx::fillrect(fb, tx + 8, ty + 8, 36, 36, 0x00F5F1E8);
-        gfx::rect(fb, tx + 8, ty + 8, 36, 36, 0x008C7A20);
-        gfx::fillcircle(fb, tx + 15, ty + 15, 4, color::ORANGE);
-        gfx::fillrect(fb, tx + 10, ty + 34, 32, 8, 0x0030A14A);
-        gfx::line(fb, tx + 10, ty + 34, tx + 22, ty + 22, 0x006B7280);
-        gfx::line(fb, tx + 22, ty + 22, tx + 32, ty + 32, 0x006B7280);
-        break;
-    }
-    case APP_MUSIC: {
-
-        gfx::fillrect(fb, tx + 14, ty + 10, 22, 26, 0x0014181E);
-        gfx::rect(fb, tx + 14, ty + 10, 22, 26, 0x00505A66);
-        gfx::fillcircle(fb, tx + 19, ty + 34, 4, color::WHITE);
-        gfx::fillcircle(fb, tx + 30, ty + 34, 4, color::WHITE);
-        gfx::vline(fb, tx + 19, ty + 14, ty + 34, color::WHITE);
-        gfx::vline(fb, tx + 30, ty + 14, ty + 34, color::WHITE);
-        gfx::hline(fb, tx + 19, tx + 30, ty + 14, color::WHITE);
-        break;
-    }
-    case APP_MONITOR: {
-        // gauge + curve
-        gfx::fillrect(fb, tx + 8, ty + 10, 36, 32, 0x0014181E);
-        gfx::rect(fb, tx + 8, ty + 10, 36, 32, 0x00505A66);
-        gfx::line(fb, tx + 10, ty + 36, tx + 18, ty + 28, color::GREEN);
-        gfx::line(fb, tx + 18, ty + 28, tx + 26, ty + 32, color::GREEN);
-        gfx::line(fb, tx + 26, ty + 32, tx + 42, ty + 16, color::GREEN);
-        gfx::hline(fb, tx + 10, tx + 42, ty + 38, 0x00505A66);
-        break;
-    }
-    case APP_BROWSER: {
-        // globe
-        gfx::circle(fb, tx + 26, ty + 26, 15, color::BLUE_LT);
-        gfx::line(fb, tx + 11, ty + 26, tx + 41, ty + 26, color::BLUE_LT);
-        gfx::line(fb, tx + 15, ty + 15, tx + 37, ty + 37, color::BLUE_LT);
-        gfx::line(fb, tx + 37, ty + 15, tx + 15, ty + 37, color::BLUE_LT);
-        break;
-    }
-    case APP_NETCFG: {
-        // signal bars
-        for (int i = 0; i < 4; i++) {
-            int bh = 6 + i * 6;
-            gfx::fillrect(fb, tx + 8 + i * 10, ty + 40 - bh, 7, bh, i < 3 ? color::GREEN : color::BLUE_LT);
-        }
-        break;
-    }
-    case APP_NEFUD: {
-        // package box
-        gfx::fillrect(fb, tx + 8, ty + 8, 36, 34, color::ORANGE);
-        gfx::fillrect(fb, tx + 8, ty + 8, 36, 8, color::YELLOW);
-        gfx::line(fb, tx + 8, ty + 20, tx + 44, ty + 20, color::WHITE);
-        gfx::line(fb, tx + 26, ty + 8, tx + 26, ty + 42, color::WHITE);
-        break;
-    }
-    default: break;
+    case APP_FILEMGR:    return 0xE6B94A;
+    case APP_TERMINAL:   return 0x3B4654;
+    case APP_CALC:       return 0x3A6EA5;
+    case APP_TEXTVIEW:   return 0xE8E6DF;
+    case APP_WIKI:       return 0x2A7A6C;
+    case APP_SETTINGS:   return 0x666C74;
+    case APP_STORE:      return 0xE67E22;
+    case APP_IMAGEVIEWER:return 0xF5F1E8;
+    case APP_MUSIC:      return 0x14181E;
+    case APP_MONITOR:    return 0x14181E;
+    case APP_BROWSER:    return 0x5A9BD4;
+    case APP_NETCFG:     return 0x3FA45A;
+    case APP_NEFUD:      return 0xE67E22;
+    case APP_LVGLDESKTOP:return 0x7A5AA6;
+    default:             return 0x8899AA;
     }
 }
 
-static void paint_icons(Surface& fb) {
-    for (int i = 0; i < s_icon_count; i++) {
-        DesktopIcon& ic = s_icons[i];
-        if (ic.deleted) continue;
-        if (s_sel_icon == i) {
-            gfx::fillrect(fb, ic.x, ic.y, ICON_W, ICON_H, 0x20FFFFFF);
-            gfx::rect(fb, ic.x, ic.y, ICON_W, ICON_H, 0x50FFFFFF);
-        }
-        int tx = ic.x + (ICON_W - TILE) / 2;
-        int ty = ic.y + 2;
-        draw_icon_tile(fb, tx, ty, ic.app);
-        const char* lbl = icon_label(ic.app);
-        int tw = gfx::text_width(lbl);
-        int lx = ic.x + (ICON_W - tw) / 2;
-        gfx::fillrect(fb, lx - 2, ty + TILE + 6, tw + 4, 17, 0x50000000);
-        gfx::text(fb, lx, ty + TILE + 8, lbl, color::WHITE, 0x50000000);
-    }
-    // desktop context menu
-    if (s_rmenu_open) {
-        const char* items[2] = { "Open", "Delete Shortcut" };
-        int mw = 150, mh = 2 * 22 + 6;
-        int mx = s_rmenu_x, my = s_rmenu_y;
-        if (mx + mw > fb.width) mx = fb.width - mw - 4;
-        if (my + mh > fb.height - TASKBAR_H) my = fb.height - TASKBAR_H - mh - 4;
-        gfx::fillrect(fb, mx, my, mw, mh, color::WHITE);
-        gfx::rect(fb, mx, my, mw, mh, color::BORDER);
-        for (int i = 0; i < 2; i++) {
-            int iy = my + 3 + i * 22;
-            uint32_t bg = (s_rmenu_hover == i) ? 0x00D8E6F5 : color::WHITE;
-            gfx::fillrect(fb, mx + 1, iy, mw - 2, 22, bg);
-            gfx::text(fb, mx + 10, iy + 3, items[i], color::TEXT, bg);
-        }
-    }
+static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
+    DesktopIcon& ic = s_icons[i];
+    s_icon_color[i] = icon_color(ic.app);
+    lv_obj_t* card = lv_button_create(scr);
+    lv_obj_set_size(card, ICON_W, ICON_H);
+    lv_obj_set_pos(card, x, y);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0x1E222C), 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_30, 0);
+    lv_obj_set_style_radius(card, 10, 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(0x40FFFFFF), 0);
+    lv_obj_set_style_shadow_width(card, 0, 0);
+    lv_obj_set_style_pad_all(card, 0, 0);
+    // LVGL v9 objects are draggable by default (press + move)
+    // app tile
+    lv_obj_t* tile = lv_obj_create(card);
+    lv_obj_set_size(tile, TILE, TILE);
+    lv_obj_align(tile, LV_ALIGN_TOP_MID, 0, 2);
+    lv_obj_set_style_bg_color(tile, lv_color_hex(s_icon_color[i]), 0);
+    lv_obj_set_style_radius(tile, 6, 0);
+    lv_obj_set_style_border_width(tile, 1, 0);
+    lv_obj_set_style_border_color(tile, lv_color_hex(0x40000000), 0);
+    lv_obj_set_style_bg_grad_color(tile, lv_color_hex(0x88FFFFFF), 0);
+    lv_obj_set_style_bg_grad_dir(tile, LV_GRAD_DIR_VER, 0);
+    lv_obj_set_style_bg_grad_stop(tile, 60, 0);
+    // label
+    const char* lbl = icon_label(ic.app);
+    lv_obj_t* lab = lv_label_create(card);
+    lv_label_set_text(lab, lbl);
+    lv_obj_set_style_text_color(lab, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(lab, &lv_font_montserrat_16, 0);
+    lv_obj_align(lab, LV_ALIGN_BOTTOM_MID, 0, -4);
+    lv_obj_add_event_cb(card, on_icon_click, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    lv_obj_add_event_cb(card, on_icon_release, LV_EVENT_RELEASED, (void*)(intptr_t)i);
+    return card;
 }
 
-static void paint_taskbar(Surface& fb) {
-    if (!g_settings.show_taskbar) return;
-    int W = fb.width, H = fb.height;
-    int y0 = H - TASKBAR_H;
-    gfx::fillrect(fb, 0, y0, W, TASKBAR_H, 0x00262A31);
-    gfx::hline(fb, 0, W - 1, y0, 0x004F5A66);
-    // start button
-    int sx = 4, sy = y0 + 3, sw = 64, sh = 24;
-    uint32_t accent = accent_color(g_settings.accent);
-    uint32_t sbc = s_start_btn_hover ? 0x004A90C2 : accent;
-    gfx::fillrect(fb, sx, sy, sw, sh, sbc);
-    gfx::rect(fb, sx, sy, sw, sh, 0x002F6FB6);
-    gfx::text_ttf(fb, sx + 8, sy + 2, "Start", color::WHITE, sbc, 16);  // TTF (falls back to bitmap)
-    if (s_start_open) gfx::fillrect(fb, sx, sy, sw, 2, color::WHITE);
-    // task button
-    int bx = sx + sw + 8;
-    for (int i = 0; i < g_wm->windows().size(); i++) {
-        Window* w = g_wm->windows()[i];
-        if (!w->visible || w->closed) continue;
-        int tl = w->title.len();
-        if (tl > 12) tl = 12;
-        int wd = tl * 8 + 16;
-        bool active = (g_wm->focus() == w);
-        uint32_t bg = active ? accent : 0x003B4654;
-        gfx::fillrect(fb, bx, sy, wd, sh, bg);
-        gfx::rect(fb, bx, sy, wd, sh, 0x00262A31);
-        gfx::text(fb, bx + 8, sy + 4, w->title.c_str(), color::WHITE, bg);
-        if (w->minimized) {
-            gfx::hline(fb, bx + 4, bx + wd - 5, sy + sh - 4, color::WHITE);
-        }
-        bx += wd + 4;
-    }
-    // clock
-    if (g_settings.show_clock) {
-        uint32_t sec = platform_seconds_of_day();
-        char buf[16];
-        ksprintf(buf, sizeof(buf), "%02u:%02u", (sec / 3600) % 24, (sec / 60) % 60);
-        gfx::text_ttf(fb, W - 56, y0 + 4, buf, color::WHITE, 0x00262A31, 16);  // TTF clock
-    }
-}
-
-// start menu entries：built-in apps + settings + store + installed store apps
+// start menu entries: built-in apps + settings + store + installed store apps
 static int build_menu(int* list) {
     int n = 0;
-    for (int i = 0; i < APP_BUILTIN_COUNT; i++) list[n++] = i;
-    list[n++] = APP_SETTINGS;
-    list[n++] = APP_STORE;
+    for (int i = 0; i < APP_BUILTIN_COUNT && n < 30; i++) list[n++] = i;
+    if (n < 30) list[n++] = APP_SETTINGS;
+    if (n < 30) list[n++] = APP_STORE;
     int ids[8];
     int cnt = app_installed_list(ids, 8);
-    for (int i = 0; i < cnt; i++) list[n++] = ids[i];
+    for (int i = 0; i < cnt && n < 30; i++) list[n++] = ids[i];
     return n;
 }
 
-static void paint_start_menu(Surface& fb) {
-    if (!s_start_open) return;
-    int menu_apps[16];
-    int rows = build_menu(menu_apps);
-    int H = fb.height;
-    int mw = 196;
-    int mh = rows * 26 + 10 + 32; // app rows + minute + Power Off
-    int mx = 4, my = H - TASKBAR_H - mh;
-    if (my < 0) my = 0;
-    gfx::fillrect(fb, mx, my, mw, mh, color::WHITE);
-    gfx::rect(fb, mx, my, mw, mh, color::BORDER);
-    int y = my + 5;
-    for (int i = 0; i < rows; i++) {
-        bool hover = (s_start_hover == i);
-        uint32_t bg = hover ? 0x00D8E6F5 : color::WHITE;
-        gfx::fillrect(fb, mx + 3, y, mw - 6, 24, bg);
-        gfx::text(fb, mx + 12, y + 4, app_name(menu_apps[i]), hover ? color::BLUE : color::TEXT, bg);
-        y += 26;
-    }
-    gfx::hline(fb, mx + 8, mx + mw - 8, y + 2, color::BORDER);
-    y += 8;
-    bool hover = (s_start_hover == rows);
-    uint32_t bg = hover ? 0x00F5DEDC : color::WHITE;
-    gfx::fillrect(fb, mx + 3, y, mw - 6, 24, bg);
-    gfx::text(fb, mx + 12, y + 4, "Power Off", color::RED, bg);
+// ---- taskbar + start menu ----
+static void build_taskbar(lv_obj_t* scr, int W, int H) {
+    lv_obj_t* bar = lv_obj_create(scr);
+    lv_obj_set_size(bar, W, TASKBAR_H);
+    lv_obj_set_pos(bar, 0, H - TASKBAR_H);
+    lv_obj_set_style_bg_color(bar, lv_color_hex(0x262A31), 0);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(bar, 1, 0);
+    lv_obj_set_style_border_color(bar, lv_color_hex(0x4F5A66), 0);
+    lv_obj_set_style_radius(bar, 0, 0);
+    lv_obj_set_style_pad_all(bar, 0, 0);
+    lv_obj_move_foreground(bar);
+
+    // start button
+    uint32_t accent = accent_color(g_settings.accent);
+    lv_obj_t* sb = lv_button_create(bar);
+    lv_obj_set_size(sb, 64, 24);
+    lv_obj_set_pos(sb, 4, 3);
+    lv_obj_set_style_bg_color(sb, lv_color_hex(accent & 0xFFFFFF), 0);
+    lv_obj_set_style_radius(sb, 4, 0);
+    lv_obj_add_event_cb(sb, on_start_click, LV_EVENT_CLICKED, 0);
+    lv_obj_t* sl = lv_label_create(sb);
+    lv_label_set_text(sl, "Start");
+    lv_obj_set_style_text_color(sl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(sl);
+
+    // clock
+    s_clock_label = lv_label_create(bar);
+    lv_label_set_text(s_clock_label, "--:--");
+    lv_obj_set_style_text_color(s_clock_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_16, 0);
+    lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -10, 0);
 }
 
+static void build_start_menu(lv_obj_t* scr, int W, int H) {
+    s_menu_count = build_menu(s_menu_apps);
+    int rows = s_menu_count;
+    int mw = 196;
+    int mh = rows * 26 + 10 + 32;
+    int mx = 4, my = H - TASKBAR_H - mh;
+    if (my < 0) my = 0;
+    s_start_menu = lv_obj_create(scr);
+    lv_obj_set_size(s_start_menu, mw, mh);
+    lv_obj_set_pos(s_start_menu, mx, my);
+    lv_obj_set_style_bg_color(s_start_menu, lv_color_hex(0xF2F2F0), 0);
+    lv_obj_set_style_bg_opa(s_start_menu, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(s_start_menu, 8, 0);
+    lv_obj_set_style_border_width(s_start_menu, 1, 0);
+    lv_obj_set_style_border_color(s_start_menu, lv_color_hex(0xA0A8B0), 0);
+    lv_obj_set_style_pad_all(s_start_menu, 0, 0);
+    lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(s_start_menu);
+
+    int y = 4;
+    for (int i = 0; i < rows; i++) {
+        lv_obj_t* it = lv_button_create(s_start_menu);
+        lv_obj_set_size(it, mw - 6, 24);
+        lv_obj_set_pos(it, 3, y);
+        lv_obj_set_style_bg_color(it, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_radius(it, 4, 0);
+        lv_obj_add_event_cb(it, on_menu_launch, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        lv_obj_t* l = lv_label_create(it);
+        lv_label_set_text(l, app_name(s_menu_apps[i]));
+        lv_obj_set_style_text_color(l, lv_color_hex(0x22262A), 0);
+        lv_obj_align(l, LV_ALIGN_LEFT_MID, 10, 0);
+        y += 26;
+    }
+    lv_obj_t* sep = lv_obj_create(s_start_menu);
+    lv_obj_set_size(sep, mw - 16, 1);
+    lv_obj_set_pos(sep, 8, y + 4);
+    lv_obj_set_style_bg_color(sep, lv_color_hex(0xC0C4C8), 0);
+    lv_obj_set_style_border_width(sep, 0, 0);
+    lv_obj_set_style_radius(sep, 0, 0);
+    y += 10;
+    lv_obj_t* po = lv_button_create(s_start_menu);
+    lv_obj_set_size(po, mw - 6, 24);
+    lv_obj_set_pos(po, 3, y);
+    lv_obj_set_style_bg_color(po, lv_color_hex(0xF5DEDC), 0);
+    lv_obj_set_style_radius(po, 4, 0);
+    lv_obj_add_event_cb(po, on_menu_launch, LV_EVENT_CLICKED, (void*)(intptr_t)(-1));
+    lv_obj_t* pl = lv_label_create(po);
+    lv_label_set_text(pl, "Power Off");
+    lv_obj_set_style_text_color(pl, lv_color_hex(0xC22A2A), 0);
+    lv_obj_align(pl, LV_ALIGN_LEFT_MID, 10, 0);
+}
+
+static void build_rmenu(lv_obj_t* scr) {
+    s_rmenu = lv_obj_create(scr);
+    lv_obj_set_size(s_rmenu, 150, 50);
+    lv_obj_set_pos(s_rmenu, 40, 40);
+    lv_obj_set_style_bg_color(s_rmenu, lv_color_hex(0xF5F5F3), 0);
+    lv_obj_set_style_bg_opa(s_rmenu, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(s_rmenu, 6, 0);
+    lv_obj_set_style_border_width(s_rmenu, 1, 0);
+    lv_obj_set_style_border_color(s_rmenu, lv_color_hex(0xA0A8B0), 0);
+    lv_obj_set_style_pad_all(s_rmenu, 0, 0);
+    lv_obj_add_flag(s_rmenu, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(s_rmenu);
+    const char* items[2] = { "Open", "Delete Shortcut" };
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t* it = lv_button_create(s_rmenu);
+        lv_obj_set_size(it, 144, 22);
+        lv_obj_set_pos(it, 3, 3 + i * 22);
+        lv_obj_set_style_bg_color(it, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_radius(it, 4, 0);
+        lv_obj_t* l = lv_label_create(it);
+        lv_label_set_text(l, items[i]);
+        lv_obj_set_style_text_color(l, lv_color_hex(0x22262A), 0);
+        lv_obj_align(l, LV_ALIGN_LEFT_MID, 8, 0);
+        s_rmenu_items[i] = it;
+        lv_obj_add_event_cb(it, i == 0 ? on_rmenu_open : on_rmenu_del,
+                            LV_EVENT_CLICKED, (void*)(intptr_t)s_rmenu_icon);
+    }
+}
+
+static void on_clock_tick(lv_timer_t* t) {
+    (void)t;
+    if (!s_clock_label) return;
+    uint32_t sec = platform_seconds_of_day();
+    char buf[16];
+    ksprintf(buf, sizeof(buf), "%02u:%02u", (sec / 3600) % 24, (sec / 60) % 60);
+    lv_label_set_text(s_clock_label, buf);
+}
+
+// ---- public desktop API ----
 void desktop_init() {
     s_start_open = false;
-    s_sel_icon = -1;
+    s_rmenu_open = false;
+    s_initialized = false;
+    s_dirty = true;
+    s_last_sig = 0;
+}
+
+// Window overlays change the desktop pixels underneath (window moved / resized
+// / opened / closed). Hash visible windows to detect exactly that; only then
+// force a full LVGL redraw. Otherwise LVGL redraws only invalid regions, so
+// an idle desktop costs almost no CPU (no busy-loop, no CPU saturation).
+static uint32_t window_signature() {
+    uint32_t sig = 0;
+    List<Window*>& ws = g_wm->windows();
+    for (int i = 0; i < ws.size(); i++) {
+        Window* w = ws[i];
+        if (!w->visible || w->closed) continue;
+        sig = sig * 131u + (uint32_t)w->x * 7u + (uint32_t)w->y * 13u +
+              (uint32_t)w->w * 17u + (uint32_t)w->h * 19u +
+              (uint32_t)w->title.len() + (w->minimized ? 5u : 0u);
+    }
+    return sig;
 }
 
 void desktop_paint(Surface& fb) {
-    paint_wallpaper(fb);
-    paint_icons(fb);
-    paint_taskbar(fb);
-    paint_start_menu(fb);
+    int W = fb.width, H = fb.height;
+    if (!s_initialized) {
+        lv_init();
+        s_fb_buf = (lv_color_t*)kalloc((size_t)W * 24u * 4u);
+        if (!s_fb_buf) return;
+        s_disp = lv_display_create(W, H);
+        lv_display_set_flush_cb(s_disp, lvgl_flush_cb);
+        lv_display_set_buffers(s_disp, s_fb_buf, NULL,
+                               (size_t)W * 24u * 4u, LV_DISPLAY_RENDER_MODE_PARTIAL);
+        s_indev = lv_indev_create();
+        lv_indev_set_type(s_indev, LV_INDEV_TYPE_POINTER);
+        lv_indev_set_read_cb(s_indev, lvgl_read_cb);
+        lv_indev_set_display(s_indev, s_disp);
+
+        // keyboard input (keypad indev + shared group for text widgets)
+        s_kb_indev = lv_indev_create();
+        lv_indev_set_type(s_kb_indev, LV_INDEV_TYPE_KEYPAD);
+        lv_indev_set_read_cb(s_kb_indev, lvgl_key_read_cb);
+        lv_indev_set_display(s_kb_indev, s_disp);
+        s_kb_group = lv_group_create();
+        lv_indev_set_group(s_kb_indev, s_kb_group);
+        lv_group_set_default(s_kb_group);
+
+        lv_obj_t* scr = lv_screen_active();
+        build_wallpaper(scr, W, H);
+        for (int i = 0; i < s_icon_count; i++) {
+            s_icon_objs[i] = make_icon(scr, i, s_icons[i].x, s_icons[i].y);
+        }
+        build_taskbar(scr, W, H);
+        build_start_menu(scr, W, H);
+        build_rmenu(scr);
+        lv_timer_create(on_clock_tick, 1000, NULL);
+        s_initialized = true;
+        s_dirty = true;
+    }
+    // external overlay changed? then repaint the full desktop
+    uint32_t sig = window_signature();
+    if (sig != s_last_sig) { s_dirty = true; s_last_sig = sig; }
+    if (s_dirty) {
+        lv_obj_update_layout(lv_screen_active()); // layout first so coords exist
+        lv_obj_invalidate(lv_screen_active());
+        s_dirty = false;
+    }
+    s_surf = &fb;
+    lv_tick_inc(16);
+    lv_timer_handler();
+    lv_refr_now(s_disp);
+    s_surf = 0;
 }
 
 void desktop_paint_boot(Surface& fb) {
     fb.fill(0x0012141A);
     int W = fb.width, H = fb.height;
-
     gfx::text_scale(fb, W / 2 - 4 * 8 * 4, H / 2 - 90, "nefuOS", color::WHITE, 0x0012141A, 4);
     gfx::text(fb, W / 2 - 52, H / 2 - 18, "v0.1.0  C++/C  tiny OS", color::BLUE_LT, 0x0012141A);
-    // progress bar
     int bw = 300, bx = W / 2 - bw / 2, by = H / 2 + 16;
     gfx::rect(fb, bx, by, bw, 12, 0x00404A58);
     int p = (platform_tick_ms() / 40) % (bw - 8);
@@ -360,181 +590,85 @@ void desktop_paint_boot(Surface& fb) {
 bool desktop_handle_mouse(int x, int y, uint8_t buttons) {
     int H = platform_screen()->height;
     bool pressed = (buttons & 1) != 0;
-    bool released = (buttons == 0) && (s_last_buttons != 0);
     bool r_pressed = (buttons & 2) != 0 && (s_last_buttons & 2) == 0;
     s_last_buttons = buttons;
-    uint32_t now = platform_tick_ms();
-    int menu_apps[16];
-
-    // desktop icon context menu
-    if (s_rmenu_open) {
-        int mw = 150, mh = 2 * 22 + 6;
-        int mx = s_rmenu_x, my = s_rmenu_y;
-        if (mx + mw > platform_screen()->width) mx = platform_screen()->width - mw - 4;
-        if (my + mh > H - TASKBAR_H) my = H - TASKBAR_H - mh - 4;
-        if (x >= mx && x < mx + mw && y >= my && y < my + mh) {
-            int idx = (y - my - 3) / 22;
-            s_rmenu_hover = (idx >= 0 && idx < 2) ? idx : -1;
-            if (pressed) {
-                if (idx == 0 && s_rmenu_icon >= 0) {
-                    DesktopIcon& ic = s_icons[s_rmenu_icon];
-                    if (!ic.deleted) app_launch(ic.app);
-                } else if (idx == 1 && s_rmenu_icon >= 0) {
-                    s_icons[s_rmenu_icon].deleted = true;   // shortcut only
-                    if (s_sel_icon == s_rmenu_icon) s_sel_icon = -1;
-                }
-                s_rmenu_open = false;
-                s_rmenu_icon = -1;
-                s_rmenu_hover = -1;
-            }
-            return true;
-        }
-        if (pressed) { s_rmenu_open = false; s_rmenu_icon = -1; }
+    // windows take priority: never feed clicks under a window to LVGL
+    if (g_wm->hit(x, y)) {
+        s_btn = false;
+        return false;
+    }
+    // idle pointer moves only trigger LVGL-local hover repaints; the full
+    // desktop is redrawn by desktop_paint when a window overlay changes.
+    if (s_mx != x || s_my != y || s_btn != pressed) {
+        s_mx = x;
+        s_my = y;
+        s_btn = pressed;
     }
 
-    // start menu priority when open
-    if (s_start_open) {
-        int rows = build_menu(menu_apps);
-        int mw = 196, mh = rows * 26 + 10 + 32;
-        int mx = 4, my = H - TASKBAR_H - mh;
-        if (my < 0) my = 0;
-        if (x >= mx && x < mx + mw && y >= my && y < my + mh) {
-            int row = (y - my - 5) / 26;
-            if (row < 0 || row >= rows) row = -1;
-            s_start_hover = row;
-            if (pressed && row >= 0) {
-                s_start_open = false;
-                s_start_hover = -1;
-                if (row < rows) app_launch(menu_apps[row]);
-                else if (row == rows) {
-                    nefuos_shutdown();
-                    platform_poweroff();
-                }
-                return true;
-            }
-            return true;
-        }
-        if (pressed) { s_start_open = false; s_start_hover = -1; }
-    }
-
-    // taskbar（）
-    if (g_settings.show_taskbar && y >= H - TASKBAR_H) {
-        if (pressed) s_start_open = false;
-        s_start_btn_hover = 0;
-        // start button
-        if (x >= 4 && x < 68 && y >= H - 27 && y < H - 3) {
-            s_start_btn_hover = 1;
-            if (pressed) s_start_open = !s_start_open;
-            return true;
-        }
-        // task button
-        int bx = 76;
-        for (int i = 0; i < g_wm->windows().size(); i++) {
-            Window* w = g_wm->windows()[i];
-            if (!w->visible || w->closed) continue;
-            int tl = w->title.len();
-            if (tl > 12) tl = 12;
-            int wd = tl * 8 + 16;
-            if (x >= bx && x < bx + wd && y >= H - 28 && y < H - 2) {
-                if (pressed) {
-                    if (w->minimized) { w->minimized = false; g_wm->raise(w); }
-                    else if (g_wm->focus() == w) w->minimized = true;
-                    else g_wm->raise(w);
-                }
-                return true;
-            }
-            bx += wd + 4;
-        }
-        return true; // taskbar blank area consumes too
-    }
-
-    // window overlay goes to WM first（）
-    if (g_wm->hit(x, y)) return false;
-
-    // desktop icons: click / right-click / drag
+    // right click on an icon -> context menu (LVGL panel shown on top)
     if (r_pressed) {
         for (int i = 0; i < s_icon_count; i++) {
             DesktopIcon& ic = s_icons[i];
             if (ic.deleted) continue;
             if (x >= ic.x && x < ic.x + ICON_W && y >= ic.y && y < ic.y + ICON_H) {
-                s_sel_icon = i;
-                s_rmenu_open = true;
-                s_rmenu_x = x;
-                s_rmenu_y = y;
                 s_rmenu_icon = i;
-                s_rmenu_hover = -1;
+                if (s_rmenu) {
+                    lv_obj_set_pos(s_rmenu, x < 140 ? x : x - 150, y < 60 ? y : y - 50);
+                    lv_obj_remove_flag(s_rmenu, LV_OBJ_FLAG_HIDDEN);
+                    s_rmenu_open = true;
+                    // rebind item callbacks to this icon
+                    if (s_rmenu_items[0]) {
+                        lv_obj_remove_event_cb(s_rmenu_items[0], on_rmenu_open);
+                        lv_obj_add_event_cb(s_rmenu_items[0], on_rmenu_open, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+                    }
+                    if (s_rmenu_items[1]) {
+                        lv_obj_remove_event_cb(s_rmenu_items[1], on_rmenu_del);
+                        lv_obj_add_event_cb(s_rmenu_items[1], on_rmenu_del, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+                    }
+                }
                 return true;
             }
         }
-        s_rmenu_open = false;
+        if (s_rmenu) { lv_obj_add_flag(s_rmenu, LV_OBJ_FLAG_HIDDEN); s_rmenu_open = false; }
         return true;
     }
 
-    if (s_drag_icon >= 0) {
-        DesktopIcon& ic = s_icons[s_drag_icon];
-        if (released) {
-            // round to the nearest grid cell (handles negative deltas correctly)
-            int col = (ic.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
-            int row = (ic.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
-            if (col < 0) col = 0;
-            if (row < 0) row = 0;
-            // find the nearest free cell so icons never overlap
-            int best_c = col, best_r = row, best_d2 = 0x7FFFFFFF;
-            for (int r = 0; r < 8; r++) {
-                for (int c = 0; c < 8; c++) {
-                    bool taken = false;
-                    for (int k = 0; k < s_icon_count; k++) {
-                        if (k == s_drag_icon || s_icons[k].deleted) continue;
-                        DesktopIcon& o = s_icons[k];
-                        int oc = (o.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
-                        int orw = (o.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
-                        if (oc == c && orw == r) { taken = true; break; }
-                    }
-                    if (!taken) {
-                        int d2 = (c - col) * (c - col) + (r - row) * (r - row);
-                        if (d2 < best_d2) { best_d2 = d2; best_c = c; best_r = r; }
-                    }
-                }
+    // click on blank desktop: dismiss menus, deselect
+    if (pressed) {
+        if (s_start_open && s_start_menu && !lv_obj_has_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN)) {
+            // let LVGL first check whether the click hit the menu;
+            // if the click is outside the menu rect, close it.
+            lv_area_t a;
+            lv_obj_get_coords(s_start_menu, &a);
+            if (x < a.x1 || x > a.x2 || y < a.y1 || y > a.y2) {
+                lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+                s_start_open = false;
             }
-            ic.x = 14 + best_c * (ICON_W + 8);
-            ic.y = 14 + best_r * (ICON_H + 10);
-            if (ic.y + ICON_H > H - TASKBAR_H) ic.y = H - TASKBAR_H - ICON_H;
-            s_drag_icon = -1;
-            return true;
         }
-        ic.x = x - ICON_W / 2;
-        ic.y = y - ICON_H / 2;
-        if (ic.x < 4) ic.x = 4;
-        if (ic.y < 4) ic.y = 4;
-        return true;
-    }
-
-    for (int i = 0; i < s_icon_count; i++) {
-        DesktopIcon& ic = s_icons[i];
-        if (ic.deleted) continue;
-        if (x >= ic.x && x < ic.x + ICON_W && y >= ic.y && y < ic.y + ICON_H) {
-            if (pressed) {
-                bool dbl = (s_last_click_icon == i && now - s_last_click_time < 400);
-                s_last_click_icon = i;
-                s_last_click_time = now;
-                s_sel_icon = i;
-                if (dbl) app_launch(ic.app);
-                else s_drag_icon = i;
+        if (s_rmenu_open && s_rmenu) {
+            lv_area_t a;
+            lv_obj_get_coords(s_rmenu, &a);
+            if (x < a.x1 || x > a.x2 || y < a.y1 || y > a.y2) {
+                lv_obj_add_flag(s_rmenu, LV_OBJ_FLAG_HIDDEN);
+                s_rmenu_open = false;
             }
-            return true;
         }
     }
-
-    if (pressed) { s_sel_icon = -1; s_start_open = false; }
-    return false;
+    return true; // desktop consumes clicks (LVGL widget events fire via timer)
 }
 
 bool desktop_handle_key(int keycode, char ascii) {
-    (void)ascii;
+    lvgl_key_push(keycode, ascii);
     if (s_start_open && keycode == KEY_ESC) {
+        if (s_start_menu) lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
         s_start_open = false;
         return true;
     }
+    if (keycode == KEY_F1) { start_menu_toggle(); return true; }
+    if (keycode == KEY_F2) { app_launch(APP_TERMINAL); return true; }
+    if (keycode == KEY_F3) { app_launch(APP_FILEMGR); return true; }
+    if (keycode == KEY_F4) { app_launch(APP_MUSIC); return true; }
+    if (keycode == KEY_F5) { app_launch(APP_SETTINGS); return true; }
     return false;
 }
 

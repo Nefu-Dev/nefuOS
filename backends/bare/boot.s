@@ -1,16 +1,16 @@
 # nefuOS bare boot sector (El Torito no-emulation, DL=0xE0 real ATAPI CD)
-# Duties: VBE 800x600x32 -> store LFB/bootinfo at 0x7000 -> load kernel.bin
-# from CD LBA24 (57 x 2048B sectors) to 0x20000 -> protected mode -> long
-# mode entry (entry.s) -> nefuos_kernel_main.
+# Duties: VBE 1024x768x32 -> store LFB/bootinfo at 0x7000 -> load kernel.bin
+# from CD LBA24 (any size, dynamic loop) to 0x20000 -> protected mode ->
+# long mode entry (entry.s) -> nefuos_kernel_main.
 # Key design:
 #  1) SeaBIOS no-emulation: DL=0xE0, physical 2048B sectors. int13 AH=0x42
 #     is served by the real ATAPI stack, single call <= 32 sectors (64KB).
-#  2) kernel.bin loaded via 4 static chunks: 32+32+32+1 (dap1 -> 0x20000,
-#     dap2 -> 0x30000, dap3 -> 0x40000, dap4 -> 0x50000, tail). DAPs are
-#     static (SeaBIOS clobbers BP/SI/ES on int13) and live in the safe zone
-#     below 0x7DAA.
-#  3) After each chunk, verify the first byte of the target; a CF=0 result
-#     with no data written (ATAPI silent failure) is retried per-chunk.
+#  2) kernel.bin is loaded by a dynamic loop: one DAP at 0x7D70 is rewritten
+#     per call (count <= 32 CD sectors = 64KB), advancing LBA/segment/remain
+#     until kernel_count/4 sectors are read.  DAP/state live below the
+#     SeaBIOS clobber zone 0x7DAA.
+#  3) After each chunk, advance state; a CF=1 failure resets and retries the
+#     whole load.
 #  4) Boot sector tail 0x7DAA-0x7DFF gets clobbered by BIOS int 0x10/0x13,
 #     so GDT/kernel_count/DAPs live in the safe zone 0x7C00-0x7DAA.
 # Memory: 0x6000 VBE mode info; 0x7000 boot info; 0x7C00 boot sector;
@@ -75,71 +75,76 @@ start_code:
     movl %eax, 0x7000
     call dbg_char
     .byte 'V'
-    # bochs VBE register set (index 0x1CE, data 0x1CF); QEMU stdvga keeps
-    # these live without an ID enable write.
+    # loop over (index, value) pairs: XRES, YRES, BPP, ENABLE
+    leaw vbe_idx, %si
+    leaw vbe_val, %di
+    movw $4, %cx
+vbe_loop:
     movw $0x1CE, %dx
-    movw $0x0001, %ax
-    outw %ax, %dx              # index XRES
-    movw $0x1CF, %dx
-    movw $1024, %ax
+    lodsw
     outw %ax, %dx
-    movw $0x1CE, %dx
-    movw $0x0002, %ax
-    outw %ax, %dx              # index YRES
     movw $0x1CF, %dx
-    movw $768, %ax
+    movw (%di), %ax
     outw %ax, %dx
-    movw $0x1CE, %dx
-    movw $0x0003, %ax
-    outw %ax, %dx              # index BPP
-    movw $0x1CF, %dx
-    movw $32, %ax
-    outw %ax, %dx
-    movw $0x1CE, %dx
-    movw $0x0004, %ax
-    outw %ax, %dx              # index ENABLE
-    movw $0x1CF, %dx
-    movw $0x0081, %ax          # display enabled + linear framebuffer
-    outw %ax, %dx
+    incw %di
+    incw %di
+    loop vbe_loop
     # bootinfo: X=1024 Y=768 pitch=4096 bpp=32
     movl $1024, 0x7004
     movl $768, 0x7008
     movl $4096, 0x700C
     movb $32, 0x7010
+    jmp vbe_done
+vbe_idx: .word 1, 2, 3, 4
+vbe_val: .word 1024, 768, 32, 0x0081
+vbe_done:
 
 # ---- load kernel.bin from real ATAPI CD via EDD int 0x13 AH=0x42 ----
-# kernel.bin at physical LBA 24, up to 192 x 2048B sectors, six static chunks.
+# kernel.bin starts at physical LBA 24 (make_iso.py layout). CD sectors are
+# 2048B; int13 0x42 is limited to 64KB (32 sectors) per call, so we loop.
+# State lives in memory (0x7D80..), never in BP/SI (int13 0x42 clobbers
+# those); the single DAP at 0x7D70 is rewritten before every call and sits
+# well below SeaBIOS's VBE clobber zone (0x7DAA+).
 cd_load_kernel:
+    # rem = ceil(kernel_count / 4)  (512B kernel sectors -> 2048B CD sectors)
+    movw kernel_count, %ax
+    addw $3, %ax
+    shrw $2, %ax
+    movw %ax, cd_rem
+    movl $24, %eax
+    movl %eax, cd_lba
+    movw $0x2000, %ax
+    movw %ax, cd_seg
+cd_loop:
+    cmpw $0, cd_rem
+    jz  cd_done
+    movw cd_rem, %ax
+    cmpw $32, %ax
+    jbe cd_n_ok
+    movw $32, %ax
+cd_n_ok:
+    movw %ax, cdap1_count
+    movw cd_seg, %ax
+    movw %ax, cdap1_seg
+    movl cd_lba, %eax
+    movl %eax, cdap1_lba
     movw $cdap1 + 0x7C00, %si
     movb BOOT_DRIVE, %dl
     movb $0x42, %ah
     int $0x13
     jc cd_retry
-    movw $cdap2 + 0x7C00, %si
-    movb BOOT_DRIVE, %dl
-    movb $0x42, %ah
-    int $0x13
-    jc cd_retry
-    movw $cdap3 + 0x7C00, %si
-    movb BOOT_DRIVE, %dl
-    movb $0x42, %ah
-    int $0x13
-    jc cd_retry
-    movw $cdap4 + 0x7C00, %si
-    movb BOOT_DRIVE, %dl
-    movb $0x42, %ah
-    int $0x13
-    jc cd_retry
-    movw $cdap5 + 0x7C00, %si
-    movb BOOT_DRIVE, %dl
-    movb $0x42, %ah
-    int $0x13
-    jc cd_retry
-    movw $cdap6 + 0x7C00, %si
-    movb BOOT_DRIVE, %dl
-    movb $0x42, %ah
-    int $0x13
-    jc cd_retry
+    # advance: lba += n, seg += n*0x80 (n sectors * 2048B / 16), rem -= n
+    movw cdap1_count, %cx
+    movzwl %cx, %edx
+    movl cd_lba, %eax
+    addl %edx, %eax
+    movl %eax, cd_lba
+    movw %cx, %ax
+    shlw $7, %ax
+    addw %ax, cd_seg
+    subw %cx, cd_rem
+    jmp cd_loop
+cd_done:
     call dbg_char
     .byte 'L'                 # all chunks ok
     jmp kernel_loaded
@@ -169,50 +174,23 @@ kernel_loaded:
     movl %eax, %cr0
     ljmp $0x08, $0x7C04
 
-# ---- EDD DAPs (static; fully clear of BIOS clobber zone 0x7DAA+) ----
-.org 0x160
+# ---- EDD DAP (static slot, fields rewritten per call; clear of clobber) ----
+# Dynamic loader code ends ~0x164; DAP + state sit below the SeaBIOS
+# clobber zone 0x7DAA (= offset 0x1AA), same as the committed 6-DAP layout.
+.org 0x170
 cdap1:
-    .byte 0x10, 0x00      # size
-    .word 32              # count (2048B sectors, 64KB)
-    .word 0x0000          # offset
-    .word 0x2000          # segment 0x2000 -> 0x20000
-    .long 24              # lba low (kernel starts at LBA24)
-    .long 0               # lba high
-cdap2:
-    .byte 0x10, 0x00      # size
-    .word 32              # count (chunk2 2048B sectors)
-    .word 0x0000          # offset
-    .word 0x3000          # segment 0x3000 -> 0x30000
-    .long 56              # lba low (24+32)
-    .long 0               # lba high
-cdap3:
-    .byte 0x10, 0x00      # size
-    .word 32              # count (chunk3 2048B sectors)
-    .word 0x0000          # offset
-    .word 0x4000          # segment 0x4000 -> 0x40000
-    .long 88              # lba low (24+64)
-    .long 0               # lba high
-cdap4:
-    .byte 0x10, 0x00      # size
-    .word 32              # count (chunk4, fixed)
-    .word 0x0000          # offset
-    .word 0x5000          # segment 0x5000 -> 0x50000
-    .long 120             # lba low (24+96)
-    .long 0               # lba high
-cdap5:
-    .byte 0x10, 0x00      # size
-    .word 32              # count (chunk5, fixed)
-    .word 0x0000          # offset
-    .word 0x6000          # segment 0x6000 -> 0x60000
-    .long 152             # lba low (24+128)
-    .long 0               # lba high
-cdap6:
-    .byte 0x10, 0x00      # size
-    .word 0               # count (patched at build time; max 32 per int13 limit)
-    .word 0x0000          # offset
-    .word 0x7000          # segment 0x7000 -> 0x70000
-    .long 184             # lba low (24+160)
-    .long 0               # lba high
+    .byte 0x10, 0x00   # size
+cdap1_count: .word 32  # count (2048B sectors, max 32 = 64KB)
+    .word 0x0000       # offset
+cdap1_seg: .word 0x2000  # segment -> physical 0x20000
+cdap1_lba: .long 24    # lba low (kernel starts at LBA24)
+    .long 0            # lba high
+
+# ---- CD load state (0x7D80, clear of SeaBIOS clobber zone 0x7DAA+) ----
+.org 0x180
+cd_rem:  .word 0       # remaining 2048B CD sectors
+cd_lba:  .long 0       # current physical LBA (48-bit, low 32 used)
+cd_seg:  .word 0       # current load segment
 
 # ---- bss zero-fill info (patched at build time) ----
 # entry.s reads these to know where to rep stosq the kernel .bss.

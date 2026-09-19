@@ -1,11 +1,13 @@
-﻿# nefuOS ： exe + + + ISO
-$ErrorActionPreference = "Stop"
+# nefuOS ： exe + + + ISO（-GrubEsp 时额外生成 ESP+GRUB 磁盘镜像）
+param(
+    [switch]$GrubEsp
+)
+$ErrorActionPreference = "Continue"
 $root = "D:\mycppos1\nefuOS"
 $g = "D:\CLion\bin\mingw\bin\g++.exe"
 $as = "D:\CLion\bin\mingw\bin\as.exe"
 $ld = "D:\CLion\bin\mingw\bin\ld.exe"
 $objcopy = "D:\CLion\bin\mingw\bin\objcopy.exe"
-$xorriso = "C:\msys64\usr\bin\xorriso.exe"
 Set-Location $root
 
 # 0) Admin hash injection (FNV-1a 64, hex). The plain password is read from
@@ -27,31 +29,82 @@ $coreSrc = @(
   "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\monitor.cpp",
   "core\apps\browser.cpp", "core\apps\netcfg.cpp",
   "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\net\net.cpp",
+  "core\gui\ttfont.cpp", "core\apps\fontview.cpp", "core\apps\lvgl_demo.cpp",
+  "core\gui\lvgl_win.cpp",
+  "core\apps\lvgl_desktop.cpp",
   "core\sys\settings.cpp", "core\sys\sha256.cpp",
   "core\apps\wiki.cpp",
+  "core\sys\power.cpp",
+  "core\apps\bios.cpp",
+  "core\audio.cpp",
   "third_party\stb_image_wrap.cpp"
 )
 
+# LVGL 9.2.0 sources (third_party/lvgl_src/lvgl-9.2.0/src/*.c)
+$gcc = "D:\CLion\bin\mingw\bin\gcc.exe"
+$lvglRoot = "third_party\lvgl_src\lvgl-9.2.0"
+$lvglSrc = Get-ChildItem (Join-Path $lvglRoot "src") -Recurse -Filter *.c | ForEach-Object { $_.FullName }
+$lvConfPath = (Resolve-Path "third_party\lvgl_conf\lv_conf.h").Path -replace '\\', '/'
+$lvglInclude = @("-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
+                 "-D", ("LV_CONF_PATH=" + $lvConfPath))
+$lvglCFlags = @("-std=gnu11", "-O2", "-Wall", "-I", "third_party",
+                "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
+                "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c")
+
 # 1) （win32）
-& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -o dist\nefuOS.exe ($coreSrc + @("backends\win32\win32.cpp")) -lgdi32 -luser32 -lgdiplus -lole32 -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lwinmm
+$bareOut = Join-Path $env:TEMP "nefu_build\bare"
+$distOut = Join-Path $env:TEMP "nefu_dist"
+New-Item -ItemType Directory -Force -Path $bareOut | Out-Null
+New-Item -ItemType Directory -Force -Path $distOut | Out-Null
+$hostExe = Join-Path $distOut "nefuOS.exe"
+# LVGL is pure C: compile with gcc first, then link via g++ with the core
+$lvglHostObjs = @()
+foreach ($lv in $lvglSrc) {
+  $lname = ($lv -replace '.*\\src\\', 'lvgl_h_') -replace '[\\/]', '_' -replace '\.c$', '.o'
+  $lobj = "$bareOut\$lname"
+  if (-not (Test-Path $lobj)) {
+    & $gcc @lvglCFlags $lv -o $lobj
+    if ($LASTEXITCODE -ne 0) { throw "lvgl host compile failed: $lv" }
+  }
+  $lvglHostObjs += $lobj
+}
+$linkErr = Join-Path $env:TEMP "nefu_link.log"
+& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party @lvglInclude -o $hostExe ($coreSrc + @("backends\win32\win32.cpp")) $lvglHostObjs -lgdi32 -luser32 -lgdiplus -lole32 -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lwinmm 2> $linkErr
 if ($LASTEXITCODE -ne 0) { throw "host build failed" }
-Write-Output "host exe OK: $((Get-Item dist\nefuOS.exe).Length) bytes"
+Write-Output "host exe OK: $((Get-Item $hostExe).Length) bytes"
 
 # 2)
 $bareFlags = @(
   "-std=c++17", "-ffreestanding", "-fno-exceptions", "-fno-rtti", "-fno-builtin",
   "-fno-stack-protector", "-mno-red-zone", "-mgeneral-regs-only", "-O2", "-Wall", "-Wextra",
-  "-Wno-sized-deallocation", "-I", "core", "-c"
+  "-ffunction-sections", "-fdata-sections",
+  "-Wno-sized-deallocation", "-DNEFU_BARE", "-I", "core", "-I", "third_party",
+  "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
+  "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c"
 )
 $objs = @()
-$bareOut = "build\bare"
-New-Item -ItemType Directory -Force -Path $bareOut | Out-Null
 foreach ($s in $coreSrc) {
   $name = $s -replace '[\\/]', '_' -replace '\.cpp$', '.o'
   $obj = "$bareOut\$name"
   & $g @bareFlags $s -o $obj
   if ($LASTEXITCODE -ne 0) { throw "bare compile failed: $s" }
   $objs += $obj
+}
+# LVGL 9.2.0 bare objects (pure C, compiled with gcc -mgeneral-regs-only so
+# any float math resolves to the kernel soft-float library)
+$lvglBareFlags = @("-std=gnu11", "-ffreestanding", "-fno-stack-protector", "-mno-red-zone",
+                   "-mgeneral-regs-only", "-O2", "-Wall", "-ffunction-sections", "-fdata-sections",
+                   "-I", "third_party",
+                   "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
+                   "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c")
+foreach ($lv in $lvglSrc) {
+  $lname = ($lv -replace '.*\\src\\', 'lvgl_') -replace '[\\/]', '_' -replace '\.c$', '.o'
+  $lobj = "$bareOut\$lname"
+  if (-not (Test-Path $lobj)) {
+    & $gcc @lvglBareFlags $lv -o $lobj
+    if ($LASTEXITCODE -ne 0) { throw "lvgl compile failed: $lv" }
+  }
+  $objs += $lobj
 }
 & $g @bareFlags "backends\bare\bare.cpp" -o "$bareOut\bare_bare.o"
 if ($LASTEXITCODE -ne 0) { throw "bare.cpp failed" }
@@ -71,7 +124,7 @@ if ($LASTEXITCODE -ne 0) { throw "entry.s failed" }
 $objs = @("$bareOut\entry.o") + $objs
 
 # 4) link（PE ）->
-& $ld -mi386pep --image-base 0x20000 -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
+& $ld -mi386pep --image-base 0x20000 --gc-sections -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
 # mingw ld of PE ： section(.text) of VirtualAddress = absoluteVMA - image_base(=0)，
 # rest section of VirtualAddress = absoluteVMA。 objcopy -O binary，VMA ，
@@ -155,7 +208,14 @@ if (-not $kernelBssStart) { $kernelBssStart = 0x93020 }
 if (-not $kernelBssSize) { $kernelBssSize = 0 }
 $kSize = (Get-Item "$bareOut\kernel.bin").Length
 Write-Output "kernel.bin OK: $kSize bytes"
-if ($kSize -gt 720000) { throw "kernel too large for floppy image" }
+$isoKernelMax = 1024 * 2048   # ISO layout: kernel occupies up to 1024 x 2048B blocks at LBA24
+if ($kSize -gt $isoKernelMax) { throw "kernel too large for ISO (max $isoKernelMax bytes, got $kSize)" }
+
+# 4b) patch the multiboot2 header (entry.s) so GRUB/ESP boot works:
+#     Address-tag load_end_addr/bss_end_addr + in-kernel kernel_boot_params
+#     (bss_start/bss_size) read by entry.s on both boot paths.
+& $python3 "tools\patch_mb2.py" "$bareOut\kernel.bin" $kernelBssStart $kernelBssSize
+if ($LASTEXITCODE -ne 0) { throw "patch_mb2 failed" }
 
 # 5) boot sector ->
 & $objcopy -O binary -j .text "$bareOut\boot.o" "$bareOut\boot.bin"
@@ -168,45 +228,42 @@ $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
 $fs.Position = 0x58
 $fs.WriteByte([byte]($kSectors -band 0xFF))
 $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
-# cdap6 count @0x1B2: remaining kernel bytes beyond 0x60000, in 2048B CD
-# sectors. Chunks 1-5 are fixed 32 sectors (LBA24..183 -> 0x20000..0x60000);
-# chunk 6 (LBA184, seg 0x7000) is capped at 32 (int13 EDD 64KB limit).
-# NOTE: cdap6 DAP starts at .org 0x1B0; its 16-byte layout is
-#   [0]=size [1]=reserved [2..3]=count [4..5]=offset [6..7]=seg [8..15]=lba
-# so count lives at 0x1B2, NOT 0x1B4 (0x1B4 is the offset field).
-$kTotal = [Math]::Ceiling($kSize / 2048)
-$cdap6Count = $kTotal - 160
-if ($cdap6Count -lt 0) { $cdap6Count = 0 }
-if ($cdap6Count -gt 32) { $cdap6Count = 32 }
-$fs.Position = 0x1B2
-$fs.WriteByte([byte]($cdap6Count -band 0xFF))
-$fs.WriteByte([byte](($cdap6Count -shr 8) -band 0xFF))
-# bss zero-fill slots @0x1C0/0x1C4 (entry.s reads them at 0x7C00+0x1C0)
-$fs.Position = 0x1C0
-$fs.Write([BitConverter]::GetBytes([uint32]$kernelBssStart), 0, 4)
-$fs.Write([BitConverter]::GetBytes([uint32]$kernelBssSize), 0, 4)
+# CD load is fully dynamic in boot.s now (single DAP at 0x7D60 rewritten
+# per call); no static chunk patch needed here.
 $fs.Close()
-Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58), cdap6=$cdap6Count"
+Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58)"
 
-# 6) （1.44MB，2880 sectors）
-$floppy = "$bareOut\floppy.img"
-$fs = [IO.File]::Create($floppy)
-$fs.SetLength(1474560)
-$fs.Close()
-$fs = [IO.File]::OpenWrite($floppy)
-$boot = [IO.File]::ReadAllBytes("$bareOut\boot.bin")
-$fs.Write($boot, 0, 512)
-$kernel = [IO.File]::ReadAllBytes("$bareOut\kernel.bin")
-$fs.Position = 512
-$fs.Write($kernel, 0, $kernel.Length)
-$fs.Close()
-Write-Output "floppy.img OK"
-
-# 7) ISO（El Torito no-emulation：SeaBIOS read-only boot.s， boot.s int13 0x42 ）
+# 6) ISO（El Torito no-emulation：boot.bin 直接放在 ISO LBA23，kernel.bin 放 LBA24，
+#    boot.s 通过 int13 0x42 从 CD 直接读取——不经过 floppy.img 中间层，裸机可直接启动）
 $python = "C:\Users\huawei\AppData\Local\Programs\Python\Python311\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
-& $python "tools\make_iso.py" "$bareOut\boot.bin" "$bareOut\kernel.bin" "dist\nefuOS_v2.iso"
+$isoOut = Join-Path $distOut "nefuOS.iso"
+& $python "tools\make_iso.py" "$bareOut\boot.bin" "$bareOut\kernel.bin" $isoOut
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
-Write-Output "ISO OK: $((Get-Item dist\nefuOS_v2.iso).Length) bytes"
+Write-Output "ISO OK: $((Get-Item $isoOut).Length) bytes"
+
+# 7) ESP + GRUB (UEFI) 磁盘镜像（可选，-GrubEsp）：
+#    GPT 分区表 + FAT32 ESP，含 BOOTX64.EFI（GRUB）、grub.cfg、全部 GRUB 模块和
+#    带 multiboot2 头的 kernel.bin。GRUB 通过 multiboot2 协议加载内核，内核自行
+#    解析 framebuffer 标签并建立分页/长模式（见 backends/bare/entry.s）。
+if ($GrubEsp) {
+    $grubRoot = Join-Path $root "tools\grub_toolchain"
+    $grubCore = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi\monolithic\grubx64.efi"
+    $grubMods = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi"
+    $grubCfg = Join-Path $root "tools\grub.cfg"
+    if (-not (Test-Path $grubCore)) {
+        Write-Output "GRUB toolchain missing — fetching (tools\fetch_grub_toolchain.py) ..."
+        & $python "tools\fetch_grub_toolchain.py"
+        if ($LASTEXITCODE -ne 0) { throw "fetch_grub_toolchain failed" }
+    }
+    if (-not (Test-Path $grubCore)) { throw "grubx64.efi still missing after fetch" }
+    $espOut = Join-Path $distOut "nefuOS_esp.img"
+    & $python "tools\make_esp.py" $grubCore $grubCfg "$bareOut\kernel.bin" $grubMods $espOut
+    if ($LASTEXITCODE -ne 0) { throw "make_esp failed" }
+    New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+    Copy-Item $espOut "dist\nefuOS_esp.img" -Force
+    Write-Output "ESP+GRUB image OK: dist\nefuOS_esp.img ($((Get-Item 'dist\nefuOS_esp.img').Length) bytes)"
+}
+
 Write-Output "BUILD DONE"
 

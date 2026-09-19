@@ -487,6 +487,24 @@ void VFS::create_default_tree() {
         "desc=CPU/memory/network monitor\n"
         "author=nefuOS\n"
         "ver=1.0\n");
+    put_text(this, "/usr/share/demo_form.html",
+        "<html><body>\n"
+        "<h2>nefuOS form demo (lithtml engine)</h2>\n"
+        "<p>This page tests form support in the built-in browser.</p>\n"
+        "<form action=\"http://10.0.2.2:8000/get\" method=\"get\">\n"
+        "  <b>GET form:</b><br/>\n"
+        "  <input name=\"q\" placeholder=\"search term\" />\n"
+        "  <button name=\"go\" value=\"Search\">Search (GET)</button>\n"
+        "</form>\n"
+        "<form action=\"http://10.0.2.2:8000/post\" method=\"post\">\n"
+        "  <b>POST form:</b><br/>\n"
+        "  <input name=\"user\" placeholder=\"username\" />\n"
+        "  <button name=\"send\" value=\"Submit\" method=\"post\">Send (POST)</button>\n"
+        "</form>\n"
+        "<hr/>\n"
+        "<ul><li>cookie jar: /var/lib/nefuos/cookies.txt</li>\n"
+        "<li>history: /home/user/.nefu_history</li></ul>\n"
+        "</body></html>\n");
     {
         // sample .bin application: NEFBIN01 package with NEFVM bytecode
         static const uint8_t hello_bin[] = {

@@ -101,6 +101,9 @@ static void term_help(TermState* t) {
     term_print(t, "  whoami            - current user (root/guest)");
     term_print(t, "  uname [-a]        - system info");
     term_print(t, "  lsblk / disks     - list block devices");
+    term_print(t, "  audio             - sound card status");
+    term_print(t, "  play <file.wav>   - play a WAV file");
+    term_print(t, "  stop              - stop playback");
     term_print(t, "  date              - uptime date");
     term_print(t, "  uptime            - time since boot");
     term_print(t, "  free              - memory status");
@@ -403,6 +406,31 @@ static void term_run(TermState* t, const char* cmd) {
             for (int i = 1; i < argc; i++) { if (i > 1) text += ' '; text += argv[i]; }
             term_print(t, text.c_str());
         }
+    }
+    else if (strcmp(a0, "audio") == 0) {
+        if (platform_audio_available())
+            term_print(t, "audio: sound card available (SB16 / Windows audio)");
+        else
+            term_print(t, "audio: no sound device found");
+    }
+    else if (strcmp(a0, "play") == 0) {
+        if (argc < 2) { term_print(t, "usage: play <file.wav>"); }
+        else {
+            char full[128];
+            if (argv[1][0] == '/') ksprintf(full, sizeof(full), "%s", argv[1]);
+            else ksprintf(full, sizeof(full), "%s/%s", g_vfs->cwd->name.c_str(), argv[1]);
+            // resolve relative to cwd via the vfs node
+            FSNode* f = g_vfs->resolve(argv[1][0] == '/' ? full : argv[1]);
+            if (!f || f->is_dir) term_print(t, "play: file not found");
+            else if (platform_play_wav_mem(f->data, f->size))
+                term_print(t, "play: started");
+            else
+                term_print(t, "play: failed (not a WAV or no sound device)");
+        }
+    }
+    else if (strcmp(a0, "stop") == 0) {
+        platform_stop_sound();
+        term_print(t, "sound stopped");
     }
     else if (strcmp(a0, "whoami") == 0) {
         term_print(t, admin_is_admin() ? "root" : "guest");

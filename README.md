@@ -213,21 +213,29 @@ registers — QEMU's BIOS VBE modes map to unusable 24bpp).
   `NEFU_ADMIN_PASSWORD` env var — the plaintext never appears in source,
   README, ISO or logs.
 
-### Third-party references & SBOM
+### Third-party components & SBOM
 
-This project ships **no third-party binary code** - the whole kernel and all
-apps are self-written. The following projects were studied or referenced for
-behavior/design only (no code copied):
+nefuOS embeds three third-party components (all permissive licenses, no GPL
+code is linked into or distributed with nefuOS):
+
+| Component | Version | License | Where it is used | Modifications |
+|---|---|---|---|---|
+| [LVGL](https://github.com/lvgl/lvgl) | 9.2.0 | MIT | full GUI widget layer (desktop, windows, buttons, tabview, list, switch) | vendored under `third_party/lvgl_src`; configured via `third_party/lvgl_conf/lv_conf.h` (32-bit color, 1 MiB pool backed by the nefuOS kernel heap); `LV_MEM_POOL_ALLOC` hooked to `nefu_lvgl_pool_alloc` |
+| [stb_truetype](https://github.com/nothings/stb) | 1.26 (2021-08-28) | MIT / public domain | scalable TrueType text in `core/gui/ttfont.cpp` | math/malloc hooks for the bare kernel (`STBTT_sqrt/pow/cos/fmod` → soft-float, `STBTT_malloc/free` → `nefu::kalloc/kfree`) |
+| Montserrat-Medium.ttf (Google Fonts) | ofl/montserrat @ github.com/google/fonts | SIL OFL 1.1 | embedded vector font (`third_party/mont_data.h`, generated from the official TTF) | converted to a C header at build time; no font outlines altered |
+
+Behavior/design references (no code copied):
 
 | Project | Version/Commit | License | How it is used here |
 |---|---|---|---|
 | SeaBIOS | git master (analyzed `src/hw/` CD boot) | LGPL-2.1 | behavior reference for El Torito no-emulation + INT 13h AH=42h limits; no code included |
 | Linux kernel | FHS layout / proc & sysfs naming | GPL-2.0 (ideas only) | directory tree design, `/proc`/`/sys`/`/dev` conventions; no code included |
 | QEMU | 11.1.1 (e1000 82540EM, SeaBIOS) | GPL-2.0 | test/verification harness only; not shipped |
-| stb (nothings) | single-file image headers | MIT | image-decode *concept* reference; host uses GDI+, bare metal has its own PPM/JPEG reader |
 | xv6 (MIT) | teaching OS | MIT | app/VFS split design inspiration; no code included |
 
-No GPL-licensed code is linked into, or distributed with, nefuOS.
+All other code (kernel, GUI shell, VFS, network stack, apps, ISO builder) is
+original to this project. Third-party license texts are kept at
+`third_party/licenses/`.
 
 ## License
 

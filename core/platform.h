@@ -65,6 +65,33 @@ void platform_fs_save(const uint8_t* data, uint32_t size);
 
 // ===================== power off / exit =====================
 void platform_poweroff();
+void platform_reboot();    // 真实重启
+void platform_suspend();  // 待机/挂起
+
+// ===================== 完整硬件识别信息 =====================
+struct HwInfo {
+    char cpu_model[64];      // CPU型号字符串
+    uint32_t cpu_mhz;        // CPU主频
+    uint64_t mem_total_mb;  // 物理总内存（MB）
+    char bios_version[32];   // BIOS/UEFI版本
+    char bios_vendor[32];    // BIOS厂商
+    uint8_t  cpu_cores;      // 核心数
+};
+// 获取完整硬件信息（CPUID/系统探测）
+bool platform_hw_info(HwInfo* out);
+
+// ===================== UEFI/BIOS配置 =====================
+struct UefiConfig {
+    char username[32];       // UEFI设置的用户名
+    char password_hash[64];  // 登录密码哈希（SHA256）
+    uint8_t  boot_timeout;   // 开机等待时间（秒）
+    bool     boot_splash;    // 是否显示开机启动页
+    char wallpaper_boot[32]; // 开机壁纸
+    char wallpaper_lock[32]; // 锁屏壁纸
+};
+// 读取/写入UEFI配置（存在CMOS/RTC掉电存储区或VFS）
+bool platform_uefi_load(UefiConfig* out);
+bool platform_uefi_save(const UefiConfig* cfg);
 
 // ===================== networking (real adapter info) =====================
 // bare: e1000 static config (10.0.2.15/24, gw 10.0.2.2) once net_init ran;
@@ -104,8 +131,13 @@ void* platform_thread_create(void (*func)(void*), void* arg);
 void  platform_thread_sleep(uint32_t ms);
 
 // ===================== audio (host) =====================
+// Real playback. play_wav_mem accepts an in-memory RIFF/WAVE (PCM).
+// play_wav resolves a VFS path (implemented in core/nefuos.cpp).
+// audio_available reports whether a sound card was probed successfully.
+bool platform_audio_available();
 bool platform_play_wav(const char* path);
 bool platform_play_wav_mem(const uint8_t* data, uint32_t size);
+bool platform_play_wav_path(const char* path);   // core helper: VFS load + play_wav_mem
 void platform_stop_sound();
 
 // ===================== disk / block devices =====================

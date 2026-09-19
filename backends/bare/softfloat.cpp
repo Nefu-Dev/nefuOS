@@ -148,4 +148,25 @@ float __floatunsisf(u32 v) {
 float __negsf2(float a) { return sf_from(sf_bits(a) ^ 0x80000000u); }
 float __fabsf(float a)  { return sf_from(sf_bits(a) & 0x7FFFFFFFu); }
 
+// ---- comparison helpers (pure integer, no FP instructions) ----
+// Return conventions (libgcc): eq/ne -> 0 if equal else nonzero;
+// lt/le/gt/ge -> negative / zero / positive.
+static int sf_cmp(float a, float b) {
+    u32 x = sf_bits(a);
+    u32 y = sf_bits(b);
+    if (x == y) return 0;
+    int xn = (x >> 31) & 1;
+    int yn = (y >> 31) & 1;
+    if (xn != yn) return xn ? -1 : 1;         // negative < positive
+    if (xn) return x > y ? -1 : (x < y ? 1 : 0); // IEEE bits reverse for negatives
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+int __eqsf2(float a, float b) { return sf_cmp(a, b) == 0 ? 0 : 1; }
+int __nesf2(float a, float b) { return sf_cmp(a, b) == 0 ? 0 : 1; }
+int __ltsf2(float a, float b) { return sf_cmp(a, b); }
+int __lesf2(float a, float b) { int c = sf_cmp(a, b); return c > 0 ? 1 : 0; }
+int __gtsf2(float a, float b) { return sf_cmp(a, b); }
+int __gesf2(float a, float b) { int c = sf_cmp(a, b); return c < 0 ? -1 : 0; }
+
 } // extern "C"

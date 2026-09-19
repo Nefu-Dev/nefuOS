@@ -76,6 +76,9 @@ const char* app_name(int id) {
     case APP_BROWSER: return T("浏览器", "Browser");
     case APP_NETCFG: return T("网络", "Network");
     case APP_NEFUD: return T("应用启动器", "App Launcher");
+    case APP_FONTVIEW: return "Font Viewer";
+    case APP_LVGLDEMO: return "LVGL Demo";
+    case APP_LVGLDESKTOP: return "LVGL Desktop";
     default: return "?";
     }
 }
@@ -102,6 +105,9 @@ int nefud_name_to_app_id(const char* name) {
     if (strcmp(name, "About nefuOS") == 0) return APP_ABOUT;
     if (strcmp(name, "Wiki") == 0) return APP_WIKI;
     if (strcmp(name, "App Launcher") == 0) return APP_NEFUD;
+    if (strcmp(name, "Font Viewer") == 0) return APP_FONTVIEW;
+    if (strcmp(name, "LVGL Demo") == 0) return APP_LVGLDEMO;
+    if (strcmp(name, "LVGL Desktop") == 0) return APP_LVGLDESKTOP;
     return -1;
 }
 
@@ -111,7 +117,8 @@ static bool s_installed[APP_COUNT];
 // store apps that ship pre-installed (like a real OS ships its apps)
 static const int PREINSTALLED[] = {
     APP_SNAKE, APP_PAINT, APP_CLOCK, APP_NOTEPAD, APP_MINER,
-    APP_IMAGEVIEWER, APP_MUSIC, APP_MONITOR, APP_BROWSER, APP_NETCFG, APP_NEFUD
+    APP_IMAGEVIEWER, APP_MUSIC, APP_MONITOR, APP_BROWSER, APP_NETCFG, APP_NEFUD,
+    APP_FONTVIEW, APP_LVGLDEMO, APP_LVGLDESKTOP
 };
 
 void apps_preinstall_defaults() {
@@ -192,6 +199,18 @@ void app_show_not_installed(const char* name) {
 }
 
 // ---------- boot ----------
+void app_launch(const char* name) {
+    if (!name) return;
+    int id = nefud_name_to_app_id(name);
+    if (id < 0) {
+        for (int i = 0; i < APP_COUNT; i++) {
+            const char* n = app_name(i);
+            if (n && strcmp(n, name) == 0) { id = i; break; }
+        }
+    }
+    if (id >= 0) app_launch(id);
+}
+
 void app_launch(int id) {
     klogf("app_launch(%d) name=%s\n", id, app_name(id));
     switch (id) {
@@ -261,6 +280,15 @@ void app_launch(int id) {
         break;
     case APP_NEFUD:
         if (app_installed(APP_NEFUD)) nefud_launch(); else app_show_not_installed("App Launcher");
+        break;
+    case APP_FONTVIEW:
+        if (app_installed(APP_FONTVIEW)) fontview_launch(); else app_show_not_installed("Font Viewer");
+        break;
+    case APP_LVGLDEMO:
+        if (app_installed(APP_LVGLDEMO)) lvgl_demo_launch(); else app_show_not_installed("LVGL Demo");
+        break;
+    case APP_LVGLDESKTOP:
+        if (app_installed(APP_LVGLDESKTOP)) lvgl_desktop_launch(); else app_show_not_installed("LVGL Desktop");
         break;
     default: break;
     }

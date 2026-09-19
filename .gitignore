@@ -1,19 +1,6 @@
 # Build artifacts
 build/
-dist/*.exe
-dist/nefuos.fs
-dist/nefuOS.iso
-dist/nefuOS_v2.iso
-dist/bug.txt
-dist/crash.txt
-dist/dbg_*.txt
-dist/err.txt
-dist/out.txt
-dist/diag_out.txt
-dist/host_screen.png
-dist/user_crop.png
-dist/win_capture.png
-dist/shots/
+dist/
 iso/
 
 # Kernels / binaries / objects
@@ -41,6 +28,14 @@ build_err.txt
 qemu_install.log
 *.pyc
 __pycache__/
+*.log
+build_baseline.log
+build_esp.log
+debug.log
+serial.log
+nefu_link.log
+nefu_build.log
+probe_write.txt
 
 # IDE / OS
 .vscode/
@@ -48,4 +43,9 @@ __pycache__/
 Thumbs.db
 
 dist/*.iso
+
+# Toolchain distributions (never upload)
+tools/qemu/
+tools/qemu-*
+tools/grub*/
 

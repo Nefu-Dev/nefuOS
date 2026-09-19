@@ -1,27 +1,27 @@
-// nefuOS Image Viewer
-// Decodes BMP/PPM on every backend; on the Win32 host it also asks the
-// platform decoder (GDI+) for JPEG/PNG/GIF so real-world images open too.
+// nefuOS Image Viewer - LVGL GUI
+// Decodes BMP/PPM natively; on the Win32 host the platform decoder (GDI+)
+// plus stb_image handle JPEG/PNG/GIF so real-world images open too.
 #include "apps.h"
 #include "jpeg.h"
+#include "../gui/lvgl_win.h"
+#include "../gui/desktop.h"
 #include "../gui/gfx.h"
-#include "../gui/widgets.h"
 #include "../platform.h"
 
 namespace nefu {
 
 struct ImageViewState {
-    List<FSNode*> files;      // image files found under the Pictures dir
-    int index;                // current file index
-    int zoom;                 // 0 = fit window, 100 = 100%, otherwise percent
-    Surface src;              // decoded 32bpp surface
-    Surface scaled;           // cached scaled surface
-    bool dirty;               // needs scale recompute
+    List<FSNode*> files;
+    int index;
+    int zoom;
+    Surface src;
+    Surface scaled;
+    bool dirty;
     bool src_ok;
-    int scroll_y;             // vertical scroll while zoomed in
-    Window* win;
-    Button btns[8];
-    Button* cur;
-    uint8_t last_buttons;
+    LvglWin* lw;
+    lv_obj_t* canvas;
+    uint8_t* buf;
+    int w, h;
 };
 
 static const char* PIC_DIR = "/home/user/Pictures";
@@ -38,7 +38,6 @@ static bool is_image_ext3(const char* n, int len) {
            strcmp(n + len - 3, "png") == 0 || strcmp(n + len - 3, "gif") == 0;
 }
 
-// ---------- PPM (P6) decoder ----------
 static bool ppm_decode(const uint8_t* data, uint32_t size, Surface& out) {
     uint32_t i = 0;
     if (size < 4 || data[0] != 'P' || data[1] != '6') return false;
@@ -60,9 +59,7 @@ static bool ppm_decode(const uint8_t* data, uint32_t size, Surface& out) {
     if (i + (uint32_t)w * (uint32_t)h * 3 > size) return false;
     out.addr = (uint8_t*)kalloc((size_t)w * (size_t)h * 4);
     if (!out.addr) return false;
-    out.width = w;
-    out.height = h;
-    out.pitch = w * 4;
+    out.width = w; out.height = h; out.pitch = w * 4;
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
             uint32_t c = ((uint32_t)data[i] << 16) | ((uint32_t)data[i + 1] << 8) | data[i + 2];
@@ -73,7 +70,6 @@ static bool ppm_decode(const uint8_t* data, uint32_t size, Surface& out) {
     return true;
 }
 
-// ---------- BMP decoder (24/32bpp, BI_RGB, no float) ----------
 static bool bmp_decode(const uint8_t* data, uint32_t size, Surface& out) {
     if (size < 54 || data[0] != 'B' || data[1] != 'M') return false;
     uint32_t off = (uint32_t)data[10] | ((uint32_t)data[11] << 8) |
@@ -85,15 +81,13 @@ static bool bmp_decode(const uint8_t* data, uint32_t size, Surface& out) {
                     ((uint32_t)data[32] << 16) | ((uint32_t)data[33] << 24);
     if (w <= 0 || h == 0 || w > 2048 || h > 2048 || h < -2048) return false;
     if (bpp != 24 && bpp != 32) return false;
-    if (comp != 0) return false;                 // BI_RGB only
+    if (comp != 0) return false;
     bool bottom_up = h > 0;
     int ah = h < 0 ? -h : h;
     if (off + (uint32_t)w * (uint32_t)ah * 4 > size) return false;
     out.addr = (uint8_t*)kalloc((size_t)w * (size_t)ah * 4);
     if (!out.addr) return false;
-    out.width = w;
-    out.height = ah;
-    out.pitch = w * 4;
+    out.width = w; out.height = ah; out.pitch = w * 4;
     uint32_t rowbytes = ((uint32_t)w * bpp / 8 + 3u) & ~3u;
     for (int y = 0; y < ah; y++) {
         int sy = bottom_up ? (ah - 1 - y) : y;
@@ -112,14 +106,12 @@ static bool bmp_decode(const uint8_t* data, uint32_t size, Surface& out) {
     return true;
 }
 
-// ---------- scaling (nearest neighbor into scaled) ----------
 static void image_recalc_scale(ImageViewState* st, int avail_w, int avail_h) {
     if (st->scaled.addr) { kfree(st->scaled.addr); st->scaled.addr = 0; }
     if (!st->src_ok) return;
     int iw = st->src.width, ih = st->src.height;
     int dw = iw, dh = ih;
     if (st->zoom <= 0) {
-        // fit window, keep aspect (integer fixed point, 1/1024 precision)
         if (iw > avail_w || ih > avail_h) {
             int rw = avail_w * 1024 / iw;
             int rh = avail_h * 1024 / ih;
@@ -138,9 +130,7 @@ static void image_recalc_scale(ImageViewState* st, int avail_w, int avail_h) {
     }
     st->scaled.addr = (uint8_t*)kalloc((size_t)dw * (size_t)dh * 4);
     if (!st->scaled.addr) return;
-    st->scaled.width = dw;
-    st->scaled.height = dh;
-    st->scaled.pitch = dw * 4;
+    st->scaled.width = dw; st->scaled.height = dh; st->scaled.pitch = dw * 4;
     for (int y = 0; y < dh; y++) {
         int sy = (y * ih) / dh;
         const uint32_t* srow = (const uint32_t*)(st->src.addr + (size_t)sy * st->src.pitch);
@@ -153,7 +143,6 @@ static void image_recalc_scale(ImageViewState* st, int avail_w, int avail_h) {
     st->dirty = false;
 }
 
-// stb_image decode hook (JPG/PNG/GIF/TGA/BMP from memory, RGBA8 out)
 bool stbi_decode_mem(const uint8_t* data, int len, int* w, int* h, uint8_t** out);
 static bool stbi_decode(const uint8_t* data, uint32_t size, Surface& out) {
     int w = 0, h = 0;
@@ -171,8 +160,6 @@ static void image_load_current(ImageViewState* st) {
     if (st->index < 0 || st->index >= st->files.size()) return;
     FSNode* f = st->files[st->index];
     if (!f || f->is_dir || f->size == 0) return;
-    // platform decoder first (host: GDI+ for jpg/png/gif), then stb_image
-    // (JPG/PNG/GIF/TGA/... on both backends), then built-in PPM/BMP/JPEG
     if (!platform_decode_image(f->data, f->size, st->src))
         if (!stbi_decode(f->data, f->size, st->src))
             if (!ppm_decode(f->data, f->size, st->src))
@@ -180,7 +167,6 @@ static void image_load_current(ImageViewState* st) {
                     jpeg_decode(f->data, f->size, st->src);
     st->src_ok = st->src.addr != 0;
     st->dirty = true;
-    st->scroll_y = 0;
 }
 
 static void image_scan_dir(ImageViewState* st) {
@@ -199,7 +185,6 @@ static void image_scan_dir(ImageViewState* st) {
     st->index = 0;
 }
 
-// ---------- built-in gallery (procedurally generated PPM) ----------
 static void vfs_put_ppm(const char* path, int w, int h, uint32_t (*f)(int x, int y, int w, int h)) {
     char head[64];
     int hn = ksprintf(head, sizeof(head), "P6\n%d %d\n255\n", w, h);
@@ -276,12 +261,6 @@ static uint32_t gen_hills(int x, int y, int w, int h) {
     return c;
 }
 
-static void put_ppm_path(const char* name, int w, int h, uint32_t (*f)(int, int, int, int)) {
-    char path[96];
-    ksprintf(path, sizeof(path), "%s/%s", PIC_DIR, name);
-    vfs_put_ppm(path, w, h, f);
-}
-
 static void ensure_gallery() {
     FSNode* d = g_vfs->resolve(PIC_DIR);
     bool has = false;
@@ -292,80 +271,46 @@ static void ensure_gallery() {
     }
     if (has) return;
     g_vfs->mkdir(PIC_DIR);
-    put_ppm_path("gradient.ppm", 400, 300, gen_gradient);
-    put_ppm_path("stars.ppm", 400, 300, gen_stars);
-    put_ppm_path("waves.ppm", 400, 300, gen_waves);
-    put_ppm_path("checker.ppm", 400, 300, gen_checker);
-    put_ppm_path("rings.ppm", 400, 300, gen_rings);
-    put_ppm_path("hills.ppm", 400, 300, gen_hills);
+    auto put = [](const char* name, int w, int h, uint32_t (*f)(int, int, int, int)) {
+        char path[96];
+        ksprintf(path, sizeof(path), "%s/%s", PIC_DIR, name);
+        vfs_put_ppm(path, w, h, f);
+    };
+    put("gradient.ppm", 400, 300, gen_gradient);
+    put("stars.ppm", 400, 300, gen_stars);
+    put("waves.ppm", 400, 300, gen_waves);
+    put("checker.ppm", 400, 300, gen_checker);
+    put("rings.ppm", 400, 300, gen_rings);
+    put("hills.ppm", 400, 300, gen_hills);
 }
 
-// ---------- interaction ----------
-static void img_click(void* ud) {
-    ImageViewState* st = (ImageViewState*)ud;
-    if (!st->cur) return;
-    const char* lab = st->cur->label;
-    if (strcmp(lab, "<") == 0) {
-        if (st->files.size() > 0) {
-            st->index = (st->index - 1 + st->files.size()) % st->files.size();
-            image_load_current(st);
-        }
-    } else if (strcmp(lab, ">") == 0) {
-        if (st->files.size() > 0) {
-            st->index = (st->index + 1) % st->files.size();
-            image_load_current(st);
-        }
-    } else if (strcmp(lab, "-") == 0) {
-        if (st->zoom == 0) st->zoom = 100; else st->zoom -= 25;
-        if (st->zoom < 25) st->zoom = 25;
-        st->dirty = true;
-    } else if (strcmp(lab, "+") == 0) {
-        if (st->zoom == 0) st->zoom = 100; else st->zoom += 25;
-        if (st->zoom > 400) st->zoom = 400;
-        st->dirty = true;
-    } else if (strcmp(lab, "100%") == 0) {
-        st->zoom = 100;
-        st->dirty = true;
-    } else if (strcmp(lab, "Fit") == 0) {
-        st->zoom = 0;
-        st->dirty = true;
-    }
-}
-
-static void img_paint(Window* w) {
-    ImageViewState* st = (ImageViewState*)w->userdata;
-    Surface& s = w->back;
+static void img_lv_draw(ImageViewState* st) {
+    if (!st->canvas || !st->buf) return;
+    int W = st->w, H = st->h;
+    Surface s;
+    s.addr = st->buf;
+    s.width = W; s.height = H; s.pitch = W * 4;
     s.fill(color::CREAM);
-    int W = s.width, H = s.height;
-    // toolbar
     gfx::fillrect(s, 0, 0, W, 30, 0x00E7E6E1);
     gfx::hline(s, 0, W - 1, 30, color::BORDER);
-    for (int i = 0; i < 8; i++) ui::draw_button(s, st->btns[i]);
-    // file name
     const char* name = "";
     if (st->index >= 0 && st->index < st->files.size()) name = st->files[st->index]->name.c_str();
     char info[96];
     ksprintf(info, sizeof(info), "%d/%d  %s", st->files.size() > 0 ? st->index + 1 : 0,
              st->files.size(), name);
     gfx::text(s, W - gfx::text_width(info) - 10, 7, info, color::TEXT2, 0x00E7E6E1);
-    // image area
     int avail_w = W - 16, avail_h = H - 30 - 24;
     if (st->dirty) image_recalc_scale(st, avail_w, avail_h);
     if (st->src_ok && st->scaled.addr) {
         int dx = 8 + (avail_w - st->scaled.width) / 2;
         int dy = 38 + (avail_h - st->scaled.height) / 2;
         if (dx < 8) dx = 8;
-        if (st->zoom > 0 && st->scaled.height > avail_h) {
-            dy = 38 - st->scroll_y;   // vertical scroll while zoomed
-        } else if (dy < 38) {
-            dy = 38;
-        }
+        if (dy < 38) dy = 38;
         gfx::blit_clip(s, st->scaled, dx, dy, 0, 0, avail_w, avail_h);
         gfx::rect(s, dx - 1, 37, avail_w + 2, avail_h + 2, color::BORDER);
     } else {
         gfx::text(s, W / 2 - 60, H / 2 - 8, "No image to display", color::TEXT2, color::CREAM);
     }
-    // status bar
     gfx::fillrect(s, 0, H - 24, W, 24, 0x00E7E6E1);
     gfx::hline(s, 0, W - 1, H - 24, color::BORDER);
     if (st->src_ok) {
@@ -374,57 +319,78 @@ static void img_paint(Window* w) {
         gfx::text(s, 8, H - 18, info, color::TEXT2, 0x00E7E6E1);
     }
     gfx::text(s, W / 2, H - 18, "Open from File Manager (double-click an image)", color::TEXT2, 0x00E7E6E1);
+    lv_obj_invalidate(st->canvas);
 }
 
-static void img_mouse(Window* w, int mx, int my, uint8_t buttons) {
-    ImageViewState* st = (ImageViewState*)w->userdata;
-    bool pressed = buttons && !st->last_buttons;
-    bool released = !buttons && st->last_buttons;
-    st->last_buttons = buttons;
-    for (int i = 0; i < 8; i++) {
-        st->cur = &st->btns[i];
-        ui::button_event(st->btns[i], mx, my, buttons, pressed, released);
+static void img_lv_btn(lv_event_t* e) {
+    ImageViewState* st = (ImageViewState*)lv_event_get_user_data(e);
+    if (!st) return;
+    int action = (int)(intptr_t)lv_event_get_user_data(e);
+    if (action == 0 && st->files.size() > 0) {
+        st->index = (st->index - 1 + st->files.size()) % st->files.size();
+        image_load_current(st);
+    } else if (action == 1 && st->files.size() > 0) {
+        st->index = (st->index + 1) % st->files.size();
+        image_load_current(st);
+    } else if (action == 2) {
+        if (st->zoom == 0) st->zoom = 100; else st->zoom -= 25;
+        if (st->zoom < 25) st->zoom = 25;
+        st->dirty = true;
+    } else if (action == 3) {
+        st->zoom = 100;
+        st->dirty = true;
+    } else if (action == 4) {
+        if (st->zoom == 0) st->zoom = 100; else st->zoom += 25;
+        if (st->zoom > 400) st->zoom = 400;
+        st->dirty = true;
+    } else if (action == 5) {
+        st->zoom = 0;
+        st->dirty = true;
     }
-    st->cur = 0;
-}
-
-static void img_scroll(Window* w, int delta) {
-    ImageViewState* st = (ImageViewState*)w->userdata;
-    if (st->zoom > 0 && st->scaled.addr) {
-        st->scroll_y += delta > 0 ? -20 : 20;
-        int maxy = st->scaled.height - (w->content_h - 54);
-        if (st->scroll_y < 0) st->scroll_y = 0;
-        if (st->scroll_y > maxy) st->scroll_y = maxy > 0 ? maxy : 0;
-    }
-}
-
-static void img_close(Window* w) {
-    ImageViewState* st = (ImageViewState*)w->userdata;
-    if (st) {
-        if (st->src.addr) kfree(st->src.addr);
-        if (st->scaled.addr) kfree(st->scaled.addr);
-        delete st;
-        w->userdata = 0;
-    }
+    img_lv_draw(st);
 }
 
 static void imageviewer_open(FSNode* target) {
     ensure_gallery();
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Image Viewer", x, y, 620, 460);
-    if (!w) return;
+    LvglWin* lw = lvgl_win_create("Image Viewer", x, y, 620, 460);
+    if (!lw) return;
     ImageViewState* st = new ImageViewState();
-    st->win = w;
+    st->lw = lw;
     st->index = 0;
     st->zoom = 0;
     st->dirty = true;
     st->src_ok = false;
-    st->scroll_y = 0;
-    st->cur = 0;
-    st->last_buttons = 0;
     st->src.addr = 0;
     st->scaled.addr = 0;
+    st->w = 604;
+    st->h = 404;
+    lw->userdata = st;
+
+    const char* labels[6] = { "<", ">", "-", "100%", "+", "Fit" };
+    for (int i = 0; i < 6; i++) {
+        lv_obj_t* b = lv_button_create(lw->content);
+        lv_obj_set_pos(b, 8 + i * 48, 6);
+        lv_obj_set_size(b, 40, 22);
+        lv_obj_set_style_radius(b, 4, 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(0x9AA5B1), 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(0x7A8591), LV_STATE_PRESSED);
+        lv_obj_add_event_cb(b, img_lv_btn, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+        lv_obj_t* lbl = lv_label_create(b);
+        lv_label_set_text(lbl, labels[i]);
+        lv_obj_center(lbl);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+    }
+
+    st->canvas = lv_canvas_create(lw->content);
+    lv_obj_set_pos(st->canvas, 8, 34);
+    lv_obj_set_size(st->canvas, st->w, st->h);
+    int bufsz = lv_canvas_buf_size(st->w, st->h, 32, 4);
+    st->buf = new uint8_t[bufsz];
+    memset(st->buf, 0xFF, (size_t)bufsz);
+    lv_canvas_set_buffer(st->canvas, st->buf, st->w, st->h, LV_COLOR_FORMAT_ARGB8888);
+
     image_scan_dir(st);
     if (target) {
         for (int i = 0; i < st->files.size(); i++) {
@@ -432,27 +398,7 @@ static void imageviewer_open(FSNode* target) {
         }
     }
     image_load_current(st);
-    // buttons: Prev / Next / Zoom- / 100% / Zoom+ / Fit
-    const char* labels[8] = { "<", ">", "-", "100%", "+", "Fit", 0, 0 };
-    int bx = 8;
-    for (int i = 0; i < 6; i++) {
-        Button& b = st->btns[i];
-        b.x = bx;
-        b.y = 4;
-        b.w = 34;
-        b.h = 22;
-        b.label = labels[i];
-        b.id = i;
-        b.pressed = false;
-        b.on_click = img_click;
-        b.ud = st;
-        bx += 40;
-    }
-    w->userdata = st;
-    w->on_paint = img_paint;
-    w->on_mouse = img_mouse;
-    w->on_scroll = img_scroll;
-    w->on_close = img_close;
+    img_lv_draw(st);
 }
 
 void imageviewer_launch() { imageviewer_open(0); }

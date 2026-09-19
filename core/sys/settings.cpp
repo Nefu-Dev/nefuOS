@@ -1,4 +1,4 @@
-// nefuOS
+// nefuOS system settings persistence and load/save logic
 #include "settings.h"
 #include "../klib/klib.h"
 #include "../platform.h"
@@ -24,7 +24,7 @@ void wallpaper_colors(int idx, uint32_t* top, uint32_t* bottom, uint32_t* base) 
     case 2: // dark
         *top = 0x00141A24; *bottom = 0x0030475E; *base = 0x00223035;
         break;
-    default: // ：blue →
+    default: // classic blue gradient
         *top = 0x00345C86; *bottom = 0x0088B7D8; *base = 0x00F2EFE8;
         break;
     }
@@ -48,9 +48,15 @@ void settings_load() {
     // booleans (show_clock / show_taskbar) are true instead of false.
     g_settings.accent = 0;
     g_settings.wallpaper = 0;
+    g_settings.wallpaper_lock = 0;
+    g_settings.wallpaper_boot = 0;
     g_settings.show_clock = true;
     g_settings.show_taskbar = true;
     g_settings.lang = 0;
+    g_settings.lock_on_suspend = true;
+    g_settings.boot_splash = true;
+    g_settings.idle_lock_sec = 0;
+    g_settings.autostart_apps[0] = 0;
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f || f->is_dir || f->size == 0) return;
     char* buf = (char*)kalloc((size_t)f->size + 1);
@@ -64,22 +70,36 @@ void settings_load() {
             int v = 0;
             if (parse_int("accent", line, &v)) g_settings.accent = v;
             else if (parse_int("wallpaper", line, &v)) g_settings.wallpaper = v;
+            else if (parse_int("wall_lock", line, &v)) g_settings.wallpaper_lock = v;
+            else if (parse_int("wall_boot", line, &v)) g_settings.wallpaper_boot = v;
             else if (parse_int("clock", line, &v)) g_settings.show_clock = (v != 0);
             else if (parse_int("taskbar", line, &v)) g_settings.show_taskbar = (v != 0);
+            else if (parse_int("lang", line, &v)) g_settings.lang = v;
+            else if (parse_int("lock_suspend", line, &v)) g_settings.lock_on_suspend = (v != 0);
+            else if (parse_int("boot_splash", line, &v)) g_settings.boot_splash = (v != 0);
+            else if (parse_int("idle_lock", line, &v)) g_settings.idle_lock_sec = v;
+            else if (strncmp(line, "autostart=", 10) == 0) {
+                strncpy(g_settings.autostart_apps, line + 10, sizeof(g_settings.autostart_apps)-1);
+                g_settings.autostart_apps[sizeof(g_settings.autostart_apps)-1] = 0;
+            }
             line = buf + i + 1;
         }
     }
     if (g_settings.accent < 0 || g_settings.accent > 3) g_settings.accent = 0;
-    if (g_settings.wallpaper < 0 || g_settings.wallpaper > 2) g_settings.wallpaper = 0;
+    if (g_settings.wallpaper < 0 || g_settings.wallpaper > 3) g_settings.wallpaper = 0;
+    if (g_settings.wallpaper_lock < 0 || g_settings.wallpaper_lock > 3) g_settings.wallpaper_lock = 0;
+    if (g_settings.wallpaper_boot < 0 || g_settings.wallpaper_boot > 3) g_settings.wallpaper_boot = 0;
     kfree(buf);
 }
 
 void settings_save() {
-    char buf[160];
+    char buf[512];
     int n = ksprintf(buf, sizeof(buf),
-        "accent=%d\nwallpaper=%d\nclock=%d\ntaskbar=%d\n",
-        g_settings.accent, g_settings.wallpaper,
-        g_settings.show_clock ? 1 : 0, g_settings.show_taskbar ? 1 : 0);
+        "accent=%d\nwallpaper=%d\nwall_lock=%d\nwall_boot=%d\nclock=%d\ntaskbar=%d\nlang=%d\nlock_suspend=%d\nboot_splash=%d\nidle_lock=%d\nautostart=%s\n",
+        g_settings.accent, g_settings.wallpaper, g_settings.wallpaper_lock, g_settings.wallpaper_boot,
+        g_settings.show_clock ? 1 : 0, g_settings.show_taskbar ? 1 : 0, g_settings.lang,
+        g_settings.lock_on_suspend ? 1 : 0, g_settings.boot_splash ? 1 : 0,
+        g_settings.idle_lock_sec, g_settings.autostart_apps);
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f) {
         g_vfs->mkdir("/etc");

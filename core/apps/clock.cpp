@@ -1,11 +1,12 @@
-﻿// nefuOS ā〃?+ libm?
+// nefuOS analog clock - LVGL GUI (canvas-based, integer math only)
 #include "apps.h"
+#include "../gui/lvgl_win.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
 
 namespace nefu {
 
-// 360 ︽﹁〃 *1024
+// sine table: sin(deg)*1024
 static const int16_t SINTAB[360] = {0,18,36,54,71,89,107,125,143,160,178,195,213,230,248,265,282,299,316,333,350,367,384,400,416,433,449,465,481,496,512,527,543,558,573,587,602,616,630,644,658,672,685,698,711,724,737,749,761,773,784,796,807,818,828,839,849,859,868,878,887,896,904,912,920,928,935,943,949,956,962,968,974,979,984,989,994,998,1002,1005,1008,1011,1014,1016,1018,1020,1022,1023,1023,1024,1024,1024,1023,1023,1022,1020,1018,1016,1014,1011,1008,1005,1002,998,994,989,984,979,974,968,962,956,949,943,935,928,920,912,904,896,887,878,868,859,849,839,828,818,807,796,784,773,761,749,737,724,711,698,685,672,658,644,630,616,602,587,573,558,543,527,512,496,481,465,449,433,416,400,384,367,350,333,316,299,282,265,248,230,213,195,178,160,143,125,107,89,71,54,36,18,0,-18,-36,-54,-71,-89,-107,-125,-143,-160,-178,-195,-213,-230,-248,-265,-282,-299,-316,-333,-350,-367,-384,-400,-416,-433,-449,-465,-481,-496,-512,-527,-543,-558,-573,-587,-602,-616,-630,-644,-658,-672,-685,-698,-711,-724,-737,-749,-761,-773,-784,-796,-807,-818,-828,-839,-849,-859,-868,-878,-887,-896,-904,-912,-920,-928,-935,-943,-949,-956,-962,-968,-974,-979,-984,-989,-994,-998,-1002,-1005,-1008,-1011,-1014,-1016,-1018,-1020,-1022,-1023,-1023,-1024,-1024,-1024,-1023,-1023,-1022,-1020,-1018,-1016,-1014,-1011,-1008,-1005,-1002,-998,-994,-989,-984,-979,-974,-968,-962,-956,-949,-943,-935,-928,-920,-912,-904,-896,-887,-878,-868,-859,-849,-839,-828,-818,-807,-796,-784,-773,-761,-749,-737,-724,-711,-698,-685,-672,-658,-644,-630,-616,-602,-587,-573,-558,-543,-527,-512,-496,-481,-465,-449,-433,-416,-400,-384,-367,-350,-333,-316,-299,-282,-265,-248,-230,-213,-195,-178,-160,-143,-125,-107,-89,-71,-54,-36,-18};
 
 static int s_sin(int deg) {
@@ -14,25 +15,39 @@ static int s_sin(int deg) {
     return SINTAB[deg];
 }
 
-static void clock_paint(Window* w) {
-    (void)w;
-    Surface& s = w->back;
-    s.fill(color::WHITE);
+struct ClockLvState {
+    LvglWin* lw;
+    lv_obj_t* canvas;
+    uint8_t* buf;
+};
+
+static ClockLvState* s_clock_st = 0;
+
+static void clock_lv_draw(lv_timer_t* t) {
+    (void)t;
+    ClockLvState* st = s_clock_st;
+    if (!st || !st->canvas || !st->buf) return;
+    lv_obj_t* cnv = st->canvas;
+    int w = lv_obj_get_width(cnv), h = lv_obj_get_height(cnv);
+    Surface cs;
+    cs.addr = st->buf;
+    cs.width = w;
+    cs.height = h;
+    cs.pitch = w * 4;
+    cs.fill(color::WHITE);
 
     uint32_t sec = platform_seconds_of_day();
     int hh = (sec / 3600) % 24, mm = (sec / 60) % 60, ss = sec % 60;
 
-
     char buf[32];
     ksprintf(buf, sizeof(buf), "%02d:%02d:%02d", hh, mm, ss);
     int tw = gfx::text_width(buf);
-    gfx::text(s, (s.width - tw) / 2, 12, buf, color::TEXT, color::WHITE);
+    gfx::text(cs, (w - tw) / 2, 10, buf, color::TEXT, color::WHITE);
 
-    // ㄧ
-    int cx = s.width / 2, cy = 140, R = 88;
-    gfx::fillcircle(s, cx, cy, R, 0x00F2F2F2);
-    gfx::circle(s, cx, cy, R, color::BORDER);
-    gfx::circle(s, cx, cy, R - 8, 0x00D8D7D1);
+    int cx = w / 2, cy = 138, R = 84;
+    gfx::fillcircle(cs, cx, cy, R, 0x00F2F2F2);
+    gfx::circle(cs, cx, cy, R, color::BORDER);
+    gfx::circle(cs, cx, cy, R - 8, 0x00D8D7D1);
 
     for (int i = 0; i < 12; i++) {
         int a = i * 30;
@@ -41,36 +56,40 @@ static void clock_paint(Window* w) {
         int ya = cy - (s_sin((a + 90) % 360) * r1) / 1024;
         int xb = cx + (s_sin(a) * (R - 2)) / 1024;
         int yb = cy - (s_sin((a + 90) % 360) * (R - 2)) / 1024;
-        gfx::line(s, xa, ya, xb, yb, (i % 3 == 0) ? color::TEXT : 0x00B5B4AE);
+        gfx::line(cs, xa, ya, xb, yb, (i % 3 == 0) ? color::TEXT : 0x00B5B4AE);
     }
 
-    int ah = ((hh % 12) * 3600 + mm * 60 + ss) / 120; // 12h = 43200s -> 360deg
-    gfx::line(s, cx, cy, cx + (s_sin(ah) * 48) / 1024, cy - (s_sin((ah + 90) % 360) * 48) / 1024, color::TEXT);
-
-    int am = (mm * 60 + ss) / 10; // 60min = 3600s -> 360deg
-    gfx::line(s, cx, cy, cx + (s_sin(am) * 68) / 1024, cy - (s_sin((am + 90) % 360) * 68) / 1024, 0x003E87B5);
-
+    int ah = ((hh % 12) * 3600 + mm * 60 + ss) / 120;
+    gfx::line(cs, cx, cy, cx + (s_sin(ah) * 48) / 1024, cy - (s_sin((ah + 90) % 360) * 48) / 1024, color::TEXT);
+    int am = (mm * 60 + ss) / 10;
+    gfx::line(cs, cx, cy, cx + (s_sin(am) * 68) / 1024, cy - (s_sin((am + 90) % 360) * 68) / 1024, 0x003E87B5);
     int as = ss * 6;
-    gfx::line(s, cx, cy, cx + (s_sin(as) * 80) / 1024, cy - (s_sin((as + 90) % 360) * 80) / 1024, color::RED);
-    gfx::fillcircle(s, cx, cy, 4, color::RED);
-    gfx::fillcircle(s, cx, cy, 2, color::WHITE);
+    gfx::line(cs, cx, cy, cx + (s_sin(as) * 80) / 1024, cy - (s_sin((as + 90) % 360) * 80) / 1024, color::RED);
+    gfx::fillcircle(cs, cx, cy, 4, color::RED);
+    gfx::fillcircle(cs, cx, cy, 2, color::WHITE);
 
-    gfx::text(s, (s.width - 120) / 2, cy + R + 18, "nefuOS Clock", color::TEXT2, color::WHITE);
-}
+    gfx::text(cs, (w - 120) / 2, cy + R + 16, "nefuOS Clock", color::TEXT2, color::WHITE);
 
-static void clock_close(Window* w) {
-    (void)w;
+    lv_obj_invalidate(cnv);
 }
 
 void clock_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Clock", x, y, 260, 300);
-    if (!w) return;
-    w->userdata = 0;
-    w->on_paint = clock_paint;
-    w->on_close = clock_close;
+    LvglWin* lw = lvgl_win_create("Clock", x, y, 260, 308);
+    if (!lw) return;
+    ClockLvState* st = new ClockLvState();
+    st->lw = lw;
+    st->canvas = lv_canvas_create(lw->content);
+    lv_obj_set_pos(st->canvas, 0, 0);
+    lv_obj_set_size(st->canvas, 260, 282);
+    int bufsz = lv_canvas_buf_size(260, 282, 32, 4);
+    st->buf = new uint8_t[bufsz];
+    memset(st->buf, 0xFF, (size_t)bufsz);
+    lv_canvas_set_buffer(st->canvas, st->buf, 260, 282, LV_COLOR_FORMAT_ARGB8888);
+    s_clock_st = st;
+    lv_timer_t* tm = lv_timer_create(clock_lv_draw, 1000, st);
+    lw->userdata = st;
+    clock_lv_draw(tm);   // first frame
 }
-
 } // namespace nefu
-

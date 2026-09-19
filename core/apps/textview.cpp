@@ -1,53 +1,15 @@
-// nefuOS text viewer
+// nefuOS text viewer - LVGL GUI
 #include "apps.h"
-#include "../gui/gfx.h"
-#include "../platform.h"
+#include "../gui/lvgl_win.h"
 
 namespace nefu {
 
-struct TVState {
+struct TVLvState {
+    LvglWin* lw;
+    lv_obj_t* body;    // scrollable container
+    lv_obj_t* label;
     FSNode* file;
-    int scroll;
 };
-
-static void tv_paint(Window* w) {
-    TVState* st = (TVState*)w->userdata;
-    Surface& s = w->back;
-    s.fill(color::WHITE);
-    List<String> lines;
-    file_to_lines(st->file, lines, 100000);
-    int vis = s.height / 16;
-    if (st->scroll > lines.size() - vis && lines.size() - vis > 0) st->scroll = lines.size() - vis;
-    for (int i = st->scroll; i < lines.size() && i < st->scroll + vis; i++) {
-        gfx::text(s, 4, (i - st->scroll) * 16, lines[i].c_str(), color::TEXT, color::WHITE);
-    }
-    if (lines.empty()) {
-        gfx::text(s, 4, 4, "(empty file)", color::TEXT2, color::WHITE);
-    }
-}
-
-static void tv_scroll(Window* w, int delta) {
-    TVState* st = (TVState*)w->userdata;
-    st->scroll += delta > 0 ? -2 : 2;
-    if (st->scroll < 0) st->scroll = 0;
-}
-
-static void tv_key(Window* w, const KeyEvent* e) {
-    TVState* st = (TVState*)w->userdata;
-    if (!e->down) return;
-    if (e->keycode == KEY_UP) st->scroll -= 1;
-    else if (e->keycode == KEY_DOWN) st->scroll += 1;
-    else if (e->keycode == KEY_PGUP) st->scroll -= 12;
-    else if (e->keycode == KEY_PGDN) st->scroll += 12;
-    else if (e->keycode == KEY_HOME) st->scroll = 0;
-    else if (e->keycode == KEY_END) st->scroll = 1 << 30;
-    if (st->scroll < 0) st->scroll = 0;
-}
-
-static void tv_close(Window* w) {
-    if (w->userdata) delete (TVState*)w->userdata;
-    w->userdata = 0;
-}
 
 void app_show_textview(FSNode* file) {
     if (!file || file->is_dir) return;
@@ -55,16 +17,38 @@ void app_show_textview(FSNode* file) {
     cascade_pos(&x, &y);
     String title = file->name;
     title += " - Text Viewer";
-    Window* w = g_wm->create_window(title.c_str(), x, y, 560, 360);
-    if (!w) return;
-    TVState* st = new TVState();
+    LvglWin* lw = lvgl_win_create(title.c_str(), x, y, 560, 360);
+    if (!lw) return;
+    TVLvState* st = new TVLvState();
+    st->lw = lw;
     st->file = file;
-    st->scroll = 0;
-    w->userdata = st;
-    w->on_paint = tv_paint;
-    w->on_scroll = tv_scroll;
-    w->on_key = tv_key;
-    w->on_close = tv_close;
+    st->body = lv_obj_create(lw->content);
+    lv_obj_set_size(st->body, 560, 334);
+    lv_obj_set_pos(st->body, 0, 0);
+    lv_obj_set_style_bg_color(st->body, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_border_width(st->body, 0, 0);
+    lv_obj_set_style_pad_all(st->body, 4, 0);
+    lv_obj_set_scrollbar_mode(st->body, LV_SCROLLBAR_MODE_AUTO);
+
+    st->label = lv_label_create(st->body);
+    List<String> lines;
+    file_to_lines(file, lines, 100000);
+    String txt;
+    int cap = lines.size();
+    if (cap > 20000) cap = 20000;   // keep memory bounded
+    for (int i = 0; i < cap; i++) {
+        txt += lines[i];
+        txt += "\n";
+    }
+    if (txt.empty()) txt = "(empty file)";
+    lv_label_set_text(st->label, txt.c_str());
+    lv_obj_set_style_text_color(st->label, lv_color_hex(0x15181E), 0);
+    lv_obj_set_style_text_font(st->label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_line_space(st->label, 3, 0);
+    int lh = cap * 17 + 12;
+    if (lh < 320) lh = 320;
+    lv_obj_set_size(st->label, 540, lh);
+    lw->userdata = st;
 }
 
 } // namespace nefu

@@ -32,6 +32,8 @@ struct Window {
     void (*on_drag)(Window* w, int mx, int my);   // content drag (highlight)
     void (*on_drop)(Window* w);                    // content drop (finish)
     void* userdata;
+    struct LvglWin* lvw;      // LVGL window container (NULL = legacy fallback)
+    void* lv_canvas;          // lv_obj_t* canvas backed by 'back'
 };
 
 class WM {

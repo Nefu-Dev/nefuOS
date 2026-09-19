@@ -174,7 +174,10 @@ void nefuos_frame() {
         g_wm->paint_all(fb);
         g_wm->cleanup();
     }
-    if (s_mx >= 0 && s_my >= 0) draw_cursor(fb, s_mx, s_my);
+    // software cursor only on bare metal (no OS cursor there). On the Win32
+    // host the real system cursor is used, so painting one here would leave
+    // trails on the LVGL desktop (LVGL redraws only invalid regions).
+    if (s_mx >= 0 && s_my >= 0 && platform_name()[0] == 'b') draw_cursor(fb, s_mx, s_my);
     platform_present();
 }
 

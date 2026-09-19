@@ -1,0 +1,52 @@
+{
+  "bomFormat": "CycloneDX-1.4",
+  "specVersion": "1.4",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "nefuOS",
+      "version": "0.2.0",
+      "description": "Dual-backend hobby operating system (Win32 host exe + x86_64 bare-metal ISO kernel)",
+      "licenses": [{ "license": { "id": "MIT" } }]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "lvgl",
+      "version": "9.2.0",
+      "purl": "pkg:github/lvgl/lvgl@9.2.0",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "externalReferences": [
+        { "type": "vcs", "url": "https://github.com/lvgl/lvgl" }
+      ],
+      "description": "Embedded GUI library; vendored at third_party/lvgl_src/lvgl-9.2.0, configured via third_party/lvgl_conf/lv_conf.h. No source changes; memory pool hooked to nefu_lvgl_pool_alloc."
+    },
+    {
+      "type": "library",
+      "name": "stb_truetype",
+      "version": "1.26",
+      "purl": "pkg:github/nothings/stb@1.26",
+      "licenses": [
+        { "license": { "id": "MIT" } },
+        { "license": { "name": "public-domain" } }
+      ],
+      "externalReferences": [
+        { "type": "vcs", "url": "https://github.com/nothings/stb" }
+      ],
+      "description": "Single-header TrueType rasterizer used by core/gui/ttfont.cpp; math/malloc hooks added for the bare-metal kernel."
+    },
+    {
+      "type": "font",
+      "name": "Montserrat-Medium",
+      "version": "ofl/montserrat (google/fonts)",
+      "purl": "pkg:github/google/fonts@montserrat",
+      "licenses": [{ "license": { "id": "OFL-1.1" } }],
+      "externalReferences": [
+        { "type": "vcs", "url": "https://github.com/google/fonts/tree/main/ofl/montserrat" }
+      ],
+      "description": "Embedded vector font, converted to a C header at build time (third_party/mont_data.h). Replaced the previously truncated VT323-Regular.ttf embedding."
+    }
+  ]
+}

@@ -22,15 +22,31 @@ def main():
         args = ["shot"]
     mode = args[0]
     if mode == "shot":
-        qmp(s, {"execute": "screendump", "arguments": {"filename": "D:/mycppos1/nefuOS/build/bare/screen1.ppm"}}, wait=1.5)
-        print("shot ok")
+        import os
+        shot_path = os.path.join(os.environ.get("TEMP", "."), "nefu_screen.ppm")
+        qmp(s, {"execute": "screendump", "arguments": {"filename": shot_path}}, wait=1.5)
+        print("shot ok", shot_path)
     elif mode == "click":
         x, y = int(args[1]), int(args[2])
         btn = int(args[3]) if len(args) > 3 else 1
+        # PS/2 relative: QEMU anchor = screen center (512,384); bare kernel
+        # starts at (400,300). Offset so the target lands where we intend.
+        x += 112
+        y += 84
         qmp(s, {"execute": "input-mouse-event", "arguments": {"type": "motion", "x": x, "y": y, "buttons": 0}})
         qmp(s, {"execute": "input-mouse-event", "arguments": {"type": "button", "button": btn, "down": True}})
         qmp(s, {"execute": "input-mouse-event", "arguments": {"type": "button", "button": btn, "down": False}})
         print("click ok", x, y, btn)
+    elif mode == "dclick":
+        x, y = int(args[1]), int(args[2])
+        btn = int(args[3]) if len(args) > 3 else 1
+        x += 112
+        y += 84
+        qmp(s, {"execute": "input-mouse-event", "arguments": {"type": "motion", "x": x, "y": y, "buttons": 0}})
+        for _ in range(2):
+            qmp(s, {"execute": "input-mouse-event", "arguments": {"type": "button", "button": btn, "down": True}}, wait=0.05)
+            qmp(s, {"execute": "input-mouse-event", "arguments": {"type": "button", "button": btn, "down": False}}, wait=0.05)
+        print("dclick ok", x, y, btn)
     elif mode == "type":
         text = args[1]
         for ch in text:

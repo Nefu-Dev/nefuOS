@@ -28,6 +28,9 @@ enum AppId {
     APP_BROWSER,
     APP_NETCFG,
     APP_NEFUD,
+    APP_FONTVIEW,
+    APP_LVGLDEMO,
+    APP_LVGLDESKTOP,
     APP_COUNT
 };
 
@@ -36,6 +39,7 @@ enum AppId {
 
 const char* app_name(int id);
 void app_launch(int id);
+void app_launch(const char* name);  // resolve by app name (for autostart)
 void app_show_textview(FSNode* file);
 void app_show_image(FSNode* file);
 void app_show_about();
@@ -71,6 +75,9 @@ void monitor_launch();
 void browser_launch();
 void netcfg_launch();
 void nefud_launch();
+void fontview_launch();
+void lvgl_demo_launch();
+void lvgl_desktop_launch();
 void wiki_launch();
 
 // tool：cascade window position

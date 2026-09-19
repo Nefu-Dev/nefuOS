@@ -4,16 +4,15 @@ Replaces xorriso which is unreliable in this MSYS2-on-Windows environment.
 Layout:
   LBA 16: PVD, 17: Boot Record VD, 18: Terminator VD, 19: Boot Catalog,
   20: PathTable L, 21: PathTable M, 22: root dir data,
-  23: boot.s (2048B-aligned, padded), 24+: kernel.bin (padded to 192 x 2048B).
+  23: boot.s (2048B-aligned, padded), 24+: kernel.bin (padded to 1024 x 2048B).
 
 Boot chain (no-emulation):
   SeaBIOS reads 1 sector (2048B) at LBA 23 = boot.s into 0x7C00,
-  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in six
-  32-sector (64KB) chunks: LBA 24..55 -> 0x20000, 56..87 -> 0x30000,
-  88..119 -> 0x40000, 120..151 -> 0x50000, 152..183 -> 0x60000,
-  184..215 -> 0x70000 (chunk 6 count patched at build).
+  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in a
+  dynamic loop (<= 32 sectors per call = 64KB), advancing LBA/segment/remain
+  until kernel_count/4 CD sectors are read.
   (Only 32-sector chunks work reliably on QEMU's ATAPI; kernel is padded to
-  192 blocks in the ISO so chunks never run off the end.)
+  1024 blocks in the ISO so chunks never run off the end.)
 """
 import struct
 import sys
@@ -28,7 +27,7 @@ LBA_PTM = 21
 LBA_ROOT = 22
 LBA_IMG = 23          # boot.s (no-emulation boot image, 1 sector)
 LBA_KERNEL = 24       # kernel.bin
-KERNEL_BLOCKS = 192    # padded; boot.s reads up to 192 via 6 static DAPs
+KERNEL_BLOCKS = 1024   # padded (2 MiB cap); boot.s dynamic loader reads any size
 
 VOL = b"NEFUOS"
 
@@ -48,9 +47,14 @@ def d7():
 def dir_rec(lba, length, flags, name):
     """ISO9660 directory record."""
     n = len(name)
-    rec = bytes([33 + n, 0]) + both32(lba) + both32(length) + d7() + bytes([flags, 0, 0]) + both16(1) + bytes([n]) + name
-    if len(rec) % 2:
-        rec += b"\x00"
+    body = both32(lba) + both32(length) + d7() + bytes([flags, 0, 0]) + both16(1) + bytes([n]) + name
+    # total = 2 (len+xar) + len(body); pad to even boundary
+    rec_len = 2 + len(body)
+    if rec_len % 2:
+        rec_len += 1
+    rec = bytes([rec_len, 0]) + body
+    if len(rec) < rec_len:
+        rec += b"\x00" * (rec_len - len(rec))
     return rec
 
 
@@ -121,12 +125,12 @@ def build(boot_path, kernel_path, iso_path):
     bc[40:44] = struct.pack("<I", LBA_IMG)  # boot image LBA (boot.s)
 
     # ---- Path Tables ----
-    ptl = bytearray(8)             # root only
+    ptl = bytearray(BS)             # root only, padded to full block
     ptl[0] = 1
     ptl[1] = 0
     ptl[2:6] = struct.pack("<I", LBA_ROOT)
     ptl[6] = 0
-    ptm = bytearray(8)
+    ptm = bytearray(BS)
     ptm[0] = 1
     ptm[1] = 0
     ptm[2:6] = struct.pack(">I", LBA_ROOT)
@@ -153,6 +157,11 @@ def build(boot_path, kernel_path, iso_path):
     out[LBA_ROOT * BS:(LBA_ROOT + 1) * BS] = root
     out[LBA_IMG * BS:(LBA_IMG + 1) * BS] = boot + bytes(BS - len(boot))
     out[LBA_KERNEL * BS:LBA_KERNEL * BS + len(kernel)] = kernel
+
+    # hard truncate to exact size (safety net)
+    expected = vol_size * BS
+    if len(out) != expected:
+        out = out[:expected]
 
     with open(iso_path, "wb") as f:
         f.write(out)

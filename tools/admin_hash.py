@@ -20,6 +20,10 @@ else:
 print(note)
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "core", "sys", "admin_hash.h")
-with open(out, "w", encoding="ascii") as f:
-    f.write("// auto-generated at build time; contains ONLY a salted SHA-256 hash\n")
-    f.write("#define NEFU_ADMIN_HASH \"%s\"\n" % h)
+try:
+    with open(out, "w", encoding="ascii") as f:
+        f.write("// auto-generated at build time; contains ONLY a salted SHA-256 hash\n")
+        f.write("#define NEFU_ADMIN_HASH \"%s\"\n" % h)
+except OSError:
+    # keep the previous hash if the source tree is write-protected
+    print("admin_hash.h write skipped (kept existing hash)")

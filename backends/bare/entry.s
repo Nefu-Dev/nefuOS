@@ -1,4 +1,10 @@
 # nefuOS 内核入口 — 链接基址 0x20000（GNU as AT&T 语法）
+# 双启动路径：
+#   A) 传统 ISO（El Torito，BIOS）：boot.s 在 32 位保护模式下 ljmp 到 0x20000，
+#      落到本文件偏移 0 的 `jmp kernel_start`；bootinfo 已由 boot.s 写入 0x7000。
+#   B) UEFI ESP + GRUB：GRUB 按 multiboot2 协议把本文件加载到 0x20000，进入内核时
+#      EAX=0x36D76289（multiboot2 magic）、EBX=multiboot2 信息结构物理地址；
+#      本代码解析 framebuffer 标签，把 LFB/宽/高/pitch/bpp 写入 0x7000 同一布局。
 # 32 位保护模式进入：建页表 -> PAE -> 长模式 -> 64 位 -> 调用 nefuos_kernel_main
 # 页表布局：
 #   0x9000  PML4    0xA000  PDPT
@@ -6,15 +12,116 @@
 # GDT64 位于 0x8F00；栈 0x1F000；堆 0x400000 起
 .section .text
 .code32
+
+# ---- 传统路径入口（boot.s ljmp $0x18, $0x20000 落到这里）----
+.globl _legacy_entry
+_legacy_entry:
+    jmp kernel_start          # 跳过 multiboot2 头（EB rel8，2 字节）
+    .org 0x8                  # 填充至 8 字节对齐：multiboot2 头位于 0x20008
+
+# ---- Multiboot2 头（GRUB 在镜像前 32KB 内扫描，须 8 字节对齐）----
+multiboot2_header:
+    .long 0xE85250D6                    # magic
+    .long 0                             # architecture: i386（32 位保护模式进入）
+    .long mh_end - multiboot2_header    # header_length
+    .long -(0xE85250D6 + (mh_end - multiboot2_header))   # checksum
+    # 请求 GRUB 用 GOP 设置 1024x768x32 线性帧缓冲，并以 framebuffer 标签回传
+    .align 8
+    .short 5, 0                         # type=5 framebuffer, flags=0
+    .long 20
+    .long 1024, 768, 32                 # width, height, depth
+    # 地址标签：加载到 0x20000；load_end/bss_end 由构建脚本补丁（GRUB 负责清 .bss）
+    .align 8
+    .short 2, 0                         # type=2 address, flags=0
+    .long 24
+    .long multiboot2_header             # header_addr（ld 解析为绝对地址）
+    .long 0x20000                       # load_addr
+    .long 0                             # load_end_addr  <- 构建时补丁
+    .long 0                             # bss_end_addr   <- 构建时补丁
+    # 入口地址标签：从 kernel_start 进入
+    .align 8
+    .short 3, 0                         # type=3 entry address, flags=0
+    .long 12
+    .long kernel_start
+    # 结束标签
+    .align 8
+    .short 0, 0                         # type=0 end
+    .long 8
+mh_end:
+    .align 8
+kernel_boot_params:                     # 构建脚本补丁：.bss 起址/大小（两条路径共用）
+    .long 0                             # bss_start（绝对地址）
+    .long 0                             # bss_size（字节）
+
 .globl kernel_start
 kernel_start:
     cli
+    cmpl $0x36D76289, %eax              # multiboot2 bootloader magic？
+    je grub_mb2_path
+    # ---- 传统路径：boot.s 已设置段寄存器（0x10）与 bootinfo(0x7000) ----
     movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
     movw %ax, %ss
     movw %ax, %fs
     movw %ax, %gs
+    jmp common_init
+
+grub_mb2_path:
+    # ---- GRUB 路径：EBX = multiboot2 信息结构物理地址 ----
+    # 先把信息结构整体拷到 0x6000（原 VBE 区，本路径未用），避免解析时
+    # 对 0x7000 的 bootinfo 写入与信息结构重叠。
+    movl %ebx, %esi
+    movl (%esi), %ecx                   # total_size
+    cmpl $0x2000, %ecx
+    jbe .mb2_sz_ok
+    movl $0x2000, %ecx
+.mb2_sz_ok:
+    movl $0x6000, %edi
+    cld
+    rep movsb
+    # ---- 遍历标签，找 type=8 framebuffer ----
+    movl $0x6008, %esi                  # 跳过信息头（u32 size + u32 reserved）
+.mb2_tag_loop:
+    movl (%esi), %eax                   # type
+    testl %eax, %eax
+    jz .mb2_no_fb
+    cmpl $8, %eax
+    je .mb2_fb
+    movl 4(%esi), %ecx                  # 跳到下一个标签（8 字节对齐）
+    addl %ecx, %esi
+    addl $7, %esi
+    andl $~7, %esi
+    jmp .mb2_tag_loop
+.mb2_fb:
+    # framebuffer 标签布局：+8 addr(lo32) +16 pitch +20 width +24 height +28 bpp
+    movl 8(%esi), %eax
+    movl %eax, 0x7000                   # LFB base
+    movl 20(%esi), %eax
+    movl %eax, 0x7004                   # width
+    movl 24(%esi), %eax
+    movl %eax, 0x7008                   # height
+    movl 16(%esi), %eax
+    movl %eax, 0x700C                   # pitch
+    movl 28(%esi), %eax
+    movb %al, 0x7010                    # bpp
+    jmp .mb2_fb_done
+.mb2_no_fb:
+    # GRUB 未提供 framebuffer（请求模式不可用等）：打探针 F 后停机，便于排查
+    movw $0xE9, %dx
+    movb $'F', %al
+    outb %al, %dx
+.halt_no_fb:
+    cli
+    hlt
+    jmp .halt_no_fb
+.mb2_fb_done:
+    # 探针 g：GRUB bootinfo 就绪（LFB/宽/高/pitch/bpp 已写入 0x7000）
+    movw $0xE9, %dx
+    movb $'g', %al
+    outb %al, %dx
+
+common_init:
     # 探针 e：段设置完成
     movw $0xE9, %dx
     movb $'e', %al
@@ -184,14 +291,15 @@ kernel_start:
     movb $'L', %al
     outb %al, %dx
     # ---- clear .bss (kernel.bin carries no zero padding) ----
-    # Read bss_start/bss_size from the boot sector slots (0x7C00+0x1C0),
-    # patched at build time from the PE section table.  The __bss_start
-    # linker symbol is unusable: mingw ld emits PE symbol values as RVAs
-    # (0 for .bss), which would zero-fill low memory and destroy the
-    # page tables at 0x9000-0x13000.
-    movq $0x7C00, %rax
-    movl 0x1C0(%rax), %edi      # bss_start (absolute runtime address)
-    movl 0x1C4(%rax), %ecx      # bss_size (bytes)
+    # Read bss_start/bss_size from kernel_boot_params (in-kernel, shared by
+    # both boot paths), patched at build time from the PE section table.  The
+    # __bss_start linker symbol is unusable: mingw ld emits PE symbol values
+    # as RVAs (0 for .bss), which would zero-fill low memory and destroy the
+    # page tables at 0x9000-0x13000.  (GRUB additionally zeroes the bss per
+    # the multiboot2 Address tag; re-zeroing here is idempotent.)
+    leaq kernel_boot_params(%rip), %rax
+    movl (%rax), %edi           # bss_start (absolute runtime address)
+    movl 4(%rax), %ecx          # bss_size (bytes)
     shrq $3, %rcx               # qword count
     xorl %eax, %eax
     rep stosq

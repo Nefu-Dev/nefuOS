@@ -46,8 +46,9 @@ struct Line {
     int form_kind;
     String form_name;
     String form_val;
+    int form_method;   // 0 = GET (query string), 1 = POST (body)
     Line() : style(0), font_size(16), bold(false), color(0), indent(0), image(0),
-             form_kind(0) {}
+             form_kind(0), form_method(0) {}
 };
 
 struct BrowserState {
@@ -306,12 +307,14 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                     String type = get_attr(html + tag_start, tag_text_len, "type");
                     String val  = get_attr(html + tag_start, tag_text_len, "value");
                     String ph   = get_attr(html + tag_start, tag_text_len, "placeholder");
+                    String fm   = get_attr(html + tag_start, tag_text_len, "method");
                     flush();
                     Line l;
                     if (!type.empty() && (type == "submit" || type == "button")) {
                         l.form_kind = 2;
                         l.form_name = name;
                         l.form_val = val.empty() ? (ph.empty() ? "Submit" : ph) : val;
+                        l.form_method = (!fm.empty() && fm == "post") ? 1 : 0;
                     } else {
                         l.form_kind = 1;
                         l.form_name = name;
@@ -324,11 +327,13 @@ static void html_parse(const char* html, int len, List<Line>& out) {
                 else if (!strcmp(tname,"button")) {
                     // <button>Label</button> -> submit line
                     String txt = get_attr(html + tag_start, tag_text_len, "value");
+                    String fm  = get_attr(html + tag_start, tag_text_len, "method");
                     flush();
                     Line l;
                     l.form_kind = 2;
                     l.form_name = get_attr(html + tag_start, tag_text_len, "name");
                     l.form_val = txt.empty() ? "Submit" : txt;
+                    l.form_method = (!fm.empty() && fm == "post") ? 1 : 0;
                     out.push(l);
                 }
             } else {
@@ -526,13 +531,146 @@ static bool load_file(BrowserState* st, const char* path) {
     return true;
 }
 
+// Append a "Cookie: host=value" header from the cookie jar
+// (/var/lib/nefuos/cookies.txt, one "host=N; path=/; nefuOS" per line)
+// that matches the request URL host. Returns the extra header length.
+static int http_append_cookie(const char* url, char* req, int req_len, int cap) {
+    const char* h = strstr(url, "://");
+    const char* host = h ? h + 3 : url;
+    char hb[96];
+    int hn = 0;
+    while (host[hn] && host[hn] != '/' && host[hn] != '?' && host[hn] != ':' && hn < 90) {
+        hb[hn] = host[hn];
+        hn++;
+    }
+    hb[hn] = 0;
+    if (hn == 0) return 0;
+    FSNode* ck = g_vfs->resolve("/var/lib/nefuos/cookies.txt");
+    if (!ck || ck->size == 0) return 0;
+    char* jar = (char*)kalloc((size_t)ck->size + 1);
+    if (!jar) return 0;
+    memcpy(jar, ck->data, ck->size);
+    jar[ck->size] = 0;
+    String out;
+    char* p = jar;
+    while (*p) {
+        char* nl = p;
+        while (*nl && *nl != '\n') nl++;
+        char save = *nl;
+        *nl = 0;
+        // line "host=N; path=/; nefuOS"
+        if (strncmp(p, hb, hn) == 0 && p[hn] == '=') {
+            if (!out.empty()) out += '; ';
+            out += hb;
+            int v = 0;
+            while (p[hn + 1 + v] && p[hn + 1 + v] != ';') v++;
+            out += '=';
+            for (int k = 0; k < v; k++) out += p[hn + 1 + k];
+        }
+        *nl = save;
+        if (save == 0) break;
+        p = nl + 1;
+    }
+    kfree(jar);
+    if (out.empty()) return 0;
+    // "Cookie: host=1; host=2\r\n"
+    char hdr[256];
+    int hl = ksprintf(hdr, sizeof(hdr), "Cookie: %s\r\n", out.c_str());
+    if (req_len + hl >= cap) return 0;
+    memcpy(req + req_len, hdr, hl);
+    return hl;
+}
+
+// Send a POST request with the given URL-encoded body and render the reply.
+static bool http_post(BrowserState* st, const char* url, const char* body) {
+    // parse scheme://host:port/path
+    const char* p = url;
+    uint32_t ip = 0;
+    uint16_t port = 80;
+    const char* path = "/";
+    if (strncmp(p, "http://", 7) == 0) p += 7;
+    else if (strncmp(p, "https://", 8) == 0) p += 8;
+    char hostbuf[128];
+    int hn = 0;
+    while (*p && *p != '/' && *p != ':' && hn < 120) hostbuf[hn++] = *p++;
+    hostbuf[hn] = 0;
+    if (*p == ':') {
+        p++;
+        int pn = 0;
+        while (*p >= '0' && *p <= '9') { pn = pn * 10 + (*p - '0'); p++; }
+        if (pn > 0) port = (uint16_t)pn;
+    }
+    if (*p == '/') path = p;
+    if (!parse_ip(hostbuf, &ip)) return false;
+    int fd = tcp_connect(ip, port, 5000);
+    if (fd < 0) return false;
+    char req[768];
+    int bl = (int)strlen(body);
+    int rl = ksprintf(req, sizeof(req),
+        "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: nefuOS/1.0\r\n"
+        "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n"
+        "Connection: close\r\n", path, hostbuf, bl);
+    rl += http_append_cookie(url, req, rl, (int)sizeof(req));
+    rl += ksprintf(req + rl, (int)sizeof(req) - rl, "\r\n%s", body);
+    tcp_send(fd, req, rl);
+    uint8_t* resp = 0;
+    uint32_t resp_len = 0;
+    uint32_t cap = 8192;
+    resp = (uint8_t*)kalloc(cap);
+    if (!resp) { tcp_close(fd); return false; }
+    uint32_t start = platform_tick_ms();
+    while (platform_tick_ms() - start < 8000) {
+        char c;
+        int n = tcp_recv(fd, &c, 1, 200);
+        if (n == 1) {
+            if (resp_len + 1 >= cap) {
+                cap *= 2;
+                uint8_t* nb = (uint8_t*)kalloc(cap);
+                if (!nb) break;
+                memcpy(nb, resp, resp_len);
+                kfree(resp);
+                resp = nb;
+            }
+            resp[resp_len++] = (uint8_t)c;
+        } else if (n < 0) break;
+    }
+    tcp_close(fd);
+    st->lines.erase_all();
+    add_line(st->lines, "HTTP POST response", 1);
+    add_line(st->lines, "", 0);
+    if (resp_len > 0) {
+        uint32_t hdr_end = 0;
+        for (uint32_t k = 0; k + 3 < resp_len; k++) {
+            if (resp[k]=='\r'&&resp[k+1]=='\n'&&resp[k+2]=='\r'&&resp[k+3]=='\n') {
+                hdr_end = k + 4;
+                break;
+            }
+        }
+        char hdr[120];
+        ksprintf(hdr, sizeof(hdr), "%u bytes received (header %u, body %u)",
+                 (unsigned)resp_len, (unsigned)hdr_end, (unsigned)(resp_len - hdr_end));
+        add_line(st->lines, hdr, 0);
+        add_line(st->lines, "", 0);
+        if (resp_len > hdr_end)
+            html_parse((const char*)resp + hdr_end, (int)(resp_len - hdr_end), st->lines);
+    } else {
+        add_line(st->lines, "No response", 0);
+    }
+    kfree(resp);
+    st->scroll = 0;
+    st->status = 2;
+    return true;
+}
+
 static bool load_http(BrowserState* st, uint32_t ip, uint16_t port, const char* path) {
     int fd = tcp_connect(ip, port, 5000);
     if (fd < 0) return false;
-    char req[512];
+    char req[640];
     int rl = ksprintf(req, sizeof(req),
-        "GET %s HTTP/1.0\r\nHost: %u.%u.%u.%u:%u\r\nUser-Agent: nefuOS/1.0\r\nConnection: close\r\n\r\n",
+        "GET %s HTTP/1.0\r\nHost: %u.%u.%u.%u:%u\r\nUser-Agent: nefuOS/1.0\r\nConnection: close\r\n",
         path, (ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF, port);
+    rl += http_append_cookie(st->url.c_str(), req, rl, (int)sizeof(req) - 4);
+    rl += ksprintf(req + rl, (int)sizeof(req) - rl, "\r\n");
     tcp_send(fd, req, rl);
     uint8_t* body = 0;
     uint32_t body_len = 0;
@@ -1123,12 +1261,25 @@ static void on_key(Window* w, const KeyEvent* e) {
 }
 
 // Build a GET query from the form fields and navigate to it.
+// POST submit runs on a background thread so the UI never blocks.
+struct PostCtx { BrowserState* st; String url; String body; };
+static void browser_post_thread(void* arg) {
+    PostCtx* c = (PostCtx*)arg;
+    bool ok = http_post(c->st, c->url.c_str(), c->body.c_str());
+    c->st->status = ok ? 2 : 3;
+    c->st->busy = false;
+    c->st->load_done = true;
+    c->st->load_error = !ok;
+    delete c;
+}
+
 static void browser_submit_form(BrowserState* st, int submit_row) {
-    (void)submit_row;
     if (st->loaded_url.empty()) return;
     String q;
+    int method = 0;
     for (int i = 0; i < st->lines.size(); i++) {
         const Line& l = st->lines[i];
+        if (l.form_kind == 2 && i == submit_row) method = l.form_method;
         if (l.form_kind != 1 || l.form_name.empty()) continue;
         if (!q.empty()) q += '&';
         q += l.form_name;
@@ -1140,6 +1291,22 @@ static void browser_submit_form(BrowserState* st, int submit_row) {
     st->form_edit_row = -1;
     st->form_edit_val.clear();
     String target = st->loaded_url;
+    if (method == 1) {
+        // POST: send the form fields as the request body
+        PostCtx* c = new PostCtx();
+        c->st = st;
+        c->url = target;
+        c->body = q;
+        st->url = target;
+        st->status = 1;
+        st->busy = true;
+        st->load_done = false;
+        st->load_error = false;
+        st->loaded_url = target;
+        st->load_thread = platform_thread_create(browser_post_thread, c);
+        return;
+    }
+    // GET: navigate to "target?query"
     if (!q.empty()) {
         target += (target.find('?') >= 0) ? '&' : '?';
         target += q;

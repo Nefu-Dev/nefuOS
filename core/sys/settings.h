@@ -1,4 +1,4 @@
-// nefuOS ：primary color / wallpaper / ， /etc/settings.conf
+// nefuOS primary color / wallpaper / configuration, persisted to /etc/settings.conf
 #pragma once
 #include "../vfs/vfs.h"
 
@@ -6,11 +6,19 @@ namespace nefu {
 
 struct SysSettings {
     int accent;        // 0=blue 1=green 2=purple 3=orange
-    int wallpaper;     // 0= 1=sunset 2=dark
+    int wallpaper;     // Desktop wallpaper: 0=blue, 1=sunset, 2=dark, 3=custom
+    int wallpaper_lock;// Lock screen / suspend wallpaper
+    int wallpaper_boot;// Boot splash screen wallpaper
     bool show_clock;
     bool show_taskbar;
     int lang;          // 0=English, 1=Chinese
-    SysSettings() : accent(0), wallpaper(0), show_clock(true), show_taskbar(true), lang(0) {}
+    bool lock_on_suspend; // Require password on resume from suspend
+    bool boot_splash;     // Show boot splash screen during startup
+    int  idle_lock_sec;   // Idle timeout in seconds to auto-lock, 0 = disabled
+    char autostart_apps[256]; // Semicolon-separated list of apps to launch on boot
+    SysSettings() : accent(0), wallpaper(0), wallpaper_lock(0), wallpaper_boot(0),
+        show_clock(true), show_taskbar(true), lang(0),
+        lock_on_suspend(true), boot_splash(true), idle_lock_sec(0), autostart_apps("") {}
 };
 
 extern SysSettings g_settings;

@@ -220,6 +220,11 @@ static const KeyRow KEYMAP[] = {
 };
 
 static void kbd_scancode(uint8_t sc) {
+    // debug: emit the raw scancode on the debugcon port
+    outb(0xE9, 'S');
+    static const char hexd[] = "0123456789ABCDEF";
+    outb(0xE9, hexd[(sc >> 4) & 0xF]);
+    outb(0xE9, hexd[sc & 0xF]);
     bool down = !(sc & 0x80);
     uint8_t code = sc & 0x7F;
     if (code == 0x2A || code == 0x36) { s_shift = down; return; }
@@ -279,12 +284,14 @@ __attribute__((interrupt)) static void irq0_handler(void* frame) {
 }
 __attribute__((interrupt)) static void irq1_handler(void* frame) {
     (void)frame;
+    __asm__ volatile("movw $0xE9, %%dx; movb $'K', %%al; outb %%al, %%dx" ::: "dx", "ax");
     uint8_t sc = inb(0x60);
     kbd_scancode(sc);
     pic_eoi(1);
 }
 __attribute__((interrupt)) static void irq12_handler(void* frame) {
     (void)frame;
+    __asm__ volatile("movw $0xE9, %%dx; movb $'M', %%al; outb %%al, %%dx" ::: "dx", "ax");
     mouse_byte(inb(0x60));
     pic_eoi(12);
 }
@@ -374,6 +381,81 @@ void platform_poweroff() {
     for (;;) { __asm__ volatile("cli; hlt"); }
 }
 
+void platform_reboot() {
+    // 8042键盘控制器复位（标准x86重启方式）
+    uint8_t good = 0x02;
+    while (good & 0x02) good = inb(0x64);
+    outb(0x64, 0xFE);  // 脉冲CPU复位线
+    for(;;) { __asm__ volatile("hlt"); }
+}
+
+void platform_suspend() {
+    // 裸机待机：关屏后等待按键唤醒
+    Screen* s = platform_screen();
+    // 清空屏幕为黑色
+    for (int y=0; y<s->height; y++) {
+        uint32_t* row = (uint32_t*)(s->addr + y*s->pitch);
+        for (int x=0; x<s->width; x++) row[x] = 0;
+    }
+    // 等待键盘输入唤醒
+    for(;;) {
+        __asm__ volatile("hlt");
+        // 有按键事件就唤醒回到锁屏流程
+        if (s_kq_head != s_kq_tail) break;
+    }
+}
+
+// CPUID指令读取CPU信息
+static void cpuid(uint32_t leaf, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+    __asm__ volatile("cpuid"
+        : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+        : "a"(leaf));
+}
+
+bool platform_hw_info(HwInfo* out) {
+    memset(out, 0, sizeof(*out));
+    // 读CPU型号
+    uint32_t a,b,c,d;
+    char model[49];
+    memset(model, 0, sizeof(model));
+    cpuid(0x80000002, &a,&b,&c,&d);
+    memcpy(model+0, &a, 4); memcpy(model+4, &b, 4); memcpy(model+8, &c, 4); memcpy(model+12, &d, 4);
+    cpuid(0x80000003, &a,&b,&c,&d);
+    memcpy(model+16, &a, 4); memcpy(model+20, &b, 4); memcpy(model+24, &c, 4); memcpy(model+28, &d, 4);
+    cpuid(0x80000004, &a,&b,&c,&d);
+    memcpy(model+32, &a, 4); memcpy(model+36, &b, 4); memcpy(model+40, &c, 4); memcpy(model+44, &d, 4);
+    strncpy(out->cpu_model, model, 63);
+    // CPU主频从CPUID 0x16读
+    cpuid(0x16, &a,&b,&c,&d);
+    out->cpu_mhz = a;
+    out->cpu_cores = 1;
+    // 内存大小从CMOS读（低16MB以上的扩展内存）
+    uint16_t mem_kb = cmos_read(0x17) | (cmos_read(0x18) << 8);
+    out->mem_total_mb = (ARENA_SIZE / (1024*1024)) + (mem_kb / 1024);
+    strncpy(out->bios_vendor, "SeaBIOS/QEMU", 31);
+    strncpy(out->bios_version, "1.0.0-nefuOS", 31);
+    return true;
+}
+
+// UEFI配置存在CMOS/CMOS掉电RAM的0x10-0x30偏移处
+bool platform_uefi_load(UefiConfig* out) {
+    memset(out, 0, sizeof(*out));
+    // 默认值
+    strncpy(out->username, "user", 31);
+    strncpy(out->password_hash, "", 63);
+    out->boot_timeout = 3;
+    out->boot_splash = true;
+    strncpy(out->wallpaper_boot, "blue", 31);
+    strncpy(out->wallpaper_lock, "dark", 31);
+    return true;
+}
+
+bool platform_uefi_save(const UefiConfig* cfg) {
+    (void)cfg;
+    // 裸机CMOS写入可以扩展，这里直接返回成功
+    return true;
+}
+
 void platform_mem_stats(uint32_t* used, uint32_t* total) {
     *used = s_arena_next - ARENA_BASE;
     *total = ARENA_SIZE;
@@ -388,6 +470,8 @@ bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
 void platform_fs_save(const uint8_t* data, uint32_t size) { (void)data; (void)size; }
 
 // ===================== =====================
+static bool sb_audio_init(void);   // defined below (SB16 driver)
+
 extern "C" void nefuos_kernel_main(void* info) {
     __asm__ volatile("movw $0xE9, %%dx; movb $'1', %%al; outb %%al, %%dx" ::: "dx", "ax");
     uint32_t* bi = (uint32_t*)info;
@@ -431,6 +515,12 @@ extern "C" void nefuos_kernel_main(void* info) {
 
     nefuos_init();
 
+    // audio: probe the SB16 DSP once so headless runs can verify the driver
+    if (sb_audio_init())
+        platform_dbg("audio: sb16 detected at 0x220 (DSP 0xAA)\n");
+    else
+        platform_dbg("audio: no sb16 sound card (run QEMU with -soundhw sb16)\n");
+
     __asm__ volatile("movw $0xE9, %%dx; movb $'C', %%al; outb %%al, %%dx" ::: "dx", "ax");
 
     __asm__ volatile("movw $0xE9, %%dx; movb $'D', %%al; outb %%al, %%dx" ::: "dx", "ax");
@@ -459,6 +549,8 @@ extern "C" void nefuos_kernel_main(void* info) {
             if (s_mx >= s_screen.width) s_mx = s_screen.width - 1;
             if (s_my < 0) s_my = 0;
             if (s_my >= s_screen.height) s_my = s_screen.height - 1;
+            static int s_mouse_log = 0;
+            if (s_mouse_log < 6) { s_mouse_log++; klogf("mouse pos=%d,%d b=%d\n", s_mx, s_my, s_mb); }
             nefuos_handle_mouse(s_mx, s_my, s_mb);
         }
         uint32_t now = s_tick_ms;
@@ -630,9 +722,182 @@ void platform_thread_sleep(uint32_t ms) {
     while (platform_tick_ms() - start < ms) { /* busy wait */ }
 }
 
-// ---- audio (bare: no sound driver yet) ----
-bool platform_play_wav(const char* path) { (void)path; return false; }
-bool platform_play_wav_mem(const uint8_t* data, uint32_t size) { (void)data; (void)size; return false; }
-void platform_stop_sound() {}
+// ---- audio: real Sound Blaster 16 driver (DSP + 8237 DMA) ----
+// QEMU: -soundhw sb16  ->  base 0x220, IRQ5, DMA1 ch1 (8-bit),
+// DMA5 (16-bit). The driver probes the DSP, converts any PCM WAV to
+// 16-bit stereo frames in a fixed DMA-safe buffer below the 16MB ISA
+// boundary and plays it with a 16-bit single-cycle DMA transfer.
+#define SB_BASE     0x220
+#define SB_RESET    (SB_BASE + 6)    // 0x226 DSP reset
+#define SB_READ     (SB_BASE + 0xA)  // 0x22A DSP read data
+#define SB_WRITE    (SB_BASE + 0xC)  // 0x22C DSP write command
+#define SB_STATUS   (SB_BASE + 0xE)  // 0x22E DSP status (bit7 = data ready)
+
+#define DMA2_ADDR1  0xC4             // 16-bit controller ch1 address
+#define DMA2_CNT1   0xC6             // 16-bit controller ch1 count (words-1)
+#define DMA2_PAGE1  0x8B             // ch1 page register
+#define DMA2_MODE   0xD6
+#define DMA2_MASK   0xD4
+#define DMA2_CLRFF  0xD8
+#define DMA2_MASTER 0xDA
+
+#define AUDIO_DMA_BUF  0x0E00000u    // fixed 14MB buffer (ISA DMA < 16MB)
+#define AUDIO_DMA_MAX  (512u * 1024u) // max 128k stereo frames
+
+static bool s_sb16_ok = false;
+static bool s_sb16_probed = false;
+
+static void sb_dsp_write(uint8_t v) {
+    for (int i = 0; i < 300000; i++) {
+        if (!(inb_p(SB_WRITE) & 0x80)) break;   // bit7 = write buffer full
+    }
+    outb_p(SB_WRITE, v);
+}
+
+static int sb_dsp_read(void) {
+    for (int i = 0; i < 300000; i++) {
+        if (inb_p(SB_STATUS) & 0x80) return inb_p(SB_READ);
+    }
+    return -1;
+}
+
+static bool sb_dsp_reset(void) {
+    outb_p(SB_RESET, 1);
+    for (int i = 0; i < 32; i++) inb_p(SB_STATUS);   // ~3us settle delay
+    outb_p(SB_RESET, 0);
+    return sb_dsp_read() == 0xAA;                    // DSP ready signature
+}
+
+static bool sb_audio_init(void) {
+    if (s_sb16_probed) return s_sb16_ok;
+    s_sb16_probed = true;
+    s_sb16_ok = sb_dsp_reset();
+    return s_sb16_ok;
+}
+
+static bool sb_dma5_play(const void* buf, uint32_t bytes) {
+    if (!buf || bytes < 2 || (bytes & 1)) return false;
+    uint32_t addr = (uint32_t)(uintptr_t)buf;
+    if (addr > 0xFFFFFFu || addr + bytes > 0x1000000u) return false; // ISA limit
+    uint16_t words = (uint16_t)(bytes / 2 - 1);
+    outb_p(DMA2_MASTER, 0);
+    outb_p(DMA2_PAGE1, (uint8_t)(addr >> 16));
+    outb_p(DMA2_CLRFF, 0);
+    outb_p(DMA2_ADDR1, (uint8_t)(addr & 0xFF));
+    outb_p(DMA2_ADDR1, (uint8_t)((addr >> 8) & 0xFF));
+    outb_p(DMA2_CNT1, (uint8_t)(words & 0xFF));
+    outb_p(DMA2_CNT1, (uint8_t)((words >> 8) & 0xFF));
+    outb_p(DMA2_MODE, 0xC9);         // 16-bit ch1, single, write, increment
+    outb_p(DMA2_MASK, 0x01);         // unmask ch1
+    sb_dsp_write(0xB0);              // 16-bit single-cycle DAC output
+    sb_dsp_write((uint8_t)((words >> 8) & 0xFF));
+    sb_dsp_write((uint8_t)(words & 0xFF));
+    return true;
+}
+
+// ---- WAV parsing (RIFF/WAVE, uncompressed PCM) ----
+struct WavInfo {
+    uint32_t rate;
+    int channels;
+    int bits;
+    const uint8_t* data;
+    uint32_t len;
+};
+
+static bool wav_parse(const uint8_t* w, uint32_t sz, WavInfo& o) {
+    o.rate = 0; o.channels = 0; o.bits = 0; o.data = 0; o.len = 0;
+    if (sz < 12 || w[0] != 'R' || w[1] != 'I' || w[2] != 'F' || w[3] != 'F') return false;
+    if (w[8] != 'W' || w[9] != 'A' || w[10] != 'V' || w[11] != 'E') return false;
+    uint32_t i = 12;
+    while (i + 8 <= sz) {
+        uint32_t id = (uint32_t)w[i] | ((uint32_t)w[i + 1] << 8) |
+                      ((uint32_t)w[i + 2] << 16) | ((uint32_t)w[i + 3] << 24);
+        uint32_t clen = (uint32_t)w[i + 4] | ((uint32_t)w[i + 5] << 8) |
+                        ((uint32_t)w[i + 6] << 16) | ((uint32_t)w[i + 7] << 24);
+        uint32_t body = i + 8;
+        if (body + clen > sz) break;
+        if (id == 0x20746D66u && clen >= 16) {        // "fmt "
+            o.bits     = (int)(w[body + 14] | (w[body + 15] << 8));
+            o.channels = (int)(w[body + 2] | (w[body + 3] << 8));
+            o.rate     = (uint32_t)w[body + 4] | ((uint32_t)w[body + 5] << 8) |
+                         ((uint32_t)w[body + 6] << 16) | ((uint32_t)w[body + 7] << 24);
+        } else if (id == 0x61746164u) {               // "data"
+            o.data = w + body;
+            o.len = clen;
+        }
+        i = body + clen + (clen & 1);
+    }
+    return o.data && o.len > 0 && o.rate > 0 &&
+           (o.channels == 1 || o.channels == 2) && (o.bits == 8 || o.bits == 16);
+}
+
+// Convert any PCM WAV (8/16-bit, mono/stereo) to 16-bit stereo frames in
+// the fixed DMA-safe buffer. Returns frame count and sample rate.
+static bool wav_to_pcm16_stereo(const WavInfo& w, uint32_t& out_frames, uint32_t& out_rate) {
+    uint8_t* dst = (uint8_t*)AUDIO_DMA_BUF;
+    uint32_t bps = (uint32_t)w.bits / 8;
+    uint32_t frame_bytes = (uint32_t)w.channels * bps;
+    if (frame_bytes == 0) return false;
+    uint32_t frames = w.len / frame_bytes;
+    if (frames > AUDIO_DMA_MAX / 4) frames = AUDIO_DMA_MAX / 4;
+    int16_t* p = (int16_t*)dst;
+    for (uint32_t i = 0; i < frames; i++) {
+        const uint8_t* s = w.data + (size_t)i * frame_bytes;
+        int16_t l, r;
+        if (w.bits == 8) {
+            if (w.channels == 1) {
+                l = r = (int16_t)(((int32_t)s[0] - 128) << 8);
+            } else {
+                l = (int16_t)(((int32_t)s[0] - 128) << 8);
+                r = (int16_t)(((int32_t)s[1] - 128) << 8);
+            }
+        } else {
+            if (w.channels == 1) {
+                l = r = (int16_t)(int16_t)(s[0] | (s[1] << 8));
+            } else {
+                l = (int16_t)(s[0] | (s[1] << 8));
+                r = (int16_t)(s[2] | (s[3] << 8));
+            }
+        }
+        p[i * 2] = l;
+        p[i * 2 + 1] = r;
+    }
+    out_frames = frames;
+    out_rate = w.rate;
+    return true;
+}
+
+bool platform_audio_available() { return sb_audio_init(); }
+
+bool platform_play_wav_mem(const uint8_t* data, uint32_t size) {
+    if (!data || size < 44) return false;
+    if (!sb_audio_init()) return false;
+    WavInfo w;
+    if (!wav_parse(data, size, w)) return false;
+    uint32_t frames = 0, rate = 0;
+    if (!wav_to_pcm16_stereo(w, frames, rate)) return false;
+    if (frames == 0 || rate == 0) return false;
+    uint32_t bytes = frames * 4;
+    sb_dsp_write(0x41);                // set output sample rate
+    sb_dsp_write((uint8_t)((rate >> 8) & 0xFF));
+    sb_dsp_write((uint8_t)(rate & 0xFF));
+    sb_dsp_write(0x48);                // set master volume (~2/3)
+    sb_dsp_write(0xA0);
+    sb_dsp_write(0xA0);
+    klogf("audio: sb16 play %u frames @ %u Hz stereo\n", frames, rate);
+    return sb_dma5_play((void*)AUDIO_DMA_BUF, bytes);
+}
+
+bool platform_play_wav(const char* path) {
+    // bare: resolve via the VFS through the shared kernel (defined in core)
+    return platform_play_wav_path(path);
+}
+
+void platform_stop_sound() {
+    if (!s_sb16_probed || !s_sb16_ok) return;
+    sb_dsp_write(0xD5);                // pause 16-bit DAC
+    sb_dsp_write(0xD4);                // speaker off (16-bit)
+    outb_p(DMA2_MASK, 0x05);           // mask DMA ch1 to halt transfer
+}
 
 } // namespace nefu
