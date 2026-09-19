@@ -71,6 +71,36 @@ Everything is real: the GUI, the Unix-like VFS, the networking stack, and the ap
 
   quality, encryption state; ping uses real ICMP (IcmpSendEcho)
 
+### Mini JavaScript engine (built-in, no external runtime)
+
+* `core/apps/minijs.cpp` is a self-contained interpreter (integers + strings)
+
+  with `var/let`, `if/else`, `while`, `for`, `print`, `alert`,
+
+  `document.write`, `len`, arithmetic/relational/logical operators.
+
+* The Browser executes `<script>` blocks and renders their output; the
+
+  Terminal exposes it as the `js <code>` command.
+
+* Fully unit-tested: 10/10 cases in `tests/minijs_test.cpp` (while/for
+
+  counting, nested loops, string concat, document.write, variables).
+
+### Lock screen, real clock & power
+
+* The desktop starts locked (`nefuos_lock_screen`): wallpaper, big clock,
+
+  User/Password panel, SHA-256 password check against the UEFI-set hash,
+
+  `Enter` unlocks, `ESC` reboots; auto-lock after idle seconds (Settings).
+
+* `date` reads the **real RTC** (CMOS on bare metal, GetLocalTime on host)
+
+  instead of a hard-coded string.
+
+* Settings gained Lock-on-suspend and auto-lock-after-idle toggles.
+
 ### Unix-like file system (real files & directories)
 
 
@@ -113,9 +143,17 @@ Everything is real: the GUI, the Unix-like VFS, the networking stack, and the ap
 
 
 
-* \~150 real Unix-style files are seeded at boot (`NFS1` VFS, serialized to
+* \~160 real Unix-style files are seeded at boot (`NFS1` VFS, serialized to
 
   `nefuos.fs` on the host backend); system files survive reboots.
+
+* `/usr` follows the FHS: `bin`, `sbin`, `lib`, `include`, `src`, `share`
+
+  (with `apps/` and `man/`), `local/bin`, `local/share`, `games`,
+
+  `downloads`; sample system files (manual page, headers, sample C source,
+
+  app README) are pre-seeded so the system tree is never empty.
 
 * **Downloads go to&#x20;**`/usr/downloads` (browser) and temp scratch goes to
 
@@ -138,6 +176,10 @@ Everything is real: the GUI, the Unix-like VFS, the networking stack, and the ap
 `dmesg` `neofetch` `top` `kill` `df` `who`/`users` `last` `sh`/`bash`
 
 `which` `history` `true`/`false` `uname` `date` `login` `sleep`
+
+`cal` `yes` `seq` `printf` `basename` `dirname` `man` `hostname` `id`
+
+`mount` `lock` (lock screen) `js` (mini JS interpreter)
 
 `su <password>` (admin `lbinm`, hash-verified) `db list|get|set|rm`
 
