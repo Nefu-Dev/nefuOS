@@ -650,6 +650,7 @@ bool platform_hw_info(HwInfo* out) {
 static int s_auto_app = -1;
 static int s_click_x = -1, s_click_y = -1;
 static const char* s_key_str = 0;
+static const char* s_url_str = 0;
 static const char* s_shot_path = 0;
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
@@ -688,6 +689,7 @@ int main(int argc, char** argv) {
             s_click_y = atoi(argv[i + 2]);
         }
         if (strcmp(argv[i], "--key") == 0 && i + 1 < argc) s_key_str = argv[i + 1];
+        if (strcmp(argv[i], "--url") == 0 && i + 1 < argc) s_url_str = argv[i + 1];
     }
     SetUnhandledExceptionFilter(crash_handler);
     printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
@@ -744,7 +746,8 @@ int main(int argc, char** argv) {
         // would otherwise have re-locked after the boot splash)
         nefuos_mark_firstboot_done();
         nefuos_unlock();
-        app_launch(s_auto_app);
+        if (s_auto_app == 17 && s_url_str) browser_launch_url(s_url_str);
+        else app_launch(s_auto_app);
     }
     if (s_shot_path) {
         uint32_t t0 = platform_tick_ms();
