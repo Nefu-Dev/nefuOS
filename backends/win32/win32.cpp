@@ -648,8 +648,9 @@ bool platform_hw_info(HwInfo* out) {
 
 // ---------------- entry ----------------
 static int s_auto_app = -1;
-static const char* s_shot_path = 0;
 static int s_click_x = -1, s_click_y = -1;
+static const char* s_key_str = 0;
+static const char* s_shot_path = 0;
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
 static void save_bmp(const char* path) {
@@ -686,6 +687,7 @@ int main(int argc, char** argv) {
             s_click_x = atoi(argv[i + 1]);
             s_click_y = atoi(argv[i + 2]);
         }
+        if (strcmp(argv[i], "--key") == 0 && i + 1 < argc) s_key_str = argv[i + 1];
     }
     SetUnhandledExceptionFilter(crash_handler);
     printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
@@ -753,6 +755,23 @@ int main(int argc, char** argv) {
                 nefuos_handle_mouse(cx, cy, 0);
                 s_click_x = -1;
                 printf("clicked %d,%d\n", cx, cy);
+            }
+            if (s_key_str && platform_tick_ms() - t0 > 1400) {
+                // inject key sequence (password) then Enter
+                for (const char* p = s_key_str; *p; p++) {
+                    char c = *p;
+                    int kc = 0;
+                    if (c == '\r' || c == '\n') kc = KEY_ENTER;
+                    else if (c == 8) kc = KEY_BACKSPACE;
+                    else if (c == 27) kc = KEY_ESC;
+                    nefuos_handle_key(kc, c, true);
+                    nefuos_handle_key(kc, c, false);
+                    Sleep(24);
+                }
+                nefuos_handle_key(KEY_ENTER, '\r', true);
+                nefuos_handle_key(KEY_ENTER, '\r', false);
+                printf("keys injected: %s\n", s_key_str);
+                s_key_str = 0;
             }
             nefuos_frame(); Sleep(16);
         }
