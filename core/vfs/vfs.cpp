@@ -134,6 +134,7 @@ FSNode* VFS::create_file(const char* path) {
     n->is_dir = false;
     n->parent = parent;
     parent->children.push(n);
+    log_event("create", path);
     return n;
 }
 
@@ -152,11 +153,31 @@ bool VFS::write_file(FSNode* f, const uint8_t* data, uint32_t size) {
     return true;
 }
 
+// NVFS journal: append one line to /var/log/syslog. The journal is a
+// regular file, so `cat /var/log/syslog` / `dmesg` show real
+// filesystem activity. The log is bounded by the caller data size.
+void VFS::log_event(const char* what, const char* path) {
+    if (!what || !path) return;
+    FSNode* log = resolve("/var/log/syslog");
+    if (!log || log->is_dir) return;
+    char buf[260];
+    int n = ksprintf(buf, sizeof(buf), "[%s] %s\n", what, path);
+    if (n <= 0) return;
+    uint32_t old = log->size;
+    uint8_t* d = (uint8_t*)kalloc((size_t)old + (size_t)n + 1);
+    if (!d) return;
+    if (old > 0 && log->data) memcpy(d, log->data, old);
+    memcpy(d + old, buf, (size_t)n);
+    write_file(log, d, old + (uint32_t)n);
+    kfree(d);
+}
+
 bool VFS::remove_node(FSNode* n) {
     if (!n || n == &root_ || !n->parent) return false;
     for (int i = 0; i < n->parent->children.size(); i++) {
         if (n->parent->children[i] == n) {
             n->parent->children.remove(i);
+            log_event("rm", n->name.c_str());
             free_tree(n);
             return true;
         }

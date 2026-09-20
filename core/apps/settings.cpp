@@ -41,6 +41,8 @@ static void settings_lv_click(lv_event_t* e) {
         g_settings.lock_on_suspend = !g_settings.lock_on_suspend;
     } else if (id == 25) {
         g_settings.idle_lock_sec = g_settings.idle_lock_sec ? 0 : 30;
+    } else if (id == 26) {
+        g_settings.browser_engine = g_settings.browser_engine ? 0 : 1;
     } else if (id == 21) {
         os_shutdown();
     } else if (id == 22) {
@@ -68,6 +70,10 @@ static void settings_lv_click(lv_event_t* e) {
     if (id == 25) {
         lv_obj_t* lbl = lv_obj_get_child(btn, 0);
         if (lbl) lv_label_set_text(lbl, g_settings.idle_lock_sec ? "[x] Auto-lock after 30s idle" : "[ ] Auto-lock idle (off)");
+    }
+    if (id == 26) {
+        lv_obj_t* lbl = lv_obj_get_child(btn, 0);
+        if (lbl) lv_label_set_text(lbl, g_settings.browser_engine ? "Browser engine: NoJS" : "Browser engine: MiniJS");
     }
 }
 
@@ -134,17 +140,19 @@ void settings_launch() {
                            200, 314, 180, 26, 24, 0x55678A);
     st->btns[25] = make_btn(st, lw->content, g_settings.idle_lock_sec ? "[x] Auto-lock after 30s idle" : "[ ] Auto-lock idle (off)",
                            12, 346, 260, 26, 25, 0x55678A);
+    st->btns[26] = make_btn(st, lw->content, g_settings.browser_engine ? "Browser engine: NoJS" : "Browser engine: MiniJS",
+                           12, 378, 220, 26, 26, 0x55678A);
 
-    sec_label(lw->content, "Language:", 12, 400);
-    st->btns[18] = make_btn(st, lw->content, "English", 12, 424, 84, 26, 18, 0x3D4B66);
-    st->btns[19] = make_btn(st, lw->content, "Chinese", 104, 424, 84, 26, 19, 0x3D4B66);
+    sec_label(lw->content, "Language:", 12, 412);
+    st->btns[18] = make_btn(st, lw->content, "English", 12, 436, 84, 26, 18, 0x3D4B66);
+    st->btns[19] = make_btn(st, lw->content, "Chinese", 104, 436, 84, 26, 19, 0x3D4B66);
 
     // 硬件信息区
     HwInfo hw;
     platform_hw_info(&hw);
     char hw_txt[256];
     ksprintf(hw_txt, sizeof(hw_txt), "CPU: %s @ %dMHz", hw.cpu_model, hw.cpu_mhz);
-    sec_label(lw->content, hw_txt, 12, 460);
+    sec_label(lw->content, hw_txt, 12, 472);
     ksprintf(hw_txt, sizeof(hw_txt), "Memory: %d MB total", (int)hw.mem_total_mb);
     sec_label(lw->content, hw_txt, 12, 480);
     ksprintf(hw_txt, sizeof(hw_txt), "BIOS: %s %s", hw.bios_vendor, hw.bios_version);

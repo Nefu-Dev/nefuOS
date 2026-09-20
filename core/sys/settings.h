@@ -15,10 +15,11 @@ struct SysSettings {
     bool lock_on_suspend; // Require password on resume from suspend
     bool boot_splash;     // Show boot splash screen during startup
     int  idle_lock_sec;   // Idle timeout in seconds to auto-lock, 0 = disabled
+    int  browser_engine;  // 0 = mini JS engine, 1 = noscript (HTML only)
     char autostart_apps[256]; // Semicolon-separated list of apps to launch on boot
     SysSettings() : accent(0), wallpaper(0), wallpaper_lock(0), wallpaper_boot(0),
         show_clock(true), show_taskbar(true), lang(0),
-        lock_on_suspend(true), boot_splash(true), idle_lock_sec(0), autostart_apps("") {}
+        lock_on_suspend(true), boot_splash(true), idle_lock_sec(0), browser_engine(0), autostart_apps("") {}
 };
 
 extern SysSettings g_settings;

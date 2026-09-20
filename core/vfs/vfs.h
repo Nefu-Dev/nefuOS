@@ -27,6 +27,7 @@ public:
     FSNode* mkdir(const char* path);
     FSNode* create_file(const char* path);
     bool write_file(FSNode* f, const uint8_t* data, uint32_t size);
+    void log_event(const char* what, const char* path);   // NVFS journal -> /var/log/syslog
     bool remove_node(FSNode* n);
     FSNode* move_node(FSNode* n, FSNode* dst_dir, const char* new_name = 0);
 

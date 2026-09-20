@@ -38,6 +38,20 @@
       "description": "Single-header TrueType rasterizer used by core/gui/ttfont.cpp; math/malloc hooks added for the bare-metal kernel."
     },
     {
+      "type": "library",
+      "name": "stb_image",
+      "version": "2.30",
+      "purl": "pkg:github/nothings/stb@2.30",
+      "licenses": [
+        { "license": { "id": "MIT" } },
+        { "license": { "name": "public-domain" } }
+      ],
+      "externalReferences": [
+        { "type": "vcs", "url": "https://github.com/nothings/stb" }
+      ],
+      "description": "Single-header image decoder (JPEG/PNG/GIF/BMP) used by the Image Viewer and the Browser image chain (third_party/stb_image_wrap.cpp)."
+    },
+    {
       "type": "font",
       "name": "Montserrat-Medium",
       "version": "ofl/montserrat (google/fonts)",

@@ -151,17 +151,25 @@ static bool stbi_decode(const uint8_t* data, uint32_t size, Surface& out) {
     return true;
 }
 
+// Shared decode chain (host: GDI+ ; bare: stb -> PPM -> BMP -> JPEG).
+// Used by both the Image Viewer and the Browser so web images render
+// on bare metal too.
+bool decode_image_any(const uint8_t* data, uint32_t size, Surface& out) {
+    if (platform_decode_image(data, size, out)) return true;
+    if (stbi_decode(data, size, out)) return true;
+    if (ppm_decode(data, size, out)) return true;
+    if (bmp_decode(data, size, out)) return true;
+    if (jpeg_decode(data, size, out)) return true;
+    return false;
+}
+
 static void image_load_current(ImageViewState* st) {
     if (st->src.addr) { kfree(st->src.addr); st->src.addr = 0; }
     st->src_ok = false;
     if (st->index < 0 || st->index >= st->files.size()) return;
     FSNode* f = st->files[st->index];
     if (!f || f->is_dir || f->size == 0) return;
-    if (!platform_decode_image(f->data, f->size, st->src))
-        if (!stbi_decode(f->data, f->size, st->src))
-            if (!ppm_decode(f->data, f->size, st->src))
-                if (!bmp_decode(f->data, f->size, st->src))
-                    jpeg_decode(f->data, f->size, st->src);
+    decode_image_any(f->data, f->size, st->src);
     st->src_ok = st->src.addr != 0;
     st->dirty = true;
 }

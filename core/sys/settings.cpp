@@ -56,6 +56,7 @@ void settings_load() {
     g_settings.lock_on_suspend = true;
     g_settings.boot_splash = true;
     g_settings.idle_lock_sec = 0;
+    g_settings.browser_engine = 0;
     g_settings.autostart_apps[0] = 0;
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f || f->is_dir || f->size == 0) return;
@@ -78,6 +79,7 @@ void settings_load() {
             else if (parse_int("lock_suspend", line, &v)) g_settings.lock_on_suspend = (v != 0);
             else if (parse_int("boot_splash", line, &v)) g_settings.boot_splash = (v != 0);
             else if (parse_int("idle_lock", line, &v)) g_settings.idle_lock_sec = v;
+            else if (parse_int("browser_engine", line, &v)) g_settings.browser_engine = v;
             else if (strncmp(line, "autostart=", 10) == 0) {
                 strncpy(g_settings.autostart_apps, line + 10, sizeof(g_settings.autostart_apps)-1);
                 g_settings.autostart_apps[sizeof(g_settings.autostart_apps)-1] = 0;
@@ -95,11 +97,11 @@ void settings_load() {
 void settings_save() {
     char buf[512];
     int n = ksprintf(buf, sizeof(buf),
-        "accent=%d\nwallpaper=%d\nwall_lock=%d\nwall_boot=%d\nclock=%d\ntaskbar=%d\nlang=%d\nlock_suspend=%d\nboot_splash=%d\nidle_lock=%d\nautostart=%s\n",
+        "accent=%d\nwallpaper=%d\nwall_lock=%d\nwall_boot=%d\nclock=%d\ntaskbar=%d\nlang=%d\nlock_suspend=%d\nboot_splash=%d\nidle_lock=%d\nbrowser_engine=%d\nautostart=%s\n",
         g_settings.accent, g_settings.wallpaper, g_settings.wallpaper_lock, g_settings.wallpaper_boot,
         g_settings.show_clock ? 1 : 0, g_settings.show_taskbar ? 1 : 0, g_settings.lang,
         g_settings.lock_on_suspend ? 1 : 0, g_settings.boot_splash ? 1 : 0,
-        g_settings.idle_lock_sec, g_settings.autostart_apps);
+        g_settings.idle_lock_sec, g_settings.browser_engine, g_settings.autostart_apps);
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f) {
         g_vfs->mkdir("/etc");

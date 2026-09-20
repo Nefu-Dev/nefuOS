@@ -7,6 +7,8 @@
 
 #include "apps.h"
 #include "minijs.h"
+#include "../sys/settings.h"
+#include <stdio.h>   // vsnprintf only (no sscanf on bare metal)
 #include "../gui/gfx.h"   // gfx::char16x16 renders the shared CJK table
 #include "../gui/wm.h"
 #include "../gui/gfx.h"
@@ -113,6 +115,68 @@ static char decode_entity(const char* s, int* consumed) {
 }
 
 // =====================================================================
+// URL resolution: relative -> absolute against a base URL
+// =====================================================================
+static void resolve_url(const char* rel, const char* base, char* out, int cap) {
+    if (!rel || !*rel) { out[0] = 0; return; }
+    if (!strncmp(rel, "http://", 7) || !strncmp(rel, "https://", 8) ||
+        !strncmp(rel, "file://", 7)) {
+        int n = (int)strlen(rel); if (n >= cap) n = cap - 1;
+        memcpy(out, rel, n); out[n] = 0; return;
+    }
+    if (!strncmp(rel, "//", 2)) {
+        // protocol-relative: inherit scheme from base
+        int n = 0;
+        if (base && (!strncmp(base, "https:", 6) || !strncmp(base, "http:", 5))) {
+            int sn = (strncmp(base, "https", 5) == 0) ? 6 : 5;
+            if (sn < cap) { memcpy(out, base, sn); out[sn] = 0; n = sn; }
+        }
+        int rn = (int)strlen(rel);
+        if (n + rn < cap) { memcpy(out + n, rel, rn); out[n + rn] = 0; }
+        else { int m = cap - n - 1; if (m > rn) m = rn; memcpy(out + n, rel, m); out[n + m] = 0; }
+        return;
+    }
+    // find scheme://host in base
+    const char* hstart = 0; int hostlen = 0; const char* slash = 0;
+    if (base) {
+        const char* p = strstr(base, "://");
+        if (p) {
+            hstart = p + 3;
+            const char* q = hstart;
+            while (*q && *q != '/' && *q != '?') q++;
+            hostlen = (int)(q - hstart);
+            slash = q;
+        }
+    }
+    int n = 0;
+    if (hstart && hostlen > 0 && n + 7 < cap) {
+        // scheme://host
+        if (strncmp(base, "https", 5) == 0) { memcpy(out + n, "https://", 8); n += 8; }
+        else { memcpy(out + n, "http://", 7); n += 7; }
+        if (n + hostlen < cap) { memcpy(out + n, hstart, hostlen); n += hostlen; }
+    }
+    if (rel[0] == '/') {
+        int rn = (int)strlen(rel);
+        int m = cap - n - 1; if (m > rn) m = rn;
+        memcpy(out + n, rel, m); out[n + m] = 0;
+        return;
+    }
+    // relative: append to base directory
+    if (slash) {
+        const char* d = slash;
+        const char* last = slash;
+        while (*d) { if (*d == '/') last = d; d++; }
+        if (last != slash) {
+            int dl = (int)(last - slash + 1);
+            if (n + dl < cap) { memcpy(out + n, slash, dl); n += dl; }
+        } else if (n + 1 < cap) { out[n++] = '/'; }
+    } else if (n + 1 < cap) { out[n++] = '/'; }
+    int rn = (int)strlen(rel);
+    int m = cap - n - 1; if (m > rn) m = rn;
+    memcpy(out + n, rel, m); out[n + m] = 0;
+}
+
+// =====================================================================
 // Self-contained HTML parser -> List<Line>
 // =====================================================================
 static bool is_void_tag(const char* t) {
@@ -166,7 +230,7 @@ static String get_attr(const char* tag_text, int tag_len, const char* attr_name)
     return result;
 }
 
-static void html_parse(const char* html, int len, List<Line>& out, char* out_title = 0, int title_cap = 0) {
+static void html_parse(const char* html, int len, List<Line>& out, char* out_title = 0, int title_cap = 0, const char* base_url = 0) {
     String cur;
     int font_size = 16;
     bool bold = false;
@@ -183,10 +247,13 @@ static void html_parse(const char* html, int len, List<Line>& out, char* out_tit
     bool in_title = false;
     int title_len = 0;
 
-    // browser engine choice from first-boot setup (/etc/nefu.conf):
+    // browser engine: Settings runtime switch takes priority, otherwise
+    // first-boot setup (/etc/nefu.conf):
     //   browser_engine=noscript disables <script> execution (HTML only).
     bool js_on = true;
-    {
+    if (g_settings.browser_engine != 0) {
+        js_on = false;
+    } else {
         FSNode* conf = g_vfs->resolve("/etc/nefu.conf");
         if (conf && conf->data && conf->size > 0) {
             char cbuf[1024];
@@ -304,6 +371,57 @@ static void html_parse(const char* html, int len, List<Line>& out, char* out_tit
                         cur += buf;
                     }
                 }
+                else if (!strcmp(tname,"pre")) { new_block(); indent+=2; }
+                else if (!strcmp(tname,"center")) { new_block(); }
+                else if (!strcmp(tname,"font")) {
+                    // <font color=.. size=..>: approximate size 1..7 -> 12..32px
+                    String sz = get_attr(html + tag_start, tag_text_len, "size");
+                    if (!sz.empty()) { int v = atoi(sz.c_str()); if (v>=1 && v<=7) font_size = 12 + (v-1)*4; }
+                    String col = get_attr(html + tag_start, tag_text_len, "color");
+                    if (!col.empty()) {
+                        uint32_t c = 0;
+                        if (col[0]=='#' && col.len()>=7) {
+                            // manual hex parse (sscanf is unavailable on bare metal)
+                            unsigned int hv = 0;
+                            for (int k = 1; k < 7; k++) {
+                                char ch = col[k]; hv <<= 4;
+                                if (ch >= '0' && ch <= '9') hv |= (unsigned int)(ch - '0');
+                                else if (ch >= 'a' && ch <= 'f') hv |= (unsigned int)(ch - 'a' + 10);
+                                else if (ch >= 'A' && ch <= 'F') hv |= (unsigned int)(ch - 'A' + 10);
+                            }
+                            c = hv;
+                        } else if (col == "red") c = 0xFF0000;
+                        else if (col == "blue") c = 0x0000FF;
+                        else if (col == "green") c = 0x008000;
+                        else if (col == "gray" || col == "grey") c = 0x808080;
+                        if (c) color = c;
+                    }
+                }
+                else if (!strcmp(tname,"iframe")) {
+                    String src2 = get_attr(html + tag_start, tag_text_len, "src");
+                    if (!src2.empty()) {
+                        flush();
+                        char ab[512];
+                        resolve_url(src2.c_str(), base_url ? base_url : "", ab, (int)sizeof(ab));
+                        char buf[560];
+                        ksprintf(buf, sizeof(buf), "[iframe] %s", ab);
+                        Line l; l.s = buf; l.style = 2; out.push(l);
+                    }
+                }
+                else if (!strcmp(tname,"select")) {
+                    // render the selected option as a form choice line
+                    String sel = get_attr(html + tag_start, tag_text_len, "value");
+                    String nm = get_attr(html + tag_start, tag_text_len, "name");
+                    flush();
+                    Line l; l.form_kind = 1; l.form_name = nm; l.form_val = sel;
+                    l.s = " "; l.style = 3; out.push(l);
+                }
+                else if (!strcmp(tname,"textarea")) {
+                    flush();
+                    Line l; l.form_kind = 1; l.form_name = get_attr(html + tag_start, tag_text_len, "name");
+                    l.form_val = get_attr(html + tag_start, tag_text_len, "value");
+                    l.s = " "; l.style = 3; out.push(l);
+                }
                 else if (!strcmp(tname,"table")) { in_table=true; new_block(); }
                 else if (!strcmp(tname,"tr")) { new_block(); td_count=0; }
                 else if (!strcmp(tname,"td")||!strcmp(tname,"th")) {
@@ -312,12 +430,14 @@ static void html_parse(const char* html, int len, List<Line>& out, char* out_tit
                     if (!strcmp(tname,"th")) bold=true;
                 }
                 else if (!strcmp(tname,"img")) {
-                    // extract src attribute and create image line
+                    // extract src attribute, resolve relative URLs against base
                     String src = get_attr(html + tag_start, tag_text_len, "src");
-                    if (!src.empty()) {
+                    if (!src.empty() && strncmp(src.c_str(), "data:", 5) != 0) {
+                        char ab[512];
+                        resolve_url(src.c_str(), base_url ? base_url : "", ab, (int)sizeof(ab));
                         flush();
                         Line l;
-                        l.image_url = src;
+                        l.image_url = ab[0] ? ab : src;
                         out.push(l);
                     } else {
                         cur += (const char*)"[IMG]";
@@ -389,6 +509,8 @@ static void html_parse(const char* html, int len, List<Line>& out, char* out_tit
                 }
                 else if (!strcmp(tname,"b")||!strcmp(tname,"strong")) bold=false;
                 else if (!strcmp(tname,"a")) color=0;
+                else if (!strcmp(tname,"pre")) { new_block(); indent-=2; if (indent<0) indent=0; }
+                else if (!strcmp(tname,"font")) { font_size = 16; color = 0; }
                 else if (!strcmp(tname,"p")||!strcmp(tname,"div")||is_block_tag(tname)) new_block();
                 else if (!strcmp(tname,"ul")||!strcmp(tname,"ol")) {
                     list_depth--; if (indent>=2) indent-=2; new_block();
@@ -499,7 +621,7 @@ static void browser_image_thread(void* arg) {
     uint8_t* body = 0; uint32_t body_len = 0;
     if (platform_http_get(img->url.c_str(), &body, &body_len) && body && body_len > 0) {
         Surface* s = new Surface();
-        if (platform_decode_image(body, body_len, *s)) {
+        if (decode_image_any(body, body_len, *s)) {
             img->surf = s;
         } else {
             delete s;
@@ -700,7 +822,7 @@ static bool http_post(BrowserState* st, const char* url, const char* body) {
         add_line(st->lines, hdr, 0);
         add_line(st->lines, "", 0);
         if (resp_len > hdr_end)
-            html_parse((const char*)resp + hdr_end, (int)(resp_len - hdr_end), st->lines);
+            html_parse((const char*)resp + hdr_end, (int)(resp_len - hdr_end), st->lines, 0, 0, url);
     } else {
         add_line(st->lines, "No response", 0);
     }
@@ -759,7 +881,7 @@ static bool load_http(BrowserState* st, uint32_t ip, uint16_t port, const char* 
     add_line(st->lines, hdr, 0);
     add_line(st->lines, "", 0);
     if (body_len > hdr_end) {
-        html_parse((const char*)body + hdr_end, (int)(body_len - hdr_end), st->lines);
+        html_parse((const char*)body + hdr_end, (int)(body_len - hdr_end), st->lines, 0, 0, st->url.c_str());
     }
     kfree(body);
     st->scroll = 0;
@@ -808,7 +930,7 @@ static void browser_search(BrowserState* st, const char* q) {
         if (txt) {
             memcpy(txt, body, body_len);
             txt[body_len] = 0;
-            html_parse(txt, (int)body_len, st->lines);
+            html_parse(txt, (int)body_len, st->lines, 0, 0, surl);
             kfree(txt);
         }
         kfree(body);
@@ -912,7 +1034,7 @@ static void browser_page_thread(void* arg) {
                 memcpy(txt, body, body_len);
                 txt[body_len] = 0;
                 char ttl[160]; ttl[0] = 0;
-                html_parse(txt, (int)body_len, st->lines, ttl, (int)sizeof(ttl));
+                html_parse(txt, (int)body_len, st->lines, ttl, (int)sizeof(ttl), url);
                 kfree(txt);
                 page_fallback(st->lines, url, ttl);
             }

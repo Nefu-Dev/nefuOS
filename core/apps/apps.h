@@ -43,6 +43,7 @@ void app_launch(int id);
 void app_launch(const char* name);  // resolve by app name (for autostart)
 void app_show_textview(FSNode* file);
 void app_show_image(FSNode* file);
+bool decode_image_any(const uint8_t* data, uint32_t size, struct Surface& out);
 void app_show_about();
 void app_show_nefud(FSNode* file);
 int  nefud_name_to_app_id(const char* name);
