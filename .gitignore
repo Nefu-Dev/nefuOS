@@ -52,3 +52,5 @@ tools/grub*/
 # Verification screenshots (not source)
 shots/
 crash.txt
+
+_p_*.py
