@@ -737,7 +737,13 @@ int main(int argc, char** argv) {
     nefuos_init();
     // drive frames until the boot splash finishes so LVGL is fully initialised
     { uint32_t t0 = platform_tick_ms(); while (platform_tick_ms() - t0 < 1800) { nefuos_frame(); Sleep(16); } }
-    if (s_auto_app >= 0) app_launch(s_auto_app);
+    if (s_auto_app >= 0) {
+        // test mode: skip first-boot wizard and lock screen (frame loop
+        // would otherwise have re-locked after the boot splash)
+        nefuos_mark_firstboot_done();
+        nefuos_unlock();
+        app_launch(s_auto_app);
+    }
     if (s_shot_path) {
         uint32_t t0 = platform_tick_ms();
         while (platform_tick_ms() - t0 < 2500) {

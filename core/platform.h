@@ -61,6 +61,8 @@ void nefuos_handle_scroll(int delta);
 void nefuos_tick();     // periodic heartbeat (clock/animation)
 void nefuos_frame();    // redraw every frame
 void nefuos_init();     // system init
+void nefuos_mark_firstboot_done(); // mark first-boot wizard complete (test mode)
+void nefuos_unlock(); // unlock the lock screen (test mode)
 void nefuos_shutdown(); // cleanup on exit (saves VFS etc.)
 
 // memory stats (for the info display)

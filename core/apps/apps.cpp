@@ -77,6 +77,7 @@ const char* app_name(int id) {
     case APP_NETCFG: return T("网络", "Network");
     case APP_NEFUD: return T("应用启动器", "App Launcher");
     case APP_FONTVIEW: return "Font Viewer";
+    case APP_EDITOR: return T("代码编辑器", "Code Editor");
     default: return "?";
     }
 }
@@ -114,7 +115,7 @@ static bool s_installed[APP_COUNT];
 static const int PREINSTALLED[] = {
     APP_SNAKE, APP_PAINT, APP_CLOCK, APP_NOTEPAD, APP_MINER,
     APP_IMAGEVIEWER, APP_MUSIC, APP_MONITOR, APP_BROWSER, APP_NETCFG, APP_NEFUD,
-    APP_FONTVIEW
+    APP_FONTVIEW, APP_EDITOR
 };
 
 void apps_preinstall_defaults() {
@@ -279,6 +280,9 @@ void app_launch(int id) {
         break;
     case APP_FONTVIEW:
         if (app_installed(APP_FONTVIEW)) fontview_launch(); else app_show_not_installed("Font Viewer");
+        break;
+    case APP_EDITOR:
+        if (app_installed(APP_EDITOR)) editor_launch(); else app_show_not_installed("Code Editor");
         break;
     default: break;
     }

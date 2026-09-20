@@ -139,6 +139,17 @@ static bool fm_visible(FSNode* n) {
     return true;
 }
 
+static bool is_code_ext(const char* ext) {
+    if (!ext) return false;
+    return strcmp(ext, "c") == 0 || strcmp(ext, "cpp") == 0 || strcmp(ext, "cc") == 0 ||
+           strcmp(ext, "cxx") == 0 || strcmp(ext, "h") == 0 || strcmp(ext, "hpp") == 0 ||
+           strcmp(ext, "hh") == 0 || strcmp(ext, "py") == 0 || strcmp(ext, "sh") == 0 ||
+           strcmp(ext, "js") == 0 || strcmp(ext, "json") == 0 || strcmp(ext, "md") == 0 ||
+           strcmp(ext, "ini") == 0 || strcmp(ext, "conf") == 0 || strcmp(ext, "txt") == 0 ||
+           strcmp(ext, "s") == 0 || strcmp(ext, "asm") == 0 || strcmp(ext, "css") == 0 ||
+           strcmp(ext, "html") == 0 || strcmp(ext, "rs") == 0 || strcmp(ext, "go") == 0;
+}
+
 static void fm_open(FSNode* c) {
     if (c->is_dir) return;
     const char* ext = file_ext(c);
@@ -146,6 +157,7 @@ static void fm_open(FSNode* c) {
             strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0 || strcmp(ext, "png") == 0 ||
             strcmp(ext, "gif") == 0 || strcmp(ext, "img") == 0) app_show_image(c);
     else if (strcmp(ext, "nefud") == 0 || strcmp(ext, "bin") == 0) app_show_nefud(c);
+    else if (is_code_ext(ext)) app_show_editor(c);
     else app_show_textview(c);
 }
 

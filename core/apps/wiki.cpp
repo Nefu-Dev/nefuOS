@@ -17,6 +17,7 @@ bool admin_login(const char* pw);
 void admin_logout();
 
 static const char* WIKI_DB = "/var/lib/nefuos/db/wiki.db";
+static const char* WIKI_ONLINE_URL = "https://miaoda.feishu.cn/app/app_17eecj9ct6k/";
 
 struct WikiEntry {
     String title;
@@ -37,7 +38,7 @@ struct WikiState {
     bool edit_dirty;
     bool login_mode;     // password prompt active
     String pw_buf;       // password buffer (never echoed)
-    Button btns[5];
+    Button btns[6];
     uint8_t last_buttons;
     uint32_t last_key_t;
 };
@@ -69,16 +70,34 @@ static void wiki_seed() {
         "Database\tSystem data lives in /var/lib/nefuos/db: system.db (key/value, "
         "admin-write) and wiki.db (this encyclopedia).~An external 'you-sql' connector "
         "string is reserved in the DSN field for future cloud sync.",
+        "Online Wiki\tThe deployed online Wiki lives at https://miaoda.feishu.cn/app/app_17eecj9ct6k/~"
+        "Guests can read; admin (admin/admin) can edit pages.~"
+        "An offline mirror of the 3 online pages is stored in this local DB, "
+        "so the Wiki keeps working without a network. Click Online to open the "
+        "live site in the browser.",
+        "nefuOS \u4ecb\u7ecd (Online)\tnefuOS \u662f\u4e00\u4e2a\u9762\u5411\u6559\u80b2\u573a\u666f\u7684\u5f00\u6e90\u64cd\u4f5c\u7cfb\u7edf\u9879\u76ee\uff0c\u81f4\u529b\u4e8e\u4e3a\u9ad8\u6821\u5e08\u751f\u63d0\u4f9b\u4e00\u4e2a\u5b89\u5168\u3001\u9ad8\u6548\u3001\u6613\u7528\u7684\u8ba1\u7b97\u73af\u5883\u3002~"
+        "\u4e3b\u8981\u7279\u6027: ~- \u5f00\u6e90\u514d\u8d39: \u57fa\u4e8e Linux \u5185\u6838\uff0c\u5b8c\u5168\u5f00\u6e90~- \u6559\u80b2\u4f18\u5316: \u9884\u88c5\u5e38\u7528\u6559\u5b66\u8f6f\u4ef6\u548c\u5f00\u53d1\u5de5\u5177~- \u5b89\u5168\u7a33\u5b9a: \u5b9a\u671f\u5b89\u5168\u66f4\u65b0\uff0c\u957f\u671f\u652f\u6301~- \u4e2d\u6587\u53cb\u597d: \u5b8c\u5584\u7684\u4e2d\u6587\u672c\u5730\u5316\u652f\u6301~"
+        "\u5feb\u901f\u5f00\u59cb: 1. \u4e0b\u8f7d\u6700\u65b0\u955c\u50cf 2. \u5236\u4f5c\u5b89\u88c5\u4ecb\u8d28 3. \u6309\u5b89\u88c5\u5411\u5bfc\u5b8c\u6210\u5b89\u88c5~"
+        "\u66f4\u591a\u4fe1\u606f: https://miaoda.feishu.cn/app/app_17eecj9ct6k/page/nefos-intro",
+        "\u5b89\u88c5\u6307\u5357 (Online)\t\u7cfb\u7edf\u8981\u6c42: CPU \u53cc\u6838 2GHz / \u5185\u5b58 4GB / \u786c\u76d8 20GB\u3002~"
+        "\u5b89\u88c5\u6b65\u9aa4: 1. \u4ece\u5b98\u65b9\u7f51\u7ad9\u4e0b\u8f7d\u6700\u65b0 ISO \u955c\u50cf 2. \u7528 Rufus \u6216 dd \u5c06\u955c\u50cf\u5199\u5165 USB 3. \u4ece USB \u542f\u52a8\u6309\u5411\u5bfc\u5b89\u88c5\u3002~"
+        "\u5e38\u89c1\u95ee\u9898: \u542f\u52a8\u5931\u8d25\u68c0\u67e5 BIOS \u7684 USB \u542f\u52a8\u9009\u9879\uff1b\u5b89\u88c5\u5361\u4f4f\u66f4\u6362 USB \u63a5\u53e3\u6216\u91cd\u505a\u542f\u52a8\u76d8\u3002~"
+        "\u66f4\u591a\u4fe1\u606f: https://miaoda.feishu.cn/app/app_17eecj9ct6k/page/install-guide",
+        "\u5e38\u7528\u547d\u4ee4\u901f\u67e5 (Online)\t\u6587\u4ef6: ls -la / cd path / cp src dst / mv src dst / rm file / mkdir dir~"
+        "\u5305\u7ba1\u7406: sudo apt update / install pkg / remove pkg / upgrade~"
+        "\u7f51\u7edc: ip addr / ping host / curl url~"
+        "\u8fdb\u7a0b: ps aux / kill pid / top~"
+        "\u66f4\u591a\u4fe1\u606f: https://miaoda.feishu.cn/app/app_17eecj9ct6k/page/command-cheatsheet",
     };
     g_vfs->mkdir("/var/lib/nefuos/db");
     FSNode* f = g_vfs->create_file(WIKI_DB);
     if (!f) return;
-    uint8_t* buf = (uint8_t*)kalloc(4096);
+    uint8_t* buf = (uint8_t*)kalloc(8192);
     if (!buf) return;
     uint8_t* p = buf;
     for (unsigned i = 0; i < sizeof(pages) / sizeof(pages[0]); i++) {
         uint32_t n = (uint32_t)strlen(pages[i]);
-        if ((uint32_t)(p - buf) + n + 2 > 4096) break;
+        if ((uint32_t)(p - buf) + n + 2 > 8192) break;
         memcpy(p, pages[i], (size_t)n);
         p += n;
         *p++ = '\n';
@@ -260,18 +279,18 @@ static void wiki_paint(Window* w) {
     // bottom buttons
     int by = s.height - 22;
     int bxi = s.width - 72;
-    const char* labels[5] = { "Login", "Edit", "New", "Save", "Cancel" };
-    if (admin_is_admin()) labels[0] = "Logout";
+    const char* labels[6] = { "Online", "Login", "Edit", "New", "Save", "Cancel" };
+    if (admin_is_admin()) labels[1] = "Logout";
     bool show_edit = !st->edit_mode && admin_is_admin();
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         Button& b = st->btns[i];
-        b.x = bxi - (4 - i) * 62;
+        b.x = bxi - (5 - i) * 62;
         b.y = by;
         b.w = 56;
         b.h = 18;
         b.id = i;
         b.label = labels[i];
-        bool vis = (i == 0) || (show_edit && (i == 1 || i == 2)) || (st->edit_mode && (i == 3 || i == 4));
+        bool vis = (i == 0) || (i == 1) || (show_edit && (i == 2 || i == 3)) || (st->edit_mode && (i == 4 || i == 5));
         if (vis) ui::draw_button(s, b);
     }
 }
@@ -320,20 +339,21 @@ static void wiki_mouse(Window* w, int mx, int my, uint8_t buttons) {
     if (my >= 2 && my < 20 && mx >= 56 && mx < 256) { st->search_focus = true; return; }
 
     // bottom buttons
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         Button& b = st->btns[i];
         if (mx >= b.x && mx < b.x + b.w && my >= b.y && my < b.y + b.h) {
-            bool vis = (i == 0) || (admin_is_admin() && !st->edit_mode && (i == 1 || i == 2)) ||
-                       (st->edit_mode && (i == 3 || i == 4));
+            bool vis = (i == 0) || (i == 1) || (admin_is_admin() && !st->edit_mode && (i == 2 || i == 3)) ||
+                       (st->edit_mode && (i == 4 || i == 5));
             if (!vis) return;
-            if (i == 0) {
+            if (i == 0) { browser_launch_url(WIKI_ONLINE_URL); return; }
+            if (i == 1) {
                 if (admin_is_admin()) { admin_logout(); }
                 else { st->login_mode = true; st->pw_buf.clear(); st->search_focus = false; return; }
             }
-            if (i == 1) { wiki_begin_edit(st); return; }
-            if (i == 2) { wiki_new_page(st); return; }
-            if (i == 3) { wiki_commit_edit(st); return; }
-            if (i == 4) { st->edit_mode = false; return; }
+            if (i == 2) { wiki_begin_edit(st); return; }
+            if (i == 3) { wiki_new_page(st); return; }
+            if (i == 4) { wiki_commit_edit(st); return; }
+            if (i == 5) { st->edit_mode = false; return; }
         }
     }
 

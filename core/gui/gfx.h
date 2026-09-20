@@ -68,6 +68,7 @@ void circle(Surface& s, int cx, int cy, int r, uint32_t c);
 void fillcircle(Surface& s, int cx, int cy, int r, uint32_t c);
 int sqrti(int v);
 void char8x16(Surface& s, int x, int y, char ch, uint32_t fg, uint32_t bg);
+void char16x16(Surface& s, int x, int y, uint32_t uc, uint32_t fg, uint32_t bg);
 void text(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg);
 void text_scale(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int scale);
 // TrueType text via the platform layer; falls back to the bitmap font when

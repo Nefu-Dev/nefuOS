@@ -3,6 +3,7 @@
 #include "font.h"
 #include "font16.h"
 #include "../platform.h"   // platform_ttf_text / platform_ttf_free
+#include "../apps/cjk_font.h"  // full GB2312 16x16 table (3848 glyphs)
 
 namespace nefu {
 namespace gfx {
@@ -104,6 +105,13 @@ static const uint8_t* glyph16(uint32_t uc) {
         int mid = (lo + hi) / 2;
         if (nefu::font16[mid].uc == uc) return nefu::font16[mid].data;
         if (nefu::font16[mid].uc < uc) lo = mid + 1; else hi = mid - 1;
+    }
+    // fallback: full GB2312 CJK bitmap table (browser and GUI share it)
+    lo = 0; hi = g_cjk_count - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (g_cjk_uni[mid] == uc) return &g_cjk_bits[mid * 32];
+        if (g_cjk_uni[mid] < uc) lo = mid + 1; else hi = mid - 1;
     }
     return 0;
 }

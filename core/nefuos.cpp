@@ -44,6 +44,14 @@ int  nefuos_setup_pwd_len(int field) {
 }
 uint32_t nefuos_setup_fail_ms() { return s_setup_fail_ms; }
 
+void nefuos_mark_firstboot_done() {
+    if (!g_vfs) return;
+    g_vfs->mkdir("/var/lib/nefuos");
+    FSNode* f = g_vfs->create_file("/var/lib/nefuos/firstboot");
+    if (f) g_vfs->write_file(f, (const uint8_t*)"1", 1);
+    s_setup = false;  // wizard state already latched in nefuos_frame
+}
+
 static bool first_boot_pending() {
     return (g_vfs->resolve("/var/lib/nefuos/firstboot") == 0);
 }
@@ -110,6 +118,14 @@ void nefuos_lock_screen() {
     s_locked = true;
     s_lock_len = 0;
     s_lock_pwd[0] = 0;
+}
+
+void nefuos_unlock() {
+    s_locked = false;
+    s_lock_len = 0;
+    s_lock_pwd[0] = 0;
+    s_lock_fail_ms = 0;
+    s_last_activity = platform_tick_ms();
 }
 
 static void lock_verify() {

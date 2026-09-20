@@ -518,12 +518,16 @@ static void on_clock_tick(lv_timer_t* t) {
 }
 
 // ---- public desktop API ----
+static void desktop_lvgl_init(Surface& fb);
+
 void desktop_init() {
     s_start_open = false;
     s_rmenu_open = false;
     s_initialized = false;
     s_dirty = true;
     s_last_sig = 0;
+    Surface fb = screen_surface();
+    desktop_lvgl_init(fb);
 }
 
 // Window overlays change the desktop pixels underneath (window moved / resized
@@ -543,42 +547,51 @@ static uint32_t window_signature() {
     return sig;
 }
 
-void desktop_paint(Surface& fb) {
+// One-time LVGL initialisation. Called early from desktop_init() so that
+// the host "--app N" mode (which never shows the lock screen before the
+// app window is created) has a working LVGL allocator; desktop_paint()
+// just skips this block once s_initialized is set.
+static void desktop_lvgl_init(Surface& fb) {
+    if (s_initialized) return;
     int W = fb.width, H = fb.height;
-    if (!s_initialized) {
-        lv_init();
-        s_fb_buf = (lv_color_t*)kalloc((size_t)W * 24u * 4u);
-        if (!s_fb_buf) return;
-        s_disp = lv_display_create(W, H);
-        lv_display_set_flush_cb(s_disp, lvgl_flush_cb);
-        lv_display_set_buffers(s_disp, s_fb_buf, NULL,
-                               (size_t)W * 24u * 4u, LV_DISPLAY_RENDER_MODE_PARTIAL);
-        s_indev = lv_indev_create();
-        lv_indev_set_type(s_indev, LV_INDEV_TYPE_POINTER);
-        lv_indev_set_read_cb(s_indev, lvgl_read_cb);
-        lv_indev_set_display(s_indev, s_disp);
+    lv_init();
+    s_fb_buf = (lv_color_t*)kalloc((size_t)W * 24u * 4u);
+    if (!s_fb_buf) { s_initialized = true; return; }
+    s_disp = lv_display_create(W, H);
+    lv_display_set_flush_cb(s_disp, lvgl_flush_cb);
+    lv_display_set_buffers(s_disp, s_fb_buf, NULL,
+                           (size_t)W * 24u * 4u, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    s_indev = lv_indev_create();
+    lv_indev_set_type(s_indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(s_indev, lvgl_read_cb);
+    lv_indev_set_display(s_indev, s_disp);
 
-        // keyboard input (keypad indev + shared group for text widgets)
-        s_kb_indev = lv_indev_create();
-        lv_indev_set_type(s_kb_indev, LV_INDEV_TYPE_KEYPAD);
-        lv_indev_set_read_cb(s_kb_indev, lvgl_key_read_cb);
-        lv_indev_set_display(s_kb_indev, s_disp);
-        s_kb_group = lv_group_create();
-        lv_indev_set_group(s_kb_indev, s_kb_group);
-        lv_group_set_default(s_kb_group);
+    // keyboard input (keypad indev + shared group for text widgets)
+    s_kb_indev = lv_indev_create();
+    lv_indev_set_type(s_kb_indev, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(s_kb_indev, lvgl_key_read_cb);
+    lv_indev_set_display(s_kb_indev, s_disp);
+    s_kb_group = lv_group_create();
+    lv_indev_set_group(s_kb_indev, s_kb_group);
+    lv_group_set_default(s_kb_group);
 
-        lv_obj_t* scr = lv_screen_active();
-        build_wallpaper(scr, W, H);
-        for (int i = 0; i < s_icon_count; i++) {
-            s_icon_objs[i] = make_icon(scr, i, s_icons[i].x, s_icons[i].y);
-        }
-        build_taskbar(scr, W, H);
-        build_start_menu(scr, W, H);
-        build_rmenu(scr);
-        lv_timer_create(on_clock_tick, 1000, NULL);
-        s_initialized = true;
-        s_dirty = true;
+    lv_obj_t* scr = lv_screen_active();
+    build_wallpaper(scr, W, H);
+    for (int i = 0; i < s_icon_count; i++) {
+        s_icon_objs[i] = make_icon(scr, i, s_icons[i].x, s_icons[i].y);
     }
+    build_taskbar(scr, W, H);
+    build_start_menu(scr, W, H);
+    build_rmenu(scr);
+    lv_timer_create(on_clock_tick, 1000, NULL);
+    s_initialized = true;
+    s_dirty = true;
+}
+
+void desktop_paint(Surface& fb) {
+    desktop_lvgl_init(fb);
+    if (!s_initialized) return;
+    int W = fb.width, H = fb.height;
     // external overlay changed? then repaint the full desktop
     uint32_t sig = window_signature();
     if (sig != s_last_sig) { s_dirty = true; s_last_sig = sig; }

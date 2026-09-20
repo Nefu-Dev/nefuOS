@@ -73,8 +73,6 @@ start_code:
     # 32bpp linear framebuffer.  LFB base is QEMU stdvga BAR0.
     movl $0xFD000000, %eax
     movl %eax, 0x7000
-    call dbg_char
-    .byte 'V'
     # loop over (index, value) pairs: XRES, YRES, BPP, ENABLE
     # labels are file offsets; add 0x7C00 so DS:SI/DS:DI reach runtime data
     leaw vbe_idx + 0x7C00, %si
@@ -91,9 +89,9 @@ vbe_loop:
     incw %di
     loop vbe_loop
     # bootinfo: X=1024 Y=768 pitch=4096 bpp=32
-    movl $1024, 0x7004
-    movl $768, 0x7008
-    movl $4096, 0x700C
+    movw $1024, 0x7004
+    movw $768, 0x7008
+    movw $4096, 0x700C
     movb $32, 0x7010
     jmp vbe_done
 vbe_idx: .word 1, 2, 3, 4
@@ -115,14 +113,12 @@ cd_load_kernel:
     addw $3, %ax
     shrw $2, %ax
     movw %ax, cd_rem + 0x7C00
-    movl $24, %eax
-    movl %eax, cd_lba + 0x7C00
-    movw $0x2000, %ax
-    movw %ax, cd_seg + 0x7C00
+    movw $24, cd_lba + 0x7C00
+    movw $0x2000, cd_seg + 0x7C00
 cd_loop:
-    cmpw $0, cd_rem + 0x7C00
-    jz  cd_done
     movw cd_rem + 0x7C00, %ax
+    testw %ax, %ax
+    jz  cd_done
     cmpw $32, %ax
     jbe cd_n_ok
     movw $32, %ax
@@ -130,6 +126,8 @@ cd_n_ok:
     movw %ax, cdap1_count + 0x7C00
     movw cd_seg + 0x7C00, %ax
     movw %ax, cdap1_seg + 0x7C00
+    movw cd_off + 0x7C00, %ax
+    movw %ax, cdap1_off + 0x7C00
     movl cd_lba + 0x7C00, %eax
     movl %eax, cdap1_lba + 0x7C00
     movw $cdap1 + 0x7C00, %si
@@ -139,13 +137,16 @@ cd_n_ok:
     jc cd_retry
     # advance: lba += n, seg += n*0x80 (n sectors * 2048B / 16), rem -= n
     movw cdap1_count + 0x7C00, %cx
-    movzwl %cx, %edx
-    movl cd_lba + 0x7C00, %eax
-    addl %edx, %eax
-    movl %eax, cd_lba + 0x7C00
+    movzwl %cx, %eax
+    addl %eax, cd_lba + 0x7C00
     movw %cx, %ax
     shlw $7, %ax
     addw %ax, cd_seg + 0x7C00
+    cmpw $0xB000, cd_seg + 0x7C00
+    jb  cd_adv_ok
+    movw $0x1300, cd_seg + 0x7C00
+    movw $0, cd_off + 0x7C00
+cd_adv_ok:
     subw %cx, cd_rem + 0x7C00
     jmp cd_loop
 cd_done:
@@ -154,8 +155,6 @@ cd_done:
     jmp kernel_loaded
 
 cd_retry:
-    call dbg_char
-    .byte 'C'                 # failed, reset and retry whole load
     xorw %ax, %ax
     int $0x13
     jmp cd_load_kernel
@@ -185,7 +184,7 @@ kernel_loaded:
 cdap1:
     .byte 0x10, 0x00   # size
 cdap1_count: .word 32  # count (2048B sectors, max 32 = 64KB)
-    .word 0x0000       # offset
+    cdap1_off: .word 0x0000  # offset
 cdap1_seg: .word 0x2000  # segment -> physical 0x20000
 cdap1_lba: .long 24    # lba low (kernel starts at LBA24)
     .long 0            # lba high
@@ -195,7 +194,7 @@ cdap1_lba: .long 24    # lba low (kernel starts at LBA24)
 cd_rem:  .word 0       # remaining 2048B CD sectors
 cd_lba:  .long 0       # current physical LBA (48-bit, low 32 used)
 cd_seg:  .word 0       # current load segment
-
+cd_off:  .word 0       # current load offset (segment:offset)
 # ---- bss zero-fill info (patched at build time) ----
 # entry.s reads these to know where to rep stosq the kernel .bss.
 # mingw ld PE symbols for __bss_start/__bss_end are RVAs (0), so the

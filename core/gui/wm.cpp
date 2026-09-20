@@ -50,12 +50,7 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h) {
     win->on_scroll = 0;
     win->on_close = 0;
     win->userdata = 0;
-    win->back.addr = (uint8_t*)kalloc((size_t)win->content_w * (size_t)win->content_h * 4);
-    win->back.width = win->content_w;
-    win->back.height = win->content_h;
-    win->back.pitch = win->content_w * 4;
-    if (!win->back.addr) { delete win; return 0; }
-    win->back.fill(color::PANEL);
+    win->back.addr = 0;
     win->lvw = 0;
     win->lv_canvas = 0;
     // Render the window through an LVGL lv_win container (title bar + close
@@ -87,6 +82,19 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h) {
             lv_obj_set_style_bg_color(lvw->content, lv_color_hex(0xEDF0F6), 0);
             lv_obj_set_style_bg_opa(lvw->content, LV_OPA_COVER, 0);
             lv_obj_set_style_pad_all(lvw->content, 0, 0);
+            // The LVGL header is taller than the legacy 18px assumption;
+            // size the canvas to the REAL content area so app content
+            // (e.g. wiki bottom buttons) is not clipped and stays clickable.
+            int hh = lv_obj_get_height(hdr);
+            if (hh <= 8) hh = 18;
+            win->content_h = h - hh;
+            if (win->content_h < 20) win->content_h = 20;
+            win->back.addr = (uint8_t*)kalloc((size_t)win->content_w * (size_t)win->content_h * 4);
+            win->back.width = win->content_w;
+            win->back.height = win->content_h;
+            win->back.pitch = win->content_w * 4;
+            win->back.fill(color::PANEL);
+            if (!win->back.addr) { delete lvw; lvw = 0; delete win; return 0; }
             lvw->open = true;
             lvw->userdata = win;
             win->lvw = lvw;
@@ -171,7 +179,20 @@ void WM::paint_all(Surface& fb) {
         // framebuffer over the LVGL content area (canvas rendering proved
         // unreliable on this LVGL build, so we bypass it entirely).
         w->content_x = w->x;
-        w->content_y = w->y + wm_hdr_h(w);
+        int hh = wm_hdr_h(w);
+        w->content_y = w->y + hh;
+        // keep the canvas height in sync with the REAL header height once
+        // LVGL has laid the window out (create_window measured too early
+        // and got the default header size). Without this, app content at
+        // the bottom (e.g. wiki buttons) is clipped and unclickable.
+        if (hh > 18) {
+            int nh = w->h - hh;
+            if (nh > 20 && nh != w->content_h) {
+                w->content_h = nh;
+                w->back.height = nh;
+                if (w->lv_canvas) lv_obj_set_size((lv_obj_t*)w->lv_canvas, w->content_w, nh);
+            }
+        }
         if (w->on_paint) w->on_paint(w);
         if (w->back.addr && w->content_w > 0 && w->content_h > 0) {
             gfx::blit_clip(fb, w->back, w->content_x, w->content_y,

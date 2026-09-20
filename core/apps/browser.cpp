@@ -7,6 +7,7 @@
 
 #include "apps.h"
 #include "minijs.h"
+#include "../gui/gfx.h"   // gfx::char16x16 renders the shared CJK table
 #include "../gui/wm.h"
 #include "../gui/gfx.h"
 #include "../gui/widgets.h"
@@ -971,6 +972,7 @@ static uint32_t decode_utf8(const char*& p) {
     return 0xFFFD;
 }
 
+#include "../gui/gfx.h"   // gfx::char16x16 renders the shared CJK table
 static void draw_text_clip(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int maxx) {
     int cx = x;
     const char* p = str;
@@ -980,8 +982,8 @@ static void draw_text_clip(Surface& s, int x, int y, const char* str, uint32_t f
         if (cx + cw > maxx) break;
         if (uc < 0x80) gfx::char8x16(s, cx, y, (char)uc, fg, bg);
         else {
-            // non-ASCII (CJK): draw a solid block as glyph placeholder
-            gfx::fillrect(s, cx, y, 16, 16, fg);
+            // non-ASCII (CJK): render from the built-in 16x16 bitmap font
+            gfx::char16x16(s, cx, y, uc, fg, bg);
         }
         cx += cw;
     }
@@ -1430,9 +1432,9 @@ static void on_close(Window* w) {
 
 } // anonymous namespace
 
-void browser_launch() {
+void browser_launch_url(const char* url) {
     BrowserState* st = new BrowserState();
-    st->input = "file:///README.txt";
+    st->input = url ? url : "file:///README.txt";
     st->cursor = st->input.len();
     st->form_edit_row = -1;
     Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);
@@ -1444,6 +1446,10 @@ void browser_launch() {
     w->on_close = on_close;
     g_wm->raise(w);
     browser_load(st, st->input.c_str());
+}
+
+void browser_launch() {
+    browser_launch_url("file:///README.txt");
 }
 
 } // namespace nefu

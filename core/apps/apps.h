@@ -31,6 +31,7 @@ enum AppId {
     APP_FONTVIEW,
     APP_LVGLDEMO,
     APP_LVGLDESKTOP,
+    APP_EDITOR,
     APP_COUNT
 };
 
@@ -73,9 +74,12 @@ void imageviewer_launch();
 void music_launch();
 void monitor_launch();
 void browser_launch();
+void browser_launch_url(const char* url);
 void netcfg_launch();
 void nefud_launch();
 void fontview_launch();
+void editor_launch();
+void app_show_editor(FSNode* file);
 void wiki_launch();
 
 // tool：cascade window position

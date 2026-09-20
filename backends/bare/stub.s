@@ -33,12 +33,42 @@ stub_start:
     movw $0xE9, %dx
     movb $'S', %al
     outb %al, %dx
-    # cdecl: nefu_inflate(dst=0x100000, dst_cap, src=0x20000+src_off, src_len)
+
+# ---- build-time patched slots (0x80/0x84/0x88 in stub.bin) ----
+.org 0x80
+kernel_src_off: .long 0
+kernel_src_len: .long 0
+kernel_dst_cap: .long 0
+.org 0x8C
+.reloc:
+    # Relocate the payload to 0x300000 so it is contiguous and clear of
+    # the VGA window (0xA0000-0xBFFFF).  boot.s loaded it in two stages:
+    #   0x20000..0xB0000  (first 576KB)  and  0x13000..    (the rest).
+    movl 0x20080, %eax          # src_off = stub size
+    movl 0x20084, %ecx          # src_len = compressed kernel size
+    addl %ecx, %eax             # payload_total = src_off + src_len
+    movl %eax, %edx
+    cmpl $0x90000, %edx         # seg1_len = min(total, 576KB)
+    jbe 1f
+    movl $0x90000, %edx
+1:  movl %edx, %ecx
+    movl $0x20000, %esi
+    movl $0x300000, %edi
+    rep movsb                   # copy first segment
+    subl %edx, %eax             # seg2_len = total - seg1_len
+    jz 2f
+    movl %eax, %ecx
+    movl $0x13000, %esi
+    movl %edx, %edi
+    addl $0x300000, %edi
+    rep movsb                   # copy second segment
+2:
+    # cdecl: nefu_inflate(dst=0x100000, dst_cap, src=0x300000+src_off, src_len)
     # args pushed right-to-left: src_len, src, dst_cap, dst
     movl 0x20084, %eax          # src_len
     pushl %eax
     movl 0x20080, %eax          # src_off
-    addl $0x20000, %eax         # src = payload base + off
+    addl $0x300000, %eax        # src = relocated payload + off
     pushl %eax
     movl 0x20088, %eax          # dst_cap
     pushl %eax
@@ -78,9 +108,3 @@ stub_fail:
     cli
     hlt
     jmp .halt
-
-# ---- build-time patched slots (0x80/0x84/0x88 in stub.bin) ----
-.org 0x80
-kernel_src_off: .long 0
-kernel_src_len: .long 0
-kernel_dst_cap: .long 0
