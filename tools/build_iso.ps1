@@ -1,4 +1,4 @@
-# nefuOS 锛?exe + + + ISO锛?GrubEsp 鏃堕澶栫敓鎴?ESP+GRUB 纾佺洏闀滃儚锛?
+# nefuOS 閿?exe + + + ISO閿?GrubEsp 閺冨爼顤傛径鏍晸閹?ESP+GRUB 绾句胶娲忛梹婊冨剼閿?
 param(
     [switch]$GrubEsp
 )
@@ -37,6 +37,7 @@ $coreSrc = @(
   "core\apps\wiki.cpp",
   "core\apps\calendar.cpp", "core\apps\diskusage.cpp",
   "core\apps\passgen.cpp", "core\apps\sticky.cpp", "core\apps\weather.cpp", "core\apps\help.cpp", "core\apps\dictionary.cpp", "core\apps\screenshot.cpp", "core\apps\colorpicker.cpp", "core\apps\search.cpp", "core\apps\recyclebin.cpp", "core\apps\taskmgr.cpp",
+  "core\apps\downloadmgr.cpp",
   "core\sys\power.cpp",
   "core\apps\bios.cpp",
   "core\audio.cpp",
@@ -54,7 +55,7 @@ $lvglCFlags = @("-std=gnu11", "-O2", "-Wall", "-I", "third_party",
                 "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
                 "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c")
 
-# 1) 锛坵in32锛?
+# 1) 閿涘澋in32閿?
 $bareOut = Join-Path $env:TEMP "nefu_build\bare"
 $distOut = Join-Path $env:TEMP "nefu_dist"
 New-Item -ItemType Directory -Force -Path $bareOut | Out-Null
@@ -117,19 +118,19 @@ $objs += "$bareOut\bare_bare.o"
 if ($LASTEXITCODE -ne 0) { throw "softfloat.cpp failed" }
 $objs += "$bareOut\bare_softfloat.o"
 
-# 3) 锛歜oot sector + kernel entry
+# 3) 閿涙瓬oot sector + kernel entry
 & $as "backends\bare\boot.s" -o "$bareOut\boot.o"
 if ($LASTEXITCODE -ne 0) { throw "boot.s failed" }
 & $as "backends\bare\entry.s" -o "$bareOut\entry.o"
 if ($LASTEXITCODE -ne 0) { throw "entry.s failed" }
 
-# 锛?x20000 kernel_start
+# 閿?x20000 kernel_start
 $objs = @("$bareOut\entry.o") + $objs
 
-# 4) link锛圥E 锛?>
+# 4) link閿涘湧E 閿?>
 & $ld -mi386pep --image-base 0x100000 --gc-sections -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
-# mingw ld of PE 锛?section(.text) of VirtualAddress = absoluteVMA - image_base(=0)锛?# rest section of VirtualAddress = absoluteVMA銆?objcopy -O binary锛孷MA 锛?# loaded to 0x20000 after .rdata/.data/.bss 0x20000锛坰tring/锛岋級銆?# 锛歱arse PE section 锛?section by RVA(absoluteVMA-0x100000) 锛宐ss 0銆?
+# mingw ld of PE 閿?section(.text) of VirtualAddress = absoluteVMA - image_base(=0)閿?# rest section of VirtualAddress = absoluteVMA閵?objcopy -O binary閿涘MA 閿?# loaded to 0x20000 after .rdata/.data/.bss 0x20000閿涘澃tring/閿涘矉绱氶妴?# 閿涙arse PE section 閿?section by RVA(absoluteVMA-0x100000) 閿涘異ss 0閵?
 function Rebin-Kernel {
     param([string]$InExe, [string]$OutBin)
     $fs = [IO.File]::OpenRead($InExe)
@@ -151,8 +152,8 @@ function Rebin-Kernel {
             $va = $br.ReadUInt32()      # VirtualAddress
             $rawSize = $br.ReadUInt32() # SizeOfRawData
             $rawPtr = $br.ReadUInt32()  # PointerToRawData
-            # PE section VirtualAddress image-base(0x100000) of RVA锛?            # loaded to 0x100000 after锛?= RVA锛?text VA=0 -> 0x100000 锛夈€?            # note锛?>= 0x100000 of VA 0x100000锛?.pdata/.data
-            # 0x40000 锛?.text entry锛夈€?            $rva = $va
+            # PE section VirtualAddress image-base(0x100000) of RVA閿?            # loaded to 0x100000 after閿?= RVA閿?text VA=0 -> 0x100000 閿涘鈧?            # note閿?>= 0x100000 of VA 0x100000閿?.pdata/.data
+            # 0x40000 閿?.text entry閿涘鈧?            $rva = $va
             $secs += [pscustomobject]@{ Name = $name; RVA = $rva; RawSize = $rawSize; RawPtr = $rawPtr; VSize = $vs }
         }
         $maxEnd = 0
@@ -264,7 +265,7 @@ if ($bootLen -ne 512) { throw "boot.bin size $bootLen != 512" }
 $payloadSize = (Get-Item "$bareOut\payload.bin").Length
 $kSectors = [Math]::Ceiling($payloadSize / 512)
 $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
-# 0x58锛?x7C58锛岋級锛?$fs.Position = 0x58
+# 0x58閿?x7C58閿涘矉绱氶敍?$fs.Position = 0x58
 $fs.WriteByte([byte]($kSectors -band 0xFF))
 $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
 # CD load is fully dynamic in boot.s now (single DAP at 0x7D60 rewritten
@@ -272,7 +273,7 @@ $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
 $fs.Close()
 Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58)"
 
-# 6) ISO锛圗l Torito no-emulation锛歜oot.bin 鐩存帴鏀惧湪 ISO LBA23锛宬ernel.bin 鏀?LBA24锛?#    boot.s 閫氳繃 int13 0x42 浠?CD 鐩存帴璇诲彇鈥斺€斾笉缁忚繃 floppy.img 涓棿灞傦紝瑁告満鍙洿鎺ュ惎鍔級
+# 6) ISO閿涘湕l Torito no-emulation閿涙瓬oot.bin 閻╁瓨甯撮弨鎯ф躬 ISO LBA23閿涘ernel.bin 閺€?LBA24閿?#    boot.s 闁俺绻?int13 0x42 娴?CD 閻╁瓨甯寸拠璇插絿閳ユ柡鈧柧绗夌紒蹇氱箖 floppy.img 娑擃參妫跨仦鍌︾礉鐟佸憡婧€閸欘垳娲块幒銉ユ儙閸旑煉绱?
 $python = "C:\Users\huawei\AppData\Local\Programs\Python\Python311\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
 $isoOut = Join-Path $distOut "nefuOS.iso"
@@ -280,15 +281,15 @@ $isoOut = Join-Path $distOut "nefuOS.iso"
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
 Write-Output "ISO OK: $((Get-Item $isoOut).Length) bytes"
 
-# 7) ESP + GRUB (UEFI) 纾佺洏闀滃儚锛堝彲閫夛紝-GrubEsp锛夛細
-#    GPT 鍒嗗尯琛?+ FAT32 ESP锛屽惈 BOOTX64.EFI锛圙RUB锛夈€乬rub.cfg銆佸叏閮?GRUB 妯″潡鍜?#    甯?multiboot2 澶寸殑 kernel.bin銆侴RUB 閫氳繃 multiboot2 鍗忚鍔犺浇鍐呮牳锛屽唴鏍歌嚜琛?#    瑙ｆ瀽 framebuffer 鏍囩骞跺缓绔嬪垎椤?闀挎ā寮忥紙瑙?backends/bare/entry.s锛夈€?
+# 7) ESP + GRUB (UEFI) 绾句胶娲忛梹婊冨剼閿涘牆褰查柅澶涚礉-GrubEsp閿涘绱?
+#    GPT 閸掑棗灏悰?+ FAT32 ESP閿涘苯鎯?BOOTX64.EFI閿涘湙RUB閿涘鈧宫rub.cfg閵嗕礁鍙忛柈?GRUB 濡€虫健閸?#    鐢?multiboot2 婢跺娈?kernel.bin閵嗕敬RUB 闁俺绻?multiboot2 閸楀繗顔呴崝鐘烘祰閸愬懏鐗抽敍灞藉敶閺嶆瓕鍤滅悰?#    鐟欙絾鐎?framebuffer 閺嶅洨顒烽獮璺虹紦缁斿鍨庢い?闂€鎸幠佸蹇ョ礄鐟?backends/bare/entry.s閿涘鈧?
 if ($GrubEsp) {
     $grubRoot = Join-Path $root "tools\grub_toolchain"
     $grubCore = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi\monolithic\grubx64.efi"
     $grubMods = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi"
     $grubCfg = Join-Path $root "tools\grub.cfg"
     if (-not (Test-Path $grubCore)) {
-        Write-Output "GRUB toolchain missing 鈥?fetching (tools\fetch_grub_toolchain.py) ..."
+        Write-Output "GRUB toolchain missing 閳?fetching (tools\fetch_grub_toolchain.py) ..."
         & $python "tools\fetch_grub_toolchain.py"
         if ($LASTEXITCODE -ne 0) { throw "fetch_grub_toolchain failed" }
     }

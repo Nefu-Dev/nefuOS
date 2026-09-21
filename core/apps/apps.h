@@ -106,6 +106,7 @@ void fontview_launch();
 void editor_launch();
 void app_show_editor(FSNode* file);
 void wiki_launch();
+void download_list_launch();
 
 // tool：cascade window position
 void cascade_pos(int* x, int* y);

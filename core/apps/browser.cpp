@@ -6,6 +6,7 @@
 // - all network I/O runs on background threads (UI never blocks)
 
 #include "apps.h"
+#include "downloadmgr.h"
 #include "minijs.h"
 #include "../sys/settings.h"
 #include <stdio.h>   // vsnprintf only (no sscanf on bare metal)
@@ -64,7 +65,7 @@ struct BrowserState {
     int status;          // 0 idle 1 loading 2 done 3 error
     bool busy;
     int cursor;
-    Button btns[3];
+    Button btns[5];
     Button* cur;
     uint8_t last_buttons;
     // ---- threaded page download state ----
@@ -1311,18 +1312,18 @@ static void on_paint(Window* w) {
 
     // address bar
     gfx::fillrect(s, 0, 0, w->content_w, BAR_H, color::PANEL);
-    gfx::rect(s, 3, 3, w->content_w - 6 - 150, BAR_H - 6, color::BORDER);
+    gfx::rect(s, 3, 3, w->content_w - 6 - 250, BAR_H - 6, color::BORDER);
     String disp = st->input.empty() ? st->url : st->input;
-    draw_text_clip(s, 8, 7, disp.c_str(), color::TEXT, color::PANEL, w->content_w - 170);
+    draw_text_clip(s, 8, 7, disp.c_str(), color::TEXT, color::PANEL, w->content_w - 270);
     int cur_x = 8 + st->cursor * 8;
-    if (cur_x > w->content_w - 170) cur_x = w->content_w - 170;
+    if (cur_x > w->content_w - 270) cur_x = w->content_w - 270;
     gfx::char8x16(s, cur_x, 7, '|', color::TEXT2, color::PANEL);
 
     // buttons
-    const char* labs[3] = { "Go", "S", "DL" };
-    for (int i = 0; i < 3; i++) {
+    const char* labs[5] = { "Go", "S", "DL", "Bk", "Hist" };
+    for (int i = 0; i < 5; i++) {
         Button& b = st->btns[i];
-        b.x = w->content_w - 144 + i * 48;
+        b.x = w->content_w - 240 + i * 48;
         b.y = 3;
         b.w = 44;
         b.h = 24;
@@ -1610,13 +1611,36 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
                 q += st->input;
                 browser_load(st, q.c_str());
             } else if (st->btns[i].id == 2) {
-                st->status = browser_save_page(st) ? 2 : 3;
+                download_list_launch();
+            } else if (st->btns[i].id == 3) {
+                // Add bookmark
+                bookmarks_add(st, st->url.c_str());
+                st->lines.erase_all();
+                add_line(st->lines, "Bookmark added!", 1);
+                add_line(st->lines, "", 0);
+                add_line(st->lines, st->url.c_str(), 0);
+                add_line(st->lines, "", 0);
+                add_line(st->lines, "All bookmarks:", 2);
+                for (int b = 0; b < st->bookmark_count; b++) {
+                    add_line(st->lines, st->bookmarks[b].c_str(), 2);
+                }
+            } else if (st->btns[i].id == 4) {
+                // Show history
+                st->lines.erase_all();
+                add_line(st->lines, "History", 1);
+                add_line(st->lines, "", 0);
+                for (int h = st->history_count - 1; h >= 0 && h >= st->history_count - 20; h--) {
+                    add_line(st->lines, st->history[h].c_str(), 2);
+                }
+                if (st->history_count == 0) {
+                    add_line(st->lines, "No history yet", 0);
+                }
             }
         }
     }
     st->cur = 0;
 
-    if (pressed && my >= 3 && my < BAR_H - 3 && mx >= 3 && mx < w->content_w - 150) {
+    if (pressed && my >= 3 && my < BAR_H - 3 && mx >= 3 && mx < w->content_w - 250) {
         int pos = (mx - 8) / 8;
         if (pos < 0) pos = 0;
         if (pos > st->input.len()) pos = st->input.len();
