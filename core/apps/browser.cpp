@@ -17,6 +17,7 @@
 #include "../vfs/vfs.h"
 #include "../platform.h"
 #include "../net/net.h"
+#include <cstring>
 
 namespace nefu {
 
@@ -566,6 +567,36 @@ static const char* ltrim_ws(const char* s) {
     return s;
 }
 
+// Heuristic: does this string look like a domain/URL (vs a search keyword)?
+static bool looks_like_domain(const char* s) {
+    if (!s || !*s) return false;
+    if (strncmp(s, "http://", 7) == 0) return true;
+    if (strncmp(s, "https://", 8) == 0) return true;
+    if (strncmp(s, "file://", 7) == 0) return true;
+    if (strncmp(s, "search:", 7) == 0) return false;
+    if (s[0] == '/' || s[0] == '.') return false;
+    for (const char* p = s; *p; p++) if (*p == ' ') return false;
+    // manual strrchr (no libc on bare metal)
+    const char* lastdot = 0;
+    for (const char* p = s; *p; p++) if (*p == '.') lastdot = p;
+    if (!lastdot) return false;
+    int tld_len = 0;
+    for (const char* p = lastdot + 1; *p; p++) {
+        if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')) tld_len++;
+        else if (*p == '/' || *p == ':' || *p == '?') break;
+        else return false;
+    }
+    if (tld_len < 2) return false;
+    for (const char* p = s; *p; p++) {
+        char c = *p;
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) continue;
+        if (c >= '0' && c <= '9') continue;
+        if (c == '.' || c == '-' || c == '/' || c == ':' || c == '_') continue;
+        return false;
+    }
+    return true;
+}
+
 static bool parse_ip(const char* s, uint32_t* out) {
     int parts[4] = {0,0,0,0};
     int idx = 0;
@@ -730,7 +761,7 @@ static int http_append_cookie(const char* url, char* req, int req_len, int cap) 
         *nl = 0;
         // line "host=N; path=/; nefuOS"
         if (strncmp(p, hb, hn) == 0 && p[hn] == '=') {
-            if (!out.empty()) out += '; ';
+            if (!out.empty()) out += "; ";
             out += hb;
             int v = 0;
             while (p[hn + 1 + v] && p[hn + 1 + v] != ';') v++;
@@ -914,17 +945,41 @@ static void walk_search(FSNode* n, WalkCtx* c) {
     }
 }
 
+// URL-encode a search query string
+static void url_encode(const char* in, char* out, int out_cap) {
+    int n = 0;
+    for (const char* p = in; *p && n < out_cap - 4; p++) {
+        char c = *p;
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            out[n++] = c;
+        } else if (c == ' ') {
+            out[n++] = '+';
+        } else {
+            n += ksprintf(out + n, out_cap - n, "%%%02X", (unsigned char)c);
+        }
+    }
+    out[n] = 0;
+}
+
 static void browser_search(BrowserState* st, const char* q) {
-    char surl[512];
-    ksprintf(surl, sizeof(surl), "https://www.bing.com/search?q=%s", q ? q : "");
-    for (char* p = surl; *p; p++) if (*p == ' ') *p = '+';
+    if (!q || !*q) q = "";
+    
+    char enc[256];
+    url_encode(q, enc, sizeof(enc));
+    
+    char surl[300];
+    ksprintf(surl, sizeof(surl), "https://www.bing.com/search?q=%s", enc);
+    
+    st->lines.erase_all();
+    add_line(st->lines, "Bing Search", 1);
+    char head[128];
+    ksprintf(head, sizeof(head), "Query: %s", q);
+    add_line(st->lines, head, 0);
+    add_line(st->lines, "", 0);
+    
     uint8_t* body = 0; uint32_t body_len = 0;
     if (platform_http_get(surl, &body, &body_len) && body && body_len > 0) {
-        st->lines.erase_all();
-        add_line(st->lines, "Bing search", 1);
-        char head[96];
-        ksprintf(head, sizeof(head), "Query: %s", q ? q : "");
-        add_line(st->lines, head, 0);
+        add_line(st->lines, "Searching the web...", 0);
         add_line(st->lines, "", 0);
         char* txt = (char*)kalloc((size_t)body_len + 1);
         if (txt) {
@@ -934,30 +989,26 @@ static void browser_search(BrowserState* st, const char* q) {
             kfree(txt);
         }
         kfree(body);
-        st->scroll = 0; st->status = 2; st->url = "search:";
-        return;
-    }
-    st->lines.erase_all();
-    add_line(st->lines, "Search (local VFS)", 1);
-    char head[96];
-    ksprintf(head, sizeof(head), "Query: %s", q ? q : "");
-    add_line(st->lines, head, 0);
-    add_line(st->lines, "", 0);
-    WalkCtx ctx;
-    ctx.st = st; ctx.q = q ? q : ""; ctx.hits = 0;
-    walk_search(g_vfs->root(), &ctx);
-    if (ctx.hits == 0) {
-        add_line(st->lines, "No matching files in the local file system.", 0);
-        add_line(st->lines, "", 0);
-        add_line(st->lines, "Note: Bing search requires the host build with network access.", 0);
+        st->url = surl;
     } else {
-        char s[64];
-        ksprintf(s, sizeof(s), "%d result(s).", ctx.hits);
-        add_line(st->lines, s, 0);
+        add_line(st->lines, "Web search unavailable (offline)", 0);
+        add_line(st->lines, "", 0);
+        add_line(st->lines, "Local file search:", 2);
+        add_line(st->lines, "", 0);
+        WalkCtx ctx;
+        ctx.st = st; ctx.q = q; ctx.hits = 0;
+        walk_search(g_vfs->root(), &ctx);
+        if (ctx.hits == 0) {
+            add_line(st->lines, "  No matching files found.", 0);
+        } else {
+            char s[64];
+            ksprintf(s, sizeof(s), "  %d local result(s).", ctx.hits);
+            add_line(st->lines, s, 0);
+        }
+        st->url = "search:";
     }
     st->scroll = 0;
     st->status = 2;
-    st->url = "search:";
 }
 
 // When a page has no static text (JS-generated SPA), show a helpful
@@ -1079,9 +1130,37 @@ static void browser_page_thread(void* arg) {
         return;
     }
 
-    // plain word -> search; path-like -> file
+    // plain word -> search; path-like -> file; domain-like -> http
     if (url[0] == '/' || url[0] == '.') {
         load_file(st, url);
+    } else if (looks_like_domain(url)) {
+        // looks like a domain (e.g. "github.com", "www.github.com/foo") -> fetch as http
+        char full[300];
+        ksprintf(full, sizeof(full), "http://%s", url);
+        uint8_t* body = 0; uint32_t body_len = 0;
+        if (platform_http_get(full, &body, &body_len) && body && body_len > 0) {
+            st->lines.erase_all();
+            add_line(st->lines, "HTTP fetch", 1);
+            add_line(st->lines, full, 2);
+            char hdr[80];
+            ksprintf(hdr, sizeof(hdr), "%u bytes received", (unsigned)body_len);
+            add_line(st->lines, hdr, 0);
+            add_line(st->lines, "", 0);
+            char* txt = (char*)kalloc((size_t)body_len + 1);
+            if (txt) {
+                memcpy(txt, body, body_len);
+                txt[body_len] = 0;
+                char ttl[160]; ttl[0] = 0;
+                html_parse(txt, (int)body_len, st->lines, ttl, (int)sizeof(ttl), full);
+                kfree(txt);
+                page_fallback(st->lines, full, ttl);
+            }
+            kfree(body);
+            st->status = 2;
+            st->scroll = 0;
+        } else {
+            show_net_error(st, full, "Connection failed or timed out");
+        }
     } else {
         browser_search(st, url);
     }
@@ -1347,16 +1426,16 @@ static void on_paint(Window* w) {
                 gfx::text(s, xoff + 14, cy + 3, l.form_val.c_str(), color::WHITE, 0x003E7CB1);
                 cy += 24;
             } else if (l.font_size >= 24) {
-                gfx::text_scale(s, xoff, cy, l.s.c_str(), fg, color::WHITE, 2);
-                if (l.bold) gfx::text_scale(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, 2);
+                draw_text_clip(s, xoff, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
+                if (l.bold) draw_text_clip(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
                 cy += 36;
             } else if (l.font_size >= 20) {
-                gfx::text(s, xoff, cy, l.s.c_str(), fg, color::WHITE);
-                if (l.bold) gfx::text(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE);
+                draw_text_clip(s, xoff, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
+                if (l.bold) draw_text_clip(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
                 cy += 22;
             } else {
-                gfx::text(s, xoff, cy, l.s.c_str(), fg, color::WHITE);
-                if (l.bold) gfx::text(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE);
+                draw_text_clip(s, xoff, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
+                if (l.bold) draw_text_clip(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
                 cy += 18;
             }
         }

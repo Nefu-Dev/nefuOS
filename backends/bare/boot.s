@@ -1,20 +1,18 @@
 # nefuOS bare boot sector (El Torito no-emulation, DL=0xE0 real ATAPI CD)
-# Duties: VBE 1024x768x32 -> store LFB/bootinfo at 0x7000 -> load kernel.bin
-# from CD LBA24 (any size, dynamic loop) to 0x20000 -> protected mode ->
-# long mode entry (entry.s) -> nefuos_kernel_main.
+# Duties: boot menu (W = BIOS reboot into Windows) -> VBE 1024x768x32 ->
+# store LFB/bootinfo at 0x7000 -> load kernel.bin from CD LBA24 to 0x20000
+# -> protected mode -> long mode entry (entry.s) -> nefuos_kernel_main.
 # Key design:
 #  1) SeaBIOS no-emulation: DL=0xE0, physical 2048B sectors. int13 AH=0x42
 #     is served by the real ATAPI stack, single call <= 32 sectors (64KB).
-#  2) the payload (stub + compressed kernel) is loaded by a dynamic loop:
-#     one DAP at 0x7D70 is rewritten per call (count <= 32 CD sectors = 64KB),
-#     advancing LBA/segment/remain until kernel_count/4 sectors are read.
-#     SeaBIOS clobber zone 0x7DAA.
-#  3) After each chunk, advance state; a CF=1 failure resets and retries the
-#     whole load.
-#  4) Boot sector tail 0x7DAA-0x7DFF gets clobbered by BIOS int 0x10/0x13,
-#     so GDT/kernel_count/DAPs live in the safe zone 0x7C00-0x7DAA.
-# Memory: 0x6000 VBE mode info; 0x7000 boot info; 0x7C00 boot sector;
-# 0x7E00 boot vars; 0x20000 payload (stub+compressed kernel); 0x100000 kernel; 0x400000 heap.
+#  2) payload is loaded by a dynamic loop: one DAP at 0x7D70 rewritten per
+#     call (count <= 32 CD sectors = 64KB), advancing LBA/segment/remain.
+#     SeaBIOS clobber zone 0x7DAA-0x7DFF is avoided.
+#  3) Boot sector tail 0x7DAA+ gets clobbered by BIOS int 0x10/0x13, so
+#     GDT/kernel_count/DAPs live in the safe zone 0x7C00-0x7DAA.
+# Layout (offsets): 0x00 entry, 0x04 pm_entry, 0x30 gdtr/gdt, 0x58 kernel_count,
+# 0x60 start_code (VBE + CD load), 0x170 DAP, 0x180 CD state,
+# 0x194 menu msg, 0x1C0 bss info, 0x1C8 menu code, 0x1FE 0xAA55.
 .code16
 .org 0
 .section .text
@@ -66,11 +64,13 @@ start_code:
     movw $0x7C00, %sp
     movb %dl, BOOT_DRIVE
     sti
+    jmp menu                     # 2.5s boot menu (W = boot Windows)
 
     # ---- VBE: program the display controller directly through the bochs
     # VBE registers (0x1CE/0x1CF).  QEMU's stdvga maps BIOS VBE modes to
     # 24bpp (unusable pixel layout); direct register setup yields a true
     # 32bpp linear framebuffer.  LFB base is QEMU stdvga BAR0.
+vbe_setup:
     movl $0xFD000000, %eax
     movl %eax, 0x7000
     # loop over (index, value) pairs: XRES, YRES, BPP, ENABLE
@@ -93,10 +93,9 @@ vbe_loop:
     movw $768, 0x7008
     movw $4096, 0x700C
     movb $32, 0x7010
-    jmp vbe_done
+    jmp cd_load_kernel
 vbe_idx: .word 1, 2, 3, 4
 vbe_val: .word 1024, 768, 32, 0x0081
-vbe_done:
 
 # ---- load payload (stub + compressed kernel) from ATAPI CD via int 0x13 AH=0x42 ----
 # payload starts at physical LBA 24 (make_iso.py layout). CD sectors are
@@ -178,8 +177,8 @@ kernel_loaded:
     ljmp $0x08, $0x7C04
 
 # ---- EDD DAP (static slot, fields rewritten per call; clear of clobber) ----
-# Dynamic loader code ends ~0x164; DAP + state sit below the SeaBIOS
-# clobber zone 0x7DAA (= offset 0x1AA), same as the committed 6-DAP layout.
+# Dynamic loader code ends before 0x170; DAP + state sit below the SeaBIOS
+# clobber zone 0x7DAA (= offset 0x1AA), same as the committed layout.
 .org 0x170
 cdap1:
     .byte 0x10, 0x00   # size
@@ -195,6 +194,13 @@ cd_rem:  .word 0       # remaining 2048B CD sectors
 cd_lba:  .long 0       # current physical LBA (48-bit, low 32 used)
 cd_seg:  .word 0       # current load segment
 cd_off:  .word 0       # current load offset (segment:offset)
+
+# ---- boot menu message (fits the free slot 0x194-0x1C0) ----
+.org 0x194
+boot_menu_msg:
+    .ascii "nefuOS - W=Windows 3s"
+    .byte 0
+
 # ---- bss zero-fill info (patched at build time) ----
 # entry.s reads these to know where to rep stosq the kernel .bss.
 # mingw ld PE symbols for __bss_start/__bss_end are RVAs (0), so the
@@ -202,6 +208,37 @@ cd_off:  .word 0       # current load offset (segment:offset)
 .org 0x1C0
 bss_start: .long 0        # absolute runtime address of .bss (0x100000 + RVA)
 bss_size:  .long 0        # .bss VirtualSize in bytes
+
+# ---- boot menu code (fits the free slot 0x1C8-0x1FE) ----
+# Shows a message, waits ~2.5s; pressing W issues int19 (BIOS reboot) so
+# the hard disk boots Windows. No Windows files or registry are touched.
+.org 0x1C8
+menu:
+    leaw boot_menu_msg + 0x7C00, %si
+m_print:
+    lodsb
+    testb %al, %al
+    jz  m_wait
+    movw $0x0E00, %ax
+    int $0x10
+    jmp m_print
+m_wait:
+    movw $0x8600, %ax      # int15 AH=86 delay 2.5s
+    movw $0x0026, %cx
+    movw $0x25A0, %dx
+    int $0x15
+    movw $0x0100, %ax
+    int $0x16
+    jnz m_key
+    jmp vbe_setup
+m_key:
+    xorw %ax, %ax
+    int $0x16
+    andb $0xDF, %al
+    cmpb $'W', %al
+    jne vbe_setup
+    int $0x19              # BIOS reboot -> hard disk -> Windows
+    jmp vbe_setup
 
 .org 0x1FE
     .word 0xAA55

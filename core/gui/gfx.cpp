@@ -99,7 +99,7 @@ static uint32_t utf8_next(const char*& p) {
     p++; return 0xFFFD;
 }
 
-static const uint8_t* glyph16(uint32_t uc) {
+const uint8_t* glyph16(uint32_t uc) {
     int lo = 0, hi = nefu::font16_count - 1;
     while (lo <= hi) {
         int mid = (lo + hi) / 2;
@@ -119,7 +119,12 @@ static const uint8_t* glyph16(uint32_t uc) {
 void char16x16(Surface& s, int x, int y, uint32_t uc, uint32_t fg, uint32_t bg) {
     if (x + 16 < 0 || y + 16 < 0 || x >= s.width || y >= s.height) return;
     const uint8_t* d = glyph16(uc);
-    if (!d) { rect(s, x, y, 16, 16, fg); return; }
+    if (!d) {
+        // glyph not found: draw background + ASCII ? instead of a solid black box
+        fillrect(s, x, y, 16, 16, bg);
+        char8x16(s, x + 4, y, '?', fg, bg);
+        return;
+    }
     for (int row = 0; row < 16; row++) {
         unsigned short b = (unsigned short)((d[row * 2] << 8) | d[row * 2 + 1]);
         if (y + row < 0 || y + row >= s.height) continue;

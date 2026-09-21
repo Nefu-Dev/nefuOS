@@ -8,6 +8,7 @@
 #include "../sys/settings.h"
 #include "../sys/power.h"
 #include "../platform.h"
+#include "lv_cjk_font.h"
 #include "lvgl.h"
 
 #if !defined(NEFU_BARE) && defined(_WIN32)
@@ -25,7 +26,7 @@ const char* nefuos_lock_pwd();
 uint32_t nefuos_lock_fail_ms();
 
 static const int TASKBAR_H = 30;
-static const int ICON_W = 96, ICON_H = 92;
+static const int ICON_W = 72, ICON_H = 72;
 static const int TILE = 52;
 
 // aggregate-only (no ctor): bare kernel never runs C++ static ctors
@@ -50,6 +51,10 @@ static DesktopIcon s_icons[] = {
     {14 + 2 * (ICON_W + 8), 14 + 3 * (ICON_H + 10), "浏览器", APP_BROWSER, false},
     {14, 14 + 4 * (ICON_H + 10), "网络", APP_NETCFG, false},
     {14 + ICON_W + 8, 14 + 4 * (ICON_H + 10), "应用启动器", APP_NEFUD, false},
+    {14 + 2 * (ICON_W + 8), 14 + 4 * (ICON_H + 10), "日历", APP_CALENDAR, false},
+    {14, 14 + 5 * (ICON_H + 10), "磁盘分析", APP_DISKUSAGE, false},
+    {14 + ICON_W + 8, 14 + 5 * (ICON_H + 10), "密码生成器", APP_PASSGEN, false},
+    {14 + 2 * (ICON_W + 8), 14 + 5 * (ICON_H + 10), "便签", APP_STICKY, false},
 };
 static const int s_icon_count = (int)(sizeof(s_icons) / sizeof(s_icons[0]));
 
@@ -334,6 +339,13 @@ static uint32_t icon_color(int app) {
     case APP_BROWSER:    return 0x5A9BD4;
     case APP_NETCFG:     return 0x3FA45A;
     case APP_NEFUD:      return 0xE67E22;
+    case APP_CALENDAR:   return 0xE74C3C;
+    case APP_DISKUSAGE:  return 0x9B59B6;
+    case APP_PASSGEN:    return 0x1ABC9C;
+    case APP_STICKY:     return 0xF1C40F;
+    case APP_WEATHER:    return 0x3498DB;
+    case APP_HELP:       return 0x9B59B6;
+    case APP_DICTIONARY: return 0xE67E22;
     default:             return 0x8899AA;
     }
 }
@@ -374,7 +386,7 @@ static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
     lv_obj_t* lab = lv_label_create(card);
     lv_label_set_text(lab, lbl);
     lv_obj_set_style_text_color(lab, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(lab, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(lab, &lv_font_montserrat_14, 0);
     lv_obj_align(lab, LV_ALIGN_BOTTOM_MID, 0, -4);
     lv_obj_add_event_cb(card, on_icon_click, LV_EVENT_CLICKED, (void*)(intptr_t)i);
     lv_obj_add_event_cb(card, on_icon_release, LV_EVENT_RELEASED, (void*)(intptr_t)i);
@@ -423,7 +435,7 @@ static void build_taskbar(lv_obj_t* scr, int W, int H) {
     s_clock_label = lv_label_create(bar);
     lv_label_set_text(s_clock_label, "--:--");
     lv_obj_set_style_text_color(s_clock_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0);
     lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -10, 0);
 }
 

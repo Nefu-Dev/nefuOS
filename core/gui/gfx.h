@@ -67,6 +67,8 @@ void line(Surface& s, int x0, int y0, int x1, int y1, uint32_t c);
 void circle(Surface& s, int cx, int cy, int r, uint32_t c);
 void fillcircle(Surface& s, int cx, int cy, int r, uint32_t c);
 int sqrti(int v);
+// Get 16x16 glyph data for a Unicode codepoint. Returns NULL if not found.
+const uint8_t* glyph16(uint32_t uc);
 void char8x16(Surface& s, int x, int y, char ch, uint32_t fg, uint32_t bg);
 void char16x16(Surface& s, int x, int y, uint32_t uc, uint32_t fg, uint32_t bg);
 void text(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg);

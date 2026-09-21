@@ -1,5 +1,6 @@
 // nefuOS LVGL application window container implementation
 #include "lvgl_win.h"
+#include "lv_cjk_font.h"
 #include <cstring>
 #include <stddef.h>
 #include "../klib/klib.h"
@@ -55,6 +56,18 @@ LvglWin* lvgl_win_create(const char* title, int x, int y, int w, int h) {
     lv_obj_set_style_bg_color(close_btn, lv_color_hex(0x3D4B66), 0);
     lv_obj_set_style_bg_color(close_btn, lv_color_hex(0xC23B3B), LV_STATE_PRESSED);
     lv_obj_add_event_cb(close_btn, win_close_cb, LV_EVENT_CLICKED, r);
+
+    // Maximize/fullscreen button
+    lv_obj_t* max_btn = lv_win_add_button(r->win, LV_SYMBOL_NEW_LINE, 34);
+    lv_obj_set_style_bg_color(max_btn, lv_color_hex(0x3D4B66), 0);
+    lv_obj_set_style_bg_color(max_btn, lv_color_hex(0x4A9EFF), LV_STATE_PRESSED);
+    // TODO: add maximize callback
+
+    // Minimize button
+    lv_obj_t* min_btn = lv_win_add_button(r->win, LV_SYMBOL_DOWN, 34);
+    lv_obj_set_style_bg_color(min_btn, lv_color_hex(0x3D4B66), 0);
+    lv_obj_set_style_bg_color(min_btn, lv_color_hex(0x9ECE6E), LV_STATE_PRESSED);
+    // TODO: add minimize callback
 
     // Content area: light panel, no padding inside
     r->content = lv_win_get_content(r->win);

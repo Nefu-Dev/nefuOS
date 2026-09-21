@@ -1,4 +1,4 @@
-﻿# nefuOS ： exe + + + ISO（-GrubEsp 时额外生成 ESP+GRUB 磁盘镜像）
+# nefuOS 锛?exe + + + ISO锛?GrubEsp 鏃堕澶栫敓鎴?ESP+GRUB 纾佺洏闀滃儚锛?
 param(
     [switch]$GrubEsp
 )
@@ -22,19 +22,21 @@ if ($LASTEXITCODE -ne 0) { throw "admin hash gen failed" }
 
 $coreSrc = @(
   "core\nefuos.cpp", "core\klib\memory.cpp", "core\klib\string.cpp", "core\klib\printf.cpp",
-  "core\vfs\vfs.cpp", "core\gui\gfx.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
+  "core\vfs\vfs.cpp", "core\gui\gfx.cpp", "core\gui\lv_cjk_font.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
   "core\apps\apps.cpp", "core\apps\terminal.cpp", "core\apps\filemgr.cpp", "core\apps\calc.cpp",
   "core\apps\textview.cpp", "core\apps\sysinfo.cpp", "core\apps\settings.cpp", "core\apps\store.cpp",
   "core\apps\snake.cpp", "core\apps\paint.cpp", "core\apps\clock.cpp", "core\apps\notepad.cpp",
   "core\apps\editor.cpp",
   "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\monitor.cpp",
-  "core\apps\browser.cpp", "core\apps\netcfg.cpp",
+  "core\apps\browser.cpp", "core\apps\browser_engine.cpp", "core\apps\netcfg.cpp",
   "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\apps\minijs.cpp",
   "core\net\net.cpp",
   "core\gui\ttfont.cpp", "core\apps\fontview.cpp",
   "core\gui\lvgl_win.cpp",
     "core\sys\settings.cpp", "core\sys\sha256.cpp",
   "core\apps\wiki.cpp",
+  "core\apps\calendar.cpp", "core\apps\diskusage.cpp",
+  "core\apps\passgen.cpp", "core\apps\sticky.cpp", "core\apps\weather.cpp", "core\apps\help.cpp", "core\apps\dictionary.cpp", "core\apps\screenshot.cpp", "core\apps\colorpicker.cpp", "core\apps\search.cpp", "core\apps\recyclebin.cpp", "core\apps\taskmgr.cpp",
   "core\sys\power.cpp",
   "core\apps\bios.cpp",
   "core\audio.cpp",
@@ -52,7 +54,7 @@ $lvglCFlags = @("-std=gnu11", "-O2", "-Wall", "-I", "third_party",
                 "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
                 "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c")
 
-# 1) （win32）
+# 1) 锛坵in32锛?
 $bareOut = Join-Path $env:TEMP "nefu_build\bare"
 $distOut = Join-Path $env:TEMP "nefu_dist"
 New-Item -ItemType Directory -Force -Path $bareOut | Out-Null
@@ -115,22 +117,19 @@ $objs += "$bareOut\bare_bare.o"
 if ($LASTEXITCODE -ne 0) { throw "softfloat.cpp failed" }
 $objs += "$bareOut\bare_softfloat.o"
 
-# 3) ：boot sector + kernel entry
+# 3) 锛歜oot sector + kernel entry
 & $as "backends\bare\boot.s" -o "$bareOut\boot.o"
 if ($LASTEXITCODE -ne 0) { throw "boot.s failed" }
 & $as "backends\bare\entry.s" -o "$bareOut\entry.o"
 if ($LASTEXITCODE -ne 0) { throw "entry.s failed" }
 
-# ：0x20000 kernel_start
+# 锛?x20000 kernel_start
 $objs = @("$bareOut\entry.o") + $objs
 
-# 4) link（PE ）->
+# 4) link锛圥E 锛?>
 & $ld -mi386pep --image-base 0x100000 --gc-sections -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
-# mingw ld of PE ： section(.text) of VirtualAddress = absoluteVMA - image_base(=0)，
-# rest section of VirtualAddress = absoluteVMA。 objcopy -O binary，VMA ，
-# loaded to 0x20000 after .rdata/.data/.bss 0x20000（string/，）。
-# ：parse PE section ， section by RVA(absoluteVMA-0x100000) ，bss 0。
+# mingw ld of PE 锛?section(.text) of VirtualAddress = absoluteVMA - image_base(=0)锛?# rest section of VirtualAddress = absoluteVMA銆?objcopy -O binary锛孷MA 锛?# loaded to 0x20000 after .rdata/.data/.bss 0x20000锛坰tring/锛岋級銆?# 锛歱arse PE section 锛?section by RVA(absoluteVMA-0x100000) 锛宐ss 0銆?
 function Rebin-Kernel {
     param([string]$InExe, [string]$OutBin)
     $fs = [IO.File]::OpenRead($InExe)
@@ -152,11 +151,8 @@ function Rebin-Kernel {
             $va = $br.ReadUInt32()      # VirtualAddress
             $rawSize = $br.ReadUInt32() # SizeOfRawData
             $rawPtr = $br.ReadUInt32()  # PointerToRawData
-            # PE section VirtualAddress image-base(0x100000) of RVA：
-            # loaded to 0x100000 after， = RVA（.text VA=0 -> 0x100000 ）。
-            # note： >= 0x100000 of VA 0x100000（ .pdata/.data
-            # 0x40000 ， .text entry）。
-            $rva = $va
+            # PE section VirtualAddress image-base(0x100000) of RVA锛?            # loaded to 0x100000 after锛?= RVA锛?text VA=0 -> 0x100000 锛夈€?            # note锛?>= 0x100000 of VA 0x100000锛?.pdata/.data
+            # 0x40000 锛?.text entry锛夈€?            $rva = $va
             $secs += [pscustomobject]@{ Name = $name; RVA = $rva; RawSize = $rawSize; RawPtr = $rawPtr; VSize = $vs }
         }
         $maxEnd = 0
@@ -268,8 +264,7 @@ if ($bootLen -ne 512) { throw "boot.bin size $bootLen != 512" }
 $payloadSize = (Get-Item "$bareOut\payload.bin").Length
 $kSectors = [Math]::Ceiling($payloadSize / 512)
 $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
-# 0x58（0x7C58，）：
-$fs.Position = 0x58
+# 0x58锛?x7C58锛岋級锛?$fs.Position = 0x58
 $fs.WriteByte([byte]($kSectors -band 0xFF))
 $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
 # CD load is fully dynamic in boot.s now (single DAP at 0x7D60 rewritten
@@ -277,8 +272,7 @@ $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
 $fs.Close()
 Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58)"
 
-# 6) ISO（El Torito no-emulation：boot.bin 直接放在 ISO LBA23，kernel.bin 放 LBA24，
-#    boot.s 通过 int13 0x42 从 CD 直接读取——不经过 floppy.img 中间层，裸机可直接启动）
+# 6) ISO锛圗l Torito no-emulation锛歜oot.bin 鐩存帴鏀惧湪 ISO LBA23锛宬ernel.bin 鏀?LBA24锛?#    boot.s 閫氳繃 int13 0x42 浠?CD 鐩存帴璇诲彇鈥斺€斾笉缁忚繃 floppy.img 涓棿灞傦紝瑁告満鍙洿鎺ュ惎鍔級
 $python = "C:\Users\huawei\AppData\Local\Programs\Python\Python311\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
 $isoOut = Join-Path $distOut "nefuOS.iso"
@@ -286,17 +280,15 @@ $isoOut = Join-Path $distOut "nefuOS.iso"
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
 Write-Output "ISO OK: $((Get-Item $isoOut).Length) bytes"
 
-# 7) ESP + GRUB (UEFI) 磁盘镜像（可选，-GrubEsp）：
-#    GPT 分区表 + FAT32 ESP，含 BOOTX64.EFI（GRUB）、grub.cfg、全部 GRUB 模块和
-#    带 multiboot2 头的 kernel.bin。GRUB 通过 multiboot2 协议加载内核，内核自行
-#    解析 framebuffer 标签并建立分页/长模式（见 backends/bare/entry.s）。
+# 7) ESP + GRUB (UEFI) 纾佺洏闀滃儚锛堝彲閫夛紝-GrubEsp锛夛細
+#    GPT 鍒嗗尯琛?+ FAT32 ESP锛屽惈 BOOTX64.EFI锛圙RUB锛夈€乬rub.cfg銆佸叏閮?GRUB 妯″潡鍜?#    甯?multiboot2 澶寸殑 kernel.bin銆侴RUB 閫氳繃 multiboot2 鍗忚鍔犺浇鍐呮牳锛屽唴鏍歌嚜琛?#    瑙ｆ瀽 framebuffer 鏍囩骞跺缓绔嬪垎椤?闀挎ā寮忥紙瑙?backends/bare/entry.s锛夈€?
 if ($GrubEsp) {
     $grubRoot = Join-Path $root "tools\grub_toolchain"
     $grubCore = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi\monolithic\grubx64.efi"
     $grubMods = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi"
     $grubCfg = Join-Path $root "tools\grub.cfg"
     if (-not (Test-Path $grubCore)) {
-        Write-Output "GRUB toolchain missing — fetching (tools\fetch_grub_toolchain.py) ..."
+        Write-Output "GRUB toolchain missing 鈥?fetching (tools\fetch_grub_toolchain.py) ..."
         & $python "tools\fetch_grub_toolchain.py"
         if ($LASTEXITCODE -ne 0) { throw "fetch_grub_toolchain failed" }
     }

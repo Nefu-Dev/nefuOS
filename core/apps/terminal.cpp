@@ -1045,7 +1045,71 @@ static void term_run(TermState* t, const char* cmd) {
         if (s_admin) term_print(t, "honeypot: admin - run `db get users` to inspect access db");
         else term_print(t, "honeypot: guest - read-only access (admin db protected)");
     }
-    else if (strcmp(a0, "shutdown") == 0 || strcmp(a0, "reboot") == 0 || strcmp(a0, "poweroff") == 0) {
+        else if (strcmp(a0, "df") == 0) {
+        term_print(t, "Filesystem      Size  Used Avail Use% Mounted on");
+        term_print(t, "nefuos-root     64M   12M   52M  19% /");
+        term_print(t, "nefuos-home     32M    8M   24M  25% /home");
+        term_print(t, "nefuos-tmp       4M    1M    3M  25% /tmp");
+    }
+    else if (strcmp(a0, "hostname") == 0) {
+        term_print(t, "nefuos-pc");
+    }
+    else if (strcmp(a0, "history") == 0) {
+        for (int i = 0; i < HIST_MAX && s_history[i][0]; i++) {
+            char buf[128];
+            ksprintf(buf, sizeof(buf), "%3d  %s", i + 1, s_history[i]);
+            term_print(t, buf);
+        }
+    }
+    else if (strcmp(a0, "env") == 0 || strcmp(a0, "printenv") == 0) {
+        term_print(t, "PATH=/bin:/usr/bin:/usr/local/bin");
+        term_print(t, "HOME=/home/user");
+        term_print(t, "USER=guest");
+        term_print(t, "SHELL=/bin/nefush");
+        term_print(t, "TERM=xterm-256color");
+        term_print(t, "OS=nefuOS");
+        term_print(t, "ARCH=x86_64");
+    }
+    else if (strcmp(a0, "top") == 0) {
+        term_print(t, "top - nefuOS process monitor");
+        term_print(t, "PID  USER  NI  VIRT  RES  S  %CPU  %MEM  TIME+  COMMAND");
+        term_print(t, "  1  root   0    12M   8M  R   0.5   0.1   0:00.05  desktop");
+        term_print(t, "  2  root   0     8M   6M  S   2.1   0.1   0:00.12  wm");
+        term_print(t, "  3  root   0     4M   3M  S   0.8   0.0   0:00.03  vfs");
+        term_print(t, "  4  root   0     6M   4M  S   1.2   0.1   0:00.08  net");
+        term_print(t, "  5  guest  0     3M   2M  R   3.4   0.0   0:00.15  shell");
+        term_print(t, "");
+        term_print(t, "Tasks: 5 total, 1 running, 4 sleeping");
+        term_print(t, "Cpu(s):  8.9 us,  2.3 sy,  0.0 ni, 88.9 id");
+        term_print(t, "MiB Mem :  64.0 total,  52.0 free,  12.0 used");
+    }
+    else if (strcmp(a0, "kill") == 0) {
+        if (argc < 2) term_print(t, "usage: kill <pid>");
+        else term_print(t, "kill: signal sent (simulated)");
+    }
+    else if (strcmp(a0, "which") == 0) {
+        if (argc < 2) term_print(t, "usage: which <command>");
+        else {
+            String p = "/bin/";
+            p += argv[1];
+            term_print(t, p.c_str());
+        }
+    }
+    else if (strcmp(a0, "who") == 0 || strcmp(a0, "w") == 0) {
+        term_print(t, "user     tty       login@  idle   what");
+        term_print(t, "guest    tty1       now     0.00s  shell");
+    }
+    else if (strcmp(a0, "id") == 0) {
+        term_print(t, "uid=1000(guest) gid=1000(guest) groups=1000(guest)");
+    }
+    else if (strcmp(a0, "chmod") == 0) {
+        if (argc < 3) term_print(t, "usage: chmod <mode> <file>");
+        else term_print(t, "chmod: permissions updated (simulated)");
+    }
+    else if (strcmp(a0, "ln") == 0) {
+        if (argc < 3) term_print(t, "usage: ln <target> <link>");
+        else term_print(t, "ln: symlink created (simulated)");
+    }else if (strcmp(a0, "shutdown") == 0 || strcmp(a0, "reboot") == 0 || strcmp(a0, "poweroff") == 0) {
         term_print(t, "shutting down...");
         nefuos_shutdown();
         platform_poweroff();

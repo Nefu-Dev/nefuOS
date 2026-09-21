@@ -1,5 +1,6 @@
 // nefuOS WM implementation
 #include "wm.h"
+#include "lv_cjk_font.h"
 #include "../klib/klib.h"
 #include "../platform.h"
 #include "lvgl_win.h"

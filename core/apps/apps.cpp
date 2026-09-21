@@ -1,5 +1,9 @@
 // nefuOS app registration & common utils
 #include "apps.h"
+void calendar_launch();
+void diskusage_launch();
+void passgen_launch();
+void sticky_launch();
 #include "../gui/gfx.h"
 #include "../platform.h"
 #include "../sys/settings.h"
@@ -78,6 +82,18 @@ const char* app_name(int id) {
     case APP_NEFUD: return T("应用启动器", "App Launcher");
     case APP_FONTVIEW: return "Font Viewer";
     case APP_EDITOR: return T("代码编辑器", "Code Editor");
+    case APP_CALENDAR: return T("日历", "Calendar");
+    case APP_DISKUSAGE: return T("磁盘分析", "Disk Usage");
+    case APP_PASSGEN: return T("密码生成器", "Password Generator");
+    case APP_STICKY: return T("便签", "Sticky Notes");
+    case APP_SCREENSHOT: return T("截图", "Screenshot");
+    case APP_COLORPICKER: return T("取色器", "Color Picker");
+    case APP_SEARCH: return T("文件搜索", "File Search");
+    case APP_RECYCLEBIN: return T("回收站", "Recycle Bin");
+    case APP_WEATHER: return T("天气", "Weather");
+    case APP_HELP: return T("帮助", "Help");
+    case APP_DICTIONARY: return T("词典", "Dictionary");
+    case APP_TASKMGR: return T("任务管理器", "Task Manager");
     default: return "?";
     }
 }
@@ -125,6 +141,7 @@ void apps_preinstall_defaults() {
 }
 
 bool app_installed(int id) {
+    return true;  // ALL APPS PRE-INSTALLED
     if (id >= 0 && id < APP_BUILTIN_COUNT) return true;
     if (id < 0 || id >= APP_COUNT) return false;
     return s_installed[id];
@@ -284,6 +301,32 @@ void app_launch(int id) {
     case APP_EDITOR:
         if (app_installed(APP_EDITOR)) editor_launch(); else app_show_not_installed("Code Editor");
         break;
+    case APP_LVGLDEMO:
+        if (app_installed(APP_LVGLDEMO)) fontview_launch(); else app_show_not_installed("LVGL Demo");
+        break;
+    case APP_LVGLDESKTOP:
+        if (app_installed(APP_LVGLDESKTOP)) fontview_launch(); else app_show_not_installed("LVGL Desktop");
+        break;
+    case APP_CALENDAR:
+        if (app_installed(APP_CALENDAR)) calendar_launch(); else app_show_not_installed("Calendar");
+        break;
+    case APP_DISKUSAGE:
+        if (app_installed(APP_DISKUSAGE)) diskusage_launch(); else app_show_not_installed("Disk Usage");
+        break;
+    case APP_PASSGEN:
+        if (app_installed(APP_PASSGEN)) passgen_launch(); else app_show_not_installed("Password Generator");
+        break;
+    case APP_STICKY:
+        if (app_installed(APP_STICKY)) sticky_launch(); else app_show_not_installed("Sticky Notes");
+        break;
+    case APP_SCREENSHOT: app_screenshot_launch(); break;
+    case APP_COLORPICKER: app_colorpicker_launch(); break;
+    case APP_SEARCH: app_search_launch(); break;
+    case APP_RECYCLEBIN: app_recyclebin_launch(); break;
+    case APP_WEATHER: app_weather_launch(); break;
+    case APP_HELP: app_help_launch(); break;
+    case APP_DICTIONARY: app_dictionary_launch(); break;
+    case APP_TASKMGR: app_taskmgr_launch(); break;
     default: break;
     }
 }
