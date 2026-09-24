@@ -5,6 +5,10 @@
 #include "../gui/gfx.h"
 #include "../platform.h"
 
+#ifndef NEFU_BARE
+extern "C" char* getenv(const char*);
+#endif
+
 namespace nefu {
 
 static uint32_t m_lcg = 8675309;
@@ -98,6 +102,11 @@ struct MusicLvState {
     uint32_t play_start;
     uint32_t pause_offset;
     int bars[24];
+    // real audio file (host backend, Media Foundation: mp3/wav/m4a/flac/...)
+    char real_path[520];
+    bool real_active;    // a real host audio file is open in the media engine
+    bool real_playing;   // it is currently playing (vs paused/stopped)
+    int vol;             // 0..100 (media engine volume)
 };
 
 static void music_scan(MusicLvState* st) {
@@ -133,7 +142,90 @@ static void play_current_track(MusicLvState* st) {
     platform_play_wav_path(path);
 }
 
+// ---- real audio files (host backend, Media Foundation) ----
+static void music_stop_real(MusicLvState* st) {
+    if (st->real_active) {
+        platform_media_close();
+        st->real_active = false;
+        st->real_playing = false;
+    }
+}
+
+static void music_open_real(MusicLvState* st) {
+    if (!platform_media_available()) return;
+    char path[520];
+    if (!platform_host_file_dialog(path, sizeof(path),
+        "Audio files\0*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.wma;*.opus;*.mp4;*.wmv\0All files\0*.*\0\0",
+        "*.mp3;*.wav")) return;
+    platform_stop_sound();           // stop any synthesized track
+    st->playing = false;
+    st->pause_offset = 0;
+    music_stop_real(st);
+    if (platform_media_open(path, true)) {
+        st->real_active = true;
+        strncpy(st->real_path, path, sizeof(st->real_path) - 1);
+        st->real_path[sizeof(st->real_path) - 1] = 0;
+        platform_media_set_volume(st->vol);
+        platform_media_play();
+        st->real_playing = true;
+        st->playing = true;
+    }
+}
+
+static void music_play(MusicLvState* st) {
+    if (st->real_active) {
+        platform_media_play();
+        st->real_playing = true;
+        st->playing = true;
+        return;
+    }
+    if (!st->playing) { st->play_start = platform_tick_ms(); st->playing = true; play_current_track(st); }
+}
+
+static void music_pause(MusicLvState* st) {
+    if (st->real_active) {
+        platform_media_pause();
+        st->real_playing = false;
+        st->playing = false;
+        return;
+    }
+    if (st->playing) { st->pause_offset += platform_tick_ms() - st->play_start; st->playing = false; platform_stop_sound(); }
+}
+
+static void music_stop(MusicLvState* st) {
+    if (st->real_active) {
+        platform_media_stop();
+        st->real_playing = false;
+        st->playing = false;
+        st->pause_offset = 0;
+        return;
+    }
+    st->playing = false; st->pause_offset = 0; platform_stop_sound();
+}
+
+static void music_prev(MusicLvState* st) {
+    if (st->songs.size() > 0) {
+        music_stop_real(st);
+        st->cur_song = (st->cur_song - 1 + st->songs.size()) % st->songs.size();
+        st->pause_offset = 0; st->play_start = platform_tick_ms(); st->playing = true;
+        play_current_track(st);
+    }
+}
+
+static void music_next(MusicLvState* st) {
+    if (st->songs.size() > 0) {
+        music_stop_real(st);
+        st->cur_song = (st->cur_song + 1) % st->songs.size();
+        st->pause_offset = 0; st->play_start = platform_tick_ms(); st->playing = true;
+        play_current_track(st);
+    }
+}
+
 static int music_progress_ms(MusicLvState* st) {
+    if (st->real_active) {
+        int pos = platform_media_position_sec();
+        return pos >= 0 ? pos * 1000 : 0;
+    }
     if (st->songs.empty()) return 0;
     int dur = st->songs[st->cur_song].duration * 1000;
     if (dur <= 0) return 0;
@@ -142,18 +234,29 @@ static int music_progress_ms(MusicLvState* st) {
     return (int)(elapsed % (uint32_t)dur);
 }
 
+static int music_duration_ms(MusicLvState* st) {
+    if (st->real_active) {
+        int d = platform_media_duration_sec();
+        return d > 0 ? d * 1000 : 0;
+    }
+    if (st->songs.empty()) return 0;
+    return st->songs[st->cur_song].duration * 1000;
+}
+
 static void music_wm_paint(Window* w) {
     MusicLvState* st = (MusicLvState*)w->userdata;
     int W = st->w, H = st->h;
     Surface& s = w->back;
     s.fill(0x0014181E);
-    // transport buttons Prev/Play/Pause/Next/Stop
-    const char* labels[5] = { "Prev", "Play", "Pause", "Next", "Stop" };
-    for (int i = 0; i < 5; i++) {
+    // transport buttons Open/Prev/Play/Pause/Next/Stop
+    const char* labels[6] = { "Open", "Prev", "Play", "Pause", "Next", "Stop" };
+    for (int i = 0; i < 6; i++) {
         int bx = 8 + i * 78;
-        gfx::fillrect(s, bx, 6, 70, 24, 0x003D4B66);
+        uint32_t bg = 0x003D4B66;
+        if (i == 2 && st->playing) bg = 0x002F6FB6;
+        gfx::fillrect(s, bx, 6, 70, 24, bg);
         gfx::rect(s, bx, 6, 70, 24, 0x002B3347);
-        gfx::text(s, bx + (70 - gfx::text_width(labels[i])) / 2, 11, labels[i], color::WHITE, 0x003D4B66);
+        gfx::text(s, bx + (70 - gfx::text_width(labels[i])) / 2, 11, labels[i], color::WHITE, bg);
     }
     for (int i = 0; i < 24; i++) {
         int target = st->playing ? (int)(mrand() % 100) : 5;
@@ -170,77 +273,146 @@ static void music_wm_paint(Window* w) {
         gfx::fillrect(s, 32 + i * bw, by + bh - h, bw - 4, h, c);
     }
     gfx::rect(s, 30, by, W - 60, bh, 0x00304050);
-    char buf[128];
-    if (st->songs.size() > 0) {
+    char buf[160];
+    if (st->real_active) {
+        // real host file: shorten to its file name
+        const char* base = st->real_path;
+        const char* slash = 0;
+        for (const char* p = st->real_path; *p; p++) if (*p == '\\' || *p == '/') slash = p;
+        if (slash) base = slash + 1;
+        ksprintf(buf, sizeof(buf), "Now Playing: %s  [real audio file]", base);
+        gfx::text(s, 32, by + bh + 18, buf, color::WHITE, 0x0014181E);
+    } else if (st->songs.size() > 0) {
         ksprintf(buf, sizeof(buf), "Now Playing: %s", st->songs[st->cur_song].name.c_str());
         gfx::text(s, 32, by + bh + 18, buf, color::WHITE, 0x0014181E);
     }
     int pb_y = by + bh + 42;
     gfx::rect(s, 32, pb_y, W - 64, 10, 0x00304050);
-    if (st->songs.size() > 0) {
+    {
         int prog = music_progress_ms(st);
-        int dur = st->songs[st->cur_song].duration * 1000;
-        int fw = (W - 64) * prog / (dur > 0 ? dur : 1);
-        if (fw > W - 64) fw = W - 64;
-        gfx::fillrect(s, 32, pb_y, fw, 10, color::BLUE_LT);
-        ksprintf(buf, sizeof(buf), "%02d:%02d / %02d:%02d",
-                 prog / 60000, (prog / 1000) % 60, dur / 60000, (dur / 1000) % 60);
-        gfx::text(s, 32, pb_y + 14, buf, color::TEXT2, 0x0014181E);
-        if (st->playing && prog >= dur - 100) {
-            st->cur_song = (st->cur_song + 1) % st->songs.size();
-            st->pause_offset = 0;
-            st->play_start = platform_tick_ms();
-            play_current_track(st);
+        int dur = music_duration_ms(st);
+        if (dur > 0) {
+            int fw = (W - 64) * prog / dur;
+            if (fw > W - 64) fw = W - 64;
+            gfx::fillrect(s, 32, pb_y, fw, 10, color::BLUE_LT);
+            ksprintf(buf, sizeof(buf), "%02d:%02d / %02d:%02d",
+                     prog / 60000, (prog / 1000) % 60, dur / 60000, (dur / 1000) % 60);
+            gfx::text(s, 32, pb_y + 14, buf, color::TEXT2, 0x0014181E);
+            if (st->playing && !st->real_active && prog >= dur - 100) {
+                st->cur_song = (st->cur_song + 1) % st->songs.size();
+                st->pause_offset = 0;
+                st->play_start = platform_tick_ms();
+                play_current_track(st);
+            }
+        } else if (st->real_active) {
+            ksprintf(buf, sizeof(buf), "position unavailable");
+            gfx::text(s, 32, pb_y + 14, buf, color::TEXT2, 0x0014181E);
         }
     }
     gfx::hline(s, 8, W - 8, pb_y + 36, 0x002A323C);
     int ly = pb_y + 44;
-    gfx::text(s, 32, ly, "Playlist", color::BLUE_LT, 0x0014181E);
-    ly += 18;
-    for (int i = 0; i < st->songs.size() && i < 8; i++) {
-        bool sel = (i == st->cur_song);
-        uint32_t bg = sel ? 0x002F3B4C : 0x0014181E;
-        gfx::fillrect(s, 24, ly, W - 48, 16, bg);
-        char num[8];
-        ksprintf(num, sizeof(num), "%d.", i + 1);
-        gfx::text(s, 28, ly + 1, num, color::TEXT2, bg);
-        gfx::text(s, 52, ly + 1, st->songs[i].name.c_str(), sel ? color::WHITE : color::LIGHT, bg);
-        int dur = st->songs[i].duration;
-        ksprintf(buf, sizeof(buf), "%02d:%02d", dur / 60, dur % 60);
-        gfx::text(s, W - 72, ly + 1, buf, color::TEXT2, bg);
-        if (sel && st->playing) gfx::text(s, W - 92, ly + 1, ">>", color::GREEN, bg);
+    if (st->real_active) {
+        gfx::text(s, 32, ly, "Real audio file (Media Foundation decoder)", color::BLUE_LT, 0x0014181E);
+        ly += 18;
+        char vb[64];
+        ksprintf(vb, sizeof(vb), "Volume: %d%%", st->vol);
+        gfx::text(s, 32, ly, vb, color::LIGHT, 0x0014181E);
+        ly += 18;
+        gfx::text(s, 32, ly, "Open another file, or Prev/Next returns to the built-in tracks.",
+                  color::TEXT2, 0x0014181E);
         ly += 16;
+        gfx::text(s, 32, ly, "Space play/pause   <-  -> seek 5s   +/- volume", color::TEXT2, 0x0014181E);
+    } else {
+        gfx::text(s, 32, ly, "Playlist", color::BLUE_LT, 0x0014181E);
+        ly += 18;
+        for (int i = 0; i < st->songs.size() && i < 8; i++) {
+            bool sel = (i == st->cur_song);
+            uint32_t bg = sel ? 0x002F3B4C : 0x0014181E;
+            gfx::fillrect(s, 24, ly, W - 48, 16, bg);
+            char num[8];
+            ksprintf(num, sizeof(num), "%d.", i + 1);
+            gfx::text(s, 28, ly + 1, num, color::TEXT2, bg);
+            gfx::text(s, 52, ly + 1, st->songs[i].name.c_str(), sel ? color::WHITE : color::LIGHT, bg);
+            int dur = st->songs[i].duration;
+            ksprintf(buf, sizeof(buf), "%02d:%02d", dur / 60, dur % 60);
+            gfx::text(s, W - 72, ly + 1, buf, color::TEXT2, bg);
+            if (sel && st->playing) gfx::text(s, W - 92, ly + 1, ">>", color::GREEN, bg);
+            ly += 16;
+        }
+        char vb[64];
+        ksprintf(vb, sizeof(vb), "Volume: %d%%", st->vol);
+        gfx::text(s, W - gfx::text_width(vb) - 24, ly + 2, vb, color::TEXT2, 0x0014181E);
+        gfx::text(s, 32, ly + 18, "Open = play a real audio file (mp3/wav/flac/m4a/...)   +/- volume",
+                  color::TEXT2, 0x0014181E);
     }
 }
 
 static void music_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
     MusicLvState* st = (MusicLvState*)w->userdata;
     if (!st || !buttons) return;
-    if (!(my >= 6 && my < 30)) return;
-    int action = -1;
-    for (int i = 0; i < 5; i++) {
-        int bx = 8 + i * 78;
-        if (mx >= bx && mx < bx + 70) { action = i; break; }
-    }
-    if (action == 0) {           // Play
-        if (!st->playing) { st->play_start = platform_tick_ms(); st->playing = true; play_current_track(st); }
-    } else if (action == 1) {    // Pause
-        if (st->playing) { st->pause_offset += platform_tick_ms() - st->play_start; st->playing = false; platform_stop_sound(); }
-    } else if (action == 2) {    // Prev
-        if (st->songs.size() > 0) {
-            st->cur_song = (st->cur_song - 1 + st->songs.size()) % st->songs.size();
-            st->pause_offset = 0; st->play_start = platform_tick_ms(); st->playing = true;
-            play_current_track(st);
+    if (my >= 6 && my < 30) {
+        int action = -1;
+        for (int i = 0; i < 6; i++) {
+            int bx = 8 + i * 78;
+            if (mx >= bx && mx < bx + 70) { action = i; break; }
         }
-    } else if (action == 3) {    // Next
-        if (st->songs.size() > 0) {
-            st->cur_song = (st->cur_song + 1) % st->songs.size();
-            st->pause_offset = 0; st->play_start = platform_tick_ms(); st->playing = true;
-            play_current_track(st);
-        }
-    } else {                     // Stop
-        st->playing = false; st->pause_offset = 0; platform_stop_sound();
+        if (action == 0) music_open_real(st);
+        else if (action == 1) music_prev(st);
+        else if (action == 2) music_play(st);
+        else if (action == 3) music_pause(st);
+        else if (action == 4) music_next(st);
+        else if (action == 5) music_stop(st);
+        return;
     }
+    // click on the progress bar seeks (real files only)
+    int by = 56;
+    int pb_y = by + (st->h * 2 / 5) + 42;
+    if (my >= pb_y && my < pb_y + 10 && st->real_active) {
+        int dur = platform_media_duration_sec();
+        if (dur > 0) {
+            int rel = mx - 32;
+            int w2 = st->w - 64;
+            if (rel < 0) rel = 0;
+            if (rel > w2) rel = w2;
+            platform_media_seek_sec(rel * dur / w2);
+        }
+        return;
+    }
+}
+
+static void music_wm_key(Window* w, const KeyEvent* e) {
+    MusicLvState* st = (MusicLvState*)w->userdata;
+    if (!st || !e->down) return;
+    if (e->keycode == KEY_SPACE || e->ascii == ' ') {
+        if (st->playing) music_pause(st);
+        else music_play(st);
+    } else if (e->keycode == KEY_LEFT) {
+        if (st->real_active) {
+            int p = platform_media_position_sec();
+            if (p > 5) platform_media_seek_sec(p - 5); else platform_media_seek_sec(0);
+        } else music_prev(st);
+    } else if (e->keycode == KEY_RIGHT) {
+        if (st->real_active) {
+            int p = platform_media_position_sec();
+            platform_media_seek_sec(p + 5);
+        } else music_next(st);
+    } else if (e->keycode == KEY_UP || e->ascii == '+' || e->ascii == '=') {
+        st->vol += 10; if (st->vol > 100) st->vol = 100;
+        platform_media_set_volume(st->vol);
+    } else if (e->keycode == KEY_DOWN || e->ascii == '-' || e->ascii == '_') {
+        st->vol -= 10; if (st->vol < 0) st->vol = 0;
+        platform_media_set_volume(st->vol);
+    } else if (e->ascii == 'o' || e->ascii == 'O') {
+        music_open_real(st);
+    }
+}
+
+static void music_wm_close(Window* w) {
+    MusicLvState* st = (MusicLvState*)w->userdata;
+    if (!st) return;
+    if (st->real_active) platform_media_close();
+    st->real_active = false;
+    platform_stop_sound();
 }
 
 void music_launch() {
@@ -254,13 +426,34 @@ void music_launch() {
     st->playing = false;
     st->play_start = 0;
     st->pause_offset = 0;
+    st->real_path[0] = 0;
+    st->real_active = false;
+    st->real_playing = false;
+    st->vol = 70;
     for (int i = 0; i < 24; i++) st->bars[i] = 0;
     st->w = w->content_w;
     st->h = w->content_h;
     w->userdata = st;
     w->on_paint = music_wm_paint;
     w->on_mouse = music_wm_mouse;
+    w->on_key = music_wm_key;
+    w->on_close = music_wm_close;
     music_scan(st);
     g_wm->raise(w);
+#ifndef NEFU_BARE
+    // host test hook: NEFU_AUTO_MEDIA=<path> auto-opens a real audio file
+    const char* am = getenv("NEFU_AUTO_MEDIA");
+    if (am && am[0] && platform_media_available()) {
+        if (platform_media_open(am, true)) {
+            st->real_active = true;
+            strncpy(st->real_path, am, sizeof(st->real_path) - 1);
+            st->real_path[sizeof(st->real_path) - 1] = 0;
+            platform_media_set_volume(st->vol);
+            platform_media_play();
+            st->real_playing = true;
+            st->playing = true;
+        }
+    }
+#endif
 }
 } // namespace nefu

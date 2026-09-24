@@ -16,6 +16,21 @@ String::String(const char* s) : buf_(0), len_(0), cap_(0) {
     else { len_ = 0; cap_ = 0; }
 }
 
+String::String(const char* s, int len) : buf_(0), len_(0), cap_(0) {
+    if (!s) s = "";
+    if (len < 0) len = 0;
+    len_ = len;
+    cap_ = len_ + 1;
+    buf_ = new char[cap_];
+    if (buf_) {
+        memcpy(buf_, s, (size_t)len_);
+        buf_[len_] = 0;
+    } else {
+        len_ = 0;
+        cap_ = 0;
+    }
+}
+
 String::String(const String& o) : buf_(0), len_(0), cap_(0) {
     cap_ = o.cap_;
     len_ = o.len_;

@@ -1,0 +1,322 @@
+// nefuOS Browser - Simple Real-Search Version
+#include "apps.h"
+#include "../gui/gfx.h"
+#include "../gui/wm.h"
+#include "../klib/klib.h"
+#include "../platform.h"
+#include "../net/net.h"
+#include <cstring>
+#include <cstdio>
+
+namespace nefu {
+
+namespace {
+
+const int BAR_H = 36;
+const int STAT_H = 22;
+
+// Case-insensitive string compare
+static int strncasecmp(const char* a, const char* b, int n) {
+    for (int i = 0; i < n; i++) {
+        char ca = a[i];
+        char cb = b[i];
+        if (ca >= 'A' && ca <= 'Z') ca += 32;
+        if (cb >= 'A' && cb <= 'Z') cb += 32;
+        if (ca != cb) return (unsigned char)ca - (unsigned char)cb;
+        if (ca == 0) return 0;
+    }
+    return 0;
+}
+
+// URL encode a string
+static void url_encode(const char* in, char* out, int out_cap) {
+    int n = 0;
+    for (const char* p = in; *p && n < out_cap - 4; p++) {
+        char c = *p;
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+            out[n++] = c;
+        } else {
+            n += ksprintf(out + n, 16, "%%%02X", (unsigned char)c);
+        }
+    }
+    out[n] = 0;
+}
+
+// Simple HTML to text converter - strips tags, extracts text
+static void html_to_text(const char* html, int len, char* out, int out_cap) {
+    int oi = 0;
+    bool in_tag = false;
+    bool in_script = false;
+    
+    for (int i = 0; i < len && oi < out_cap - 2; i++) {
+        char c = html[i];
+        
+        if (in_script) {
+            if (c == '<' && i + 6 < len && strncmp(html + i, "</script", 7) == 0) {
+                in_script = false;
+                i += 6;
+            }
+            continue;
+        }
+        
+        if (c == '<') {
+            in_tag = true;
+            // Check for script/style tags
+            if (i + 7 < len && strncasecmp(html + i + 1, "script", 6) == 0) {
+                in_script = true;
+            }
+            if (i + 6 < len && strncasecmp(html + i + 1, "style", 5) == 0) {
+                in_script = true;  // treat style as script too
+            }
+            continue;
+        }
+        if (c == '>') {
+            in_tag = false;
+            continue;
+        }
+        if (in_tag) continue;
+        
+        // Decode common entities
+        if (c == '&' && i + 3 < len) {
+            if (html[i+1] == 'l' && html[i+2] == 't' && html[i+3] == ';') {
+                out[oi++] = '<';
+                i += 3;
+                continue;
+            }
+            if (html[i+1] == 'g' && html[i+2] == 't' && html[i+3] == ';') {
+                out[oi++] = '>';
+                i += 3;
+                continue;
+            }
+            if (html[i+1] == 'a' && html[i+2] == 'm' && html[i+3] == 'p' && i + 4 < len && html[i+4] == ';') {
+                out[oi++] = '&';
+                i += 4;
+                continue;
+            }
+        }
+        
+        // Skip excessive whitespace
+        if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+            if (oi > 0 && out[oi-1] != '\n' && out[oi-1] != ' ') {
+                out[oi++] = ' ';
+            }
+            continue;
+        }
+        
+        out[oi++] = c;
+    }
+    out[oi] = 0;
+}
+
+
+// Ultra-simple browser state
+struct BrowserState {
+    char input[256];
+    int input_len;
+    char page_title[64];
+    char page_body[4096];  // simple text page
+    int page_len;
+    int scroll;
+
+    BrowserState() : input_len(0), page_len(0), scroll(0) {
+        input[0] = 0;
+        page_title[0] = 0;
+        page_body[0] = 0;
+    }
+};
+
+static void on_paint(Window* w) {
+    BrowserState* st = (BrowserState*)w->userdata;
+    if (!st) return;
+    Surface& s = w->back;
+    
+    // White background
+    gfx::fillrect(s, 0, 0, w->content_w, w->content_h, 0xFFFFFF);
+    
+    // Title bar
+    gfx::fillrect(s, 0, 0, w->content_w, BAR_H, 0xF0F0F0);
+    gfx::rect(s, 3, 3, w->content_w - 6, BAR_H - 6, 0xCCCCCC);
+    
+    // Address bar text
+    if (st->input_len > 0) {
+        gfx::text(s, 8, 9, st->input, 0x000000, 0xF0F0F0);
+    } else {
+        gfx::text(s, 8, 9, "Enter URL or search...", 0x999999, 0xF0F0F0);
+    }
+    
+    // Cursor
+    int cur_x = 8 + st->input_len * 8;
+    gfx::char8x16(s, cur_x, 9, '|', 0x666666, 0xF0F0F0);
+    
+    // Page content area
+    int content_y = BAR_H + 4;
+    int content_h = w->content_h - BAR_H - STAT_H - 8;
+    
+    // Page title
+    if (st->page_title[0]) {
+        gfx::text(s, 8, content_y, st->page_title, 0x000000, 0xFFFFFF);
+        content_y += 24;
+    }
+    
+    // Page body - simple text rendering, line by line
+    if (st->page_len > 0) {
+        int y = content_y - st->scroll;
+        char line[256];
+        int li = 0;
+        int col = 0;
+        for (int i = 0; i < st->page_len && y < w->content_h - STAT_H; i++) {
+            char c = st->page_body[i];
+            if (c == '\n' || col >= 70) {
+                line[col] = 0;
+                if (line[0]) {
+                    gfx::text(s, 8, y, line, 0x333333, 0xFFFFFF);
+                }
+                y += 16;
+                col = 0;
+                if (c == '\n') continue;
+            }
+            if (col < 250) {
+                line[col++] = c;
+            }
+        }
+        // Last line
+        if (col > 0 && y < w->content_h - STAT_H) {
+            line[col] = 0;
+            gfx::text(s, 8, y, line, 0x333333, 0xFFFFFF);
+        }
+    } else {
+        // Home page
+        const char* home[] = {
+            "nefuOS Browser",
+            "",
+            "Welcome to nefuOS Browser!",
+            "",
+            "Type a URL or search query above and press Enter.",
+            "",
+            "Examples:",
+            "  github.com",
+            "  bing.com",
+            "  hello world",
+        };
+        int y = content_y + 20;
+        for (int i = 0; i < 10; i++) {
+            gfx::text(s, 8, y, home[i], 0x555555, 0xFFFFFF);
+            y += 20;
+        }
+    }
+    
+    // Status bar
+    gfx::fillrect(s, 0, w->content_h - STAT_H, w->content_w, STAT_H, 0xE0E0E0);
+    char status[64];
+    if (st->page_len > 0) {
+        ksprintf(status, sizeof(status), "Loaded: %d bytes", st->page_len);
+    } else {
+        ksprintf(status, sizeof(status), "Ready");
+    }
+    gfx::text(s, 6, w->content_h - STAT_H + 4, status, 0x666666, 0xE0E0E0);
+}
+
+static void on_key(Window* w, const KeyEvent* e) {
+    BrowserState* st = (BrowserState*)w->userdata;
+    if (!st || !e) return;
+    if (!e->down) return;
+    
+    if (e->keycode == KEY_BACKSPACE) {
+        if (st->input_len > 0) {
+            st->input_len--;
+            st->input[st->input_len] = 0;
+        }
+    } else if (e->keycode == KEY_ENTER) {
+        // Do real search!
+        if (st->input_len > 0) {
+            // Build search URL
+            char encoded[200];
+            url_encode(st->input, encoded, sizeof(encoded));
+            char surl[256];
+            ksprintf(surl, sizeof(surl), "https://www.bing.com/search?q=%s", encoded);
+            
+            // Show loading
+            ksprintf(st->page_title, sizeof(st->page_title), "Searching: %s", st->input);
+            ksprintf(st->page_body, sizeof(st->page_body), "Loading...");
+            st->page_len = strlen(st->page_body);
+            st->scroll = 0;
+            
+            // Do HTTP request
+            uint8_t* body = 0;
+            uint32_t body_len = 0;
+            if (platform_http_get(surl, &body, &body_len) && body && body_len > 0) {
+                // Convert HTML to text
+                html_to_text((const char*)body, body_len, st->page_body, sizeof(st->page_body) - 1);
+                st->page_len = strlen(st->page_body);
+                ksprintf(st->page_title, sizeof(st->page_title), "Results for: %s", st->input);
+                kfree(body);
+            } else {
+                ksprintf(st->page_title, sizeof(st->page_title), "Search Failed");
+                ksprintf(st->page_body, sizeof(st->page_body), 
+                    "Could not reach search server.\n\nCheck your network connection.\nURL: %s", surl);
+                st->page_len = strlen(st->page_body);
+            }
+            st->scroll = 0;
+        }
+    } else if (e->keycode == KEY_ESC) {
+        st->input_len = 0;
+        st->input[0] = 0;
+    } else if (e->keycode == KEY_UP) {
+        st->scroll -= 32;
+        if (st->scroll < 0) st->scroll = 0;
+    } else if (e->keycode == KEY_DOWN) {
+        st->scroll += 32;
+    } else if ((unsigned char)e->ascii >= 32 && (unsigned char)e->ascii < 127) {
+        if (st->input_len < 250) {
+            st->input[st->input_len] = e->ascii;
+            st->input_len++;
+            st->input[st->input_len] = 0;
+        }
+    }
+}
+
+static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    // Do nothing - just clicks are ignored for now
+}
+
+static void on_scroll(Window* w, int delta) {
+    BrowserState* st = (BrowserState*)w->userdata;
+    if (!st) return;
+    st->scroll += delta * 16;
+    if (st->scroll < 0) st->scroll = 0;
+}
+
+static void on_close(Window* w) {
+    BrowserState* st = (BrowserState*)w->userdata;
+    if (st) delete st;
+}
+
+} // anonymous namespace
+
+void browser_launch_url(const char* url) {
+    BrowserState* st = new BrowserState();
+    if (url && *url) {
+        int len = 0;
+        while (url[len] && len < 250) {
+            st->input[len] = url[len];
+            len++;
+        }
+        st->input[len] = 0;
+        st->input_len = len;
+    }
+    Window* w = g_wm->create_window("Browser", 40, 30, 680, 480);
+    if (!w) { delete st; return; }
+    w->userdata = st;
+    w->on_paint = on_paint;
+    w->on_key = on_key;
+    w->on_mouse = on_mouse;
+    w->on_scroll = on_scroll;
+    w->on_close = on_close;
+    g_wm->raise(w);
+}
+
+void browser_launch() {
+    browser_launch_url(0);
+}
+
+} // namespace nefu

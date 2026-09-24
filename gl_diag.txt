@@ -1,0 +1,7 @@
+JS line hit gl: glctx cid=c
+JS line hit gl: glglc cid=c
+JS line hit gl: glglclr cid=c
+js_out[62]=<SOH>glctx|c|<NL><SOH>glglc|c|0.1%2C0.1%2C0.2%2C1<NL><SOH>glglclr|c|16384<NL>ctx ok
+JS line hit gl: glctx cid=c
+JS line hit gl: glglc cid=c
+JS line hit gl: glglclr cid=c

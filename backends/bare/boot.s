@@ -1,6 +1,8 @@
 # nefuOS bare boot sector (El Torito no-emulation, DL=0xE0 real ATAPI CD)
-# Duties: boot menu (W = BIOS reboot into Windows) -> VBE 1024x768x32 ->
-# store LFB/bootinfo at 0x7000 -> load kernel.bin from CD LBA24 to 0x20000
+# Duties: load the 2-sector multi-boot picker (menu.bin @ LBA 24) to 0x10000
+# and jump to it; the picker detects a second bootable OS on the hard disk
+# and either boots nefuOS or warm-reboots into Windows -> VBE 1024x768x32 ->
+# store LFB/bootinfo at 0x7000 -> load kernel.bin from CD LBA26 to 0x20000
 # -> protected mode -> long mode entry (entry.s) -> nefuos_kernel_main.
 # Key design:
 #  1) SeaBIOS no-emulation: DL=0xE0, physical 2048B sectors. int13 AH=0x42
@@ -112,7 +114,7 @@ cd_load_kernel:
     addw $3, %ax
     shrw $2, %ax
     movw %ax, cd_rem + 0x7C00
-    movw $24, cd_lba + 0x7C00
+    movw $26, cd_lba + 0x7C00   # payload starts at LBA 26 (LBA 24-25 = menu.bin)
     movw $0x2000, cd_seg + 0x7C00
 cd_loop:
     movw cd_rem + 0x7C00, %ax
@@ -185,7 +187,7 @@ cdap1:
 cdap1_count: .word 32  # count (2048B sectors, max 32 = 64KB)
     cdap1_off: .word 0x0000  # offset
 cdap1_seg: .word 0x2000  # segment -> physical 0x20000
-cdap1_lba: .long 24    # lba low (kernel starts at LBA24)
+cdap1_lba: .long 24    # lba low (menu.bin starts at LBA 24; rewritten by cd_load_kernel)
     .long 0            # lba high
 
 # ---- CD load state (0x7D80, clear of SeaBIOS clobber zone 0x7DAA+) ----
@@ -195,10 +197,10 @@ cd_lba:  .long 0       # current physical LBA (48-bit, low 32 used)
 cd_seg:  .word 0       # current load segment
 cd_off:  .word 0       # current load offset (segment:offset)
 
-# ---- boot menu message (fits the free slot 0x194-0x1C0) ----
+# ---- boot menu message (fits the free slot 0x194-0x1C0; legacy text) ----
 .org 0x194
 boot_menu_msg:
-    .ascii "nefuOS - W=Windows 3s"
+    .ascii "nefuOS multi-boot menu"
     .byte 0
 
 # ---- bss zero-fill info (patched at build time) ----
@@ -210,35 +212,28 @@ bss_start: .long 0        # absolute runtime address of .bss (0x100000 + RVA)
 bss_size:  .long 0        # .bss VirtualSize in bytes
 
 # ---- boot menu code (fits the free slot 0x1C8-0x1FE) ----
-# Shows a message, waits ~2.5s; pressing W issues int19 (BIOS reboot) so
-# the hard disk boots Windows. No Windows files or registry are touched.
+# Loads the 2-sector multi-boot picker (menu.bin @ CD LBA 24) to 0x10000 and
+# jumps to it. The picker detects whether the hard disk holds another
+# bootable OS; single-boot machines jump straight back to cd_load_kernel.
+# The static EDD DAP at 0x7D70 is reused: only count (32->2) and segment
+# (0x2000->0x1000) change; LBA stays 24 and offset stays 0.
 .org 0x1C8
 menu:
-    leaw boot_menu_msg + 0x7C00, %si
-m_print:
-    lodsb
-    testb %al, %al
-    jz  m_wait
-    movw $0x0E00, %ax
-    int $0x10
-    jmp m_print
-m_wait:
-    movw $0x8600, %ax      # int15 AH=86 delay 2.5s
-    movw $0x0026, %cx
-    movw $0x25A0, %dx
-    int $0x15
-    movw $0x0100, %ax
-    int $0x16
-    jnz m_key
-    jmp vbe_setup
-m_key:
+    movw $2, cdap1_count + 0x7C00    # 2 CD sectors (4 KiB)
+    movw $0x1000, cdap1_seg + 0x7C00 # segment 0x1000 -> 0x10000
+    movw $cdap1 + 0x7C00, %si
+    movb BOOT_DRIVE, %dl
+    movb $0x42, %ah
+    int $0x13
+    jc m_retry
+    .byte 0xEA                       # ljmp 0x1000:0x0000 -> menu.s
+    .word 0x0000
+    .word 0x1000
+m_retry:
     xorw %ax, %ax
-    int $0x16
-    andb $0xDF, %al
-    cmpb $'W', %al
-    jne vbe_setup
-    int $0x19              # BIOS reboot -> hard disk -> Windows
-    jmp vbe_setup
+    int $0x13
+    jmp menu
+# menu.s returns here via ljmp 0:0x7CC1 (cd_load_kernel absolute address).
 
 .org 0x1FE
     .word 0xAA55

@@ -1,52 +1,101 @@
-// nefuOS system info - LVGL GUI
+// nefuOS System Info App
 #include "apps.h"
-#include "../gui/lvgl_win.h"
+#include "../gui/gfx.h"
+#include "../gui/wm.h"
+#include "../klib/klib.h"
+#include "../vfs/vfs.h"
 #include "../platform.h"
+#include <cstring>
 
 namespace nefu {
 
+namespace {
+
+struct SysInfoState {
+    int y;
+};
+
+static void sysinfo_paint(Window* w) {
+    SysInfoState* st = (SysInfoState*)w->userdata;
+    Surface& s = w->back;
+
+    gfx::fillrect(s, 0, 0, w->content_w, w->content_h, 0xFFFFFF);
+
+    int y = 10;
+    int lh = 20;
+
+    // Title
+    gfx::text(s, 10, y, "nefuOS System Information", 0x000000, 0xFFFFFF);
+    y += lh * 2;
+
+    // OS info
+    gfx::text(s, 10, y, "OS: nefuOS v3.0 (Lavender)", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 10, y, "Kernel: x86_64 multiboot", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 10, y, "GUI: LVGL 9.2 + custom renderer", 0x333333, 0xFFFFFF);
+    y += lh * 2;
+
+    // Memory
+    gfx::text(s, 10, y, "Memory:", 0x000000, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Total RAM: ~64 MB", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Heap: 64 MB (0x400000)", 0x333333, 0xFFFFFF);
+    y += lh * 2;
+
+    // Storage
+    gfx::text(s, 10, y, "Storage:", 0x000000, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "VFS: In-memory + FAT32", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "NVFS: nefu virtual FS", 0x333333, 0xFFFFFF);
+    y += lh * 2;
+
+    // Display
+    gfx::text(s, 10, y, "Display:", 0x000000, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Resolution: 800x600", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Color depth: 32-bit", 0x333333, 0xFFFFFF);
+    y += lh * 2;
+
+    // Network
+    gfx::text(s, 10, y, "Network:", 0x000000, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "HTTP client (WinINet / raw TCP)", 0x333333, 0xFFFFFF);
+    y += lh * 2;
+
+    // Apps
+    gfx::text(s, 10, y, "Applications:", 0x000000, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Browser / Terminal / File Manager", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Settings / Store / Image Viewer", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Music Player / System Monitor", 0x333333, 0xFFFFFF);
+    y += lh;
+    gfx::text(s, 20, y, "Calculator / Calendar / Snake", 0x333333, 0xFFFFFF);
+    y += lh * 2;
+
+    // License
+    gfx::text(s, 10, y, "License: MIT / BSD (see README)", 0x666666, 0xFFFFFF);
+}
+
+static void sysinfo_close(Window* w) {
+    SysInfoState* st = (SysInfoState*)w->userdata;
+    delete st;
+}
+
+} // namespace
+
 void sysinfo_launch() {
-    int x, y;
-    cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("System Info", x, y, 400, 260);
-    if (!lw) return;
-    lv_obj_t* body = lv_obj_create(lw->content);
-    lv_obj_set_size(body, 400, 234);
-    lv_obj_set_pos(body, 0, 0);
-    lv_obj_set_style_bg_color(body, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_width(body, 0, 0);
-    lv_obj_set_style_pad_all(body, 8, 0);
-
-    uint32_t used = 0, total = 0;
-    platform_mem_stats(&used, &total);
-    Screen* sc = platform_screen();
-
-    struct Row { const char* t; uint32_t c; };
-    char b0[96], b1[96], b2[96], b3[96], b4[96], b5[96];
-    ksprintf(b0, sizeof(b0), "nefuOS v0.1.0");
-    ksprintf(b1, sizeof(b1), "Backend    : %s", platform_name());
-    ksprintf(b2, sizeof(b2), "Resolution : %dx%d (%d bpp)", sc->width, sc->height, 32);
-    ksprintf(b3, sizeof(b3), "Uptime     : %u s", nefuos_uptime_ms() / 1000);
-    ksprintf(b4, sizeof(b4), "Memory     : %u / %u KB", used / 1024, total / 1024);
-    ksprintf(b5, sizeof(b5), "VFS        : %d nodes, %u bytes", g_vfs->node_count(), g_vfs->total_bytes());
-    const char* rows[6] = { b0, b1, b2, b3, b4, b5 };
-    uint32_t cols[6] = { 0x3366AA, 0x15181E, 0x15181E, 0x15181E, 0x15181E, 0x15181E };
-    for (int i = 0; i < 6; i++) {
-        lv_obj_t* lbl = lv_label_create(body);
-        lv_label_set_text(lbl, rows[i]);
-        lv_obj_set_pos(lbl, 4, i * 22);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(cols[i]), 0);
-        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
-    }
-    lv_obj_t* foot1 = lv_label_create(body);
-    lv_label_set_text(foot1, "Built with C++ / C, dual backend.  Host: nefuOS.exe  Bare: nefuOS.iso");
-    lv_obj_set_pos(foot1, 4, 148);
-    lv_obj_set_style_text_color(foot1, lv_color_hex(0x667788), 0);
-    lv_obj_t* foot2 = lv_label_create(body);
-    lv_label_set_text(foot2, "Try Terminal: ls / tree / cat");
-    lv_obj_set_pos(foot2, 4, 172);
-    lv_obj_set_style_text_color(foot2, lv_color_hex(0x5588CC), 0);
-    lw->userdata = (void*)1;
+    SysInfoState* st = new SysInfoState();
+    Window* w = g_wm->create_window("System Info", 200, 150, 350, 450);
+    w->userdata = st;
+    w->on_paint = sysinfo_paint;
+    w->on_close = sysinfo_close;
+    g_wm->raise(w);
 }
 
 } // namespace nefu

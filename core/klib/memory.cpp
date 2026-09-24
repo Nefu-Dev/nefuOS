@@ -85,6 +85,13 @@ char* strchr(const char* s, int c) {
     return (char)c == 0 ? (char*)s : 0;
 }
 
+char* strrchr(const char* s, int c) {
+    const char* last = 0;
+    for (; *s; s++) {
+        if (*s == (char)c) last = s;
+    }
+    return (char)c == 0 ? (char*)s : (char*)last;
+}
 char* strstr(const char* hay, const char* needle) {
     if (!*needle) return (char*)hay;
     for (; *hay; hay++) {

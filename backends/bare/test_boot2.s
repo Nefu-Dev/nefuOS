@@ -1,4 +1,4 @@
-# 二分测试：最小引导 + 主引导同款除法 CHS 计算
+# bisection test: minimal boot + the same CHS division calculation as the main bootloader
 .code16
 .org 0
 .section .text

@@ -105,65 +105,67 @@ static lv_obj_t* sec_label(lv_obj_t* parent, const char* text, int x, int y) {
 void settings_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Settings", x, y, 480, 640);
+    // 480x545 fits the 800x600 work area (600 - 30 taskbar - margins);
+    // lvgl_win_create additionally clamps size/position as a safety net.
+    LvglWin* lw = lvgl_win_create("Settings", x, y, 480, 545);
     if (!lw) return;
     SettingsLvState* st = new SettingsLvState();
     st->lw = lw;
     lw->userdata = st;
 
-    // 个性化区
+    // Personalization section
     sec_label(lw->content, "Personalize nefuOS", 12, 6);
-    sec_label(lw->content, "Accent color:", 12, 34);
+    sec_label(lw->content, "Accent color:", 12, 28);
     for (int i = 0; i < 4; i++)
-        st->btns[i] = make_btn(st, lw->content, ACCENT_NAMES[i], 12 + i * 108, 58, 100, 26, i, 0x3D4B66);
+        st->btns[i] = make_btn(st, lw->content, ACCENT_NAMES[i], 12 + i * 108, 46, 100, 26, i, 0x3D4B66);
 
-    sec_label(lw->content, "Desktop wallpaper:", 12, 96);
+    sec_label(lw->content, "Desktop wallpaper:", 12, 78);
     for (int i = 0; i < 4; i++)
-        st->btns[4 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + i * 108, 120, 100, 26, 4 + i, 0x3D4B66);
+        st->btns[4 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + i * 108, 96, 100, 26, 4 + i, 0x3D4B66);
 
-    sec_label(lw->content, "Lock screen wallpaper:", 12, 158);
+    sec_label(lw->content, "Lock screen wallpaper:", 12, 126);
     for (int i = 0; i < 4; i++)
-        st->btns[8 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + i * 108, 182, 100, 26, 8 + i, 0x3D4B66);
+        st->btns[8 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + i * 108, 144, 100, 26, 8 + i, 0x3D4B66);
 
-    sec_label(lw->content, "Boot splash wallpaper:", 12, 220);
+    sec_label(lw->content, "Boot splash wallpaper:", 12, 174);
     for (int i = 0; i < 4; i++)
-        st->btns[12 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + i * 108, 244, 100, 26, 12 + i, 0x3D4B66);
+        st->btns[12 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + i * 108, 192, 100, 26, 12 + i, 0x3D4B66);
 
-    // 显示与语言
+    // Display & language section
     st->btns[16] = make_btn(st, lw->content, g_settings.show_clock ? "[x] Show clock" : "[ ] Show clock",
-                           12, 282, 160, 26, 16, 0x55678A);
+                           12, 224, 160, 26, 16, 0x55678A);
     st->btns[17] = make_btn(st, lw->content, g_settings.show_taskbar ? "[x] Show taskbar" : "[ ] Show taskbar",
-                           184, 282, 180, 26, 17, 0x55678A);
+                           184, 224, 180, 26, 17, 0x55678A);
     st->btns[20] = make_btn(st, lw->content, g_settings.boot_splash ? "[x] Show boot splash" : "[ ] Show boot splash",
-                           12, 314, 180, 26, 20, 0x55678A);
+                           12, 254, 180, 26, 20, 0x55678A);
     st->btns[24] = make_btn(st, lw->content, g_settings.lock_on_suspend ? "[x] Lock on suspend" : "[ ] Lock on suspend",
-                           200, 314, 180, 26, 24, 0x55678A);
+                           200, 254, 180, 26, 24, 0x55678A);
     st->btns[25] = make_btn(st, lw->content, g_settings.idle_lock_sec ? "[x] Auto-lock after 30s idle" : "[ ] Auto-lock idle (off)",
-                           12, 346, 260, 26, 25, 0x55678A);
+                           12, 284, 260, 26, 25, 0x55678A);
     st->btns[26] = make_btn(st, lw->content, g_settings.browser_engine ? "Browser engine: NoJS" : "Browser engine: MiniJS",
-                           12, 378, 220, 26, 26, 0x55678A);
+                           12, 314, 220, 26, 26, 0x55678A);
 
-    sec_label(lw->content, "Language:", 12, 412);
-    st->btns[18] = make_btn(st, lw->content, "English", 12, 436, 84, 26, 18, 0x3D4B66);
-    st->btns[19] = make_btn(st, lw->content, "Chinese", 104, 436, 84, 26, 19, 0x3D4B66);
+    sec_label(lw->content, "Language:", 12, 348);
+    st->btns[18] = make_btn(st, lw->content, "English", 12, 366, 84, 26, 18, 0x3D4B66);
+    st->btns[19] = make_btn(st, lw->content, "Chinese", 104, 366, 84, 26, 19, 0x3D4B66);
 
-    // 硬件信息区
+    // Hardware info section
     HwInfo hw;
     platform_hw_info(&hw);
     char hw_txt[256];
     ksprintf(hw_txt, sizeof(hw_txt), "CPU: %s @ %dMHz", hw.cpu_model, hw.cpu_mhz);
-    sec_label(lw->content, hw_txt, 12, 472);
+    sec_label(lw->content, hw_txt, 12, 404);
     ksprintf(hw_txt, sizeof(hw_txt), "Memory: %d MB total", (int)hw.mem_total_mb);
-    sec_label(lw->content, hw_txt, 12, 480);
+    sec_label(lw->content, hw_txt, 12, 412);
     ksprintf(hw_txt, sizeof(hw_txt), "BIOS: %s %s", hw.bios_vendor, hw.bios_version);
-    sec_label(lw->content, hw_txt, 12, 500);
+    sec_label(lw->content, hw_txt, 12, 426);
 
-    // 电源操作区
-    sec_label(lw->content, "Power:", 12, 528);
-    st->btns[21] = make_btn(st, lw->content, "Shutdown", 12, 552, 100, 30, 21, 0x993333);
-    st->btns[22] = make_btn(st, lw->content, "Reboot", 118, 552, 100, 30, 22, 0x336699);
-    st->btns[23] = make_btn(st, lw->content, "Suspend", 224, 552, 100, 30, 23, 0x555577);
+    // Power operations section
+    sec_label(lw->content, "Power:", 12, 452);
+    st->btns[21] = make_btn(st, lw->content, "Shutdown", 12, 470, 100, 30, 21, 0x993333);
+    st->btns[22] = make_btn(st, lw->content, "Reboot", 118, 470, 100, 30, 22, 0x336699);
+    st->btns[23] = make_btn(st, lw->content, "Suspend", 224, 470, 100, 30, 23, 0x555577);
 
-    sec_label(lw->content, "All settings are saved to /etc/settings.conf and persist across reboots", 12, 596);
+    sec_label(lw->content, "All settings are saved to /etc/settings.conf and persist across reboots", 12, 508);
 }
 } // namespace nefu

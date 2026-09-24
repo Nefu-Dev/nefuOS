@@ -39,6 +39,8 @@ void boot_splash_show(int progress) {
     lv_bar_set_value(s_splash_bar, progress, LV_ANIM_OFF);
 }
 
+// Forward declarations
+static void on_unlock_click(lv_event_t* e);
 // Lock screen: fullscreen modal LVGL window with password input
 void lock_screen() {
     g_locked = true;
@@ -70,6 +72,16 @@ void lock_screen() {
         lv_obj_t* lbl = lv_label_create(btn);
         lv_label_set_text(lbl, "Unlock");
         lv_obj_center(lbl);
+        lv_obj_add_event_cb(btn, on_unlock_click, LV_EVENT_CLICKED, NULL);
+    }
+}
+
+// Unlock button callback
+static void on_unlock_click(lv_event_t* e) {
+    if (!s_pwd_input) return;
+    const char* pwd = lv_textarea_get_text(s_pwd_input);
+    if (verify_password(pwd)) {
+        unlock_screen();
     }
 }
 

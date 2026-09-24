@@ -1,4 +1,4 @@
-// nefuOS （VFS）
+// nefuOS (VFS)
 #pragma once
 #include "../klib/klib.h"
 
@@ -8,7 +8,7 @@ struct FSNode {
     String name;
     bool is_dir;
     uint32_t size;
-    uint32_t mtime;              // sec（）
+    uint32_t mtime;              // sec()
     FSNode* parent;
     List<FSNode*> children;
     uint8_t* data;

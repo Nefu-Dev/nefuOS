@@ -99,6 +99,38 @@ static uint32_t utf8_next(const char*& p) {
     p++; return 0xFFFD;
 }
 
+// The full CJK table (cjk_font.h) is stored in GB2312 qu order, which is
+// NOT sorted by Unicode code point, so a plain binary search misses most
+// glyphs. Build a sorted index (uni + bitmap pointer) once and reuse it.
+static uint16_t*        s_cjk_sorted_uni  = 0;
+static const uint8_t**  s_cjk_sorted_bits = 0;
+static int              s_cjk_sorted_n    = 0;
+
+static void cjk_ensure_index() {
+    if (s_cjk_sorted_uni) return;
+    s_cjk_sorted_n = g_cjk_count;
+    s_cjk_sorted_uni = (uint16_t*)kalloc(sizeof(uint16_t) * (size_t)g_cjk_count);
+    s_cjk_sorted_bits = (const uint8_t**)kalloc(sizeof(const uint8_t*) * (size_t)g_cjk_count);
+    if (!s_cjk_sorted_uni || !s_cjk_sorted_bits) { s_cjk_sorted_n = 0; return; }
+    for (int i = 0; i < g_cjk_count; i++) {
+        s_cjk_sorted_uni[i] = g_cjk_uni[i];
+        s_cjk_sorted_bits[i] = &g_cjk_bits[i * 32];
+    }
+    // insertion sort both arrays by Unicode code point (done once at first use)
+    for (int i = 1; i < g_cjk_count; i++) {
+        uint16_t v = s_cjk_sorted_uni[i];
+        const uint8_t* b = s_cjk_sorted_bits[i];
+        int j = i - 1;
+        while (j >= 0 && s_cjk_sorted_uni[j] > v) {
+            s_cjk_sorted_uni[j + 1] = s_cjk_sorted_uni[j];
+            s_cjk_sorted_bits[j + 1] = s_cjk_sorted_bits[j];
+            j--;
+        }
+        s_cjk_sorted_uni[j + 1] = v;
+        s_cjk_sorted_bits[j + 1] = b;
+    }
+}
+
 const uint8_t* glyph16(uint32_t uc) {
     int lo = 0, hi = nefu::font16_count - 1;
     while (lo <= hi) {
@@ -107,11 +139,12 @@ const uint8_t* glyph16(uint32_t uc) {
         if (nefu::font16[mid].uc < uc) lo = mid + 1; else hi = mid - 1;
     }
     // fallback: full GB2312 CJK bitmap table (browser and GUI share it)
-    lo = 0; hi = g_cjk_count - 1;
-    while (lo <= hi) {
+    cjk_ensure_index();
+    lo = 0; hi = s_cjk_sorted_n - 1;
+    while (lo <= hi && s_cjk_sorted_uni) {
         int mid = (lo + hi) / 2;
-        if (g_cjk_uni[mid] == uc) return &g_cjk_bits[mid * 32];
-        if (g_cjk_uni[mid] < uc) lo = mid + 1; else hi = mid - 1;
+        if (s_cjk_sorted_uni[mid] == uc) return s_cjk_sorted_bits[mid];
+        if (s_cjk_sorted_uni[mid] < uc) lo = mid + 1; else hi = mid - 1;
     }
     return 0;
 }
@@ -266,7 +299,7 @@ void fillcircle(Surface& s, int cx, int cy, int r, uint32_t c) {
     }
 }
 
-// integer sqrt（no floats）
+// integer sqrt(no floats)
 int sqrti(int v) {
     if (v <= 0) return 0;
     int x = v, y = (x + 1) / 2;

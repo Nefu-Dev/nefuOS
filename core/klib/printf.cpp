@@ -42,7 +42,7 @@ static void kvfmt(char* buf, size_t bufsz, const char* fmt, va_list ap) {
         while (*fmt >= '0' && *fmt <= '9') { width = width * 10 + (*fmt - '0'); fmt++; }
         if (*fmt == 'l') fmt++; // ignore long prefix
         int pad = 0; char pc = ' ';
-        if (minus) { /* 不做左对齐 */ (void)minus; }
+        if (minus) { /* no left alignment needed */ (void)minus; }
         switch (*fmt) {
         case 's': {
             const char* s = va_arg(ap, const char*);

@@ -6,6 +6,9 @@
 #include "minijs.h"
 #include "../klib/klib.h"
 
+#ifdef NEFU_BARE
+// nefuOS kernel build: the self-contained toy interpreter below (no libc).
+// The Windows host build (below) uses QuickJS (bellard/quickjs, MIT) instead.
 namespace nefu {
 
 namespace {
@@ -160,6 +163,37 @@ struct MJs {
                 if (*p == ')') p++;
                 if (arg.t == 1) set_num(v, (int)strlen(arg.str));
                 else set_num(v, 0);
+                return v;
+            }
+            // DOM commands for the browser host: setText(id, txt) /
+            // setColor(id, #hex) / hide(id) / show(id). Each call is encoded
+            // as a "\x01cmd|id|value" control line in the output stream; the
+            // browser parses those lines and mutates its DOM, then re-layouts.
+            if (strcmp(name, "setText") == 0 || strcmp(name, "setColor") == 0 ||
+                strcmp(name, "hide") == 0 || strcmp(name, "show") == 0) {
+                if (*p == '(') {
+                    p++;
+                    MVal idv; set_num(idv, 0);
+                    skip_ws();
+                    if (*p != ')') idv = eval_or();
+                    skip_ws();
+                    MVal valv; set_num(valv, 0);
+                    if (*p == ',') { p++; skip_ws(); }
+                    if (*p != ')') valv = eval_or();
+                    skip_ws();
+                    if (*p == ')') p++;
+                    emit('\x01');
+                    emit_str(name);
+                    emit('|');
+                    if (idv.t == 1) emit_str(idv.str);
+                    else { char nb[16]; ksprintf(nb, sizeof(nb), "%d", idv.num); emit_str(nb); }
+                    emit('|');
+                    if (valv.t == 1) emit_str(valv.str);
+                    else { char nb[16]; ksprintf(nb, sizeof(nb), "%d", valv.num); emit_str(nb); }
+                    emit('\n');
+                    return v;
+                }
+                err = 1;
                 return v;
             }
             MVal* f = find_var(name);
@@ -463,3 +497,425 @@ int mini_js_run(const char* script, char* out, int out_sz) {
 }
 
 } // namespace nefu
+
+#else  // !NEFU_BARE: host build uses QuickJS (bellard/quickjs, MIT).
+
+#include "quickjs/quickjs.h"
+#include <string.h>
+#include <stdlib.h>
+
+namespace nefu {
+
+namespace {
+
+// out-stream writer state shared with the JS callbacks below
+struct RunCtx { char* out; int out_sz; int oi; };
+
+static void ctx_emit(RunCtx* rc, const char* s) {
+    while (*s && rc->oi < rc->out_sz - 1) rc->out[rc->oi++] = *s++;
+}
+static void ctx_emitc(RunCtx* rc, char c) {
+    if (rc->oi < rc->out_sz - 1) rc->out[rc->oi++] = c;
+}
+
+// print/alert -> out + newline; document.write -> out only (magic 0/1)
+static JSValue nfu_out(JSContext* c, JSValueConst thisv, int argc,
+                       JSValueConst* argv, int magic) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    if (argc > 0) {
+        const char* s = JS_ToCString(c, argv[0]);
+        if (s) { ctx_emit(rc, s); JS_FreeCString(c, s); }
+    }
+    if (magic == 1) ctx_emitc(rc, '\n');
+    return JS_UNDEFINED;
+}
+
+// setText/setColor/hide/show -> "\x01cmd|id|val\n" control line for the browser
+static JSValue nfu_domcmd(JSContext* c, JSValueConst thisv, int argc,
+                          JSValueConst* argv, int magic) {
+    static const char* const names[4] = { "setText", "setColor", "hide", "show" };
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    const char* idv = argc > 0 ? JS_ToCString(c, argv[0]) : 0;
+    const char* val = (argc > 1) ? JS_ToCString(c, argv[1]) : 0;
+    ctx_emitc(rc, '\x01');
+    ctx_emit(rc, names[magic]);
+    ctx_emitc(rc, '|');
+    if (idv) { ctx_emit(rc, idv); JS_FreeCString(c, idv); }
+    ctx_emitc(rc, '|');
+    if (val) { ctx_emit(rc, val); JS_FreeCString(c, val); }
+    ctx_emitc(rc, '\n');
+    return JS_UNDEFINED;
+}
+
+static JSValue nfu_len(JSContext* c, JSValueConst thisv, int argc,
+                       JSValueConst* argv) {
+    if (argc > 0) {
+        const char* s = JS_ToCString(c, argv[0]);
+        if (s) { int n = (int)strlen(s); JS_FreeCString(c, s); return JS_NewInt32(c, n); }
+    }
+    return JS_NewInt32(c, 0);
+}
+
+// ===================== WebGL bridge =====================
+// document.getElementById(id) -> canvas object -> getContext('webgl2') -> a gl
+// object. Every GL call is encoded as a "\x01gl<cmd>|cid|args" control line
+// (args URL percent-encoded, comma-separated) that browser.cpp's gl_cmd()
+// decodes and executes on the hidden WGL context / iGPU.
+static JSClassID s_canvas_cls, s_gl_cls;
+static int s_sh_n = 0, s_pr_n = 0, s_bu_n = 0;   // JS-side object ids
+
+static void canvas_finalizer(JSRuntime* rt, JSValue val) {
+    void* p = JS_GetOpaque(val, s_canvas_cls);
+    if (p) free(p);
+}
+static void gl_finalizer(JSRuntime* rt, JSValue val) {
+    void* p = JS_GetOpaque(val, s_gl_cls);
+    if (p) free(p);
+}
+
+static void urlenc(const char* in, char* out, int cap) {
+    static const char* hexd = "0123456789ABCDEF";
+    int n = 0;
+    for (const unsigned char* u = (const unsigned char*)in; *u && n < cap - 4; u++) {
+        unsigned char ch = *u;
+        if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') ||
+            (ch >= 'A' && ch <= 'Z') || ch == '.' || ch == '-' || ch == '_') {
+            out[n++] = (char)ch;
+        } else {
+            out[n++] = '%'; out[n++] = hexd[ch >> 4]; out[n++] = hexd[ch & 15];
+        }
+    }
+    out[n] = 0;
+}
+
+static void gl_emit(RunCtx* rc, const char* sub, const char* cid, const char* args) {
+    char enc[1600];
+    urlenc(args, enc, sizeof(enc));
+    ctx_emitc(rc, '\x01');
+    ctx_emit(rc, "gl"); ctx_emit(rc, sub);
+    ctx_emitc(rc, '|'); ctx_emit(rc, cid);
+    ctx_emitc(rc, '|'); ctx_emit(rc, enc);
+    ctx_emitc(rc, '\n');
+}
+
+static char* gl_cid_of(JSContext* c, JSValueConst thisv) {
+    if (!JS_IsObject(thisv)) return 0;
+    return (char*)JS_GetOpaque(thisv, s_gl_cls);
+}
+static char* canvas_cid_of(JSContext* c, JSValueConst thisv) {
+    if (!JS_IsObject(thisv)) return 0;
+    return (char*)JS_GetOpaque(thisv, s_canvas_cls);
+}
+
+// numeric GL commands (magic = index into names)
+static const char* glcmd_names[] = {
+    "glc", "glclr", "v", "csh", "link", "use", "draw", "att",
+    "bindbuf", "attptr"
+};
+static JSValue nfu_gl(JSContext* c, JSValueConst thisv, int argc,
+                      JSValueConst* argv, int magic) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_UNDEFINED;
+    char args[512]; int ap = 0;
+    if (magic == 0) {   // clearColor: exactly 4 floats
+        double f[4] = {0, 0, 0, 1};
+        int n = argc > 4 ? 4 : argc;
+        for (int i = 0; i < n; i++) JS_ToFloat64(c, &f[i], argv[i]);
+        ap = sprintf(args, "%g,%g,%g,%g", f[0], f[1], f[2], f[3]);
+    } else if (magic == 1) {   // clear: 1 int
+        double d = 0; if (argc > 0) JS_ToFloat64(c, &d, argv[0]);
+        ap = sprintf(args, "%d", (int)d);
+    } else if (magic == 2) {   // viewport: 4 ints
+        int v[4] = {0, 0, 300, 150};
+        int n = argc > 4 ? 4 : argc;
+        for (int i = 0; i < n; i++) { double d = 0; JS_ToFloat64(c, &d, argv[i]); v[i] = (int)d; }
+        ap = sprintf(args, "%d,%d,%d,%d", v[0], v[1], v[2], v[3]);
+    } else if (magic == 3 || magic == 4 || magic == 5) {   // compileShader/link/use: 1 id
+        double d = 0; if (argc > 0) JS_ToFloat64(c, &d, argv[0]);
+        ap = sprintf(args, "%d", (int)d);
+    } else if (magic == 6) {   // drawArrays(mode, first, count)
+        int v[3] = {0, 0, 0};
+        int n = argc > 3 ? 3 : argc;
+        for (int i = 0; i < n; i++) { double d = 0; JS_ToFloat64(c, &d, argv[i]); v[i] = (int)d; }
+        ap = sprintf(args, "%d,%d", v[0], v[2]);
+    } else if (magic == 7) {   // attachShader(pid, sid)
+        int v[2] = {0, 0};
+        int n = argc > 2 ? 2 : argc;
+        for (int i = 0; i < n; i++) { double d = 0; JS_ToFloat64(c, &d, argv[i]); v[i] = (int)d; }
+        ap = sprintf(args, "%d,%d", v[0], v[1]);
+    } else if (magic == 8) {   // bindBuffer(target, bid)
+        int v[2] = {0, 0};
+        int n = argc > 2 ? 2 : argc;
+        for (int i = 0; i < n; i++) { double d = 0; JS_ToFloat64(c, &d, argv[i]); v[i] = (int)d; }
+        ap = sprintf(args, "%d,%d", v[1], v[0]);
+    } else if (magic == 9) {   // vertexAttribPointer(loc,size,type,norm,stride,offset)
+        int v[4] = {0, 0, 0, 0};
+        double d;
+        if (argc > 0) { JS_ToFloat64(c, &d, argv[0]); v[0] = (int)d; }
+        if (argc > 1) { JS_ToFloat64(c, &d, argv[1]); v[1] = (int)d; }
+        if (argc > 4) { JS_ToFloat64(c, &d, argv[4]); v[2] = (int)d; }
+        if (argc > 5) { JS_ToFloat64(c, &d, argv[5]); v[3] = (int)d; }
+        ap = sprintf(args, "%d,%d,%d,%d", v[0], v[1], v[2], v[3]);
+    }
+    if (magic == 10) return JS_UNDEFINED;   // enableVertexAttribArray: done by glattptr
+    args[ap] = 0;
+    gl_emit(rc, glcmd_names[magic], cid, args);
+    return JS_UNDEFINED;
+}
+
+// createShader(type) -> sid; type remembered for shaderSource
+static int s_sh_type[256];
+static JSValue nfu_createShader(JSContext* c, JSValueConst thisv, int argc,
+                                JSValueConst* argv) {
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_NewInt32(c, 0);
+    double d = 0; if (argc > 0) JS_ToFloat64(c, &d, argv[0]);
+    int sid = s_sh_n + 1; if (sid > 255) sid = 255;
+    s_sh_n = sid;
+    s_sh_type[sid] = (int)d;
+    return JS_NewInt32(c, sid);
+}
+
+// shaderSource(sid, src)
+static JSValue nfu_shaderSource(JSContext* c, JSValueConst thisv, int argc,
+                                JSValueConst* argv) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_UNDEFINED;
+    double d = 0; if (argc > 0) JS_ToFloat64(c, &d, argv[0]);
+    int sid = (int)d;
+    const char* src = argc > 1 ? JS_ToCString(c, argv[1]) : 0;
+    if (!src) return JS_UNDEFINED;
+    char args[1400];
+    int ap = sprintf(args, "%d,%d,", sid, s_sh_type[sid]);
+    int sl = (int)strlen(src);
+    if (ap + sl >= (int)sizeof(args) - 1) sl = (int)sizeof(args) - 1 - ap;
+    memcpy(args + ap, src, (size_t)sl);
+    args[ap + sl] = 0;
+    JS_FreeCString(c, src);
+    gl_emit(rc, "sh", cid, args);
+    return JS_UNDEFINED;
+}
+
+static JSValue nfu_createProgram(JSContext* c, JSValueConst thisv, int argc,
+                                 JSValueConst* argv) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_NewInt32(c, 0);
+    int pid = s_pr_n + 1; if (pid > 255) pid = 255;
+    s_pr_n = pid;
+    char args[64];
+    sprintf(args, "%d", pid);
+    gl_emit(rc, "prog", cid, args);
+    return JS_NewInt32(c, pid);
+}
+
+static JSValue nfu_createBuffer(JSContext* c, JSValueConst thisv, int argc,
+                                JSValueConst* argv) {
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_NewInt32(c, 0);
+    int bid = s_bu_n + 1; if (bid > 255) bid = 255;
+    s_bu_n = bid;
+    return JS_NewInt32(c, bid);
+}
+
+// bindBuffer(target, bid) - remember target for bufferData
+static int s_bu_target[256];
+static JSValue nfu_bindBuffer(JSContext* c, JSValueConst thisv, int argc,
+                              JSValueConst* argv) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_UNDEFINED;
+    double td = 0, bd = 0;
+    if (argc > 0) JS_ToFloat64(c, &td, argv[0]);
+    if (argc > 1) JS_ToFloat64(c, &bd, argv[1]);
+    int bid = (int)bd;
+    if (bid >= 0 && bid < 256) s_bu_target[bid] = (int)td;
+    char args[64];
+    sprintf(args, "%d,%d", bid, (int)td);
+    gl_emit(rc, "bindbuf", cid, args);
+    return JS_UNDEFINED;
+}
+
+// bufferData(target, data, usage) - data may be a float array or a
+// comma-separated string; both become "bid,target,f1,f2,..." in the command
+static JSValue nfu_bufferData(JSContext* c, JSValueConst thisv, int argc,
+                              JSValueConst* argv) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    char* cid = gl_cid_of(c, thisv);
+    if (!cid) return JS_UNDEFINED;
+    double td = 0; if (argc > 0) JS_ToFloat64(c, &td, argv[0]);
+    int bid = 0;
+    for (int i = 1; i < 256; i++) if (s_bu_target[i] == (int)td) { bid = i; break; }
+    char data[1200];
+    data[0] = 0;
+    int dn = 0;
+    if (argc > 1 && JS_IsArray(c, argv[1])) {
+        for (int i = 0; i < 512 && dn < 1100; i++) {
+            JSValue v = JS_GetPropertyUint32(c, argv[1], (uint32_t)i);
+            int undef = JS_IsUndefined(v);
+            if (undef) { JS_FreeValue(c, v); break; }
+            double d = 0;
+            int bad = JS_ToFloat64(c, &d, v);
+            JS_FreeValue(c, v);
+            if (bad) break;
+            int tl = sprintf(data + dn, i == 0 ? "%g" : ",%g", d);
+            dn += tl;
+        }
+    } else {
+        const char* ds = argc > 1 ? JS_ToCString(c, argv[1]) : 0;
+        if (ds) {
+            int sl = (int)strlen(ds);
+            if (sl > 1100) sl = 1100;
+            memcpy(data, ds, (size_t)sl);
+            data[sl] = 0;
+            JS_FreeCString(c, ds);
+        }
+    }
+    if (!data[0]) return JS_UNDEFINED;
+    char args[1600];
+    sprintf(args, "%d,%d,%s", bid, (int)td, data);
+    gl_emit(rc, "buf", cid, args);
+    return JS_UNDEFINED;
+}
+
+// getContext('webgl'|'webgl2') -> gl object (emits glctx to create the context)
+static JSValue nfu_getContext(JSContext* c, JSValueConst thisv, int argc,
+                              JSValueConst* argv, int magic) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    char* cid = canvas_cid_of(c, thisv);
+    if (!cid) return JS_NULL;
+    gl_emit(rc, "ctx", cid, "");
+    JSValue g = JS_NewObjectClass(c, s_gl_cls);
+    char* op = (char*)malloc(strlen(cid) + 1);
+    if (op) memcpy(op, cid, strlen(cid) + 1);
+    JS_SetOpaque(g, op);
+    JS_SetPropertyStr(c, g, "clearColor", JS_NewCFunctionMagic(c, nfu_gl, "clearColor", 4, JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(c, g, "clear", JS_NewCFunctionMagic(c, nfu_gl, "clear", 1, JS_CFUNC_generic_magic, 1));
+    JS_SetPropertyStr(c, g, "viewport", JS_NewCFunctionMagic(c, nfu_gl, "viewport", 4, JS_CFUNC_generic_magic, 2));
+    JS_SetPropertyStr(c, g, "compileShader", JS_NewCFunctionMagic(c, nfu_gl, "compileShader", 1, JS_CFUNC_generic_magic, 3));
+    JS_SetPropertyStr(c, g, "linkProgram", JS_NewCFunctionMagic(c, nfu_gl, "linkProgram", 1, JS_CFUNC_generic_magic, 4));
+    JS_SetPropertyStr(c, g, "useProgram", JS_NewCFunctionMagic(c, nfu_gl, "useProgram", 1, JS_CFUNC_generic_magic, 5));
+    JS_SetPropertyStr(c, g, "drawArrays", JS_NewCFunctionMagic(c, nfu_gl, "drawArrays", 3, JS_CFUNC_generic_magic, 6));
+    JS_SetPropertyStr(c, g, "attachShader", JS_NewCFunctionMagic(c, nfu_gl, "attachShader", 2, JS_CFUNC_generic_magic, 7));
+    JS_SetPropertyStr(c, g, "vertexAttribPointer", JS_NewCFunctionMagic(c, nfu_gl, "vertexAttribPointer", 6, JS_CFUNC_generic_magic, 9));
+    JS_SetPropertyStr(c, g, "enableVertexAttribArray", JS_NewCFunctionMagic(c, nfu_gl, "enableVertexAttribArray", 1, JS_CFUNC_generic_magic, 10));
+    JS_SetPropertyStr(c, g, "createShader", JS_NewCFunction(c, nfu_createShader, "createShader", 1));
+    JS_SetPropertyStr(c, g, "shaderSource", JS_NewCFunction(c, nfu_shaderSource, "shaderSource", 2));
+    JS_SetPropertyStr(c, g, "createProgram", JS_NewCFunction(c, nfu_createProgram, "createProgram", 0));
+    JS_SetPropertyStr(c, g, "createBuffer", JS_NewCFunction(c, nfu_createBuffer, "createBuffer", 0));
+    JS_SetPropertyStr(c, g, "bindBuffer", JS_NewCFunction(c, nfu_bindBuffer, "bindBuffer", 2));
+    JS_SetPropertyStr(c, g, "bufferData", JS_NewCFunction(c, nfu_bufferData, "bufferData", 3));
+    // GL constants (WebGL2 / GL ES)
+    JS_SetPropertyStr(c, g, "VERTEX_SHADER", JS_NewInt32(c, 0x8B31));
+    JS_SetPropertyStr(c, g, "FRAGMENT_SHADER", JS_NewInt32(c, 0x8B30));
+    JS_SetPropertyStr(c, g, "ARRAY_BUFFER", JS_NewInt32(c, 0x8892));
+    JS_SetPropertyStr(c, g, "ELEMENT_ARRAY_BUFFER", JS_NewInt32(c, 0x8893));
+    JS_SetPropertyStr(c, g, "STATIC_DRAW", JS_NewInt32(c, 0x88E4));
+    JS_SetPropertyStr(c, g, "TRIANGLES", JS_NewInt32(c, 0x0004));
+    JS_SetPropertyStr(c, g, "COLOR_BUFFER_BIT", JS_NewInt32(c, 0x4000));
+    JS_SetPropertyStr(c, g, "DEPTH_BUFFER_BIT", JS_NewInt32(c, 0x0100));
+    JS_SetPropertyStr(c, g, "FLOAT", JS_NewInt32(c, 0x1406));
+    JS_SetPropertyStr(c, g, "FALSE", JS_NewInt32(c, 0));
+    JS_SetPropertyStr(c, g, "TRUE", JS_NewInt32(c, 1));
+    return g;
+}
+
+// document.getElementById(id) -> canvas wrapper
+static JSValue nfu_getElementById(JSContext* c, JSValueConst thisv, int argc,
+                                  JSValueConst* argv) {
+    const char* idv = argc > 0 ? JS_ToCString(c, argv[0]) : 0;
+    JSValue obj = JS_NewObjectClass(c, s_canvas_cls);
+    char* op = 0;
+    if (idv) {
+        op = (char*)malloc(strlen(idv) + 1);
+        if (op) memcpy(op, idv, strlen(idv) + 1);
+    }
+    JS_SetOpaque(obj, op);
+    JS_SetPropertyStr(c, obj, "getContext",
+        JS_NewCFunctionMagic(c, nfu_getContext, "getContext", 1, JS_CFUNC_generic_magic, 0));
+    if (idv) JS_FreeCString(c, idv);
+    return obj;
+}
+
+// one shared runtime+context: global state survives across <script> blocks,
+// exactly like a real browser
+static JSRuntime* s_rt;
+static JSContext* s_ctx;
+
+static void ensure_js() {
+    if (s_rt) return;
+    s_rt = JS_NewRuntime();
+    if (!s_rt) return;
+    JS_SetMemoryLimit(s_rt, 16 * 1024 * 1024);   // cap runaway scripts
+    s_ctx = JS_NewContext(s_rt);
+    if (!s_ctx) { JS_FreeRuntime(s_rt); s_rt = 0; return; }
+    JSValue g = JS_GetGlobalObject(s_ctx);
+    JS_SetPropertyStr(s_ctx, g, "print",
+        JS_NewCFunctionMagic(s_ctx, nfu_out, "print", 1, JS_CFUNC_generic_magic, 1));
+    JS_SetPropertyStr(s_ctx, g, "alert",
+        JS_NewCFunctionMagic(s_ctx, nfu_out, "alert", 1, JS_CFUNC_generic_magic, 1));
+    JS_SetPropertyStr(s_ctx, g, "len",
+        JS_NewCFunction(s_ctx, nfu_len, "len", 1));
+    JS_SetPropertyStr(s_ctx, g, "setText",
+        JS_NewCFunctionMagic(s_ctx, nfu_domcmd, "setText", 2, JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(s_ctx, g, "setColor",
+        JS_NewCFunctionMagic(s_ctx, nfu_domcmd, "setColor", 2, JS_CFUNC_generic_magic, 1));
+    JS_SetPropertyStr(s_ctx, g, "hide",
+        JS_NewCFunctionMagic(s_ctx, nfu_domcmd, "hide", 1, JS_CFUNC_generic_magic, 2));
+    JS_SetPropertyStr(s_ctx, g, "show",
+        JS_NewCFunctionMagic(s_ctx, nfu_domcmd, "show", 1, JS_CFUNC_generic_magic, 3));
+    JS_NewClassID(&s_canvas_cls);
+    JSClassDef cdef;
+    memset(&cdef, 0, sizeof(cdef));
+    cdef.class_name = "NfuCanvas";
+    cdef.finalizer = canvas_finalizer;
+    JS_NewClass(s_rt, s_canvas_cls, &cdef);
+    JS_NewClassID(&s_gl_cls);
+    memset(&cdef, 0, sizeof(cdef));
+    cdef.class_name = "NfuGL";
+    cdef.finalizer = gl_finalizer;
+    JS_NewClass(s_rt, s_gl_cls, &cdef);
+    JSValue doc = JS_NewObject(s_ctx);
+    JS_SetPropertyStr(s_ctx, doc, "write",
+        JS_NewCFunctionMagic(s_ctx, nfu_out, "write", 1, JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(s_ctx, doc, "getElementById",
+        JS_NewCFunction(s_ctx, nfu_getElementById, "getElementById", 1));
+    JS_SetPropertyStr(s_ctx, g, "document", doc);
+    // keep the doc JSValue alive: freeing it here would drop the reference
+    // below the one held by the global object and break document.write
+    JS_FreeValue(s_ctx, g);
+}
+
+} // namespace
+
+int mini_js_run(const char* script, char* out, int out_sz) {
+    if (!script || !out || out_sz <= 1) return 1;
+    out[0] = 0;
+    ensure_js();
+    if (!s_ctx) return 1;
+    RunCtx rc;
+    rc.out = out; rc.out_sz = out_sz; rc.oi = 0;
+    JS_SetContextOpaque(s_ctx, &rc);
+    JSValue r = JS_Eval(s_ctx, script, (size_t)strlen(script), "<script>",
+                        JS_EVAL_TYPE_GLOBAL);
+    int err = 0;
+    if (JS_IsException(r)) {
+        err = 1;
+        JSValue ex = JS_GetException(s_ctx);
+        const char* msg = JS_ToCString(s_ctx, ex);
+        if (msg) {
+            ctx_emit(&rc, "E: ");
+            ctx_emit(&rc, msg);
+            JS_FreeCString(s_ctx, msg);
+        }
+        JS_FreeValue(s_ctx, ex);
+    }
+    JS_FreeValue(s_ctx, r);
+    out[rc.oi] = 0;
+    return err;
+}
+
+} // namespace nefu
+#endif

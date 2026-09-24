@@ -4,11 +4,14 @@ Replaces xorriso which is unreliable in this MSYS2-on-Windows environment.
 Layout:
   LBA 16: PVD, 17: Boot Record VD, 18: Terminator VD, 19: Boot Catalog,
   20: PathTable L, 21: PathTable M, 22: root dir data,
-  23: boot.s (2048B-aligned, padded), 24+: kernel.bin (padded to 1024 x 2048B).
+  23: boot.s (2048B-aligned, padded), 24-25: menu.bin (multi-boot picker,
+  2 x 2048B), 26+: kernel.bin (padded to 1024 x 2048B).
 
 Boot chain (no-emulation):
   SeaBIOS reads 1 sector (2048B) at LBA 23 = boot.s into 0x7C00,
-  then boot.s itself reads kernel.bin via int13 AH=0x42 from LBA 24 in a
+  then boot.s loads the 2-sector picker (menu.bin @ LBA 24) to 0x10000 and
+  jumps to it; the picker either warm-reboots into Windows (int19) or returns
+  to boot.s, which reads kernel.bin via int13 AH=0x42 from LBA 26 in a
   dynamic loop (<= 32 sectors per call = 64KB), advancing LBA/segment/remain
   until kernel_count/4 CD sectors are read.
   (Only 32-sector chunks work reliably on QEMU's ATAPI; kernel is padded to
@@ -26,7 +29,8 @@ LBA_PTL = 20
 LBA_PTM = 21
 LBA_ROOT = 22
 LBA_IMG = 23          # boot.s (no-emulation boot image, 1 sector)
-LBA_KERNEL = 24       # kernel.bin
+LBA_MENU = 24         # menu.bin (multi-boot picker, 2 sectors)
+LBA_KERNEL = 26       # kernel.bin
 KERNEL_BLOCKS = 1024   # padded (2 MiB cap); boot.s dynamic loader reads any size
 
 VOL = b"NEFUOS"
@@ -58,10 +62,13 @@ def dir_rec(lba, length, flags, name):
     return rec
 
 
-def build(boot_path, kernel_path, iso_path):
+def build(boot_path, menu_path, kernel_path, iso_path):
     with open(boot_path, "rb") as f:
         boot = f.read()
     assert len(boot) == 512, "boot.bin must be 512B"
+    with open(menu_path, "rb") as f:
+        menu = f.read()
+    assert 0 < len(menu) <= 2 * BS, "menu.bin must fit in 2 CD sectors (<= %d bytes)" % (2 * BS)
     with open(kernel_path, "rb") as f:
         kernel = f.read()
     assert len(kernel) <= KERNEL_BLOCKS * BS, "kernel too large for %d blocks" % KERNEL_BLOCKS
@@ -136,15 +143,17 @@ def build(boot_path, kernel_path, iso_path):
     ptm[2:6] = struct.pack(">I", LBA_ROOT)
     ptm[6] = 0
 
-    # ---- Root directory data (NEFUOS.BIN boot + NEFUOS.KRN kernel) ----
+    # ---- Root directory data (NEFUOS.BIN boot + NEFUOS.MEN picker + NEFUOS.KRN kernel) ----
     root = bytearray(BS)
     dot = dir_rec(LBA_ROOT, BS, 2, b"\x00")
     root[0:len(dot)] = dot                                        # "."
     root[len(dot):len(dot) * 2] = dot                             # ".."
     frec = dir_rec(LBA_IMG, 2048, 0, b"NEFUOS.BIN;1")
     root[len(dot) * 2:len(dot) * 2 + len(frec)] = frec
+    mrec = dir_rec(LBA_MENU, len(menu), 0, b"NEFUOS.MEN;1")
+    root[len(dot) * 2 + len(frec):len(dot) * 2 + len(frec) + len(mrec)] = mrec
     krec = dir_rec(LBA_KERNEL, len(kernel), 0, b"NEFUOS.KRN;1")
-    root[len(dot) * 2 + len(frec):len(dot) * 2 + len(frec) + len(krec)] = krec
+    root[len(dot) * 2 + len(frec) + len(mrec):len(dot) * 2 + len(frec) + len(mrec) + len(krec)] = krec
 
     # ---- Assemble ----
     out = bytearray(vol_size * BS)
@@ -156,6 +165,7 @@ def build(boot_path, kernel_path, iso_path):
     out[LBA_PTM * BS:(LBA_PTM + 1) * BS] = ptm
     out[LBA_ROOT * BS:(LBA_ROOT + 1) * BS] = root
     out[LBA_IMG * BS:(LBA_IMG + 1) * BS] = boot + bytes(BS - len(boot))
+    out[LBA_MENU * BS:(LBA_MENU + 2) * BS] = menu + bytes(2 * BS - len(menu))
     out[LBA_KERNEL * BS:LBA_KERNEL * BS + len(kernel)] = kernel
 
     # hard truncate to exact size (safety net)
@@ -169,7 +179,7 @@ def build(boot_path, kernel_path, iso_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("usage: python make_iso.py <boot.bin> <kernel.bin> <out.iso>")
+    if len(sys.argv) != 5:
+        print("usage: python make_iso.py <boot.bin> <menu.bin> <kernel.bin> <out.iso>")
         sys.exit(1)
-    build(sys.argv[1], sys.argv[2], sys.argv[3])
+    build(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])

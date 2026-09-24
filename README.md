@@ -22,6 +22,95 @@ Everything is real: the GUI, the Unix-like VFS, the networking stack, and the ap
 
 ***
 
+## Key Highlights & Original Design
+
+These are the original, hand-written parts that make nefuOS different from a "copy-paste from osdev wiki" toy:
+
+### 1. Dual-Backend Architecture (one codebase, two realities)
+- **Win32 host mode**: every syscall maps directly to Windows API — no emulation layer, no abstraction overhead
+- **Bare-metal mode**: same C++ code compiles to freestanding x86_64 with VBE framebuffer + PS/2 input
+- Same VFS, same window manager, same apps run on both — the OS "kernel" is just a `#ifdef PLATFORM_WIN32` away from being a desktop app
+
+### 2. Zero-Libc, Zero-STL Freestanding Kernel
+- Hand-written `memcpy`, `memset`, `strlen`, `ksprintf`, `String`, `List` — no libgcc, no libstdc++ in the bare-metal build
+- Integer-only rendering: all GUI math is 32-bit integer (no floating point) because the bare-metal ABI has no SSE
+- ~27,000 lines of C/C++ across both backends
+
+### 3. Custom HTML5 Pipeline (no WebKit, no Blink)
+- **Tokenizer** → **Tree builder** → **Layout engine** → **Paint engine** — four-stage pipeline modeled after Ladybird/Hubbub (MIT/BSD)
+- Tokenizer handles DOCTYPE, tags, attributes, comments, text nodes
+- Tree builder has a tag stack for proper nesting
+- Layout engine does block/inline flow with auto-wrap
+- Paint engine culls off-screen runs and draws directly to the framebuffer
+
+### 4. nefu Virtual File System (NVFS) Design
+- In-memory VFS with persistent save magic (`NFS1`) — survives reboot on host, bakes into kernel on bare-metal
+- Directory tree with symlinks, file metadata, recursive mkdir -p
+- Separate FAT32 driver (read-only) designed for real disk/USB mounting
+- Planned: journaling NVFS with superblock, inodes, cluster chains
+
+### 5. Built-in Text Editor with Syntax Highlighting
+- Line numbers, cursor navigation, block cursor
+- Simple C/C++ syntax highlighting: comments = green, keywords = blue, strings = purple
+- Save / load to VFS, file association opens in editor
+- Tab support, enter to split lines, backspace to merge
+
+### 6. 50+ Unix-like Terminal Commands
+- Full shell: `ls cd pwd cat mkdir touch rm echo tree cp mv find grep wc head tail sort uniq`
+- System info: `ps free df du uname whoami id date uptime dmesg lspci lsusb`
+- Networking: `ping netstat` (real ICMP on host)
+- Shell utilities: `seq yes alias less more whatis whereis apropos history env export`
+- Development: `nefucpp` — compile C++ to .nefud (auto-includes sysapi.h)
+- `.nefud` app launcher: recognizes NEFUD1 / NEFBIN magic bytes and executes bound apps
+
+### 7. Window Manager with Real Desktop Behavior
+- Draggable + resizable windows, focus stacking, title bar double-click = maximize
+- Desktop icons are shortcuts (delete icon ≠ delete app)
+- Trash bin with restore / permanent delete / empty-all
+- Taskbar + start menu + system clock + notification area
+
+### 8. Game Collection
+- Snake (arrow keys, R to restart, score tracking)
+- Calculator (4-function + sqrt + square)
+- Calendar (month view, today highlighted)
+
+### 9. Security & Boot
+- UEFI/BIOS config utility: username + SHA-256 hashed password (never stored plaintext)
+- Plan: chainload Windows from nefuOS boot menu (no registry modification)
+- Plan: self-recovery mode (rollback journal replays after OOM / power loss)
+
+### 10. Self-Contained Build
+- One PowerShell script (`tools/build_iso.ps1`) compiles everything
+- Uses MinGW-w64 g++ + `as` assembler
+- Outputs: host `.exe` (~1.7 MB) + bare-metal kernel.bin + El Torito ISO
+- No external dependencies beyond the compiler toolchain
+
+### 11. nefuOS System API Library (sysapi.h)
+- C++ header-only API for app developers
+- 10 categories: file, process, memory, network, display, power, settings, time, notify, app
+- All apps can call `nefu::sysapi::*` functions directly
+- Auto-included when compiling with `nefucpp`
+
+### 12. nefucpp — Built-in C++ Packager
+- Terminal command: `nefucpp myapp.cpp [output.nefud]`
+- Auto-includes: `sysapi.h`, `klib.h`, `gui/gfx.h`
+- Packages output as `.nefud` nefuOS application format
+- Run with: `run myapp.nefud`
+
+### 13. TTF Chinese Text Rendering
+- Automatic CJK detection: any non-ASCII string uses system TTF font
+- Full Chinese support in UI, browser, terminal
+- No more "black box" tofu characters
+- Falls back to bitmap font for pure ASCII
+
+### 14. Ladybird-Style Browser
+- Multi-tab support (up to 5 tabs)
+- Toolbar: back / forward / refresh buttons
+- Address bar with URL detection vs search keywords
+- HTML parser recognizes `<img>`, `<br>`, `<p>`, `<h1>` tags
+- Real Bing search, page scroll, history navigation
+
+---
 ## Features
 
 ### Desktop & GUI
@@ -282,9 +371,17 @@ nefuOS/
 ### Boot chain (El Torito no-emulation)
 
 ```
-BIOS/SeaBIOS ──boot catalog──▶ 2 KiB boot image @0x7C00 (boot.s)
+BIOS/SeaBIOS ──boot catalog──▶ 2 KiB boot image @0x7C00 (boot.s, LBA 23)
 
-boot.s ──INT 13h AH=42h (single DAP, dynamic loop, safe zone 0x7D60)──▶
+boot.s ──EDD DAP──▶ menu.bin @0x10000 (LBA 24-25, multi-boot picker)
+
+menu.s ──hard-disk probe (AH=15 + EDD MBR + 0xAA55 + partition table)──▶
+        single boot: straight back into cd_load_kernel (zero delay)
+        multi boot:  Windows-Boot-Manager-style 80x25 blue picker
+                     (UP/DOWN/ENTER; 3 s timeout -> nefuOS,
+                      Windows -> int 19h warm reboot to the hard disk)
+
+boot.s ──INT 13h AH=42h (single DAP, dynamic loop, safe zone 0x7D70)──▶
         payload @0x20000 = 32-bit stub (2.2 KB) + raw-DEFLATE kernel (507 KB)
 
 stub ──inflate (self-contained RFC 1951, -Os -m32, no libc)──▶ kernel @0x100000

@@ -26,6 +26,28 @@ static void win_close_cb(lv_event_t* e) {
 }
 
 LvglWin* lvgl_win_create(const char* title, int x, int y, int w, int h) {
+    // Clamp window geometry to the screen work area, same policy as
+    // WM::create_window. Without this every LVGL window (Settings 480x700,
+    // Notepad 560px wide at a cascade offset, BIOS, ...) could extend past the
+    // 800x600 screen edge and become unreachable. Fullscreen-style windows
+    // (800x600 at 0,0, e.g. boot splash / lock screen / BSOD) are exempt.
+    {
+        const int SCREEN_W = 800;
+        const int SCREEN_H = 600;
+        const int TASKBAR_H = 30;
+        const bool fullscreen_like = (x == 0 && y == 0 && w >= SCREEN_W && h >= SCREEN_H);
+        if (!fullscreen_like) {
+            const int MAX_W = SCREEN_W - 8;
+            const int MAX_H = SCREEN_H - TASKBAR_H - 8;
+            if (w > MAX_W) w = MAX_W;
+            if (h > MAX_H) h = MAX_H;
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+            if (x + w > SCREEN_W) x = SCREEN_W - w;
+            if (y + h > SCREEN_H - TASKBAR_H) y = SCREEN_H - TASKBAR_H - h;
+        }
+    }
+
     LvglWin* r = new LvglWin();
     if (!r) return 0;
     memset(r, 0, sizeof(*r));

@@ -82,7 +82,7 @@ FSNode* VFS::resolve(const char* path) {
 
 FSNode* VFS::mkdir(const char* path) {
     if (!path || !*path) return 0;
-    // '/'， +
+    // '/', +
     String p = path;
     int last = p.rfind('/');
     String parent_path, name;
@@ -185,7 +185,7 @@ bool VFS::remove_node(FSNode* n) {
     return false;
 }
 
-// ---------- （Trash） ----------
+// ---------- (Trash) ----------
 FSNode* VFS::trash_dir() {
     FSNode* d = resolve("/home/user/Trash");
     if (!d) {
@@ -237,7 +237,7 @@ FSNode* VFS::move_node(FSNode* n, FSNode* dst_dir, const char* new_name) {
 
     FSNode* p = dst_dir;
     while (p) { if (p == n) return 0; p = p->parent; }
-    // （）
+    // ()
     const char* nn = new_name ? new_name : n->name.c_str();
     if (find_child(dst_dir, nn)) return 0;
     // parent

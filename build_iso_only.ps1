@@ -15,11 +15,11 @@ if ($LASTEXITCODE -ne 0) { throw "admin hash gen failed" }
 
 $coreSrc = @(
   "core\nefuos.cpp", "core\klib\memory.cpp", "core\klib\string.cpp", "core\klib\printf.cpp",
-  "core\vfs\vfs.cpp", "core\gui\gfx.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
+  "core\vfs\vfs.cpp", "core\vfs\nvfs.cpp", "core\gui\gfx.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
   "core\apps\apps.cpp", "core\apps\terminal.cpp", "core\apps\filemgr.cpp", "core\apps\calc.cpp",
   "core\apps\textview.cpp", "core\apps\sysinfo.cpp", "core\apps\settings.cpp", "core\apps\store.cpp",
   "core\apps\snake.cpp", "core\apps\paint.cpp", "core\apps\clock.cpp", "core\apps\notepad.cpp",
-  "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\monitor.cpp",
+  "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\videoplayer.cpp", "core\apps\monitor.cpp",
   "core\apps\browser.cpp", "core\apps\netcfg.cpp",
   "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\net\net.cpp",
   "core\gui\ttfont.cpp", "core\apps\fontview.cpp", "core\apps\lvgl_demo.cpp",
@@ -81,11 +81,18 @@ $objs += "$bareOut\bare_bare.o"
 if ($LASTEXITCODE -ne 0) { throw "softfloat.cpp failed" }
 $objs += "$bareOut\bare_softfloat.o"
 
-# 3) boot sector + kernel entry
+# 3) boot sector + kernel entry + multi-boot picker
 & $as "backends\bare\boot.s" -o "$bareOut\boot.o"
 if ($LASTEXITCODE -ne 0) { throw "boot.s failed" }
 & $as "backends\bare\entry.s" -o "$bareOut\entry.o"
 if ($LASTEXITCODE -ne 0) { throw "entry.s failed" }
+& $as "backends\bare\menu.s" -o "$bareOut\menu.o"
+if ($LASTEXITCODE -ne 0) { throw "menu.s failed" }
+& $objcopy -O binary -j .text "$bareOut\menu.o" "$bareOut\menu.bin"
+if ($LASTEXITCODE -ne 0) { throw "menu objcopy failed" }
+$menuLen = (Get-Item "$bareOut\menu.bin").Length
+if ($menuLen -gt 4096) { throw "menu.bin too large: $menuLen bytes (max 4096)" }
+Write-Output "menu.bin OK: $menuLen bytes"
 
 $objs = @("$bareOut\entry.o") + $objs
 
@@ -178,7 +185,7 @@ Write-Output "boot.bin patched: $kSectors kernel sectors"
 
 # 6) ISO (El Torito no-emulation)
 $isoOut = Join-Path $distOut "nefuOS.iso"
-& $python3 "tools\make_iso.py" "$bareOut\boot.bin" "$bareOut\kernel.bin" $isoOut
+& $python3 "tools\make_iso.py" "$bareOut\boot.bin" "$bareOut\menu.bin" "$bareOut\kernel.bin" $isoOut
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
 Write-Output "ISO OK: $((Get-Item $isoOut).Length) bytes"
 

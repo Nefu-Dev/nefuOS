@@ -1,5 +1,5 @@
-// auto-generated：8x16 ASCII bitmap font（32..127），per char 16 bytes，one row per byte 8 pixel，MSB=left side
-// generator tool：tools/fontgen.cpp，do not edit manually
+// auto-generated:8x16 ASCII bitmap font(32..127),per char 16 bytes,one row per byte 8 pixel,MSB=left side
+// generator tool:tools/fontgen.cpp,do not edit manually
 #pragma once
 namespace nefu { extern const unsigned char font8x16[96][16]; }
 const unsigned char nefu::font8x16[96][16] = {

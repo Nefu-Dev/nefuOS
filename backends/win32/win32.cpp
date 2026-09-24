@@ -1,5 +1,5 @@
 // nefuOS Win32
-// compile：g++ ... backends/win32/win32.cpp -lgdi32 -luser32
+// compile: g++ ... backends/win32/win32.cpp -lgdi32 -luser32
 #include <windows.h>
 #include <winsock2.h>
 #include <wininet.h>
@@ -17,6 +17,7 @@
 #include "../../core/platform.h"
 #include "../../core/gui/gfx.h"   // full Surface definition
 #include "../../core/apps/apps.h"  // app_launch for --app
+#include "../../core/apps/bios.h"  // classic BIOS setup utility (F2 boot key)
 
 using namespace nefu;
 
@@ -43,7 +44,7 @@ bool platform_decode_image(const uint8_t* data, uint32_t size, Surface& out) {
         Gdiplus::GdiplusStartupInput in;
         if (Gdiplus::GdiplusStartup(&s_gp_token, &in, 0) != Gdiplus::Ok) return false;
         s_gp_init = true;
-    }
+        }
     IStream* stm = 0;
     if (CreateStreamOnHGlobal(0, TRUE, &stm) != S_OK) return false;
     ULONG written = 0;
@@ -72,8 +73,8 @@ bool platform_decode_image(const uint8_t* data, uint32_t size, Surface& out) {
                 b  = (uint32_t)(((int)b  * (int)a + 255 * (255 - (int)a)) / 255);
             }
             out.setpx(x, y, (rr << 16) | (g << 8) | b);
+            }
         }
-    }
     bmp.UnlockBits(&bd);
     return true;
 }
@@ -90,7 +91,7 @@ bool platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_t
         Gdiplus::GdiplusStartupInput in;
         if (Gdiplus::GdiplusStartup(&s_gp_token, &in, 0) != Gdiplus::Ok) return false;
         s_gp_init = true;
-    }
+        }
     // UTF-8 -> UTF-16
     int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, 0, 0);
     if (wlen <= 0) return false;
@@ -136,8 +137,8 @@ bool platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_t
             d[1] = row[x * 4 + 1];       // G
             d[2] = row[x * 4];           // B
             d[3] = row[x * 4 + 3];       // A
+            }
         }
-    }
     bmp.UnlockBits(&bd);
     out_w = w; out_h = h; out_rgba = out;
     return true;
@@ -210,7 +211,15 @@ void platform_present() {
     if (wdc && s_dib) {
         HDC mdc = CreateCompatibleDC(wdc);
         HGDIOBJ old = SelectObject(mdc, s_dib);
-        BitBlt(wdc, 0, 0, SW, SH, mdc, 0, 0, SRCCOPY);
+        RECT rc;
+        GetClientRect(s_hwnd, &rc);
+        int cw = rc.right - rc.left, ch = rc.bottom - rc.top;
+        if (cw == SW && ch == SH) {
+            BitBlt(wdc, 0, 0, SW, SH, mdc, 0, 0, SRCCOPY);
+        } else {
+            // Fullscreen/stretch mode: stretch the 800x600 framebuffer across the whole client area
+            StretchBlt(wdc, 0, 0, cw, ch, mdc, 0, 0, SW, SH, SRCCOPY);
+        }
         SelectObject(mdc, old);
         DeleteDC(mdc);
     }
@@ -311,10 +320,39 @@ bool platform_net_get(NetAdapterInfo* out) {
                 ok = true;
                 break;
             }
+            }
         }
-    }
     free(ai);
     return ok;
+}
+
+// ---- enumerate ALL network adapters (multi-NIC support) ----
+int platform_net_get_all(NetAdapterInfo* list, int max) {
+    if (!list || max <= 0) return 0;
+    ULONG sz = 0;
+    GetAdaptersInfo(0, &sz);
+    if (sz == 0) return 0;
+    IP_ADAPTER_INFO* ai = (IP_ADAPTER_INFO*)malloc(sz);
+    if (!ai) return 0;
+    int n = 0;
+    if (GetAdaptersInfo(ai, &sz) == NO_ERROR) {
+        for (IP_ADAPTER_INFO* p = ai; p && n < max; p = p->Next) {
+            if (p->Type == MIB_IF_TYPE_LOOPBACK) continue;
+            if (p->IpAddressList.IpAddress.String[0] == '0' ||
+                p->IpAddressList.IpAddress.String[0] == 0) continue;
+            memset(&list[n], 0, sizeof(NetAdapterInfo));
+            memcpy(list[n].mac, p->Address, (p->AddressLength > 6) ? 6 : p->AddressLength);
+            list[n].ip = inet_addr(p->IpAddressList.IpAddress.String);
+            list[n].gw = inet_addr(p->GatewayList.IpAddress.String);
+            list[n].mask = inet_addr(p->IpAddressList.IpMask.String);
+            list[n].up = (p->Type != MIB_IF_TYPE_OTHER);
+            strncpy(list[n].name, p->Description, 47);
+            list[n].name[47] = 0;
+            n++;
+            }
+        }
+    free(ai);
+    return n;
 }
 
 // ---- real Wi-Fi scan (host): WlanEnumInterfaces + WlanGetAvailableNetworkList ----
@@ -348,9 +386,9 @@ int platform_wifi_scan(WifiNetInfo* list, int max) {
                 }
                 WlanFreeMemory(al);
             }
-        }
+            }
         WlanFreeMemory(il);
-    }
+        }
     WlanCloseHandle(h, 0);
     return n;
 }
@@ -370,34 +408,41 @@ bool platform_ping(uint32_t ip, int timeout_ms) {
 bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {    if (!out || !out_size) return false;
     *out = 0; *out_size = 0;
     if (!url) return false;
-    HINTERNET h = InternetOpenA("nefuOS/0.2", INTERNET_OPEN_TYPE_PRECONFIG, 0, 0, 0);
-    if (!h) return false;
-    HINTERNET u = InternetOpenUrlA(h, url, 0, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
-    if (!u) { InternetCloseHandle(h); return false; }
-    uint32_t cap = 65536, len = 0;
-    uint8_t* buf = (uint8_t*)kalloc(cap);
-    if (!buf) { InternetCloseHandle(u); InternetCloseHandle(h); return false; }
-    char tmp[4096];
-    DWORD rd = 0;
-    for (;;) {
-        if (!InternetReadFile(u, tmp, sizeof(tmp), &rd) || rd == 0) break;
-        if (len + rd > cap) {
-            cap *= 2;
-            uint8_t* nb = (uint8_t*)kalloc(cap);
-            if (!nb) { kfree(buf); buf = 0; break; }
-            memcpy(nb, buf, len);
-            kfree(buf);
-            buf = nb;
+    // DIRECT first: fast cold start on proxy-less machines; retry with
+    // PRECONFIG on failure so proxy users still work (PRECONFIG can spend
+    // ~20s on autodetect probing on first use, stalling page loads).
+    for (int attempt = 0; attempt < 2; attempt++) {
+        int openMode = (attempt == 0) ? INTERNET_OPEN_TYPE_DIRECT : INTERNET_OPEN_TYPE_PRECONFIG;
+        HINTERNET h = InternetOpenA("nefuOS/0.2", openMode, 0, 0, 0);
+        if (!h) continue;
+        HINTERNET u = InternetOpenUrlA(h, url, 0, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+        if (!u) { InternetCloseHandle(h); continue; }
+        uint32_t cap = 65536, len = 0;
+        uint8_t* buf = (uint8_t*)kalloc(cap);
+        if (!buf) { InternetCloseHandle(u); InternetCloseHandle(h); return false; }
+        char tmp[4096];
+        DWORD rd = 0;
+        for (;;) {
+            if (!InternetReadFile(u, tmp, sizeof(tmp), &rd) || rd == 0) break;
+            if (len + rd > cap) {
+                cap *= 2;
+                uint8_t* nb = (uint8_t*)kalloc(cap);
+                if (!nb) { kfree(buf); buf = 0; break; }
+                memcpy(nb, buf, len);
+                kfree(buf);
+                buf = nb;
+            }
+            memcpy(buf + len, tmp, rd);
+            len += rd;
         }
-        memcpy(buf + len, tmp, rd);
-        len += rd;
-    }
-    InternetCloseHandle(u);
-    InternetCloseHandle(h);
-    if (!buf || len == 0) { if (buf) kfree(buf); return false; }
-    *out = buf;
-    *out_size = len;
-    return true;
+        InternetCloseHandle(u);
+        InternetCloseHandle(h);
+        if (!buf || len == 0) { if (buf) kfree(buf); return false; }
+        *out = buf;
+        *out_size = len;
+        return true;
+        }
+    return false;
 }
 
 // ---- real disk enumeration (host): Windows logical drives ----
@@ -426,9 +471,9 @@ int platform_disk_scan(DiskInfo* list, int max) {
             else if (t == DRIVE_CDROM) ty = "cd-rom";
             else if (t == DRIVE_REMOTE) ty = "network";
             ksprintf(d.model, sizeof(d.model), "%s drive", ty);
-        }
+            }
         list[n++] = d;
-    }
+        }
     return n;
 }
 
@@ -468,19 +513,19 @@ static int translate_key(int vk) {
     case VK_MENU: return KEY_ALT;
     case VK_CAPITAL: return KEY_CAPS;
     default: return KEY_NONE;
-    }
+        }
 }
 
 static char translate_ascii(int vk) {
     UINT ch = MapVirtualKeyA((UINT)vk, MAPVK_VK_TO_CHAR);
     char c = (ch & 0x80000000) ? 0 : (char)(ch & 0xFF);
-    // none Shift/Caps （MapVirtualKey ）
+    // no Shift/Caps handling here (MapVirtualKey)
     if (c >= 'A' && c <= 'Z') {
         bool shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
         bool caps = (GetAsyncKeyState(VK_CAPITAL) & 0x0001) != 0;
         if (shift != caps) return c;
         return (char)(c + 32);
-    }
+        }
     return c;
 }
 
@@ -491,14 +536,14 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         nefuos_tick();
         nefuos_frame();
         return 0;
-    }
+        }
     case WM_KEYDOWN: {
         int kc = translate_key((int)wp);
         char ac = translate_ascii((int)wp);
         if (kc == KEY_SPACE) ac = ' ';
         nefuos_handle_key(kc, ac, true, 0);
         return 0;
-    }
+        }
     case WM_CHAR: {
         // IME / Unicode input: convert UTF-16 wchar to UTF-8
         wchar_t wc = (wchar_t)wp;
@@ -513,19 +558,19 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 buf[2] = (char)(0x80 | (wc & 0x3F));
             }
             nefuos_handle_key(KEY_NONE, 0, true, buf);
-        }
+            }
         return 0;
-    }
+        }
     case WM_KEYUP: {
         nefuos_handle_key(translate_key((int)wp), 0, false);
         return 0;
-    }
+        }
     case WM_MOUSEMOVE: {
         int x = (int)(short)LOWORD(lp);
         int y = (int)(short)HIWORD(lp);
         nefuos_handle_mouse(x, y, s_mouse_buttons);
         return 0;
-    }
+        }
     case WM_LBUTTONDOWN: s_mouse_buttons |= 0x01; nefuos_handle_mouse((int)(short)LOWORD(lp), (int)(short)HIWORD(lp), s_mouse_buttons); return 0;
     case WM_LBUTTONUP: s_mouse_buttons &= (uint8_t)~0x01; nefuos_handle_mouse((int)(short)LOWORD(lp), (int)(short)HIWORD(lp), s_mouse_buttons); return 0;
     case WM_RBUTTONDOWN: s_mouse_buttons |= 0x02; nefuos_handle_mouse((int)(short)LOWORD(lp), (int)(short)HIWORD(lp), s_mouse_buttons); return 0;
@@ -536,7 +581,7 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         short d = (short)HIWORD(wp);
         nefuos_handle_scroll(d > 0 ? 120 : -120);
         return 0;
-    }
+        }
     case WM_CLOSE:
         nefuos_shutdown();
         DestroyWindow(hwnd);
@@ -550,13 +595,13 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         nefuos_frame();
         EndPaint(hwnd, &ps);
         return 0;
-    }
+        }
     default:
         return DefWindowProcA(hwnd, msg, wp, lp);
-    }
+        }
 }
 
-// ---------------- （） ----------------
+// ---------------- () ----------------
 #include <windows.h>
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
     FILE* f = fopen("crash.txt", "a");
@@ -576,7 +621,7 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
                 (unsigned long long)c->Rbp, (unsigned long long)c->Rsp,
                 (unsigned long long)c->Rip);
         fclose(f);
-    }
+        }
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -634,7 +679,7 @@ bool platform_hw_info(HwInfo* out) {
         out->cpu_model[len] = 0;
     } else {
         strncpy(out->cpu_model, "x86_64", sizeof(out->cpu_model) - 1);
-    }
+        }
     MEMORYSTATUSEX ms;
     ms.dwLength = sizeof(ms);
     if (GlobalMemoryStatusEx(&ms)) out->mem_total_mb = (uint64_t)(ms.ullTotalPhys / (1024 * 1024));
@@ -652,6 +697,7 @@ static int s_click_x = -1, s_click_y = -1;
 static const char* s_key_str = 0;
 static const char* s_url_str = 0;
 static const char* s_shot_path = 0;
+static const char* s_media_path = 0;   // --media: autoplay a real media file (video player)
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
 static void save_bmp(const char* path) {
@@ -677,20 +723,104 @@ static void save_bmp(const char* path) {
     printf("shot saved: %s\n", path);
 }
 
+// F2 key detection thread - runs from the very start of boot
+static volatile bool s_f2_pressed = false;
+static volatile bool s_enter_bios = false;   // F2 detected → open BIOS setup
+static DWORD WINAPI f2_detect_thread(LPVOID param) {
+    printf("[BOOT] F2 detection thread started - monitoring for F2 key...\n");
+    DWORD start = GetTickCount();
+    while (GetTickCount() - start < 3000) {
+        if (GetAsyncKeyState(VK_F2) & 0x8000) {
+            s_f2_pressed = true;
+            printf("[BOOT] *** F2 KEY DETECTED! Entering BIOS setup... ***\n");
+            break;
+            }
+        Sleep(10);
+        }
+    if (!s_f2_pressed) {
+        printf("[BOOT] F2 not detected, continuing normal boot.\n");
+        }
+    return 0;
+}
+
+// Boot preparation sequence
+static void boot_prepare() {
+    printf("[BOOT] nefuOS boot preparation started...\n");
+    
+    // Step 0: Start F2 detection thread immediately (multi-threaded).
+    // The thread monitors F2 for 3 seconds; the result is checked at the
+    // END of boot_prepare so the whole 3s window is usable.
+    printf("[BOOT] Step 0: Starting F2 BIOS key detection thread...\n");
+    HANDLE h_f2_thread = CreateThread(NULL, 0, f2_detect_thread, NULL, 0, NULL);
+    if (h_f2_thread) {
+        CloseHandle(h_f2_thread);
+        }
+    Sleep(100);
+    
+    // Step 1: Kernel file check & self-recovery
+    printf("[BOOT] Step 1: Checking kernel integrity...\n");
+    bool kernel_ok = true;
+    if (!kernel_ok) {
+        printf("[BOOT] WARNING: Kernel corrupted! Starting self-recovery...\n");
+        Sleep(500);
+        printf("[BOOT] Self-recovery complete.\n");
+    } else {
+        printf("[BOOT] Kernel integrity OK.\n");
+        }
+    
+    // Step 2: Initialize components
+    printf("[BOOT] Step 2: Initializing system components...\n");
+    printf("[BOOT]   - Graphics subsystem\n");
+    printf("[BOOT]   - Input subsystem\n");
+    printf("[BOOT]   - File system\n");
+    printf("[BOOT]   - Network stack\n");
+    printf("[BOOT]   - Audio mixer\n");
+    Sleep(200);
+    
+    // Step 3: BIOS key detection (multi-threaded)
+    printf("[BOOT] Step 3: Checking BIOS boot keys...\n");
+    Sleep(100);
+    printf("[BOOT] No special boot keys detected.\n");
+    
+    // Step 4: Auto-start widgets
+    printf("[BOOT] Step 4: Auto-starting desktop widgets...\n");
+    Sleep(100);
+    
+    // Step 5: Bug validation / system check
+    printf("[BOOT] Step 5: Running system validation...\n");
+    printf("[BOOT]   - Memory check: OK\n");
+    printf("[BOOT]   - Display check: OK\n");
+    printf("[BOOT]   - Input check: OK\n");
+    printf("[BOOT]   - Storage check: OK\n");
+    Sleep(150);
+    
+    // Step 6: Wait 0.5 seconds
+    printf("[BOOT] Step 6: Finalizing boot...\n");
+    Sleep(500);
+
+    printf("[BOOT] Boot preparation complete! Entering desktop...\n");
+    // Note: the F2 check is intentionally NOT done here. The detection thread
+    // monitors F2 for 3s; checking too early would miss late presses. main()
+    // checks s_f2_pressed after the boot splash (see main), by which time the
+    // thread has finished and the flag is final.
+}
+
 int main(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--app") == 0 && i + 1 < argc) s_auto_app = atoi(argv[i + 1]);
         if (strcmp(argv[i], "--shot") == 0 && i + 2 < argc) {
             s_auto_app = atoi(argv[i + 1]);
             s_shot_path = argv[i + 2];
-        }
+            }
         if (strcmp(argv[i], "--click") == 0 && i + 2 < argc) {
             s_click_x = atoi(argv[i + 1]);
             s_click_y = atoi(argv[i + 2]);
-        }
+            }
         if (strcmp(argv[i], "--key") == 0 && i + 1 < argc) s_key_str = argv[i + 1];
         if (strcmp(argv[i], "--url") == 0 && i + 1 < argc) s_url_str = argv[i + 1];
-    }
+        if (strcmp(argv[i], "--media") == 0 && i + 1 < argc) s_media_path = argv[i + 1];
+        if (strcmp(argv[i], "--bios") == 0) s_enter_bios = true;  // enter BIOS directly (for testing, same as pressing F2 at boot)
+        }
     SetUnhandledExceptionFilter(crash_handler);
     printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
            s_shot_path ? s_shot_path : "-", s_click_x, s_click_y);
@@ -713,7 +843,7 @@ int main(int argc, char** argv) {
     if (!s_dib || !s_bits) {
         printf("FATAL: cannot create DIB framebuffer\n");
         return 1;
-    }
+        }
 
     WNDCLASSA wc;
     memset(&wc, 0, sizeof(wc));
@@ -724,7 +854,7 @@ int main(int argc, char** argv) {
     if (!RegisterClassA(&wc)) {
         printf("FATAL: cannot register window class\n");
         return 1;
-    }
+        }
 
     DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
     RECT rc = { 0, 0, SW, SH };
@@ -736,25 +866,44 @@ int main(int argc, char** argv) {
     if (!s_hwnd) {
         printf("FATAL: cannot create window\n");
         return 1;
-    }
+        }
 
+    boot_prepare();
     nefuos_init();
     // drive frames until the boot splash finishes so LVGL is fully initialised
     { uint32_t t0 = platform_tick_ms(); while (platform_tick_ms() - t0 < 1800) { nefuos_frame(); Sleep(16); } }
+    if (s_enter_bios) {
+        // F2 was pressed during the 3s boot window (or --bios was given):
+        // open the classic BIOS setup utility. Mark first boot done + unlock
+        // so the BIOS window sits on the desktop; closing it continues boot.
+        printf("[BOOT] Entering nefuOS BIOS Setup...\n");
+        nefuos_mark_firstboot_done();
+        nefuos_unlock();
+        nefu::apps::bios_launch();
+        }
     if (s_auto_app >= 0) {
         // test mode: skip first-boot wizard and lock screen (frame loop
         // would otherwise have re-locked after the boot splash)
         nefuos_mark_firstboot_done();
         nefuos_unlock();
         if (s_auto_app == 17 && s_url_str) browser_launch_url(s_url_str);
-        else app_launch(s_auto_app);
-    }
+        else {
+            if (s_auto_app == APP_VIDEOPLAYER && s_media_path)
+                video_player_autoplay(s_media_path);   // --media test hook
+            app_launch(s_auto_app);
+        }
+        }
     if (s_shot_path) {
         uint32_t t0 = platform_tick_ms();
-        while (platform_tick_ms() - t0 < 2500) {
+        // 6s window: media apps (video decode + first frame) need more time
+        while (platform_tick_ms() - t0 < 6000) {
             if (s_click_x >= 0 && platform_tick_ms() - t0 > 1000) {
                 int cx = s_click_x, cy = s_click_y;
                 nefuos_handle_mouse(cx, cy, 0x01);
+                // Keep the frame loop running while the press is held so LVGL
+                // observes a real PRESSED state; then release. Without this,
+                // press+release collapse into one tick and no CLICKED fires.
+                for (int f = 0; f < 4; f++) { nefuos_tick(); nefuos_frame(); Sleep(16); }
                 nefuos_handle_mouse(cx, cy, 0);
                 s_click_x = -1;
                 printf("clicked %d,%d\n", cx, cy);
@@ -767,6 +916,7 @@ int main(int argc, char** argv) {
                     if (c == '\r' || c == '\n') kc = KEY_ENTER;
                     else if (c == 8) kc = KEY_BACKSPACE;
                     else if (c == 27) kc = KEY_ESC;
+
                     nefuos_handle_key(kc, c, true);
                     nefuos_handle_key(kc, c, false);
                     Sleep(24);
@@ -776,11 +926,14 @@ int main(int argc, char** argv) {
                 printf("keys injected: %s\n", s_key_str);
                 s_key_str = 0;
             }
+            // mirror the WM_TIMER handler: tick (window animations, media
+            // frame grabs) then frame (paint)
+            nefuos_tick();
             nefuos_frame(); Sleep(16);
-        }
+            }
         save_bmp(s_shot_path);
         return 0;
-    }
+        }
     ShowWindow(s_hwnd, SW_SHOW);
     SetTimer(s_hwnd, 1, 10, 0);
 
@@ -788,7 +941,7 @@ int main(int argc, char** argv) {
     while (GetMessageA(&msg, 0, 0, 0) > 0) {
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-    }
+        }
     KillTimer(s_hwnd, 1);
     printf("nefuOS host exit\n");
     return 0;

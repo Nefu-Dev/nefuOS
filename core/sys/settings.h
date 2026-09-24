@@ -27,15 +27,18 @@ extern SysSettings g_settings;
 void settings_load();   // from /etc/settings.conf read
 void settings_save();   // /etc/settings.conf
 
-// （ / start button）
+// ( / start button)
 uint32_t accent_color(int idx);
 
-// （）
+// ()
 void wallpaper_colors(int idx, uint32_t* top, uint32_t* bottom, uint32_t* base);
 
 // simple UI language helper: 0 = English, 1 = Chinese
+// Force English-only mode to avoid CJK font rendering issues (boxes/squares)
+// TODO: add proper CJK font support later
 inline const char* T(const char* zh, const char* en) {
-    return g_settings.lang ? zh : en;
+    (void)zh; // suppress unused warning
+    return en; // always return English to avoid font issues
 }
 
 } // namespace nefu

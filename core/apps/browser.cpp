@@ -1,1721 +1,3016 @@
-// nefuOS built-in browser
-// - file://  local VFS text/HTML viewer
-// - http://   threaded download (host: WinINet, bare: in-house TCP)
-// - search:   Bing (host) or local VFS (bare)
-// - self-contained HTML parser with <img> rendering
-// - all network I/O runs on background threads (UI never blocks)
+// =====================================================================
+// nefuOS Browser v3.0 — professional-grade browser
+//
+// Architecture (Ladybird / LibHubbub / LibCSS inspired, four-stage pipeline):
+//
+//   ┌─────────────┐   navigate()   ┌────────────┐
+//   │ BrowserApp  │ ─────────────► │  Loader    │  platform_http_get()
+//   │ chrome / UI │ ◄───────────── │  (worker)  │  host: worker thread
+//   └─────────────┘   page bytes   └─────┬──────┘  bare: synchronous inline
+//                                        ▼
+//   ┌─────────────┐   DOM (bounded) ┌────────────┐
+//   │ Layout      │ ◄────────────── │ HTML Parser│  tokenizer → tree builder
+//   │ block flow  │                 └────────────┘  (entities, script skip)
+//   └──────┬──────┘
+//          ▼  runs + link rects
+//   ┌─────────────┐
+//   │ Paint       │  cull + draw runs to the framebuffer, scroll-aware
+//   └─────────────┘
+//
+// Design goals:
+//  * SAFE     — every buffer bounded, DOM capped and depth-limited,
+//               no out-of-bounds writes anywhere.
+//  * FAST     — the page is parsed ONCE per navigation; the layout is
+//               cached per tab and rebuilt only on width change.
+//  * UX       — real tabs (open/close/switch), back/forward history,
+//               clickable links, editable address bar with cursor,
+//               loading state, proportional scrollbar, status bar.
+//  * PORTABLE — one codebase for the Win32 host (worker thread) and the
+//               bare-metal kernel (synchronous load; no scheduler yet).
+//
+// Keyboard (platform convention: Ctrl+letter arrives as the plain letter):
+//   l focus address · t new tab · w close tab · r reload · h home · F5 reload
+//   arrows / PgUp / PgDn / Home / End scroll the page
+// =====================================================================
+// Windows + OpenGL headers must come FIRST, before any C++ standard header:
+// windows.h pulls in intrin.h -> mm_malloc.h -> <cstdlib> internally, and
+// expanding that after libstdc++ state is set up breaks ::abs/::div_t etc.
+// Bare builds skip this section entirely (no GPU driver stack there).
+#ifndef NEFU_BARE
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <GL/gl.h>
+#include <GL/glext.h>
+#endif
 
 #include "apps.h"
-#include "downloadmgr.h"
-#include "minijs.h"
-#include "../sys/settings.h"
-#include <stdio.h>   // vsnprintf only (no sscanf on bare metal)
-#include "../gui/gfx.h"   // gfx::char16x16 renders the shared CJK table
-#include "../gui/wm.h"
+#include "jpeg.h"          // nefu::jpeg_decode — in-tree baseline-JPEG decoder
+#include "stb_image_wrap.h" // nefu::stbi_decode_mem/info/sniff + nsvg SVG decode
+#include "minijs.h"        // nefu::mini_js_run — tiny JS engine for <script>
 #include "../gui/gfx.h"
-#include "../gui/widgets.h"
+#include "../gui/wm.h"
 #include "../klib/klib.h"
-#include "../vfs/vfs.h"
 #include "../platform.h"
-#include "../net/net.h"
 #include <cstring>
+#include <cstdio>
 
 namespace nefu {
 
 namespace {
 
-const int BAR_H = 30;
-const int STAT_H = 20;
-const int MAX_IMG_W = 300;   // max rendered image width
-const int MAX_IMG_H = 200;   // max rendered image height
+// ===================== layout constants =====================
+const int TAB_H = 24;          // tab strip height
+const int NAV_H = 22;          // navigation row height
+const int BAR_H = 58;          // total chrome height (tabs + nav)
+const int STAT_H = 24;         // status bar height
+const int SB_W  = 10;          // scrollbar width
+const int MAX_TABS  = 8;       // maximum open tabs
+const int MAX_PAGE  = 34 * 1024 * 1024;   // page buffer cap (34 MB per tab)
+const int DOM_MAX   = 16384;   // DOM node arena cap
+const int DOM_DEPTH = 48;      // DOM nesting depth cap
+const int HIST_MAX  = 24;      // per-tab history entries
+const int RUN_MAX   = 32768;   // layout run cap
 
-// ---- cached decoded image ----
-struct CachedImage {
-    String url;
-    Surface* surf;
-    bool loading;
-    bool failed;
-    CachedImage() : surf(0), loading(false), failed(false) {}
+// ===================== image support =====================
+const int IMG_MAX      = 12;    // cached images per tab
+const int MAX_IMG_PIX  = 262144; // decoded pixel cap per image (e.g. 512x512)
+const int MAX_IMG_DISP = 200;   // max display width (px); height scales
+
+// ===================== CSS subset + JS =====================
+const int CSS_MAX     = 64;      // style-sheet rules per tab
+const int SCRIPT_MAX  = 8192;    // accumulated <script> bytes per page
+const int JS_OUT_MAX  = 2048;    // JS console output buffer
+
+// One parsed CSS rule: a selector + the properties this engine understands.
+// 0 / false / -1 means "not set" so later rules can override earlier ones.
+struct CSSRule {
+    char sel[64];
+    uint32_t color;      // text color (0 = not set)
+    int font_size;       // px (0 = not set)
+    bool bold_set;
+    bool bold;
+    bool none;           // display:none
+    uint32_t bg;         // background color (0 = none)
+    int align;           // 0 none, 1 center, 2 right
+    int margin;          // px, -1 = not set (all four sides share one value)
+    int padding;         // px, -1 = not set
+    int width;           // px, -1 = auto
+    int height;          // px, -1 = auto
+    CSSRule() : color(0), font_size(0), bold_set(false), bold(false),
+                none(false), bg(0), align(0), margin(-1), padding(-1),
+                width(-1), height(-1) { sel[0] = 0; }
 };
 
-// ---- rendered output line ----
-struct Line {
-    String s;
-    int style;       // 0 normal, 1 title, 2 link
-    int font_size;   // 16 / 20 / 24 / 32
+// ===================== colors (dark Ladybird-style chrome) =====================
+const uint32_t C_TOOLBAR  = 0x0F172A;
+const uint32_t C_TAB_ACT  = 0x3B82F6;
+const uint32_t C_TAB_IDLE = 0x1E293B;
+const uint32_t C_BTN      = 0x334155;
+const uint32_t C_BTN_DIS  = 0x273244;
+const uint32_t C_TEXT_LT  = 0x94A3B8;
+const uint32_t C_TEXT_DK  = 0x1E293B;
+const uint32_t C_ADDR_BG  = 0xF8FAFC;
+const uint32_t C_ADDR_BD  = 0x94A3B8;
+const uint32_t C_PAGE_BG  = 0xFFFFFF;
+const uint32_t C_LINK     = 0x2563EB;
+const uint32_t C_HEAD     = 0x0F172A;
+const uint32_t C_GRAY     = 0x64748B;
+const uint32_t C_HRLINE   = 0xCBD5E1;
+const uint32_t C_IMG      = 0xE2E8F0;
+const uint32_t C_SB_TRACK = 0xF1F5F9;
+const uint32_t C_SB_THUMB = 0x94A3B8;
+const uint32_t C_STATUS   = 0x0F172A;
+const uint32_t C_ERR      = 0xDC2626;
+
+// ===================== small helpers =====================
+static char lower_char(char c) { return (c >= 'A' && c <= 'Z') ? (char)(c + 32) : c; }
+
+// case-insensitive equality against a string literal
+static bool ci_eq(const char* a, const char* b) {
+    while (*a && *b) {
+        if (lower_char(*a) != lower_char(*b)) return false;
+        a++; b++;
+    }
+    return *a == 0 && *b == 0;
+}
+
+// case-insensitive prefix match
+static bool ci_starts(const char* s, const char* pre) {
+    while (*pre) {
+        if (lower_char(*s) != lower_char(*pre)) return false;
+        s++; pre++;
+    }
+    return true;
+}
+
+static int maxi(int a, int b) { return a > b ? a : b; }
+
+// truncate a string to cap-1 bytes (always NUL-terminated)
+static void clip_str(char* dst, int cap, const char* src) {
+    if (cap <= 0) return;
+    int i = 0;
+    while (src && src[i] && i < cap - 1) { dst[i] = src[i]; i++; }
+    dst[i] = 0;
+}
+
+// percent-encode a URL / search query
+static void url_encode(const char* in, char* out, int cap) {
+    int n = 0;
+    for (const char* p = in; *p && n < cap - 4; p++) {
+        char c = *p;
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+            out[n++] = c;
+        } else {
+            n += ksprintf(out + n, 8, "%%%02X", (unsigned char)c);
+        }
+    }
+    out[n] = 0;
+}
+
+// extract the host part of a URL (for tab titles and status)
+static void url_host(const char* url, char* out, int cap) {
+    out[0] = 0;
+    const char* p = url;
+    if (ci_starts(p, "http://")) p += 7;
+    else if (ci_starts(p, "https://")) p += 8;
+    else if (ci_starts(p, "file://")) p += 7;
+    int n = 0;
+    while (*p && *p != '/' && *p != '?' && *p != '#' && n < cap - 1) out[n++] = *p++;
+    out[n] = 0;
+}
+
+// display width of a UTF-8 string in the 8x16 bitmap font
+// (ASCII glyphs are 8 px wide, CJK glyphs 16 px)
+static int utf8_char_len(const char* s) {
+    unsigned char c = (unsigned char)s[0];
+    if (c < 0x80) return 1;
+    if ((c & 0xE0) == 0xC0 && (unsigned char)s[1]) return 2;
+    if ((c & 0xF0) == 0xE0 && (unsigned char)s[1] && (unsigned char)s[2]) return 3;
+    return 1;
+}
+
+static int disp_w(const char* s, int len) {
+    int w = 0, i = 0;
+    while (i < len) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x80) { w += 8; i++; }
+        else if ((c & 0xE0) == 0xC0 && i + 1 < len) { w += 16; i += 2; }
+        else if ((c & 0xF0) == 0xE0 && i + 2 < len) { w += 16; i += 3; }
+        else { w += 8; i++; }
+    }
+    return w;
+}
+
+// ===================== DOM (bounded arena) =====================
+enum class Tag : uint8_t {
+    Root, Text,
+    H1, H2, H3, H4, H5, H6,
+    P, Div, Span, A, Img,
+    Ul, Ol, Li, Br, Hr,
+    B, Strong, I, Em, Pre, Blockquote,
+    Table, Tr, Td, Th, Form, Button, Canvas,
+    Script, Style, Unknown
+};
+
+static Tag tag_of(const char* name) {
+    switch (lower_char(name[0])) {
+        case 'h':
+            if (ci_eq(name, "h1")) return Tag::H1;
+            if (ci_eq(name, "h2")) return Tag::H2;
+            if (ci_eq(name, "h3")) return Tag::H3;
+            if (ci_eq(name, "h4")) return Tag::H4;
+            if (ci_eq(name, "h5")) return Tag::H5;
+            if (ci_eq(name, "h6")) return Tag::H6;
+            if (ci_eq(name, "hr")) return Tag::Hr;
+            break;
+        case 'p':
+            if (ci_eq(name, "p")) return Tag::P;
+            if (ci_eq(name, "pre")) return Tag::Pre;
+            break;
+        case 'd':
+            if (ci_eq(name, "div")) return Tag::Div;
+            break;
+        case 's':
+            if (ci_eq(name, "span")) return Tag::Span;
+            if (ci_eq(name, "strong")) return Tag::Strong;
+            if (ci_eq(name, "script")) return Tag::Script;
+            if (ci_eq(name, "style")) return Tag::Style;
+            break;
+        case 'a':
+            if (ci_eq(name, "a")) return Tag::A;
+            break;
+        case 'i':
+            if (ci_eq(name, "img")) return Tag::Img;
+            if (ci_eq(name, "i")) return Tag::I;
+            break;
+        case 'u':
+            if (ci_eq(name, "ul")) return Tag::Ul;
+            break;
+        case 'o':
+            if (ci_eq(name, "ol")) return Tag::Ol;
+            break;
+        case 'l':
+            if (ci_eq(name, "li")) return Tag::Li;
+            break;
+        case 'b':
+            if (ci_eq(name, "b")) return Tag::B;
+            if (ci_eq(name, "blockquote")) return Tag::Blockquote;
+            if (ci_eq(name, "button")) return Tag::Button;
+            break;
+        case 'c':
+            if (ci_eq(name, "canvas")) return Tag::Canvas;
+            break;
+        case 'e':
+            if (ci_eq(name, "em")) return Tag::Em;
+            break;
+        case 't':
+            if (ci_eq(name, "table")) return Tag::Table;
+            if (ci_eq(name, "tr")) return Tag::Tr;
+            if (ci_eq(name, "td")) return Tag::Td;
+            if (ci_eq(name, "th")) return Tag::Th;
+            break;
+        case 'f':
+            if (ci_eq(name, "form")) return Tag::Form;
+            break;
+        case 'n':
+            if (ci_eq(name, "nav")) return Tag::Div;
+            break;
+        default: break;
+    }
+    // structural tags → Div, inline/unknown → Span
+    if (ci_eq(name, "header") || ci_eq(name, "section") || ci_eq(name, "article") ||
+        ci_eq(name, "footer") || ci_eq(name, "main") || ci_eq(name, "aside") ||
+        ci_eq(name, "hgroup") || ci_eq(name, "address")) return Tag::Div;
+    if (ci_eq(name, "code") || ci_eq(name, "kbd") || ci_eq(name, "samp") ||
+        ci_eq(name, "small") || ci_eq(name, "mark") || ci_eq(name, "label") ||
+        ci_eq(name, "u") || ci_eq(name, "sub") || ci_eq(name, "sup")) return Tag::Span;
+    return Tag::Unknown;
+}
+
+static bool is_void_tag(const char* name) {
+    return ci_eq(name, "br") || ci_eq(name, "hr") || ci_eq(name, "img") ||
+           ci_eq(name, "input") || ci_eq(name, "meta") || ci_eq(name, "link") ||
+           ci_eq(name, "source") || ci_eq(name, "base") || ci_eq(name, "wbr");
+}
+
+static bool is_block_tag(Tag t) {
+    switch (t) {
+        case Tag::P: case Tag::Div: case Tag::H1: case Tag::H2: case Tag::H3:
+        case Tag::H4: case Tag::H5: case Tag::H6: case Tag::Ul: case Tag::Ol:
+        case Tag::Li: case Tag::Pre: case Tag::Blockquote: case Tag::Table:
+        case Tag::Tr: case Tag::Td: case Tag::Th: case Tag::Form: case Tag::Canvas:
+            return true;
+        default: return false;
+    }
+}
+
+static bool is_inline_tag(Tag t) {
+    switch (t) {
+        case Tag::Span: case Tag::A: case Tag::B: case Tag::Strong:
+        case Tag::I: case Tag::Em: case Tag::Button: case Tag::Unknown:
+            return true;
+        default: return false;
+    }
+}
+
+struct DomNode {
+    Tag tag = Tag::Unknown;
+    String text;       // Text nodes only
+    String href, src, alt;
+    List<int> kids;
+    char cls[48];      // class attribute (space-separated)
+    char id[32];       // id attribute
+    char onclick[96];  // inline onclick="" handler (mini JS)
+    int cw, ch;        // canvas element size (width/height attrs, default 300x150)
+    CSSRule inl;       // inline style="" (selector unused)
+    bool has_inl;
+    DomNode() : has_inl(false), cw(300), ch(150) { cls[0] = id[0] = onclick[0] = 0; }
+};
+
+struct DomArena {
+    List<DomNode> nodes;
+    List<int> stack;
+    bool overflow = false;
+
+    DomArena() {
+        DomNode root;
+        root.tag = Tag::Root;
+        nodes.push(root);
+        stack.push(0);
+    }
+
+    int top() const { return stack.size() > 0 ? stack[stack.size() - 1] : 0; }
+
+    void open(Tag t, const char* href, const char* src, const char* alt,
+              const char* cls = 0, const char* id = 0, const CSSRule* inl = 0,
+              const char* onclick = 0) {
+        if (overflow) return;
+        if (nodes.size() >= DOM_MAX || stack.size() >= DOM_DEPTH) { overflow = true; return; }
+        int idx = nodes.size();
+        DomNode n;
+        n.tag = t;
+        if (href && href[0]) n.href = href;
+        if (src && src[0]) n.src = src;
+        if (alt && alt[0]) n.alt = alt;
+        if (cls && cls[0]) clip_str(n.cls, sizeof(n.cls), cls);
+        if (id && id[0]) clip_str(n.id, sizeof(n.id), id);
+        if (onclick && onclick[0]) clip_str(n.onclick, sizeof(n.onclick), onclick);
+        if (inl) { n.inl = *inl; n.has_inl = true; }
+        nodes.push(n);
+        nodes[top()].kids.push(idx);
+        stack.push(idx);
+    }
+
+    // pop the stack up to (and including) the first node of tag t
+    void pop_to(Tag t) {
+        int i = stack.size() - 1;
+        while (i > 0 && nodes[stack[i]].tag != t) i--;
+        if (i > 0 && nodes[stack[i]].tag == t) {
+            while (stack.size() > i) stack.pop();
+        }
+    }
+
+    void close_top() { if (stack.size() > 1) stack.pop(); }
+
+    void add_text(const char* s, int len) {
+        if (overflow || len <= 0) return;
+        if (nodes.size() >= DOM_MAX) { overflow = true; return; }
+        int p = top();
+        // merge into the previous text child when possible (fewer nodes)
+        if (nodes[p].kids.size() > 0) {
+            int k = nodes[p].kids[nodes[p].kids.size() - 1];
+            if (nodes[k].tag == Tag::Text) {
+                for (int i = 0; i < len; i++) nodes[k].text += s[i];
+                return;
+            }
+        }
+        DomNode n;
+        n.tag = Tag::Text;
+        // inherit onclick from the containing element so the run's node
+        // hit-test finds the handler
+        if (nodes[p].onclick[0]) clip_str(n.onclick, sizeof(n.onclick), nodes[p].onclick);
+        for (int i = 0; i < len; i++) n.text += s[i];
+        nodes.push(n);
+        nodes[p].kids.push(nodes.size() - 1);
+    }
+};
+
+// decode HTML entities into a NUL-terminated buffer, returns decoded length
+static int decode_entities(const char* in, int inlen, char* out, int cap) {
+    int n = 0, i = 0;
+    while (i < inlen && n < cap - 1) {
+        char c = in[i];
+        if (c == '&' && i + 1 < inlen) {
+            int adv = 0;
+            char r = 0;
+            if (i + 4 < inlen && in[i+1]=='a' && in[i+2]=='m' && in[i+3]=='p' && in[i+4]==';') { r='&'; adv=5; }
+            else if (i + 3 < inlen && in[i+1]=='l' && in[i+2]=='t' && in[i+3]==';') { r='<'; adv=4; }
+            else if (i + 3 < inlen && in[i+1]=='g' && in[i+2]=='t' && in[i+3]==';') { r='>'; adv=4; }
+            else if (i + 5 < inlen && in[i+1]=='q' && in[i+2]=='u' && in[i+3]=='o' && in[i+4]=='t' && in[i+5]==';') { r='"'; adv=6; }
+            else if (i + 4 < inlen && in[i+1]=='#' && in[i+2]=='3' && in[i+3]=='9' && in[i+4]==';') { r='\''; adv=5; }
+            else if (i + 5 < inlen && in[i+1]=='n' && in[i+2]=='b' && in[i+3]=='s' && in[i+4]=='p' && in[i+5]==';') { r=' '; adv=6; }
+            else if (i + 3 < inlen && in[i+1]=='#' && in[i+2] >= '0' && in[i+2] <= '9') {
+                int val = 0, j = i + 2;
+                while (j < inlen && in[j] >= '0' && in[j] <= '9' && j - (i + 2) < 6) { val = val * 10 + (in[j] - '0'); j++; }
+                if (j < inlen && in[j] == ';') {
+                    r = (val >= 32 && val < 127) ? (char)val : ' ';
+                    adv = j - i + 1;
+                }
+            }
+            if (r != 0) { out[n++] = r; i += adv; continue; }
+        }
+        out[n++] = c;
+        i++;
+    }
+    out[n] = 0;
+    return n;
+}
+
+struct PageLayout;   // fwd (defined with the layout engine below)
+
+// ===================== CSS subset =====================
+// Parse #RGB / #RRGGBB / #RRGGBBAA / a few named colors -> 0xRRGGBB.
+static uint32_t css_color(const char* v) {
+    if (v[0] == '#') {
+        int hx = 0, n = 0;
+        while (v[n + 1] && n < 8) {
+            char c = lower_char(v[n + 1]);
+            int dv;
+            if (c >= '0' && c <= '9') dv = c - '0';
+            else if (c >= 'a' && c <= 'f') dv = c - 'a' + 10;
+            else break;
+            hx = (hx << 4) | dv;
+            n++;
+        }
+        if (n == 3) {
+            int r = (hx >> 8) & 0xF, g = (hx >> 4) & 0xF, b = hx & 0xF;
+            return (uint32_t)((r << 16) | (r << 12) | (g << 8) | (g << 4) | b);
+        }
+        if (n == 6) return (uint32_t)hx;
+        if (n == 8) return (uint32_t)(hx & 0xFFFFFF);
+        return 0;
+    }
+    if (ci_eq(v, "red")) return 0xDC2626;
+    if (ci_eq(v, "green")) return 0x16A34A;
+    if (ci_eq(v, "blue")) return 0x2563EB;
+    if (ci_eq(v, "black")) return 0x0F172A;
+    if (ci_eq(v, "white")) return 0xFFFFFF;
+    if (ci_eq(v, "gray") || ci_eq(v, "grey")) return 0x64748B;
+    if (ci_eq(v, "yellow")) return 0xFACC15;
+    if (ci_eq(v, "orange")) return 0xF97316;
+    return 0;
+}
+
+// leading integer of "14px" / "120" (clamped to [0,512])
+static int css_px(const char* v) {
+    int n = 0;
+    while (v[n] >= '0' && v[n] <= '9') n++;
+    if (n == 0) return 0;
+    int x = 0;
+    for (int i = 0; i < n; i++) x = x * 10 + (v[i] - '0');
+    if (x > 512) x = 512;
+    return x;
+}
+
+// Does a selector match this node? Supports: tag, .class, #id, tag.class,
+// tag#id, .class#id, tag.class#id and '*'. The rest is ignored.
+static bool css_match(const char* sel, Tag tag, const char* cls, const char* id) {
+    const char* s = sel;
+    while (*s == ' ' || *s == '\t' || *s == '\n') s++;
+    int sl = (int)strlen(s);
+    while (sl > 0 && (s[sl-1]==' '||s[sl-1]=='\t'||s[sl-1]=='\n')) sl--;
+    if (sl == 0) return false;
+    if (sl == 1 && s[0] == '*') return true;
+    char tagbuf[24]; int tn = 0;
+    char clsbuf[48]; int cn = 0;
+    char idbuf[32];  int in = 0;
+    int mode = 0;   // 0 tag, 1 class, 2 id
+    for (int i = 0; i < sl; i++) {
+        char c = s[i];
+        if (c == '.') { mode = 1; continue; }
+        if (c == '#') { mode = 2; continue; }
+        if (mode == 0 && tn < 23) tagbuf[tn++] = lower_char(c);
+        else if (mode == 1 && cn < 47) clsbuf[cn++] = lower_char(c);
+        else if (mode == 2 && in < 31) idbuf[in++] = lower_char(c);
+    }
+    tagbuf[tn] = 0; clsbuf[cn] = 0; idbuf[in] = 0;
+    if (tn > 0 && tag_of(tagbuf) != tag) return false;
+    if (cn > 0) {
+        bool hit = false;
+        int cl = (int)strlen(cls), p = 0;
+        while (p <= cl) {
+            int q = p;
+            while (q < cl && cls[q] != ' ') q++;
+            if (q - p == cn) {
+                bool eq = true;
+                for (int k = 0; k < cn; k++)
+                    if (lower_char(cls[p + k]) != clsbuf[k]) { eq = false; break; }
+                if (eq) { hit = true; break; }
+            }
+            p = q + 1;
+        }
+        if (!hit) return false;
+    }
+    if (in > 0) {
+        if (id[0] == 0 || (int)strlen(id) != in) return false;
+        for (int k = 0; k < in; k++)
+            if (lower_char(id[k]) != idbuf[k]) return false;
+    }
+    return true;
+}
+
+// Parse a "prop: value; prop: value" declaration block into a CSSRule.
+static void css_parse_decls(const char* d, int len, CSSRule& r) {
+    int i = 0;
+    while (i < len) {
+        while (i < len && (d[i]==' '||d[i]=='\n'||d[i]=='\t'||d[i]=='\r'||d[i]==';')) i++;
+        if (i >= len) break;
+        char prop[24]; int pn = 0;
+        while (i < len && d[i] != ':' && pn < 23) prop[pn++] = lower_char(d[i++]);
+        prop[pn] = 0;
+        while (i < len && (d[i]==' '||d[i]=='\t'||d[i]=='\n'||d[i]=='\r'||d[i]==':')) i++;
+        char val[64]; int vn = 0;
+        while (i < len && d[i] != ';' && vn < 63) val[vn++] = d[i++];
+        val[vn] = 0;
+        int a = 0, b = vn;
+        while (a < b && (val[a]==' '||val[a]=='\t'||val[a]=='\n'||val[a]=='\r')) a++;
+        while (b > a && (val[b-1]==' '||val[b-1]=='\t'||val[b-1]=='\n'||val[b-1]=='\r')) b--;
+        memmove(val, val + a, (size_t)(b - a)); val[b - a] = 0;
+        if (ci_eq(prop, "color")) {
+            uint32_t c = css_color(val);
+            if (c) r.color = c;
+        } else if (ci_eq(prop, "font-size")) {
+            int v = css_px(val);
+            if (v > 0) r.font_size = v;
+        } else if (ci_eq(prop, "font-weight")) {
+            r.bold_set = true;
+            r.bold = !(ci_eq(val, "normal") || ci_eq(val, "400") || ci_eq(val, "lighter"));
+        } else if (ci_eq(prop, "display")) {
+            if (ci_eq(val, "none")) r.none = true;
+        } else if (ci_eq(prop, "background-color")) {
+            uint32_t c = css_color(val);
+            if (c) r.bg = c;
+        } else if (ci_eq(prop, "text-align")) {
+            if (ci_eq(val, "center")) r.align = 1;
+            else if (ci_eq(val, "right")) r.align = 2;
+        } else if (ci_eq(prop, "margin")) {
+            int v = css_px(val);
+            if (v > 0) r.margin = v;
+        } else if (ci_eq(prop, "padding")) {
+            int v = css_px(val);
+            if (v > 0) r.padding = v;
+        } else if (ci_eq(prop, "width")) {
+            int v = css_px(val);
+            if (v > 0) r.width = v;
+        } else if (ci_eq(prop, "height")) {
+            int v = css_px(val);
+            if (v > 0) r.height = v;
+        }
+    }
+}
+
+// Parse a full stylesheet: "selector { decls }" repeated. Returns rule count.
+static int css_parse(const char* css, int len, CSSRule* out, int max) {
+    int n = 0, i = 0;
+    while (i < len && n < max) {
+        while (i < len && (css[i]==' '||css[i]=='\n'||css[i]=='\t'||css[i]=='\r')) i++;
+        if (i >= len) break;
+        if (css[i] == '/' && i + 1 < len && css[i + 1] == '*') {   // comment
+            int e = i + 2;
+            while (e + 1 < len && !(css[e]=='*' && css[e+1]=='/')) e++;
+            i = (e + 1 < len) ? e + 2 : len;
+            continue;
+        }
+        if (css[i] == '}' || css[i] == ';') { i++; continue; }
+        char sel[64]; int sn = 0;
+        while (i < len && css[i] != '{' && sn < 63) {
+            if (css[i] != '\n' && css[i] != '\r') sel[sn++] = css[i];
+            i++;
+        }
+        sel[sn] = 0;
+        int a = 0, b = sn;
+        while (a < b && (sel[a]==' '||sel[a]=='\t')) a++;
+        while (b > a && (sel[b-1]==' '||sel[b-1]=='\t')) b--;
+        memmove(sel, sel + a, (size_t)(b - a)); sel[b - a] = 0;
+        if (i >= len) break;
+        i++;   // '{'
+        int dstart = i;
+        while (i < len && css[i] != '}') i++;
+        CSSRule r;
+        clip_str(r.sel, sizeof(r.sel), sel);
+        css_parse_decls(css + dstart, i - dstart, r);
+        if (i < len) i++;   // '}'
+        if (r.sel[0] && (r.color || r.font_size || r.bold_set || r.none || r.bg || r.align))
+            out[n++] = r;
+    }
+    return n;
+}
+
+// stb decodes RGBA; the image cache blits BGRA — swap R and B in place.
+static void bgra_swap(uint8_t* p, int npix) {
+    for (int i = 0; i < npix; i++) {
+        uint8_t t = p[0]; p[0] = p[2]; p[2] = t;
+        p += 4;
+    }
+}
+
+// ===================== HTML tokenizer + tree builder =====================
+struct PageParser {
+    const char* html;
+    int len;
+    int pos;
+    DomArena dom;
+    char tbuf[1024];
+    int tlen;
+    // worker-side outputs: accumulated <script> text and <style> text
+    char* script_buf;
+    int* script_len;
+    char cssbuf[8192];
+    int csslen;
+    CSSRule* css_out;
+    int* css_n;
+    int css_max;
+
+    PageParser(const char* h, int l, char* sbuf = 0, int* slen = 0,
+               CSSRule* cso = 0, int* csn = 0, int csmax = 0)
+        : html(h), len(l), pos(0), tlen(0), script_buf(sbuf), script_len(slen),
+          csslen(0), css_out(cso), css_n(csn), css_max(csmax) {}
+
+    void push_char(char c) {
+        if (tlen >= (int)sizeof(tbuf) - 1) flush_text();
+        tbuf[tlen++] = c;
+    }
+
+    void flush_text() {
+        if (tlen == 0) return;
+        // trim whitespace at both ends
+        int s = 0, e = tlen;
+        while (s < e && (tbuf[s]==' ' || tbuf[s]=='\t' || tbuf[s]=='\n' || tbuf[s]=='\r')) s++;
+        while (e > s && (tbuf[e-1]==' ' || tbuf[e-1]=='\t' || tbuf[e-1]=='\n' || tbuf[e-1]=='\r')) e--;
+        if (e > s) {
+            char dec[2048];
+            int dl = decode_entities(tbuf + s, e - s, dec, (int)sizeof(dec));
+            dom.add_text(dec, dl);
+        }
+        tlen = 0;
+    }
+
+    void skip_until(const char* close_tag) {
+        while (pos < len) {
+            if (html[pos] == '<' && ci_starts(html + pos + 1, close_tag)) break;
+            pos++;
+        }
+        while (pos < len && html[pos] != '>') pos++;
+        if (pos < len) pos++;
+    }
+
+    void parse() {
+        char tagbuf[24];
+        char href[96], src[96], alt[64];
+        while (pos < len && !dom.overflow) {
+            if (html[pos] != '<') { push_char(html[pos]); pos++; continue; }
+
+            flush_text();
+
+            // comment <!-- ... -->
+            if (pos + 3 < len && html[pos+1]=='!' && html[pos+2]=='-' && html[pos+3]=='-') {
+                int e = pos + 4;
+                while (e + 2 < len && !(html[e]=='-' && html[e+1]=='-' && html[e+2]=='>')) e++;
+                pos = (e + 3 < len) ? e + 3 : len;
+                continue;
+            }
+            // doctype / <!...>
+            if (pos + 1 < len && html[pos+1] == '!') {
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                continue;
+            }
+
+            pos++; // skip '<'
+            bool closing = false;
+            if (pos < len && html[pos] == '/') { closing = true; pos++; }
+
+            int nl = 0;
+            while (pos < len && nl < 23 && html[pos] != ' ' && html[pos] != '>' &&
+                   html[pos] != '/' && html[pos] != '\t' && html[pos] != '\n' && html[pos] != '\r') {
+                tagbuf[nl++] = lower_char(html[pos++]);
+            }
+            tagbuf[nl] = 0;
+            Tag t = tag_of(tagbuf);
+
+            // <script>: collect raw text (run later through mini_js_run)
+            if (!closing && t == Tag::Script) {
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                while (pos < len) {
+                    if (html[pos] == '<' && ci_starts(html + pos + 1, "/script")) break;
+                    if (script_buf && script_len && *script_len < SCRIPT_MAX - 1)
+                        script_buf[(*script_len)++] = html[pos];
+                    pos++;
+                }
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                continue;
+            }
+            // <style>: collect raw CSS text for the style sheet
+            if (!closing && t == Tag::Style) {
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                while (pos < len) {
+                    if (html[pos] == '<' && ci_starts(html + pos + 1, "/style")) break;
+                    if (csslen < (int)sizeof(cssbuf) - 1) cssbuf[csslen++] = html[pos];
+                    pos++;
+                }
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                continue;
+            }
+            // <title>: handled separately by extract_title(), skip its content
+            if (!closing && ci_eq(tagbuf, "title")) {
+                skip_until("/title");
+                continue;
+            }
+            // <html>/<head>: no node
+            if (!closing && (ci_eq(tagbuf, "html") || ci_eq(tagbuf, "head"))) {
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                continue;
+            }
+            if (!closing && ci_eq(tagbuf, "body")) t = Tag::Div;
+
+            // attributes
+            char cls[48] = {0}, id[32] = {0}, onclick[96] = {0};
+            int cw = 300, ch = 150;
+            CSSRule inl;
+            bool has_inl = false;
+            href[0] = src[0] = alt[0] = 0;
+            while (pos < len && html[pos] != '>') {
+                if (html[pos] == ' ' || html[pos] == '\t' || html[pos] == '\n' ||
+                    html[pos] == '\r' || html[pos] == '/') { pos++; continue; }
+                char aname[24];
+                int an = 0;
+                while (pos < len && an < 23 && html[pos] != '=' && html[pos] != '>' &&
+                       html[pos] != ' ' && html[pos] != '\t' && html[pos] != '\n' && html[pos] != '\r') {
+                    aname[an++] = lower_char(html[pos++]);
+                }
+                aname[an] = 0;
+                while (pos < len && (html[pos]==' ' || html[pos]=='\t' || html[pos]=='\n' || html[pos]=='\r')) pos++;
+                char aval[96] = {0};
+                int av = 0;
+                if (pos < len && html[pos] == '=') {
+                    pos++;
+                    while (pos < len && (html[pos]==' ' || html[pos]=='\t' || html[pos]=='\n' || html[pos]=='\r')) pos++;
+                    if (pos < len && (html[pos]=='"' || html[pos]=='\'')) {
+                        char q = html[pos++];
+                        while (pos < len && html[pos] != q && av < 95) aval[av++] = html[pos++];
+                        if (pos < len) pos++;
+                    } else {
+                        while (pos < len && av < 95 && html[pos] != ' ' && html[pos] != '>' && html[pos] != '\t') {
+                            aval[av++] = html[pos++];
+                        }
+                    }
+                }
+                if (ci_eq(aname, "href")) clip_str(href, sizeof(href), aval);
+                else if (ci_eq(aname, "src")) clip_str(src, sizeof(src), aval);
+                else if (ci_eq(aname, "alt")) clip_str(alt, sizeof(alt), aval);
+                else if (ci_eq(aname, "class")) clip_str(cls, sizeof(cls), aval);
+                else if (ci_eq(aname, "id")) clip_str(id, sizeof(id), aval);
+                else if (ci_eq(aname, "onclick")) clip_str(onclick, sizeof(onclick), aval);
+                else if (ci_eq(aname, "width")) cw = atoi(aval);
+                else if (ci_eq(aname, "height")) ch = atoi(aval);
+                else if (ci_eq(aname, "style")) {
+                    inl = CSSRule();
+                    css_parse_decls(aval, (int)strlen(aval), inl);
+                    has_inl = (inl.color || inl.font_size || inl.bold_set ||
+                               inl.none || inl.bg || inl.align);
+                    if (!has_inl) inl = CSSRule();
+                }
+            }
+            if (pos < len && html[pos] == '>') pos++;
+
+            if (closing) {
+                if (t == Tag::Li) dom.pop_to(Tag::Li);
+                else if (t == Tag::P) dom.pop_to(Tag::P);
+                else if (t == Tag::Td || t == Tag::Th) dom.pop_to(Tag::Td);
+                else if (t == Tag::Tr) dom.pop_to(Tag::Tr);
+                else dom.pop_to(t);
+                continue;
+            }
+
+            // void elements: br/hr/img produce a leaf node, others are dropped
+            if (is_void_tag(tagbuf)) {
+                if (t == Tag::Br || t == Tag::Hr || t == Tag::Img) {
+                    dom.open(t, href, src, alt, cls, id, has_inl ? &inl : 0, onclick);
+                    dom.close_top();
+                }
+                continue;
+            }
+
+            // block-level auto-closing (simplified HTML5 adoption rules)
+            if (is_block_tag(t)) {
+                if (t == Tag::Li) dom.pop_to(Tag::Li);
+                if (t == Tag::P) dom.pop_to(Tag::P);
+                if (t == Tag::Td || t == Tag::Th) dom.pop_to(Tag::Td);
+                if (t == Tag::Tr) dom.pop_to(Tag::Tr);
+                // close stray inline elements above the new block
+                while (stack_top_is_inline()) dom.close_top();
+            }
+
+            dom.open(t, href, src, alt, cls, id, has_inl ? &inl : 0, onclick);
+            if (t == Tag::Canvas) {
+                DomNode& cn = dom.nodes[dom.top()];
+                cn.cw = cw; cn.ch = ch;
+            }
+        }
+        flush_text();
+        // hand the collected <style> text to the caller as parsed rules
+        if (csslen > 0 && css_out && css_n) {
+            *css_n = css_parse(cssbuf, csslen, css_out, css_max);
+        }
+    }
+
+private:
+    bool stack_top_is_inline() const {
+        if (dom.stack.size() <= 1) return false;
+        int idx = dom.stack[dom.stack.size() - 1];
+        if (idx < 0 || idx >= dom.nodes.size()) return false;
+        return is_inline_tag(dom.nodes[idx].tag);
+    }
+};
+
+struct ImgJob;   // fetch job; defined with LoadJob below
+
+// fwd decl (defined below): layout calls it while resolving <img> src
+static void resolve_url(const char* base, const char* href, char* out, int cap);
+
+// ===================== images =====================
+// Per-tab image cache. A slot starts as a fetch job (loading=true); the main
+// thread decodes the bytes in poll_img_jobs and caches a downscaled BGRA
+// buffer. The page layout is rebuilt once an image finishes so its box can
+// grow from the placeholder to the real size.
+struct Img {
+    char url[256];
+    ImgJob* job;        // in-flight fetch (owned by main thread)
+    uint8_t* rgba;      // downscaled BGRA pixels (kalloc'd, 0 until done)
+    int w, h;           // decoded size
+    int disp_w, disp_h; // display size (capped by MAX_IMG_DISP)
+    bool used;          // slot in use
+    bool loading;       // fetch in flight
+    bool done;          // decoded and cached
+    bool fail;          // fetch / decode failed (incl. too large)
+
+    Img() : job(0), rgba(0), w(0), h(0), disp_w(0), disp_h(0),
+            used(false), loading(false), done(false), fail(false) {
+        url[0] = 0;
+    }
+};
+
+static void start_img_job(Img& im, const char* url);   // defined with the loader
+
+// ===================== layout engine =====================
+struct Run {
+    String text;
+    int x, y, w, h;
+    uint32_t color;
+    int kind;      // 0 = text, 1 = image, 2 = horizontal rule
+    bool link;
+    String href;
+    int img_id;    // index into TabState::imgs, -1 = none
+    int node;      // originating DomNode index, -1 = none (click hit-testing)
+    char cid[32];  // canvas element id (kind==5 only)
+};
+
+struct PageLayout {
+    List<Run> runs;
+    int height = 0;
+};
+
+// Shift runs [s,e) so each visual line is centered / right-aligned in wrap_w.
+static void align_runs(PageLayout* out, int s, int e, int align, int wrap_w) {
+    if (wrap_w <= 0) return;
+    int i = s;
+    while (i < e) {
+        int j = i, y = out->runs[i].y;
+        int x0 = out->runs[i].x, x1 = out->runs[i].x + out->runs[i].w;
+        j++;
+        while (j < e && out->runs[j].y == y) {
+            if (out->runs[j].x < x0) x0 = out->runs[j].x;
+            if (out->runs[j].x + out->runs[j].w > x1) x1 = out->runs[j].x + out->runs[j].w;
+            j++;
+        }
+        int total = x1 - x0;
+        int shift = (align == 1) ? (wrap_w - total) / 2 : (wrap_w - total);
+        if (shift < 0) shift = 0;
+        for (int k = i; k < j; k++) out->runs[k].x += shift;
+        i = j;
+    }
+}
+
+struct Flow {
+    PageLayout* out;
+    int x, y, w;        // pen position + wrap width
+    int indent;         // left indent (px)
+    int line_h;         // current line height
+    int node_now;       // DomNode index currently emitted (click mapping)
+    uint32_t color;
     bool bold;
-    uint32_t color;  // 0 = use default text color
-    int indent;      // character columns
-    String image_url; // non-empty = this line is an image
-    Surface* image;   // cached decoded image (null = not loaded yet)
-    // form support: 0 none, 1 text input, 2 submit button
-    int form_kind;
-    String form_name;
-    String form_val;
-    int form_method;   // 0 = GET (query string), 1 = POST (body)
-    Line() : style(0), font_size(16), bold(false), color(0), indent(0), image(0),
-             form_kind(0), form_method(0) {}
+    bool in_link;
+    String href;
+    Img* imgs;          // per-tab image cache (0 for built-in pages)
+    const char* base_url;
+    const CSSRule* css; // per-tab style sheet (0 = none)
+    int css_n;
+
+    Flow(PageLayout* o, int width, Img* im = 0, const char* base = 0,
+         const CSSRule* c = 0, int cn = 0)
+        : out(o), x(0), y(4), w(width), indent(0), line_h(16),
+          color(C_TEXT_DK), bold(false), in_link(false), imgs(im), base_url(base),
+          css(c), css_n(cn), node_now(-1) {}
+
+    void newline() { x = indent; y += line_h; line_h = 16; }
+
+    void emit(const char* s, int len, int word_w, uint32_t col, bool link, const char* h, int kind) {
+        Run r;
+        r.x = x; r.y = y; r.w = word_w; r.h = 16;
+        r.color = col; r.kind = kind; r.link = link;
+        r.img_id = -1; r.node = node_now;
+        if (link && h) r.href = h;
+        for (int i = 0; i < len; i++) r.text += s[i];
+        out->runs.push(r);
+        x += word_w;
+    }
+
+    void add_word(const char* s, int len, uint32_t col, bool link, const char* h) {
+        int word_w = disp_w(s, len);
+        if (x + word_w > w - 8) newline();
+        emit(s, len, word_w, col, link, h, 0);
+    }
+};
+
+// word-wrapped text with hard breaks for words wider than the line
+static void flow_text(Flow& f, const char* s) {
+    int i = 0;
+    while (s[i]) {
+        int ws = i;
+        while (s[ws] && s[ws] != ' ') ws++;
+        int wlen = ws - i;
+        if (wlen == 0) { i = ws + (s[ws] ? 1 : 0); continue; }
+        int word_w = disp_w(s + i, wlen);
+        if (word_w > f.w - 8 && wlen > 1) {
+            // hard break: emit one UTF-8 character per run (CJK chars
+            // are 3 bytes; splitting them would render as '?')
+            int j = i;
+            while (j < ws) {
+                int clen = utf8_char_len(s + j);
+                int cw = disp_w(s + j, clen);
+                if (f.x + cw > f.w - 8) f.newline();
+                f.emit(s + j, clen, cw, f.color, f.in_link, f.href.c_str(), 0);
+                j += clen;
+            }
+        } else {
+            f.add_word(s + i, wlen, f.color, f.in_link, f.href.c_str());
+        }
+        if (s[ws] == ' ') f.x += 8;   // advance past the space
+        i = ws + (s[ws] ? 1 : 0);
+    }
+}
+
+// Box-model + alignment + background carried into the inner layout pass.
+struct Eff {
+    uint32_t bg; int align;
+    int margin, padding, width, height;
+    Eff() : bg(0), align(0), margin(0), padding(0), width(-1), height(-1) {}
+};
+
+// Apply the per-node effective style (matched rules + inline style) around
+// the inner layout pass; the inner pass itself recurses through this wrapper
+// so children inherit colors / bold / line height.
+static void layout_node_inner(const List<DomNode>& nodes, int idx, Flow& f,
+                              int depth, const Eff& e);
+static void layout_node(const List<DomNode>& nodes, int idx, Flow& f, int depth) {
+    if (depth > 24 || f.out->runs.size() > RUN_MAX) return;
+    const DomNode& n = nodes[idx];
+
+    uint32_t col = 0; int fs = 0; bool bset = false, bold = false;
+    bool none = false;
+    Eff e;
+    if (f.css) {
+        for (int i = 0; i < f.css_n; i++) {
+            const CSSRule& r = f.css[i];
+            if (!css_match(r.sel, n.tag, n.cls, n.id)) continue;
+            if (r.color) col = r.color;
+            if (r.font_size) fs = r.font_size;
+            if (r.bold_set) { bold = r.bold; bset = true; }
+            if (r.none) none = true;
+            if (r.bg) e.bg = r.bg;
+            if (r.align) e.align = r.align;
+            if (r.margin > 0) e.margin = r.margin;
+            if (r.padding > 0) e.padding = r.padding;
+            if (r.width > 0) e.width = r.width;
+            if (r.height > 0) e.height = r.height;
+        }
+    }
+    if (n.has_inl) {
+        if (n.inl.color) col = n.inl.color;
+        if (n.inl.font_size) fs = n.inl.font_size;
+        if (n.inl.bold_set) { bold = n.inl.bold; bset = true; }
+        if (n.inl.none) none = true;
+        if (n.inl.bg) e.bg = n.inl.bg;
+        if (n.inl.align) e.align = n.inl.align;
+        if (n.inl.margin > 0) e.margin = n.inl.margin;
+        if (n.inl.padding > 0) e.padding = n.inl.padding;
+        if (n.inl.width > 0) e.width = n.inl.width;
+        if (n.inl.height > 0) e.height = n.inl.height;
+    }
+    if (none) return;
+
+    uint32_t old_col = f.color; bool old_bold = f.bold; int old_lh = f.line_h;
+    if (col) f.color = col;
+    else if (n.tag >= Tag::H1 && n.tag <= Tag::H6) f.color = C_HEAD;
+    if (bset) f.bold = bold;
+    if (fs) {
+        if (fs < 16) fs = 16;
+        if (fs > 48) fs = 48;
+        f.line_h = fs;
+    }
+    layout_node_inner(nodes, idx, f, depth, e);
+    f.color = old_col; f.bold = old_bold; f.line_h = old_lh;
+}
+
+static void layout_node_inner(const List<DomNode>& nodes, int idx, Flow& f,
+                              int depth, const Eff& e) {
+    if (depth > 24 || f.out->runs.size() > RUN_MAX) return;
+    const DomNode& n = nodes[idx];
+
+    switch (n.tag) {
+        case Tag::Text:
+            f.node_now = idx;
+            flow_text(f, n.text.c_str());
+            return;
+        case Tag::Canvas: {
+            f.newline();
+            Run r;
+            r.x = f.x; r.y = f.y;
+            r.w = n.cw; if (r.w < 8) r.w = 8;
+            r.h = n.ch; if (r.h < 8) r.h = 8;
+            r.color = C_GRAY; r.kind = 5; r.link = false; r.img_id = -1; r.node = idx;
+            r.cid[0] = 0;
+            clip_str(r.cid, sizeof(r.cid), n.id);
+            f.out->runs.push(r);
+            f.y += r.h;
+            f.newline();
+            return;
+        }
+        case Tag::Br:
+            f.newline();
+            return;
+        case Tag::Hr: {
+            f.newline();
+            Run r;
+            r.x = f.x; r.y = f.y;
+            r.w = f.w - f.indent - 8; if (r.w < 8) r.w = 8;
+            r.h = 1; r.color = C_HRLINE; r.kind = 2; r.link = false; r.node = idx;
+            f.out->runs.push(r);
+            f.y += 10;
+            f.newline();
+            return;
+        }
+        case Tag::Img: {
+            int img_id = -1;
+            if (f.imgs && n.src[0]) {
+                char u[256];
+                resolve_url(f.base_url ? f.base_url : "", n.src.c_str(), u, sizeof(u));
+                if (u[0]) {
+                    for (int k = 0; k < IMG_MAX; k++) {
+                        if (f.imgs[k].used && strcmp(f.imgs[k].url, u) == 0) { img_id = k; break; }
+                    }
+                    if (img_id < 0) {
+                        for (int k = 0; k < IMG_MAX; k++) {
+                            if (!f.imgs[k].used) {
+                                Img& im = f.imgs[k];
+                                im.used = true;
+                                im.loading = true;
+                                clip_str(im.url, sizeof(im.url), u);
+                                start_img_job(im, u);
+                                img_id = k;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Run r;
+            r.x = f.x; r.y = f.y;
+            r.color = C_GRAY; r.kind = 1; r.link = false; r.img_id = img_id; r.node = idx;
+            const char* alt = n.alt.c_str();
+            if (img_id >= 0 && f.imgs[img_id].done && f.imgs[img_id].rgba) {
+                r.w = f.imgs[img_id].disp_w;
+                r.h = f.imgs[img_id].disp_h;
+            } else {
+                r.w = 64; r.h = 48;
+            }
+            if (img_id >= 0 && f.imgs[img_id].loading) r.text = "[loading...]";
+            else if (img_id >= 0 && f.imgs[img_id].fail) r.text = "[image failed]";
+            else if (alt && alt[0]) { for (int i = 0; alt[i] && i < 55; i++) r.text += alt[i]; }
+            else r.text = "[img]";
+            f.out->runs.push(r);
+            f.x += r.w + 8;
+            if (f.line_h < r.h + 4) f.line_h = r.h + 4;
+            return;
+        }
+        case Tag::H1: case Tag::H2: case Tag::H3:
+        case Tag::H4: case Tag::H5: case Tag::H6: {
+            f.newline();
+            if (e.margin) f.y += e.margin;
+            f.y += 8;
+            uint32_t old_col = f.color;
+            bool old_bold = f.bold;
+            f.bold = true;
+            f.line_h = 20;
+            int saved_w = f.w;
+            int bx = f.x, by = f.y;
+            int s = f.out->runs.size();
+            if (e.padding) f.indent += e.padding;
+            if (e.width > 0 && f.x + e.width < f.w) f.w = f.x + e.width;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            int ex = f.x, ey = f.y;
+            if (e.padding) f.indent -= e.padding;
+            f.w = saved_w;
+            f.color = old_col;
+            f.bold = old_bold;
+            f.y += 8;
+            f.newline();
+            if (e.bg && f.out->runs.size() < RUN_MAX) {
+                Run b;
+                b.x = bx; b.y = by;
+                b.w = (e.width > 0 && bx + e.width < f.w) ? e.width : (f.w - bx);
+                if (b.w < 8) b.w = 8;
+                b.h = (ey + f.line_h) - by; if (b.h < 4) b.h = 4;
+                if (e.height > 0 && b.h < e.height) b.h = e.height;
+                b.color = e.bg; b.kind = 3; b.link = false; b.img_id = -1; b.node = idx;
+                f.out->runs.push(b);
+            }
+            if (e.align) align_runs(f.out, s, f.out->runs.size(), e.align, f.w);
+            return;
+        }
+        case Tag::P: case Tag::Div: case Tag::Pre: case Tag::Blockquote: case Tag::Form: {
+            f.newline();
+            if (e.margin) f.y += e.margin;
+            if (n.tag == Tag::Pre || n.tag == Tag::Blockquote) f.indent += 16;
+            int s = f.out->runs.size();
+            int bx = f.x, by = f.y;
+            int saved_w = f.w;
+            if (e.padding) f.indent += e.padding;
+            if (e.width > 0 && f.x + e.width < f.w) f.w = f.x + e.width;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            int ex = f.x, ey = f.y;
+            if (e.padding) f.indent -= e.padding;
+            f.w = saved_w;
+            if (n.tag == Tag::Pre || n.tag == Tag::Blockquote) f.indent -= 16;
+            f.newline();
+            if (e.bg && f.out->runs.size() < RUN_MAX) {
+                Run b;
+                b.x = bx; b.y = by;
+                b.w = (e.width > 0 && bx + e.width < f.w) ? e.width : (f.w - bx);
+                if (b.w < 8) b.w = 8;
+                b.h = (ey + f.line_h) - by; if (b.h < 4) b.h = 4;
+                if (e.height > 0 && b.h < e.height) b.h = e.height;
+                b.color = e.bg; b.kind = 3; b.link = false; b.img_id = -1; b.node = idx;
+                f.out->runs.push(b);
+            }
+            if (e.align) align_runs(f.out, s, f.out->runs.size(), e.align, f.w);
+            return;
+        }
+        case Tag::Ul: case Tag::Ol: {
+            f.newline();
+            f.indent += 12;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.indent -= 12;
+            f.newline();
+            return;
+        }
+        case Tag::Li: {
+            f.newline();
+            if (f.x + 12 <= f.w - 8) f.emit("*", 1, 8, C_GRAY, false, 0, 0);
+            f.x += 4;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.newline();
+            return;
+        }
+        case Tag::Table: {
+            f.newline();
+            f.indent += 8;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.indent -= 8;
+            f.newline();
+            return;
+        }
+        case Tag::Tr: {
+            f.newline();
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.newline();
+            return;
+        }
+        case Tag::Td: case Tag::Th: {
+            bool old_bold = f.bold;
+            if (n.tag == Tag::Th) f.bold = true;
+            f.add_word("|", 1, C_GRAY, false, 0);
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.bold = old_bold;
+            return;
+        }
+        case Tag::A: {
+            bool old_link = f.in_link;
+            String old_href = f.href;
+            uint32_t old_col = f.color;
+            f.in_link = true;
+            f.href = n.href;
+            f.color = C_LINK;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.in_link = old_link;
+            f.href = old_href;
+            f.color = old_col;
+            return;
+        }
+        case Tag::B: case Tag::Strong: {
+            bool old = f.bold;
+            f.bold = true;
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            f.bold = old;
+            return;
+        }
+        case Tag::I: case Tag::Em:
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            return;
+        default:   // Root / Span / Button / Unknown
+            for (int i = 0; i < n.kids.size(); i++) layout_node(nodes, n.kids[i], f, depth + 1);
+            return;
+    }
+}
+
+static void layout_page(const List<DomNode>& nodes, int width, PageLayout& out,
+                        Img* imgs = 0, const char* base_url = 0,
+                        const CSSRule* css = 0, int css_n = 0) {
+    out.runs.erase_all();
+    out.height = 0;
+    if (nodes.size() == 0) return;
+    Flow f(&out, width, imgs, base_url, css, css_n);
+    layout_node(nodes, 0, f, 0);
+    out.height = f.y + f.line_h + 4;
+}
+
+// ===================== built-in pages =====================
+static void build_home(PageLayout& out, int width) {
+    out.runs.erase_all();
+    out.height = 0;
+    int cx = width / 2;
+    Flow f(&out, width);
+
+    const char* big = "nefuOS";
+    int blen = (int)strlen(big);
+    f.x = cx - blen * 8 / 2;
+    f.y = 40;
+    f.line_h = 20;
+    f.emit(big, blen, blen * 8, C_HEAD, false, 0, 0);
+    f.newline();
+
+    const char* sub = "Browser";
+    int slen = (int)strlen(sub);
+    f.x = cx - slen * 8 / 2;
+    f.emit(sub, slen, slen * 8, C_TAB_ACT, false, 0, 0);
+    f.newline();
+    f.y += 14;
+
+    const char* hint = "Type an address or search, then press Enter";
+    int hlen = (int)strlen(hint);
+    f.x = cx - hlen * 8 / 2;
+    f.emit(hint, hlen, hlen * 8, C_GRAY, false, 0, 0);
+    f.newline();
+    f.y += 12;
+
+    const char* ql = "Quick Links";
+    int qlen = (int)strlen(ql);
+    f.x = cx - qlen * 8 / 2;
+    f.line_h = 18;
+    f.emit(ql, qlen, qlen * 8, C_HEAD, false, 0, 0);
+    f.newline();
+    f.y += 4;
+
+    struct Link { const char* name; const char* url; };
+    static const Link links[] = {
+        { "GitHub",      "https://github.com" },
+        { "Bing Search", "https://www.bing.com" },
+        { "DuckDuckGo",  "https://duckduckgo.com" },
+        { "Ladybird",    "https://ladybird.org" },
+    };
+    for (int i = 0; i < 4; i++) {
+        int ll = (int)strlen(links[i].name);
+        f.x = cx - ll * 8 / 2;
+        f.emit(links[i].name, ll, ll * 8, C_LINK, true, links[i].url, 0);
+        f.newline();
+        f.y += 2;
+    }
+    out.height = f.y + 20;
+}
+
+static void build_error(PageLayout& out, int width, const char* url, const char* msg) {
+    out.runs.erase_all();
+    out.height = 0;
+    Flow f(&out, width);
+    f.x = 16;
+    f.y = 24;
+    f.line_h = 18;
+    f.emit("Failed to load page", 20, 20 * 8, C_ERR, false, 0, 0);
+    f.newline();
+    f.y += 4;
+    if (url && url[0]) {
+        f.emit(url, (int)strlen(url), disp_w(url, (int)strlen(url)), C_TEXT_DK, false, 0, 0);
+        f.newline();
+        f.y += 4;
+    }
+    if (msg && msg[0]) {
+        f.emit(msg, (int)strlen(msg), disp_w(msg, (int)strlen(msg)), C_GRAY, false, 0, 0);
+        f.newline();
+    }
+    out.height = f.y + 20;
+}
+
+// ===================== navigation & loading =====================
+// A LoadJob is owned by the main thread (tab.job). The worker thread only
+// fills it and sets done=1; the main thread commits, frees, and deletes it.
+// On bare metal platform_thread_create() runs the worker inline, so the job
+// is already done when start_job() returns — same code path, no #ifdef.
+struct LoadJob {
+    volatile int done;   // 0 running, 1 finished
+    volatile int phase;  // 0 downloading, 1 parsing
+    bool ok;
+    bool cancelled;
+    bool truncated;
+    bool push_hist;
+    uint32_t start_ms;
+    char url[256];
+    char* data;          // kalloc'd page bytes (cap MAX_PAGE)
+    uint32_t len;
+    DomArena* dom;       // DOM built on the worker thread (0 = parse skipped)
+    char title[96];      // <title> extracted on the worker thread
+    char script[SCRIPT_MAX];   // accumulated <script> bytes (NUL at end)
+    int script_len;
+    char js_out[JS_OUT_MAX];   // mini_js_run console output
+    CSSRule css[CSS_MAX];      // parsed <style> sheet
+    int css_n;
+};
+
+// Image fetch job — same ownership pattern as LoadJob: the worker fills it
+// and sets done; the main thread decodes, frees, and deletes it.
+struct ImgJob {
+    volatile int done;   // 0 running, 1 finished
+    bool ok;
+    bool cancelled;
+    char url[256];
+    uint8_t* data;       // raw bytes (ownership handed to the main thread)
+    uint32_t len;
+};
+
+struct BrowserState;   // fwd (defined below, after TabState)
+struct TabState;
+static void clear_imgs(TabState& tab);
+
+struct TabState {
+    char input[160];
+    int input_len;
+    int input_cursor;
+    char url[256];
+    char title[96];
+    char err[128];
+    char* page;          // kalloc'd page buffer
+    int page_len;
+    int page_cap;
+    bool used;           // tab slot is open
+    bool loaded;
+    bool is_home;
+    bool truncated;
+    int scroll;
+    int max_scroll;
+    int layout_w;        // viewport width the cached layout was built for
+    PageLayout layout;
+    List<DomNode> dom;
+    List<String> back;
+    List<String> fwd;
+    LoadJob* job;
+    char queued[256];    // next URL once the current job finishes
+    bool has_queued;
+    uint32_t load_ms;
+    Img imgs[IMG_MAX];   // per-tab image cache
+    CSSRule css[CSS_MAX]; // style sheet (fixed array, copied from the job)
+    int css_n;
+    char js_msg[160];     // last JS console output (shown in the status bar)
+
+    TabState()
+        : input_len(0), input_cursor(0), page(0), page_len(0), page_cap(0),
+          used(false), loaded(false), is_home(false), truncated(false),
+          scroll(0), max_scroll(0), layout_w(-1), job(0), has_queued(false),
+          load_ms(0), css_n(0) {
+        input[0] = url[0] = title[0] = err[0] = queued[0] = 0;
+        js_msg[0] = 0;
+    }
+
+    ~TabState() {
+        if (page) kfree(page);
+        layout.runs.erase_all();
+        dom.erase_all();
+        back.erase_all();
+        fwd.erase_all();
+        if (job) {
+            job->cancelled = true;
+            // bounded wait for the worker so we can free it (host thread);
+            // on bare the load is synchronous, so it is already done.
+            for (int i = 0; i < 60 && !job->done; i++) platform_thread_sleep(5);
+            if (job->done) {
+                if (job->data) kfree(job->data);
+                if (job->dom) delete job->dom;
+                delete job;
+            }
+        }
+        clear_imgs(*this);
+    }
 };
 
 struct BrowserState {
-    String input;
-    String url;
-    List<Line> lines;
-    int scroll;
-    int status;          // 0 idle 1 loading 2 done 3 error
-    bool busy;
-    int cursor;
-    Button btns[5];
-    Button* cur;
-    uint8_t last_buttons;
-    // ---- threaded page download state ----
-    volatile bool load_done;
-    volatile bool load_error;
-    uint8_t* loaded_body;
-    uint32_t loaded_len;
-    String loaded_url;
-    void* load_thread;
-    // ---- image cache ----
-    List<CachedImage*> img_cache;
-    // ---- form editing ----
-    int form_edit_row;      // row of the input being edited, -1 = none
-    String form_edit_val;   // edited value
+    TabState tabs[MAX_TABS];
+    int active;
+    int tab_count;
+    bool input_focus;
+
+    BrowserState() : active(0), tab_count(1), input_focus(false) {}
 };
 
-// =====================================================================
-// HTML entity decoder
-// =====================================================================
-static int hex_val(char c) {
+static void start_job(TabState& tab, const char* url, bool push_hist);
+static void load_worker(void* arg);
+static void commit_page(TabState& tab, LoadJob* j);
+
+// smart URL detection: scheme → as-is; domain-like → http:// ; else search
+static void smart_url(const char* in, char* out, int cap) {
+    out[0] = 0;
+    while (*in == ' ') in++;
+    if (!in[0]) return;
+    if (ci_starts(in, "http://") || ci_starts(in, "https://") || ci_starts(in, "file://")) {
+        clip_str(out, cap, in);
+        return;
+    }
+    bool has_dot = false, has_space = false;
+    for (const char* p = in; *p; p++) {
+        if (*p == '.') has_dot = true;
+        else if (*p == ' ') has_space = true;
+    }
+    if (has_dot && !has_space && strlen(in) > 3) {
+        ksprintf(out, cap, "http://%s", in);
+    } else {
+        char enc[160];
+        url_encode(in, enc, sizeof(enc));
+        ksprintf(out, cap, "https://www.bing.com/search?q=%s", enc);
+    }
+}
+
+// resolve a possibly-relative href against the current page URL
+static void resolve_url(const char* base, const char* href, char* out, int cap) {
+    out[0] = 0;
+    if (!href || !href[0] || cap <= 1) return;
+    if (ci_starts(href, "http://") || ci_starts(href, "https://") || ci_starts(href, "file://")) {
+        clip_str(out, cap, href);
+        return;
+    }
+    if (!base || !base[0]) return;
+
+    char base_s[256];
+    clip_str(base_s, sizeof(base_s), base);
+    char* q = strchr(base_s, '?'); if (q) *q = 0;
+    char* f = strchr(base_s, '#'); if (f) *f = 0;
+
+    // protocol-relative: //host/path
+    if (href[0] == '/' && href[1] == '/') {
+        int n = 0;
+        while (base_s[n] && base_s[n] != ':' && n < cap - 1) { out[n] = base_s[n]; n++; }
+        if (base_s[n] == ':' && n < cap - 1) out[n++] = ':';
+        int h = 0;
+        while (href[h] && n < cap - 1) out[n++] = href[h++];
+        out[n] = 0;
+        return;
+    }
+    // absolute path: /path
+    if (href[0] == '/') {
+        const char* host = base_s;
+        if (ci_starts(base_s, "http://")) host = base_s + 7;
+        else if (ci_starts(base_s, "https://")) host = base_s + 8;
+        const char* slash = 0;
+        for (const char* p = host; *p; p++) if (*p == '/') { slash = p; break; }
+        int pre = slash ? (int)(slash - base_s) : (int)strlen(base_s);
+        int n = 0;
+        for (int i = 0; i < pre && n < cap - 1; i++) out[n++] = base_s[i];
+        int h = 0;
+        while (href[h] && n < cap - 1) out[n++] = href[h++];
+        out[n] = 0;
+        return;
+    }
+    // directory-relative: path/foo
+    int last = -1;
+    for (int i = 0; base_s[i]; i++) if (base_s[i] == '/') last = i;
+    int dir = last + 1;
+    int n = 0;
+    for (int i = 0; i < dir && n < cap - 1; i++) out[n++] = base_s[i];
+    int h = 0;
+    while (href[h] && n < cap - 1) out[n++] = href[h++];
+    out[n] = 0;
+}
+
+// extract <title>…</title> from the raw page bytes
+static void extract_title(const char* page, int len, char* out, int cap) {
+    out[0] = 0;
+    int i = 0;
+    while (i + 6 < len && !(page[i] == '<' && ci_starts(page + i + 1, "title"))) i++;
+    if (i + 6 >= len) return;
+    while (i < len && page[i] != '>') i++;
+    i++;
+    int n = 0;
+    bool seen = false;
+    for (; i < len && n < cap - 1; i++) {
+        if (page[i] == '<') {
+            if (ci_starts(page + i + 1, "/title")) break;
+            continue;
+        }
+        char c = page[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (!seen) continue;
+            if (n > 0 && out[n - 1] == ' ') continue;
+            c = ' ';
+        } else {
+            seen = true;
+        }
+        out[n++] = c;
+    }
+    while (n > 0 && out[n - 1] == ' ') out[--n] = 0;
+    out[n] = 0;
+}
+
+static void start_job(TabState& tab, const char* url, bool push_hist) {
+    if (tab.job) {
+        // a load is already in flight → queue (the latest URL wins)
+        tab.job->cancelled = true;
+        clip_str(tab.queued, sizeof(tab.queued), url);
+        tab.has_queued = true;
+        return;
+    }
+    LoadJob* j = new LoadJob();
+    j->done = 0;
+    j->ok = false;
+    j->cancelled = false;
+    j->truncated = false;
+    j->push_hist = push_hist;
+    j->start_ms = platform_tick_ms();
+    j->data = 0;
+    j->len = 0;
+    clip_str(j->url, sizeof(j->url), url);
+    tab.job = j;
+    platform_thread_create(load_worker, j);
+}
+
+// ---- image pipeline -------------------------------------------------
+
+static void img_worker(void* arg) {
+    ImgJob* j = (ImgJob*)arg;
+    uint8_t* body = 0;
+    uint32_t body_len = 0;
+    bool ok = platform_http_get(j->url, &body, &body_len);
+    if (ok && body && body_len > 0 && !j->cancelled) {
+        j->data = body;   // hand ownership to the main thread
+        j->len = body_len;
+        j->ok = true;
+    } else {
+        if (body) kfree(body);
+    }
+    j->done = 1;
+}
+
+static void start_img_job(Img& im, const char* url) {
+    if (im.job) return;   // already in flight
+    ImgJob* j = new ImgJob();
+    j->done = 0;
+    j->ok = false;
+    j->cancelled = false;
+    j->data = 0;
+    j->len = 0;
+    clip_str(j->url, sizeof(j->url), url);
+    im.job = j;
+    platform_thread_create(img_worker, j);
+}
+
+// Scan JPEG markers for a SOF0..SOF3 segment and return its dimensions.
+// Kept separate so we can reject huge images BEFORE spending a full decode.
+static bool jpeg_probe_size(const uint8_t* d, uint32_t len, int* w, int* h) {
+    *w = *h = 0;
+    if (len < 4 || d[0] != 0xFF || d[1] != 0xD8) return false;
+    uint32_t i = 2;
+    while (i + 4 < len) {
+        if (d[i] != 0xFF) { i++; continue; }
+        uint8_t m = d[i + 1];
+        if (m == 0xD9 || m == 0xDA) return false;   // EOI / SOS: no SOF found
+        if ((m >= 0xC0 && m <= 0xC3) || (m >= 0xC5 && m <= 0xC7) ||
+            (m >= 0xC9 && m <= 0xCB) || (m >= 0xCD && m <= 0xCF)) {
+            if (i + 9 < len) {
+                *h = (int)((d[i + 5] << 8) | d[i + 6]);
+                *w = (int)((d[i + 7] << 8) | d[i + 8]);
+                return true;
+            }
+            return false;
+        }
+        if (m == 0x01 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }
+        if (i + 3 < len) {
+            uint16_t seg = (uint16_t)((d[i + 2] << 8) | d[i + 3]);
+            i += 2 + seg;
+        } else return false;
+    }
+    return false;
+}
+
+// nearest-neighbour downscale (integer math only, bare-metal safe)
+static void scale_surface(Surface& dst, const Surface& src) {
+    for (int y = 0; y < dst.height; y++) {
+        int sy = (y * src.height) / dst.height;
+        for (int x = 0; x < dst.width; x++) {
+            int sx = (x * src.width) / dst.width;
+            const uint8_t* pp = src.addr + (size_t)sy * (size_t)src.pitch + (size_t)sx * 4;
+            uint32_t c = (uint32_t)pp[0] | ((uint32_t)pp[1] << 8) | ((uint32_t)pp[2] << 16);
+            dst.setpx(x, y, c);
+        }
+    }
+}
+
+// blit a cached image 1:1 into the page surface at (dx,dy)
+static void draw_img(Surface& s, int dx, int dy, const Img& im) {
+    if (!im.rgba || im.disp_w <= 0 || im.disp_h <= 0) return;
+    for (int y = 0; y < im.disp_h; y++) {
+        int gy = dy + y;
+        if (gy < 0 || gy >= s.height) continue;
+        const uint8_t* row = im.rgba + (size_t)y * (size_t)im.disp_w * 4;
+        for (int x = 0; x < im.disp_w; x++) {
+            int gx = dx + x;
+            if (gx < 0 || gx >= s.width) continue;
+            const uint8_t* pp = row + (size_t)x * 4;
+            uint32_t c = (uint32_t)pp[0] | ((uint32_t)pp[1] << 8) | ((uint32_t)pp[2] << 16);
+            s.setpx(gx, gy, c);
+        }
+    }
+}
+
+static void poll_img_jobs(BrowserState* st) {
+    for (int t = 0; t < MAX_TABS; t++) {
+        TabState& tab = st->tabs[t];
+        if (!tab.used) continue;
+        for (int k = 0; k < IMG_MAX; k++) {
+            Img& im = tab.imgs[k];
+            ImgJob* j = im.job;
+            if (!j || !j->done) continue;
+            im.job = 0;
+            im.loading = false;
+            if (!j->cancelled && j->ok && j->data && j->len > 0) {
+                nefu::ImgFmt fmt = nefu::stbi_sniff(j->data, j->len);
+                if (fmt == nefu::IMG_SVG) {
+                    // vector: rasterize directly at display size (nanosvg)
+                    int w = 0, h = 0;
+                    uint8_t* out = 0;
+                    if (nefu::nsvg_decode_mem(j->data, j->len, MAX_IMG_DISP,
+                                              &w, &h, &out)) {
+                        bgra_swap(out, w * h);
+                        im.w = w; im.h = h;
+                        im.disp_w = w; im.disp_h = h;
+                        im.rgba = out;
+                        im.done = true;
+                    } else {
+                        im.fail = true;
+                    }
+                } else if (fmt != nefu::IMG_UNKNOWN) {
+                    int w = 0, h = 0;
+                    uint8_t* out = 0;
+                    bool dec_ok = false;
+                    if (fmt == nefu::IMG_WEBP) {
+                        // WebP via libwebp bridge (RGBA)
+                        unsigned char* rgba = 0;
+                        if (nefu_webp_decode(j->data, (unsigned)j->len, &w, &h, &rgba)) {
+                            out = rgba;
+                            dec_ok = true;
+                        }
+                    } else if (nefu::stbi_info_mem(j->data, j->len, &w, &h) &&
+                               w > 0 && h > 0 && w * h <= MAX_IMG_PIX) {
+                        dec_ok = nefu::stbi_decode_mem(j->data, j->len, &w, &h, &out);
+                    }
+                    if (dec_ok) {
+                            bgra_swap(out, w * h);   // RGBA -> BGRA cache
+                            im.w = w; im.h = h;
+                            im.disp_w = im.w;
+                            if (im.disp_w > MAX_IMG_DISP) im.disp_w = MAX_IMG_DISP;
+                            if (im.disp_w < 1) im.disp_w = 1;
+                            im.disp_h = (im.h * im.disp_w) / im.w;
+                            if (im.disp_h < 1) im.disp_h = 1;
+                            uint32_t need = (uint32_t)im.disp_w * (uint32_t)im.disp_h * 4;
+                            uint8_t* buf = (uint8_t*)kalloc(need);
+                            if (buf) {
+                                Surface small;
+                                small.addr = buf;
+                                small.width = im.disp_w;
+                                small.height = im.disp_h;
+                                small.pitch = im.disp_w * 4;
+                                Surface big;
+                                big.addr = out;
+                                big.width = w; big.height = h; big.pitch = w * 4;
+                                scale_surface(small, big);
+                                im.rgba = buf;
+                                im.done = true;
+                            } else {
+                                im.fail = true;
+                            }
+                            kfree(out);
+                        } else {
+                            im.fail = true;
+                        }
+                } else {
+                    im.fail = true;
+                }
+            } else {
+                im.fail = true;
+            }
+            if (j->data) kfree(j->data);
+            delete j;
+            if (tab.used && (im.done || im.fail)) {
+                tab.layout_w = -1;   // image box changed -> re-layout
+            }
+        }
+    }
+}
+
+// cancel in-flight jobs and free cached pixels for a tab
+static void clear_imgs(TabState& tab) {
+    for (int k = 0; k < IMG_MAX; k++) {
+        Img& im = tab.imgs[k];
+        if (im.job) {
+            im.job->cancelled = true;
+            for (int i = 0; i < 60 && !im.job->done; i++) platform_thread_sleep(5);
+            if (im.job->done) {
+                if (im.job->data) kfree(im.job->data);
+                delete im.job;
+            }
+            im.job = 0;
+        }
+        if (im.rgba) kfree(im.rgba);
+        im.job = 0;
+        im.rgba = 0;
+        im.used = im.loading = im.done = im.fail = false;
+        im.url[0] = 0;
+    }
+}
+
+static void load_worker(void* arg) {
+    LoadJob* j = (LoadJob*)arg;
+    uint8_t* body = 0;
+    uint32_t body_len = 0;
+    bool ok = platform_http_get(j->url, &body, &body_len);
+    if (ok && body && body_len > 0 && !j->cancelled) {
+        j->truncated = body_len > MAX_PAGE - 1;
+        uint32_t cap = body_len + 1;
+        if (cap > MAX_PAGE) { cap = MAX_PAGE; j->truncated = true; }
+        char* p = (char*)kalloc(cap);
+        // arena may be tight (bare: 64 MB shared with every other tab and
+        // the DOM/layout caches): halve the page until an allocation fits,
+        // never fail the whole load just because one big page was too big.
+        if (!p) {
+            j->truncated = true;
+            uint32_t try_cap = cap / 2;
+            while (try_cap >= 65536 && !p) {
+                p = (char*)kalloc(try_cap);
+                if (p) cap = try_cap;
+                else try_cap /= 2;
+            }
+        }
+        if (p) {
+            memcpy(p, body, cap - 1);
+            p[cap - 1] = 0;
+            j->data = p;
+            j->len = cap - 1;
+            j->ok = true;
+        }
+    }
+    if (body) kfree(body);
+    // parse the HTML here too, so a 34 MB page never freezes the UI thread:
+    // the worker builds the DOM, the main thread only takes ownership.
+    if (j->ok && j->data && j->len > 0) {
+        j->phase = 1;   // parsing (host: worker thread; bare: same inline path)
+        DomArena* ar = new DomArena();
+        if (ar) {
+            PageParser pp(j->data, j->len, j->script, &j->script_len,
+                          j->css, &j->css_n, CSS_MAX);
+            pp.parse();
+            ar->nodes = pp.dom.nodes;
+            j->dom = ar;
+        }
+        extract_title(j->data, j->len, j->title, sizeof(j->title));
+        // execute the accumulated <script> body through the mini JS engine;
+        // print/alert/document.write land in js_out (merged into the page)
+        if (j->script_len > 0) {
+            j->script[j->script_len] = 0;
+            nefu::mini_js_run(j->script, j->js_out, (int)sizeof(j->js_out));
+        }
+    }
+    j->done = 1;
+}
+
+// Apply one \x01-prefixed DOM command from the JS output stream to the DOM.
+// ===================== WebGL canvas (Windows host only) =====================
+// WebGL2 maps onto desktop GL 4.x through a hidden window + WGL context; the
+// iGPU driver compiles "#version 300 es" shaders directly. All GL entry points
+// are loaded at runtime from opengl32.dll (no link dependency). The JS side
+// encodes calls as "\x01gl<cmd>|cid|args" control lines with URL percent
+// encoding; this decoder executes them on the GL context and keeps the last
+// rendered frame for the page blit.
+#ifndef NEFU_BARE
+struct NfuGl {
+    int ready;
+    void (*glClearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
+    void (*glClear)(GLbitfield);
+    void (*glViewport)(GLint, GLint, GLsizei, GLsizei);
+    void (*glFinish)(void);
+    void (*glReadPixels)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*);
+    unsigned int (*glCreateShader)(GLenum);
+    void (*glShaderSource)(GLuint, GLsizei, const char* const*, const GLint*);
+    void (*glCompileShader)(GLuint);
+    unsigned int (*glCreateProgram)(void);
+    void (*glAttachShader)(GLuint, GLuint);
+    void (*glLinkProgram)(GLuint);
+    void (*glUseProgram)(GLuint);
+    void (*glGenBuffers)(GLsizei, GLuint*);
+    void (*glBindBuffer)(GLenum, GLuint);
+    void (*glBufferData)(GLenum, GLsizeiptr, const void*, GLenum);
+    void (*glVertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
+    void (*glEnableVertexAttribArray)(GLuint);
+    void (*glDrawArrays)(GLenum, GLint, GLsizei);
+    unsigned int (*glGetError)(void);
+    const unsigned char* (*glGetString)(GLenum);
+    void (*glGetShaderiv)(GLuint, GLenum, GLint*);
+    void (*glGetProgramiv)(GLuint, GLenum, GLint*);
+    void (*glGetShaderInfoLog)(GLuint, GLsizei, GLsizei*, char*);
+    void (*glGetProgramInfoLog)(GLuint, GLsizei, GLsizei*, char*);
+    void (*glGenVertexArrays)(GLsizei, GLuint*);
+    void (*glBindVertexArray)(GLuint);
+    HGLRC (*wglCreateContext)(HDC);
+    BOOL (*wglMakeCurrent)(HDC, HGLRC);
+    BOOL (*wglDeleteContext)(HGLRC);
+    PROC (*wglGetProcAddress)(LPCSTR);
+};
+static NfuGl g_gl;
+
+static void* gl_sym(const char* n) {
+    void* p = (void*)g_gl.wglGetProcAddress(n);
+    if (!p) p = (void*)GetProcAddress(GetModuleHandleA("opengl32.dll"), n);
+    return p;
+}
+
+// stage 1: WGL entry points from the opengl32.dll export table (no context)
+static void gl_load_wgl() {
+    if (g_gl.wglCreateContext) return;
+    HMODULE op = LoadLibraryA("opengl32.dll");
+    if (!op) return;
+    g_gl.wglGetProcAddress = (PROC (*)(LPCSTR))GetProcAddress(op, "wglGetProcAddress");
+    g_gl.wglCreateContext = (HGLRC (*)(HDC))GetProcAddress(op, "wglCreateContext");
+    g_gl.wglMakeCurrent = (BOOL (*)(HDC, HGLRC))GetProcAddress(op, "wglMakeCurrent");
+    g_gl.wglDeleteContext = (BOOL (*)(HGLRC))GetProcAddress(op, "wglDeleteContext");
+    if (!g_gl.wglGetProcAddress || !g_gl.wglCreateContext) return;
+}
+
+// stage 2: GL entry points; must run with a current context
+// (wglGetProcAddress returns NULL otherwise)
+static void gl_load_ext() {
+    if (g_gl.ready) return;
+    #define GLF(n, ...) g_gl.n = (__VA_ARGS__)gl_sym(#n)
+    GLF(glClearColor, void (*)(GLfloat, GLfloat, GLfloat, GLfloat));
+    GLF(glClear, void (*)(GLbitfield));
+    GLF(glViewport, void (*)(GLint, GLint, GLsizei, GLsizei));
+    GLF(glFinish, void (*)(void));
+    GLF(glReadPixels, void (*)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*));
+    GLF(glCreateShader, unsigned int (*)(GLenum));
+    GLF(glShaderSource, void (*)(GLuint, GLsizei, const char* const*, const GLint*));
+    GLF(glCompileShader, void (*)(GLuint));
+    GLF(glCreateProgram, unsigned int (*)(void));
+    GLF(glAttachShader, void (*)(GLuint, GLuint));
+    GLF(glLinkProgram, void (*)(GLuint));
+    GLF(glUseProgram, void (*)(GLuint));
+    GLF(glGenBuffers, void (*)(GLsizei, GLuint*));
+    GLF(glBindBuffer, void (*)(GLenum, GLuint));
+    GLF(glBufferData, void (*)(GLenum, GLsizeiptr, const void*, GLenum));
+    GLF(glVertexAttribPointer, void (*)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*));
+    GLF(glEnableVertexAttribArray, void (*)(GLuint));
+    GLF(glDrawArrays, void (*)(GLenum, GLint, GLsizei));
+    GLF(glGetError, unsigned int (*)(void));
+    GLF(glGetString, const unsigned char* (*)(GLenum));
+    GLF(glGetShaderiv, void (*)(GLuint, GLenum, GLint*));
+    GLF(glGetProgramiv, void (*)(GLuint, GLenum, GLint*));
+    GLF(glGetShaderInfoLog, void (*)(GLuint, GLsizei, GLsizei*, char*));
+    GLF(glGetProgramInfoLog, void (*)(GLuint, GLsizei, GLsizei*, char*));
+    GLF(glGenVertexArrays, void (*)(GLsizei, GLuint*));
+    GLF(glBindVertexArray, void (*)(GLuint));
+    #undef GLF
+    g_gl.ready = 1;
+}
+
+struct GlShader { unsigned used, sid, id; int type; };   // sid = JS-side id, id = GL object id
+struct GlProg { unsigned used, sid, id; };
+struct GlBuf { unsigned used, sid, id; int target; };
+
+struct GlCanvas {
+    bool used;
+    char cid[32];
+    int w, h;
+    HWND hwnd; HDC hdc; HGLRC rc;
+    uint8_t* fb; int fbw, fbh;   // last rendered frame (BGRA, bottom-up)
+    float cr, cg, cb, ca;
+    GlShader sh[16]; GlProg pr[8]; GlBuf bu[16];
+    unsigned cur_prog;
+    GLuint vao;
+};
+static GlCanvas s_glcv[4];
+
+static int hexv(char c) {
     if (c >= '0' && c <= '9') return c - '0';
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;
     return 0;
 }
 
-static char decode_entity(const char* s, int* consumed) {
-    if (s[0] != '&') { *consumed = 1; return s[0]; }
-    if (!strncmp(s, "&nbsp;", 6)) { *consumed = 6; return ' '; }
-    if (!strncmp(s, "&lt;",   4)) { *consumed = 4; return '<'; }
-    if (!strncmp(s, "&gt;",   4)) { *consumed = 4; return '>'; }
-    if (!strncmp(s, "&amp;",  5)) { *consumed = 5; return '&'; }
-    if (!strncmp(s, "&quot;", 6)) { *consumed = 6; return '"'; }
-    if (!strncmp(s, "&apos;", 6)) { *consumed = 6; return '\''; }
-    if (!strncmp(s, "&#", 2)) {
-        int val = 0; int i = 2;
-        if (s[2] == 'x' || s[2] == 'X') {
-            i = 3;
-            while (s[i] && s[i] != ';' && i < 12) { val = val * 16 + hex_val(s[i]); i++; }
-        } else {
-            while (s[i] && s[i] != ';' && i < 12) { val = val * 10 + (s[i] - '0'); i++; }
-        }
-        if (s[i] == ';') i++;
-        *consumed = i;
-        return (val >= 32 && val < 127) ? (char)val : '?';
-    }
-    *consumed = 1;
-    return '&';
-}
-
-// =====================================================================
-// URL resolution: relative -> absolute against a base URL
-// =====================================================================
-static void resolve_url(const char* rel, const char* base, char* out, int cap) {
-    if (!rel || !*rel) { out[0] = 0; return; }
-    if (!strncmp(rel, "http://", 7) || !strncmp(rel, "https://", 8) ||
-        !strncmp(rel, "file://", 7)) {
-        int n = (int)strlen(rel); if (n >= cap) n = cap - 1;
-        memcpy(out, rel, n); out[n] = 0; return;
-    }
-    if (!strncmp(rel, "//", 2)) {
-        // protocol-relative: inherit scheme from base
-        int n = 0;
-        if (base && (!strncmp(base, "https:", 6) || !strncmp(base, "http:", 5))) {
-            int sn = (strncmp(base, "https", 5) == 0) ? 6 : 5;
-            if (sn < cap) { memcpy(out, base, sn); out[sn] = 0; n = sn; }
-        }
-        int rn = (int)strlen(rel);
-        if (n + rn < cap) { memcpy(out + n, rel, rn); out[n + rn] = 0; }
-        else { int m = cap - n - 1; if (m > rn) m = rn; memcpy(out + n, rel, m); out[n + m] = 0; }
-        return;
-    }
-    // find scheme://host in base
-    const char* hstart = 0; int hostlen = 0; const char* slash = 0;
-    if (base) {
-        const char* p = strstr(base, "://");
-        if (p) {
-            hstart = p + 3;
-            const char* q = hstart;
-            while (*q && *q != '/' && *q != '?') q++;
-            hostlen = (int)(q - hstart);
-            slash = q;
-        }
-    }
+static void url_decode(const char* in, char* out, int cap) {
     int n = 0;
-    if (hstart && hostlen > 0 && n + 7 < cap) {
-        // scheme://host
-        if (strncmp(base, "https", 5) == 0) { memcpy(out + n, "https://", 8); n += 8; }
-        else { memcpy(out + n, "http://", 7); n += 7; }
-        if (n + hostlen < cap) { memcpy(out + n, hstart, hostlen); n += hostlen; }
-    }
-    if (rel[0] == '/') {
-        int rn = (int)strlen(rel);
-        int m = cap - n - 1; if (m > rn) m = rn;
-        memcpy(out + n, rel, m); out[n + m] = 0;
-        return;
-    }
-    // relative: append to base directory
-    if (slash) {
-        const char* d = slash;
-        const char* last = slash;
-        while (*d) { if (*d == '/') last = d; d++; }
-        if (last != slash) {
-            int dl = (int)(last - slash + 1);
-            if (n + dl < cap) { memcpy(out + n, slash, dl); n += dl; }
-        } else if (n + 1 < cap) { out[n++] = '/'; }
-    } else if (n + 1 < cap) { out[n++] = '/'; }
-    int rn = (int)strlen(rel);
-    int m = cap - n - 1; if (m > rn) m = rn;
-    memcpy(out + n, rel, m); out[n + m] = 0;
-}
-
-// =====================================================================
-// Self-contained HTML parser -> List<Line>
-// =====================================================================
-static bool is_void_tag(const char* t) {
-    static const char* v[] = {"br","hr","img","input","meta","link","area",
-                               "base","col","embed","source","track","wbr",0};
-    for (int i = 0; v[i]; i++) if (!strcmp(t, v[i])) return true;
-    return false;
-}
-
-static bool is_block_tag(const char* t) {
-    static const char* b[] = {"p","div","section","article","header","footer",
-                               "nav","aside","main","blockquote","pre","form",
-                               "fieldset","figure","figcaption","address","center",0};
-    for (int i = 0; b[i]; i++) if (!strcmp(t, b[i])) return true;
-    return false;
-}
-
-// extract attribute value from tag text: e.g. src="http://..." -> returns value
-static String get_attr(const char* tag_text, int tag_len, const char* attr_name) {
-    String result;
-    int alen = (int)strlen(attr_name);
-    for (int i = 0; i + alen < tag_len; i++) {
-        bool match = true;
-        for (int j = 0; j < alen; j++) {
-            char a = tag_text[i+j];
-            char b2 = attr_name[j];
-            if (a >= 'A' && a <= 'Z') a = a - 'A' + 'a';
-            if (b2 >= 'A' && b2 <= 'Z') b2 = b2 - 'A' + 'a';
-            if (a != b2) { match = false; break; }
-        }
-        if (match) {
-            int k = i + alen;
-            while (k < tag_len && (tag_text[k] == ' ' || tag_text[k] == '\t')) k++;
-            if (k < tag_len && tag_text[k] == '=') {
-                k++;
-                while (k < tag_len && (tag_text[k] == ' ' || tag_text[k] == '\t')) k++;
-                char quote = 0;
-                if (k < tag_len && (tag_text[k] == '"' || tag_text[k] == '\'')) {
-                    quote = tag_text[k]; k++;
-                }
-                while (k < tag_len) {
-                    if (quote && tag_text[k] == quote) break;
-                    if (!quote && (tag_text[k] == ' ' || tag_text[k] == '>' || tag_text[k] == '\t')) break;
-                    result += tag_text[k];
-                    k++;
-                }
-                return result;
-            }
-        }
-    }
-    return result;
-}
-
-static void html_parse(const char* html, int len, List<Line>& out, char* out_title = 0, int title_cap = 0, const char* base_url = 0) {
-    String cur;
-    int font_size = 16;
-    bool bold = false;
-    uint32_t color = 0;
-    int indent = 0;
-    int list_depth = 0;
-    int ol_count[8] = {0,0,0,0,0,0,0,0};
-    bool in_ul = false;
-    bool in_skip = false;
-    char skip_tag[16] = {0};
-    int script_start = -1;
-    bool in_table = false;
-    int td_count = 0;
-    bool in_title = false;
-    int title_len = 0;
-
-    // browser engine: Settings runtime switch takes priority, otherwise
-    // first-boot setup (/etc/nefu.conf):
-    //   browser_engine=noscript disables <script> execution (HTML only).
-    bool js_on = true;
-    if (g_settings.browser_engine != 0) {
-        js_on = false;
-    } else {
-        FSNode* conf = g_vfs->resolve("/etc/nefu.conf");
-        if (conf && conf->data && conf->size > 0) {
-            char cbuf[1024];
-            uint32_t cn = conf->size < 1023 ? conf->size : 1023;
-            memcpy(cbuf, conf->data, cn);
-            cbuf[cn] = 0;
-            char* bp = strstr(cbuf, "browser_engine=");
-            if (bp && strncmp(bp + 15, "noscript", 8) == 0) js_on = false;
-        }
-    }
-
-    auto flush = [&]() {
-        if (!cur.empty()) {
-            Line l;
-            l.s = cur;
-            l.font_size = font_size;
-            l.bold = bold;
-            l.color = color;
-            l.indent = indent;
-            out.push(l);
-            cur.clear();
-        }
-    };
-    auto new_block = [&]() { flush(); };
-
-    int i = 0;
-    while (i < len) {
-        if (in_skip) {
-            char close[24] = "</";
-            strcat(close, skip_tag);
-            int clen = (int)strlen(close);
-            int found = -1;
-            for (int k = i; k + clen <= len; k++) {
-                bool m2 = true;
-                for (int c = 0; c < clen; c++) {
-                    char a = html[k+c];
-                    char b2 = close[c];
-                    if (a >= 'A' && a <= 'Z') a = a - 'A' + 'a';
-                    if (b2 >= 'A' && b2 <= 'Z') b2 = b2 - 'A' + 'a';
-                    if (a != b2) { m2 = false; break; }
-                }
-                if (m2) { found = k; break; }
-            }
-            if (found >= 0) { i = found; in_skip = false; }
-            else { i = len; }
-            continue;
-        }
-
-        if (html[i] == '<') {
-            int tag_start = i;
-            int j = i + 1;
-            bool is_close = (j < len && html[j] == '/');
-            if (is_close) j++;
-            if (j + 3 < len && html[j]=='!' && html[j+1]=='-' && html[j+2]=='-') {
-                while (j + 2 < len && !(html[j]=='-'&&html[j+1]=='-'&&html[j+2]=='>')) j++;
-                i = j + 3;
-                continue;
-            }
-            if (j < len && html[j] == '!') {
-                while (j < len && html[j] != '>') j++;
-                i = j + 1;
-                continue;
-            }
-            char tname[32]; int tn = 0;
-            while (j < len && tn < 31 && html[j]!='>' && html[j]!=' ' &&
-                   html[j]!='\t' && html[j]!='\n' && html[j]!='/' && html[j]!='=') {
-                char c = html[j++];
-                if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
-                tname[tn++] = c;
-            }
-            tname[tn] = 0;
-            int tag_text_end = j;
-            while (tag_text_end < len && html[tag_text_end] != '>') tag_text_end++;
-            int tag_text_len = tag_text_end - tag_start;
-            while (j < len && html[j] != '>') j++;
-            if (j < len && html[j] == '>') j++;
-            i = j;
-            if (tn == 0) continue;
-
-            if (!is_close) {
-                if (!strcmp(tname,"title")) { in_title = true; title_len = 0; continue; }
-                if (!strcmp(tname,"script") || !strcmp(tname,"style") ||
-                    !strcmp(tname,"head") || !strcmp(tname,"title") ||
-                    !strcmp(tname,"noscript")) {
-                    in_skip = true;
-                    strncpy(skip_tag, tname, 15); skip_tag[15]=0;
-                    if (!strcmp(tname,"script")) script_start = i;  // i is just past '>'
-                    continue;
-                }
-                if (is_block_tag(tname)) new_block();
-                if (!strcmp(tname,"h1")) { new_block(); font_size=32; bold=true; }
-                else if (!strcmp(tname,"h2")) { new_block(); font_size=24; bold=true; }
-                else if (!strcmp(tname,"h3")) { new_block(); font_size=20; bold=true; }
-                else if (!strcmp(tname,"h4")||!strcmp(tname,"h5")||!strcmp(tname,"h6")) {
-                    new_block(); font_size=16; bold=true;
-                }
-                else if (!strcmp(tname,"b")||!strcmp(tname,"strong")) bold=true;
-                else if (!strcmp(tname,"a")) color=0x0000EE;
-                else if (!strcmp(tname,"br")) new_block();
-                else if (!strcmp(tname,"hr")) {
-                    new_block();
-                    Line l; l.s = "----------------------------------------";
-                    l.font_size=16; out.push(l);
-                }
-                else if (!strcmp(tname,"ul")) { in_ul=true; list_depth++; indent+=2; }
-                else if (!strcmp(tname,"ol")) { in_ul=false; list_depth++;
-                    if (list_depth<8) ol_count[list_depth]=0; indent+=2; }
-                else if (!strcmp(tname,"li")) {
-                    new_block();
-                    if (in_ul) cur += (const char*)"  ";
-                    else {
-                        if (list_depth<8) ol_count[list_depth]++;
-                        char buf[16];
-                        ksprintf(buf,sizeof(buf),"%d. ", list_depth<8?ol_count[list_depth]:1);
-                        cur += buf;
-                    }
-                }
-                else if (!strcmp(tname,"pre")) { new_block(); indent+=2; }
-                else if (!strcmp(tname,"center")) { new_block(); }
-                else if (!strcmp(tname,"font")) {
-                    // <font color=.. size=..>: approximate size 1..7 -> 12..32px
-                    String sz = get_attr(html + tag_start, tag_text_len, "size");
-                    if (!sz.empty()) { int v = atoi(sz.c_str()); if (v>=1 && v<=7) font_size = 12 + (v-1)*4; }
-                    String col = get_attr(html + tag_start, tag_text_len, "color");
-                    if (!col.empty()) {
-                        uint32_t c = 0;
-                        if (col[0]=='#' && col.len()>=7) {
-                            // manual hex parse (sscanf is unavailable on bare metal)
-                            unsigned int hv = 0;
-                            for (int k = 1; k < 7; k++) {
-                                char ch = col[k]; hv <<= 4;
-                                if (ch >= '0' && ch <= '9') hv |= (unsigned int)(ch - '0');
-                                else if (ch >= 'a' && ch <= 'f') hv |= (unsigned int)(ch - 'a' + 10);
-                                else if (ch >= 'A' && ch <= 'F') hv |= (unsigned int)(ch - 'A' + 10);
-                            }
-                            c = hv;
-                        } else if (col == "red") c = 0xFF0000;
-                        else if (col == "blue") c = 0x0000FF;
-                        else if (col == "green") c = 0x008000;
-                        else if (col == "gray" || col == "grey") c = 0x808080;
-                        if (c) color = c;
-                    }
-                }
-                else if (!strcmp(tname,"iframe")) {
-                    String src2 = get_attr(html + tag_start, tag_text_len, "src");
-                    if (!src2.empty()) {
-                        flush();
-                        char ab[512];
-                        resolve_url(src2.c_str(), base_url ? base_url : "", ab, (int)sizeof(ab));
-                        char buf[560];
-                        ksprintf(buf, sizeof(buf), "[iframe] %s", ab);
-                        Line l; l.s = buf; l.style = 2; out.push(l);
-                    }
-                }
-                else if (!strcmp(tname,"select")) {
-                    // render the selected option as a form choice line
-                    String sel = get_attr(html + tag_start, tag_text_len, "value");
-                    String nm = get_attr(html + tag_start, tag_text_len, "name");
-                    flush();
-                    Line l; l.form_kind = 1; l.form_name = nm; l.form_val = sel;
-                    l.s = " "; l.style = 3; out.push(l);
-                }
-                else if (!strcmp(tname,"textarea")) {
-                    flush();
-                    Line l; l.form_kind = 1; l.form_name = get_attr(html + tag_start, tag_text_len, "name");
-                    l.form_val = get_attr(html + tag_start, tag_text_len, "value");
-                    l.s = " "; l.style = 3; out.push(l);
-                }
-                else if (!strcmp(tname,"table")) { in_table=true; new_block(); }
-                else if (!strcmp(tname,"tr")) { new_block(); td_count=0; }
-                else if (!strcmp(tname,"td")||!strcmp(tname,"th")) {
-                    if (td_count>0) cur += (const char*)" | ";
-                    td_count++;
-                    if (!strcmp(tname,"th")) bold=true;
-                }
-                else if (!strcmp(tname,"img")) {
-                    // extract src attribute, resolve relative URLs against base
-                    String src = get_attr(html + tag_start, tag_text_len, "src");
-                    if (!src.empty() && strncmp(src.c_str(), "data:", 5) != 0) {
-                        char ab[512];
-                        resolve_url(src.c_str(), base_url ? base_url : "", ab, (int)sizeof(ab));
-                        flush();
-                        Line l;
-                        l.image_url = ab[0] ? ab : src;
-                        out.push(l);
-                    } else {
-                        cur += (const char*)"[IMG]";
-                    }
-                }
-                else if (!strcmp(tname,"input")) {
-                    // <input name=.. type=.. value=.. placeholder=..> -> form line
-                    String name = get_attr(html + tag_start, tag_text_len, "name");
-                    String type = get_attr(html + tag_start, tag_text_len, "type");
-                    String val  = get_attr(html + tag_start, tag_text_len, "value");
-                    String ph   = get_attr(html + tag_start, tag_text_len, "placeholder");
-                    String fm   = get_attr(html + tag_start, tag_text_len, "method");
-                    flush();
-                    Line l;
-                    if (!type.empty() && (type == "submit" || type == "button")) {
-                        l.form_kind = 2;
-                        l.form_name = name;
-                        l.form_val = val.empty() ? (ph.empty() ? "Submit" : ph) : val;
-                        l.form_method = (!fm.empty() && fm == "post") ? 1 : 0;
-                    } else {
-                        l.form_kind = 1;
-                        l.form_name = name;
-                        l.form_val = val.empty() ? ph : val;
-                        l.s = " ";
-                        l.style = 3;   // input row marker
-                    }
-                    out.push(l);
-                }
-                else if (!strcmp(tname,"button")) {
-                    // <button>Label</button> -> submit line
-                    String txt = get_attr(html + tag_start, tag_text_len, "value");
-                    String fm  = get_attr(html + tag_start, tag_text_len, "method");
-                    flush();
-                    Line l;
-                    l.form_kind = 2;
-                    l.form_name = get_attr(html + tag_start, tag_text_len, "name");
-                    l.form_val = txt.empty() ? "Submit" : txt;
-                    l.form_method = (!fm.empty() && fm == "post") ? 1 : 0;
-                    out.push(l);
-                }
-            } else {
-                if (!strcmp(tname,"title")) { in_title = false; if (out_title) out_title[title_len] = 0; continue; }
-                if (!strcmp(tname,"script")||!strcmp(tname,"style")||
-                    !strcmp(tname,"head")||!strcmp(tname,"title")||
-                    !strcmp(tname,"noscript")) {
-                    if (!strcmp(tname,"script") && script_start >= 0) {
-                        int slen = tag_start - script_start;
-                        if (slen > 0 && slen < 600) {
-                            char sbuf[600];
-                            memcpy(sbuf, html + script_start, slen);
-                            sbuf[slen] = 0;
-                            char jsout[600];
-                            int rc = js_on ? mini_js_run(sbuf, jsout, sizeof(jsout)) : 1;
-                            if (!rc && jsout[0]) {
-                                flush();
-                                Line l;
-                                l.s = jsout;
-                                l.font_size = 16;
-                                out.push(l);
-                            }
-                        }
-                        script_start = -1;
-                    }
-                    in_skip=false; continue;
-                }
-                if (!strcmp(tname,"h1")||!strcmp(tname,"h2")||!strcmp(tname,"h3")||
-                    !strcmp(tname,"h4")||!strcmp(tname,"h5")||!strcmp(tname,"h6")) {
-                    new_block(); font_size=16; bold=false;
-                }
-                else if (!strcmp(tname,"b")||!strcmp(tname,"strong")) bold=false;
-                else if (!strcmp(tname,"a")) color=0;
-                else if (!strcmp(tname,"pre")) { new_block(); indent-=2; if (indent<0) indent=0; }
-                else if (!strcmp(tname,"font")) { font_size = 16; color = 0; }
-                else if (!strcmp(tname,"p")||!strcmp(tname,"div")||is_block_tag(tname)) new_block();
-                else if (!strcmp(tname,"ul")||!strcmp(tname,"ol")) {
-                    list_depth--; if (indent>=2) indent-=2; new_block();
-                }
-                else if (!strcmp(tname,"li")) new_block();
-                else if (!strcmp(tname,"td")||!strcmp(tname,"th")) {
-                    if (!strcmp(tname,"th")) bold=false;
-                }
-                else if (!strcmp(tname,"table")) { in_table=false; new_block(); }
-                else if (!strcmp(tname,"tr")) new_block();
-            }
-        } else {
-            char c = html[i];
-            if (in_title) {
-                if (out_title && title_len < title_cap - 1) out_title[title_len++] = c;
-                i++;
-                continue;
-            }
-            if (c == '&') {
-                int consumed = 0;
-                char dec = decode_entity(html + i, &consumed);
-                if (consumed > 0) { cur += dec; i += consumed; continue; }
-            }
-            if (c==' '||c=='\t'||c=='\n'||c=='\r') {
-                if (!cur.empty() && cur[cur.len()-1] != ' ') cur += ' ';
-                i++;
-                continue;
-            }
-            cur += c;
-            i++;
-        }
-    }
-    flush();
-}
-
-static void html_to_lines(const char* html, int len, List<Line>& out) {
-    html_parse(html, len, out);
-}
-
-// =====================================================================
-// helpers
-// =====================================================================
-static void add_line(List<Line>& lines, const char* s, int style) {
-    Line l;
-    l.s = s ? s : "";
-    l.style = style;
-    if (style == 1) { l.font_size = 24; l.bold = true; }
-    lines.push(l);
-}
-
-static const char* ltrim_ws(const char* s) {
-    while (*s == ' ' || *s == '\t') s++;
-    return s;
-}
-
-// Heuristic: does this string look like a domain/URL (vs a search keyword)?
-static bool looks_like_domain(const char* s) {
-    if (!s || !*s) return false;
-    if (strncmp(s, "http://", 7) == 0) return true;
-    if (strncmp(s, "https://", 8) == 0) return true;
-    if (strncmp(s, "file://", 7) == 0) return true;
-    if (strncmp(s, "search:", 7) == 0) return false;
-    if (s[0] == '/' || s[0] == '.') return false;
-    for (const char* p = s; *p; p++) if (*p == ' ') return false;
-    // manual strrchr (no libc on bare metal)
-    const char* lastdot = 0;
-    for (const char* p = s; *p; p++) if (*p == '.') lastdot = p;
-    if (!lastdot) return false;
-    int tld_len = 0;
-    for (const char* p = lastdot + 1; *p; p++) {
-        if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')) tld_len++;
-        else if (*p == '/' || *p == ':' || *p == '?') break;
-        else return false;
-    }
-    if (tld_len < 2) return false;
-    for (const char* p = s; *p; p++) {
-        char c = *p;
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) continue;
-        if (c >= '0' && c <= '9') continue;
-        if (c == '.' || c == '-' || c == '/' || c == ':' || c == '_') continue;
-        return false;
-    }
-    return true;
-}
-
-static bool parse_ip(const char* s, uint32_t* out) {
-    int parts[4] = {0,0,0,0};
-    int idx = 0;
-    const char* p = s;
-    while (*p && idx < 4) {
-        int val = 0; int digits = 0;
-        while (*p >= '0' && *p <= '9' && digits < 3) {
-            val = val * 10 + (*p - '0');
-            p++; digits++;
-        }
-        if (digits == 0 || val > 255) return false;
-        parts[idx++] = val;
-        if (*p == '.') { p++; continue; }
-        break;
-    }
-    if (idx != 4 || *p != 0) return false;
-    *out = ((uint32_t)parts[0]<<24)|((uint32_t)parts[1]<<16)|((uint32_t)parts[2]<<8)|(uint32_t)parts[3];
-    return true;
-}
-
-static void show_net_error(BrowserState* st, const char* url, const char* reason) {
-    st->lines.erase_all();
-    add_line(st->lines, "Unable to connect", 1);
-    add_line(st->lines, "", 0);
-    char buf[512];
-    ksprintf(buf, sizeof(buf), "URL: %s", url ? url : "(empty)");
-    add_line(st->lines, buf, 0);
-    ksprintf(buf, sizeof(buf), "Error: %s", reason ? reason : "Connection failed");
-    add_line(st->lines, buf, 0);
-    add_line(st->lines, "", 0);
-    add_line(st->lines, "Suggestions:", 0);
-    add_line(st->lines, "  - Check your network connection", 0);
-    add_line(st->lines, "  - Verify the URL is correct", 0);
-    add_line(st->lines, "  - The server may be down or unreachable", 0);
-    add_line(st->lines, "  - On bare metal, only IP literals are supported (no DNS)", 0);
-    st->status = 3;
-    st->scroll = 0;
-    st->busy = false;
-}
-
-// =====================================================================
-// image cache + background image download
-// =====================================================================
-static CachedImage* find_cached_image(BrowserState* st, const char* url) {
-    for (int i = 0; i < st->img_cache.size(); i++) {
-        if (!strcmp(st->img_cache[i]->url.c_str(), url)) return st->img_cache[i];
-    }
-    return 0;
-}
-
-static void browser_image_thread(void* arg) {
-    CachedImage* img = (CachedImage*)arg;
-    uint8_t* body = 0; uint32_t body_len = 0;
-    if (platform_http_get(img->url.c_str(), &body, &body_len) && body && body_len > 0) {
-        Surface* s = new Surface();
-        if (decode_image_any(body, body_len, *s)) {
-            img->surf = s;
-        } else {
-            delete s;
-            img->failed = true;
-        }
-        kfree(body);
-    } else {
-        img->failed = true;
-    }
-    img->loading = false;
-}
-
-static void ensure_image_loading(BrowserState* st, Line& l) {
-    if (l.image_url.empty()) return;
-    if (l.image) return; // already resolved
-    CachedImage* ci = find_cached_image(st, l.image_url.c_str());
-    if (!ci) {
-        ci = new CachedImage();
-        ci->url = l.image_url;
-        ci->surf = 0;
-        ci->loading = true;
-        ci->failed = false;
-        st->img_cache.push(ci);
-        platform_thread_create(browser_image_thread, ci);
-    }
-    if (ci->surf) l.image = ci->surf;
-    else if (ci->failed) l.image = (Surface*)-1; // mark as failed (won't retry)
-}
-
-// =====================================================================
-// loaders (synchronous, called from background thread)
-// =====================================================================
-static bool load_file(BrowserState* st, const char* path) {
-    FSNode* f = g_vfs->resolve(path);
-    if (!f || f->is_dir) {
-        st->lines.erase_all();
-        add_line(st->lines, "File not found", 1);
-        add_line(st->lines, "", 0);
-        char buf[256];
-        ksprintf(buf, sizeof(buf), "Path: %s", path);
-        add_line(st->lines, buf, 0);
-        add_line(st->lines, "", 0);
-        add_line(st->lines, "Try: file:///home/user/Documents/nefuos.txt", 2);
-        st->status = 3;
-        return false;
-    }
-    st->lines.erase_all();
-    bool is_html = false;
-    const char* fn = f->name.c_str();
-    int fl = f->name.len();
-    if (fl > 5 && (!strcmp(fn+fl-5,".html") || !strcmp(fn+fl-5,".htm"))) is_html = true;
-    if (fl > 4 && !strcmp(fn+fl-4,".xml")) is_html = true;
-    if (is_html && f->size > 0) {
-        html_parse((const char*)f->data, (int)f->size, st->lines);
-    } else {
-        char* buf = (char*)kalloc((size_t)f->size + 1);
-        if (buf) {
-            memcpy(buf, f->data, f->size);
-            buf[f->size] = 0;
-            char* line = buf;
-            for (char* p = buf; ; p++) {
-                if (*p == '\n' || *p == 0) {
-                    char save = *p;
-                    *p = 0;
-                    int ll = (int)strlen(line);
-                    if (ll > 0 && line[ll-1] == '\r') line[ll-1] = 0;
-                    add_line(st->lines, line, 0);
-                    if (save == 0) break;
-                    line = p + 1;
-                }
-            }
-            kfree(buf);
-        }
-    }
-    st->scroll = 0;
-    st->status = 2;
-    return true;
-}
-
-// Append a "Cookie: host=value" header from the cookie jar
-// (/var/lib/nefuos/cookies.txt, one "host=N; path=/; nefuOS" per line)
-// that matches the request URL host. Returns the extra header length.
-static int http_append_cookie(const char* url, char* req, int req_len, int cap) {
-    const char* h = strstr(url, "://");
-    const char* host = h ? h + 3 : url;
-    char hb[96];
-    int hn = 0;
-    while (host[hn] && host[hn] != '/' && host[hn] != '?' && host[hn] != ':' && hn < 90) {
-        hb[hn] = host[hn];
-        hn++;
-    }
-    hb[hn] = 0;
-    if (hn == 0) return 0;
-    FSNode* ck = g_vfs->resolve("/var/lib/nefuos/cookies.txt");
-    if (!ck || ck->size == 0) return 0;
-    char* jar = (char*)kalloc((size_t)ck->size + 1);
-    if (!jar) return 0;
-    memcpy(jar, ck->data, ck->size);
-    jar[ck->size] = 0;
-    String out;
-    char* p = jar;
-    while (*p) {
-        char* nl = p;
-        while (*nl && *nl != '\n') nl++;
-        char save = *nl;
-        *nl = 0;
-        // line "host=N; path=/; nefuOS"
-        if (strncmp(p, hb, hn) == 0 && p[hn] == '=') {
-            if (!out.empty()) out += "; ";
-            out += hb;
-            int v = 0;
-            while (p[hn + 1 + v] && p[hn + 1 + v] != ';') v++;
-            out += '=';
-            for (int k = 0; k < v; k++) out += p[hn + 1 + k];
-        }
-        *nl = save;
-        if (save == 0) break;
-        p = nl + 1;
-    }
-    kfree(jar);
-    if (out.empty()) return 0;
-    // "Cookie: host=1; host=2\r\n"
-    char hdr[256];
-    int hl = ksprintf(hdr, sizeof(hdr), "Cookie: %s\r\n", out.c_str());
-    if (req_len + hl >= cap) return 0;
-    memcpy(req + req_len, hdr, hl);
-    return hl;
-}
-
-// Send a POST request with the given URL-encoded body and render the reply.
-static bool http_post(BrowserState* st, const char* url, const char* body) {
-    // parse scheme://host:port/path
-    const char* p = url;
-    uint32_t ip = 0;
-    uint16_t port = 80;
-    const char* path = "/";
-    if (strncmp(p, "http://", 7) == 0) p += 7;
-    else if (strncmp(p, "https://", 8) == 0) p += 8;
-    char hostbuf[128];
-    int hn = 0;
-    while (*p && *p != '/' && *p != ':' && hn < 120) hostbuf[hn++] = *p++;
-    hostbuf[hn] = 0;
-    if (*p == ':') {
-        p++;
-        int pn = 0;
-        while (*p >= '0' && *p <= '9') { pn = pn * 10 + (*p - '0'); p++; }
-        if (pn > 0) port = (uint16_t)pn;
-    }
-    if (*p == '/') path = p;
-    if (!parse_ip(hostbuf, &ip)) return false;
-    int fd = tcp_connect(ip, port, 5000);
-    if (fd < 0) return false;
-    char req[768];
-    int bl = (int)strlen(body);
-    int rl = ksprintf(req, sizeof(req),
-        "POST %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: nefuOS/1.0\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: %d\r\n"
-        "Connection: close\r\n", path, hostbuf, bl);
-    rl += http_append_cookie(url, req, rl, (int)sizeof(req));
-    rl += ksprintf(req + rl, (int)sizeof(req) - rl, "\r\n%s", body);
-    tcp_send(fd, req, rl);
-    uint8_t* resp = 0;
-    uint32_t resp_len = 0;
-    uint32_t cap = 8192;
-    resp = (uint8_t*)kalloc(cap);
-    if (!resp) { tcp_close(fd); return false; }
-    uint32_t start = platform_tick_ms();
-    while (platform_tick_ms() - start < 8000) {
-        char c;
-        int n = tcp_recv(fd, &c, 1, 200);
-        if (n == 1) {
-            if (resp_len + 1 >= cap) {
-                cap *= 2;
-                uint8_t* nb = (uint8_t*)kalloc(cap);
-                if (!nb) break;
-                memcpy(nb, resp, resp_len);
-                kfree(resp);
-                resp = nb;
-            }
-            resp[resp_len++] = (uint8_t)c;
-        } else if (n < 0) break;
-    }
-    tcp_close(fd);
-    st->lines.erase_all();
-    add_line(st->lines, "HTTP POST response", 1);
-    add_line(st->lines, "", 0);
-    if (resp_len > 0) {
-        uint32_t hdr_end = 0;
-        for (uint32_t k = 0; k + 3 < resp_len; k++) {
-            if (resp[k]=='\r'&&resp[k+1]=='\n'&&resp[k+2]=='\r'&&resp[k+3]=='\n') {
-                hdr_end = k + 4;
-                break;
-            }
-        }
-        char hdr[120];
-        ksprintf(hdr, sizeof(hdr), "%u bytes received (header %u, body %u)",
-                 (unsigned)resp_len, (unsigned)hdr_end, (unsigned)(resp_len - hdr_end));
-        add_line(st->lines, hdr, 0);
-        add_line(st->lines, "", 0);
-        if (resp_len > hdr_end)
-            html_parse((const char*)resp + hdr_end, (int)(resp_len - hdr_end), st->lines, 0, 0, url);
-    } else {
-        add_line(st->lines, "No response", 0);
-    }
-    kfree(resp);
-    st->scroll = 0;
-    st->status = 2;
-    return true;
-}
-
-static bool load_http(BrowserState* st, uint32_t ip, uint16_t port, const char* path) {
-    int fd = tcp_connect(ip, port, 5000);
-    if (fd < 0) return false;
-    char req[640];
-    int rl = ksprintf(req, sizeof(req),
-        "GET %s HTTP/1.0\r\nHost: %u.%u.%u.%u:%u\r\nUser-Agent: nefuOS/1.0\r\nConnection: close\r\n",
-        path, (ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF, port);
-    rl += http_append_cookie(st->url.c_str(), req, rl, (int)sizeof(req) - 4);
-    rl += ksprintf(req + rl, (int)sizeof(req) - rl, "\r\n");
-    tcp_send(fd, req, rl);
-    uint8_t* body = 0;
-    uint32_t body_len = 0;
-    uint32_t cap = 8192;
-    body = (uint8_t*)kalloc(cap);
-    if (!body) { tcp_close(fd); return false; }
-    uint32_t start = platform_tick_ms();
-    while (platform_tick_ms() - start < 8000) {
-        char c;
-        int n = tcp_recv(fd, &c, 1, 200);
-        if (n == 1) {
-            if (body_len + 1 >= cap) {
-                cap *= 2;
-                uint8_t* nb = (uint8_t*)kalloc(cap);
-                if (!nb) break;
-                memcpy(nb, body, body_len);
-                kfree(body);
-                body = nb;
-            }
-            body[body_len++] = (uint8_t)c;
-        } else if (n < 0) break;
-    }
-    tcp_close(fd);
-    if (body_len == 0) { kfree(body); return false; }
-    uint32_t hdr_end = 0;
-    for (uint32_t k = 0; k + 3 < body_len; k++) {
-        if (body[k]=='\r'&&body[k+1]=='\n'&&body[k+2]=='\r'&&body[k+3]=='\n') {
-            hdr_end = k + 4;
-            break;
-        }
-    }
-    st->lines.erase_all();
-    add_line(st->lines, "HTTP response", 1);
-    add_line(st->lines, "", 0);
-    char hdr[120];
-    ksprintf(hdr, sizeof(hdr), "%u bytes received (header %u, body %u)",
-             (unsigned)body_len, (unsigned)hdr_end, (unsigned)(body_len - hdr_end));
-    add_line(st->lines, hdr, 0);
-    add_line(st->lines, "", 0);
-    if (body_len > hdr_end) {
-        html_parse((const char*)body + hdr_end, (int)(body_len - hdr_end), st->lines, 0, 0, st->url.c_str());
-    }
-    kfree(body);
-    st->scroll = 0;
-    st->status = 2;
-    return true;
-}
-
-// =====================================================================
-// local VFS search (bare fallback)
-// =====================================================================
-struct WalkCtx { BrowserState* st; const char* q; int hits; };
-
-static void walk_search(FSNode* n, WalkCtx* c) {
-    if (!n || !c->st) return;
-    if (!n->is_dir) {
-        const char* nm = n->name.c_str();
-        if (strstr(nm, c->q)) {
-            char buf[256];
-            ksprintf(buf, sizeof(buf), "  %s  (%u bytes)", nm, (unsigned)n->size);
-            add_line(c->st->lines, buf, 2);
-            c->hits++;
-            if (c->hits > 50) return;
-        }
-    }
-    if (n->is_dir) {
-        for (int i = 0; i < n->children.size(); i++) {
-            walk_search(n->children[i], c);
-            if (c->hits > 50) return;
-        }
-    }
-}
-
-// URL-encode a search query string
-static void url_encode(const char* in, char* out, int out_cap) {
-    int n = 0;
-    for (const char* p = in; *p && n < out_cap - 4; p++) {
-        char c = *p;
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
-            out[n++] = c;
-        } else if (c == ' ') {
-            out[n++] = '+';
-        } else {
-            n += ksprintf(out + n, out_cap - n, "%%%02X", (unsigned char)c);
-        }
+    while (*in && n < cap - 1) {
+        if (*in == '%' && in[1] && in[2]) {
+            out[n++] = (char)(hexv(in[1]) * 16 + hexv(in[2]));
+            in += 3;
+        } else out[n++] = *in++;
     }
     out[n] = 0;
 }
 
-static void browser_search(BrowserState* st, const char* q) {
-    if (!q || !*q) q = "";
-    
-    char enc[256];
-    url_encode(q, enc, sizeof(enc));
-    
-    char surl[300];
-    ksprintf(surl, sizeof(surl), "https://www.bing.com/search?q=%s", enc);
-    
-    st->lines.erase_all();
-    add_line(st->lines, "Bing Search", 1);
-    char head[128];
-    ksprintf(head, sizeof(head), "Query: %s", q);
-    add_line(st->lines, head, 0);
-    add_line(st->lines, "", 0);
-    
-    uint8_t* body = 0; uint32_t body_len = 0;
-    if (platform_http_get(surl, &body, &body_len) && body && body_len > 0) {
-        add_line(st->lines, "Searching the web...", 0);
-        add_line(st->lines, "", 0);
-        char* txt = (char*)kalloc((size_t)body_len + 1);
-        if (txt) {
-            memcpy(txt, body, body_len);
-            txt[body_len] = 0;
-            html_parse(txt, (int)body_len, st->lines, 0, 0, surl);
-            kfree(txt);
+static int parse_floats(const char* s, float* out, int maxn) {
+    int n = 0;
+    while (*s && n < maxn) {
+        out[n++] = (float)atof(s);
+        while (*s && *s != ',') s++;
+        if (*s == ',') s++;
+    }
+    return n;
+}
+
+static int parse_ints(const char* s, int* out, int maxn) {
+    int n = 0;
+    while (*s && n < maxn) {
+        out[n++] = atoi(s);
+        while (*s && *s != ',') s++;
+        if (*s == ',') s++;
+    }
+    return n;
+}
+
+static GlCanvas* gl_find_or_create(const char* cid, const DomNode* nodes, int nn) {
+    for (int i = 0; i < 4; i++)
+        if (s_glcv[i].used && ci_eq(s_glcv[i].cid, cid)) return &s_glcv[i];
+    int w = 300, h = 150;
+    for (int i = 0; i < nn; i++)
+        if (nodes[i].tag == Tag::Canvas && ci_eq(nodes[i].id, cid)) { w = nodes[i].cw; h = nodes[i].ch; break; }
+    for (int i = 0; i < 4; i++) {
+        if (s_glcv[i].used) continue;
+        GlCanvas& c = s_glcv[i];
+        memset(&c, 0, sizeof(c));
+        c.used = true;
+        clip_str(c.cid, sizeof(c.cid), cid);
+        c.w = w; c.h = h;
+        c.cr = 0.f; c.cg = 0.f; c.cb = 0.f; c.ca = 1.f;
+        c.hwnd = CreateWindowExA(0, "STATIC", "gl", WS_POPUP, 0, 0, w, h, 0, 0, GetModuleHandleA(0), 0);
+        if (!c.hwnd) { c.used = false; return 0; }
+        c.hdc = GetDC(c.hwnd);
+        PIXELFORMATDESCRIPTOR pfd;
+        memset(&pfd, 0, sizeof(pfd));
+        pfd.nSize = sizeof(pfd); pfd.nVersion = 1;
+        pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+        pfd.iPixelType = PFD_TYPE_RGBA; pfd.cColorBits = 32; pfd.cDepthBits = 24;
+        int pf = ChoosePixelFormat(c.hdc, &pfd);
+        if (!pf || !SetPixelFormat(c.hdc, pf, &pfd)) { c.used = false; return 0; }
+        c.rc = g_gl.wglCreateContext(c.hdc);
+        if (!c.rc) { c.used = false; return 0; }
+        return &c;
+    }
+    return 0;
+}
+
+static void gl_render_readback(GlCanvas& c) {
+    if (!c.fb || c.fbw != c.w || c.fbh != c.h) {
+        if (c.fb) kfree(c.fb);
+        c.fb = 0;
+        c.fbw = c.fbh = 0;
+        uint8_t* nb = (uint8_t*)kalloc((size_t)c.w * (size_t)c.h * 4);
+        if (!nb) return;
+        c.fb = nb; c.fbw = c.w; c.fbh = c.h;
+    }
+    if (!c.fb) return;
+    g_gl.glFinish();
+    g_gl.glReadPixels(0, 0, c.w, c.h, GL_BGRA, GL_UNSIGNED_BYTE, c.fb);
+}
+
+// runs with tab.dom as the node source (for canvas sizes)
+static void gl_cmd(TabState& tab, const char* cmd, const char* cid, const char* val) {
+    char dv[4096];
+    url_decode(val, dv, sizeof(dv));
+    val = dv;
+    gl_load_wgl();
+    GlCanvas* c = 0;
+    for (int i = 0; i < 4; i++)
+        if (s_glcv[i].used && ci_eq(s_glcv[i].cid, cid)) { c = &s_glcv[i]; break; }
+    if (!c) {
+        if (ci_eq(cmd, "ctx")) c = gl_find_or_create(cid, tab.dom.data(), tab.dom.size());
+        if (!c) {
+            clip_str(tab.js_msg, sizeof(tab.js_msg), "GL: canvas create failed");
+            return;
         }
-        kfree(body);
-        st->url = surl;
+        char dbg[96];
+        ksprintf(dbg, sizeof(dbg), "GL: ctx %s %dx%d rc=%p", cid, c->w, c->h, (void*)c->rc);
+        clip_str(tab.js_msg, sizeof(tab.js_msg), dbg);
+    }
+    g_gl.wglMakeCurrent(c->hdc, c->rc);
+    if (!g_gl.ready) gl_load_ext();   // needs a current context for wglGetProcAddress
+    if (ci_eq(cmd, "glc")) {
+        float f[4]; int n = parse_floats(val, f, 4);
+        if (n >= 3) { c->cr = f[0]; c->cg = f[1]; c->cb = f[2]; c->ca = n > 3 ? f[3] : 1.f; }
+        return;
+    }
+    if (ci_eq(cmd, "glclr")) {
+        g_gl.glClearColor(c->cr, c->cg, c->cb, c->ca);
+        g_gl.glClear((GLbitfield)atoi(val));
+        gl_render_readback(*c);
+        return;
+    }
+    if (ci_eq(cmd, "v")) {
+        int v[4]; int n = parse_ints(val, v, 4);
+        if (n >= 4) g_gl.glViewport(v[0], v[1], v[2], v[3]);
+        return;
+    }
+    if (ci_eq(cmd, "sh")) {   // sid,type,src(encoded)
+        int sid = atoi(val);
+        const char* p = val; while (*p && *p != ',') p++; if (*p) p++;
+        int type = atoi(p); while (*p && *p != ',') p++; if (*p) p++;
+        char src[2048]; clip_str(src, sizeof(src), p);
+        for (int i = 0; i < 16; i++) {
+            if (c->sh[i].used && c->sh[i].sid == (unsigned)sid) return;
+        }
+        unsigned gid = g_gl.glCreateShader((GLenum)type);
+        if (!gid) return;
+        const char* srcp = src;
+        g_gl.glShaderSource(gid, 1, &srcp, 0);
+        for (int i = 0; i < 16; i++) {
+            if (!c->sh[i].used) {
+                c->sh[i].used = 1; c->sh[i].sid = (unsigned)sid; c->sh[i].id = gid; c->sh[i].type = type;
+                return;
+            }
+        }
+        return;
+    }
+    if (ci_eq(cmd, "csh")) {
+        unsigned sid = (unsigned)atoi(val);
+        for (int i = 0; i < 16; i++)
+            if (c->sh[i].used && c->sh[i].sid == sid) {
+                g_gl.glCompileShader(c->sh[i].id);
+                return;
+            }
+        return;
+    }
+    if (ci_eq(cmd, "prog")) {
+        unsigned pid = (unsigned)atoi(val);
+        for (int i = 0; i < 8; i++) if (c->pr[i].used && c->pr[i].sid == pid) return;
+        unsigned gid = g_gl.glCreateProgram();
+        for (int i = 0; i < 8; i++) {
+            if (!c->pr[i].used) { c->pr[i].used = 1; c->pr[i].sid = pid; c->pr[i].id = gid; return; }
+        }
+        return;
+    }
+    if (ci_eq(cmd, "att")) {   // pid,sid (JS ids)
+        int v[2]; parse_ints(val, v, 2);
+        GlProg* pr = 0; GlShader* sh = 0;
+        for (int i = 0; i < 8; i++) if (c->pr[i].used && c->pr[i].sid == (unsigned)v[0]) pr = &c->pr[i];
+        for (int i = 0; i < 16; i++) if (c->sh[i].used && c->sh[i].sid == (unsigned)v[1]) sh = &c->sh[i];
+        if (pr && sh) g_gl.glAttachShader(pr->id, sh->id);
+        return;
+    }
+    if (ci_eq(cmd, "link")) {
+        unsigned pid = (unsigned)atoi(val);
+        for (int i = 0; i < 8; i++)
+            if (c->pr[i].used && c->pr[i].sid == pid) {
+                g_gl.glLinkProgram(c->pr[i].id);
+                return;
+            }
+        return;
+    }
+    if (ci_eq(cmd, "use")) {
+        unsigned pid = (unsigned)atoi(val);
+        for (int i = 0; i < 8; i++)
+            if (c->pr[i].used && c->pr[i].sid == pid) {
+                g_gl.glUseProgram(c->pr[i].id); c->cur_prog = pid; return;
+            }
+        return;
+    }
+    if (ci_eq(cmd, "bindbuf")) {   // bid,target (bid is JS id)
+        int v[2]; parse_ints(val, v, 2);
+        for (int i = 0; i < 16; i++) {
+            if (c->bu[i].used && c->bu[i].sid == (unsigned)v[0]) {
+                c->bu[i].target = v[1];
+                g_gl.glBindBuffer((GLenum)v[1], c->bu[i].id);
+                return;
+            }
+        }
+        unsigned gid; g_gl.glGenBuffers(1, &gid);
+        for (int i = 0; i < 16; i++) {
+            if (!c->bu[i].used) {
+                c->bu[i].used = 1; c->bu[i].sid = (unsigned)v[0]; c->bu[i].id = gid; c->bu[i].target = v[1];
+                g_gl.glBindBuffer((GLenum)v[1], gid);
+                return;
+            }
+        }
+        return;
+    }
+    if (ci_eq(cmd, "buf")) {   // bid,target,data
+        int bid = atoi(val);
+        const char* p = val; while (*p && *p != ',') p++; if (*p) p++;
+        int target = atoi(p); while (*p && *p != ',') p++; if (*p) p++;
+        float f[512];
+        int n = parse_floats(p, f, 512);
+        for (int i = 0; i < 16; i++) {
+            if (c->bu[i].used && c->bu[i].sid == (unsigned)bid) {
+                c->bu[i].target = target;
+                g_gl.glBindBuffer((GLenum)target, c->bu[i].id);
+                g_gl.glBufferData((GLenum)target, (GLsizeiptr)(n * 4), n ? f : 0, GL_STATIC_DRAW);
+                return;
+            }
+        }
+        unsigned gid; g_gl.glGenBuffers(1, &gid);
+        for (int i = 0; i < 16; i++) {
+            if (!c->bu[i].used) {
+                c->bu[i].used = 1; c->bu[i].sid = (unsigned)bid; c->bu[i].id = gid; c->bu[i].target = target;
+                g_gl.glBindBuffer((GLenum)target, gid);
+                g_gl.glBufferData((GLenum)target, (GLsizeiptr)(n * 4), n ? f : 0, GL_STATIC_DRAW);
+                return;
+            }
+        }
+        return;
+    }
+    if (ci_eq(cmd, "attptr")) {   // loc,size,stride,offset
+        int v[4]; parse_ints(val, v, 4);
+        g_gl.glVertexAttribPointer((GLuint)v[0], v[1], GL_FLOAT, GL_FALSE, v[2], (const void*)(size_t)v[3]);
+        g_gl.glEnableVertexAttribArray((GLuint)v[0]);
+        return;
+    }
+    if (ci_eq(cmd, "draw")) {   // mode,count
+        int v[2]; parse_ints(val, v, 2);
+        g_gl.glViewport(0, 0, c->w, c->h);
+        g_gl.glDrawArrays((GLenum)v[0], 0, v[1]);
+        gl_render_readback(*c);
+        return;
+    }
+}
+#else
+static void gl_cmd(TabState& tab, const char* cmd, const char* cid, const char* val) {
+    (void)tab; (void)cmd; (void)cid; (void)val;
+}
+#endif
+
+static void dom_cmd(TabState& tab, const char* cmd, const char* id, const char* val) {
+    for (int i = 0; i < tab.dom.size(); i++) {
+        DomNode& n = tab.dom[i];
+        if (!n.id[0] || !ci_eq(n.id, id)) continue;
+        if (ci_eq(cmd, "setText")) {
+            n.kids.erase_all();
+            DomNode t;
+            t.tag = Tag::Text;
+            for (const char* s2 = val; *s2; s2++) t.text += *s2;
+            n.kids.push(tab.dom.size());
+            tab.dom.push(t);
+        } else if (ci_eq(cmd, "setColor")) {
+            uint32_t c = css_color(val);
+            if (c) { n.inl.color = c; n.has_inl = true; }
+        } else if (ci_eq(cmd, "hide")) {
+            n.inl.none = true; n.has_inl = true;
+        } else if (ci_eq(cmd, "show")) {
+            n.inl.none = false; n.has_inl = true;
+        }
+        break;   // first id match wins
+    }
+}
+
+// Parse the JS console output: \x01cmd|id|val lines mutate the DOM, plain
+// text becomes page text. Called after the worker DOM was copied into the tab.
+static void apply_js_commands(TabState& tab, const char* js) {
+    for (const char* c = js; *c; ) {
+        if (*c == '\x01') {
+            const char* cmd = c + 1;
+            const char* sep1 = 0, *sep2 = 0;
+            const char* q = cmd;
+            while (*q && *q != '\n') {
+                if (*q == '|' && !sep1) sep1 = q;
+                else if (*q == '|') { sep2 = q; break; }
+                q++;
+            }
+            if (sep1 && sep2) {
+                char cbuf[24]; int cn = 0;
+                for (const char* t = cmd; t < sep1 && cn < 23; cn++) cbuf[cn] = *t++;
+                cbuf[cn] = 0;
+                char ibuf[64]; int in2 = 0;
+                for (const char* t = sep1 + 1; t < sep2 && in2 < 63; in2++) ibuf[in2] = *t++;
+                ibuf[in2] = 0;
+                if (cbuf[0] == 'g' && cbuf[1] == 'l') {
+                    // GL commands: the value extends to the end of the line and
+                    // may be long (shader sources, vertex data)
+                    
+                    char vbig[4096]; int vn3 = 0;
+                    for (const char* t = sep2 + 1; *t && *t != '\n' && vn3 < 4095; vn3++) vbig[vn3] = *t++;
+                    vbig[vn3] = 0;
+                    gl_cmd(tab, cbuf + 2, ibuf, vbig);   // skip the "gl" dispatch prefix
+                    while (*c && *c != '\n') c++;
+                    if (*c) c++;
+                    continue;
+                }
+                char vbuf[80]; int vn2 = 0;
+                for (const char* t = sep2 + 1; *t && *t != '\n' && vn2 < 79; vn2++) vbuf[vn2] = *t++;
+                vbuf[vn2] = 0;
+                dom_cmd(tab, cbuf, ibuf, vbuf);
+            }
+            while (*c && *c != '\n') c++;
+            if (*c) c++;
+            continue;
+        }
+        c++;
+    }
+}
+
+static void commit_page(TabState& tab, LoadJob* j) {
+    clear_imgs(tab);   // previous page's images are gone
+    if (j->data && j->len > 0) {
+        // zero-copy: the worker buffer becomes the page buffer (j->data is
+        // NULLed here so poll_jobs does not free it again)
+        if (tab.page) kfree(tab.page);
+        tab.page = j->data;
+        tab.page_cap = (int)j->len + 1;
+        tab.page_len = (int)j->len;
+        j->data = 0;
+    }
+    bool ok_page = tab.page && tab.page_len > 0;
+
+    // history: remember the page we are leaving (only on successful navigation)
+    if (j->push_hist) {
+        if (ok_page && tab.url[0] && tab.loaded && !tab.is_home && !tab.err[0]) {
+            if (tab.back.size() >= HIST_MAX) tab.back.remove(0);
+            tab.back.push(tab.url);
+        }
+        tab.fwd.erase_all();
+    }
+
+    clip_str(tab.url, sizeof(tab.url), j->url);
+    if (ok_page) {
+        tab.loaded = true;
+        tab.is_home = false;
+        tab.truncated = j->truncated;
+        tab.err[0] = 0;
+        // the DOM was built by the worker thread; the layout is rebuilt lazily
+        // in paint (tab.dom = shallow copy of the node list, same as before)
+        tab.dom.erase_all();
+        if (j->dom) {
+            tab.dom = j->dom->nodes;
+            clip_str(tab.title, sizeof(tab.title), j->title);
+            tab.css_n = j->css_n;
+            for (int k = 0; k < j->css_n && k < CSS_MAX; k++) tab.css[k] = j->css[k];
+            if (j->js_out[0]) {
+                
+                // \x01 DOM commands mutate the committed DOM; plain text from
+                // print/alert/document.write becomes a trailing text node.
+                apply_js_commands(tab, j->js_out);
+                char vis[JS_OUT_MAX];
+                int vn = 0;
+                for (const char* c = j->js_out; *c && vn < JS_OUT_MAX - 1; ) {
+                    if (*c == '\x01') {
+                        while (*c && *c != '\n') c++;
+                        if (*c) c++;
+                        continue;
+                    }
+                    vis[vn++] = *c++;
+                }
+                vis[vn] = 0;
+                if (vis[0]) {
+                    DomNode n;
+                    n.tag = Tag::Text;
+                    for (int i = 0; i < (int)strlen(vis) && n.text.len() < 4000; i++)
+                        n.text += vis[i];
+                    tab.dom[0].kids.push(tab.dom.size());
+                    tab.dom.push(n);
+                    clip_str(tab.js_msg, sizeof(tab.js_msg), vis);
+                } else {
+                    tab.js_msg[0] = 0;
+                }
+            } else {
+                tab.js_msg[0] = 0;
+            }
+        }
+        if (!tab.title[0]) url_host(j->url, tab.title, sizeof(tab.title));
     } else {
-        add_line(st->lines, "Web search unavailable (offline)", 0);
-        add_line(st->lines, "", 0);
-        add_line(st->lines, "Local file search:", 2);
-        add_line(st->lines, "", 0);
-        WalkCtx ctx;
-        ctx.st = st; ctx.q = q; ctx.hits = 0;
-        walk_search(g_vfs->root(), &ctx);
-        if (ctx.hits == 0) {
-            add_line(st->lines, "  No matching files found.", 0);
-        } else {
-            char s[64];
-            ksprintf(s, sizeof(s), "  %d local result(s).", ctx.hits);
-            add_line(st->lines, s, 0);
+        tab.loaded = true;
+        tab.is_home = false;
+        tab.truncated = false;
+        tab.page_len = 0;
+        tab.err[0] = 0;
+        ksprintf(tab.err, sizeof(tab.err), "Cannot reach %s", j->url);
+        clip_str(tab.title, sizeof(tab.title), "Error");
+    }
+    clip_str(tab.input, sizeof(tab.input), tab.url);
+    tab.input_len = (int)strlen(tab.input);
+    tab.input_cursor = tab.input_len;
+    tab.layout_w = -1;   // force a re-layout
+    tab.scroll = 0;
+    tab.load_ms = platform_tick_ms() - j->start_ms;
+}
+
+static void poll_jobs(BrowserState* st) {
+    poll_img_jobs(st);
+    for (int t = 0; t < MAX_TABS; t++) {
+        TabState& tab = st->tabs[t];
+        LoadJob* j = tab.job;
+        if (!j || !j->done) continue;
+        tab.job = 0;
+        if (tab.used && !j->cancelled && j->ok && j->data) {
+            commit_page(tab, j);
+        } else if (tab.used && !j->cancelled) {
+            // load failed
+            tab.loaded = true;
+            tab.is_home = false;
+            tab.page_len = 0;
+            tab.err[0] = 0;
+            ksprintf(tab.err, sizeof(tab.err), "Cannot reach %s", j->url);
+            clip_str(tab.title, sizeof(tab.title), "Error");
+            clip_str(tab.url, sizeof(tab.url), j->url);
+            tab.layout_w = -1;
+            tab.scroll = 0;
         }
-        st->url = "search:";
+        if (j->data) kfree(j->data);
+        if (j->dom) delete j->dom;
+        delete j;
+        if (tab.used && tab.has_queued) {
+            tab.has_queued = false;
+            char u[256];
+            clip_str(u, sizeof(u), tab.queued);
+            start_job(tab, u, true);
+        }
     }
-    st->scroll = 0;
-    st->status = 2;
 }
 
-// When a page has no static text (JS-generated SPA), show a helpful
-// fallback instead of a blank body.
-static void page_fallback(List<Line>& lines, const char* url, const char* title) {
-    int content = 0;
-    for (int i = 4; i < lines.size(); i++) {   // skip status block (0..3)
-        Line& l = lines[i];
-        if (l.style == 1 || l.style == 2 || l.s.empty()) continue;
-        content++;
-        if (content > 1) break;
-    }
-    if (content > 0) return;
-    lines.erase_all();
-    add_line(lines, "Page has no static text", 1);
-    add_line(lines, "", 0);
-    if (title && title[0]) {
-        char t[160];
-        ksprintf(t, sizeof(t), "Title: %s", title);
-        add_line(lines, t, 0);
-        add_line(lines, "", 0);
-    }
-    add_line(lines, "This page is generated by JavaScript, which the", 0);
-    add_line(lines, "nefuOS browser cannot execute yet.", 0);
-    add_line(lines, "", 0);
-    add_line(lines, "You can:", 2);
-    add_line(lines, "  - search Bing: type a keyword (not a URL) in the", 0);
-    add_line(lines, "    address bar and press Enter", 0);
-    add_line(lines, "  - open the offline Wiki mirror from the Wiki app", 0);
-    add_line(lines, "  - visit a plain-HTML site, e.g. bing.com", 0);
+static void navigate_url(TabState& tab, const char* url, bool push_hist) {
+    if (!url || !url[0]) return;
+    clip_str(tab.input, sizeof(tab.input), url);
+    tab.input_len = (int)strlen(tab.input);
+    tab.input_cursor = tab.input_len;
+    tab.has_queued = false;
+    tab.err[0] = 0;
+    start_job(tab, url, push_hist);
 }
 
-static bool browser_save_page(BrowserState* st) {
-    g_vfs->mkdir("/usr/downloads");
-    char path[128];
-    ksprintf(path, sizeof(path), "/usr/downloads/page_%u.html", (unsigned)platform_tick_ms());
-    String all;
-    for (int i = 0; i < st->lines.size(); i++) {
-        all += st->lines[i].s;
-        all += (const char*)"\n";
-    }
-    FSNode* f = g_vfs->create_file(path);
-    if (!f) return false;
-    return g_vfs->write_file(f, (const uint8_t*)all.c_str(), (uint32_t)all.len());
+static void navigate_input(TabState& tab) {
+    char u[256];
+    smart_url(tab.input, u, sizeof(u));
+    if (!u[0]) return;
+    navigate_url(tab, u, true);
 }
 
-// =====================================================================
-// background page download thread
-// =====================================================================
-static void browser_page_thread(void* arg) {
-    BrowserState* st = (BrowserState*)arg;
-    const char* url = st->loaded_url.c_str();
+static void go_home(BrowserState* st, TabState& tab) {
+    if (tab.job) tab.job->cancelled = true;
+    tab.has_queued = false;
+    clear_imgs(tab);
+    if (tab.page) { kfree(tab.page); tab.page = 0; }
+    tab.page_len = 0;
+    tab.page_cap = 0;
+    tab.loaded = true;
+    tab.is_home = true;
+    tab.truncated = false;
+    tab.err[0] = 0;
+    tab.url[0] = 0;
+    clip_str(tab.title, sizeof(tab.title), "Home");
+    tab.layout_w = -1;
+    tab.scroll = 0;
+    tab.max_scroll = 0;
+    tab.input[0] = 0;
+    tab.input_len = 0;
+    tab.input_cursor = 0;
+    st->input_focus = true;
+}
 
-    // search: URLs
-    if (strncmp(url, "search:", 7) == 0) {
-        browser_search(st, url + 7);
-        st->load_done = true;
+static void reload(TabState& tab) {
+    if (tab.is_home) return;
+    if (!tab.url[0]) return;
+    navigate_url(tab, tab.url, false);
+}
+
+static void go_back(TabState& tab) {
+    if (tab.back.size() == 0) return;
+    String u = tab.back.pop();
+    if (tab.url[0] && tab.loaded && !tab.is_home && !tab.err[0]) {
+        if (tab.fwd.size() >= HIST_MAX) tab.fwd.remove(0);
+        tab.fwd.push(tab.url);
+    }
+    navigate_url(tab, u.c_str(), false);
+}
+
+static void go_fwd(TabState& tab) {
+    if (tab.fwd.size() == 0) return;
+    String u = tab.fwd.pop();
+    if (tab.url[0] && tab.loaded && !tab.is_home && !tab.err[0]) {
+        if (tab.back.size() >= HIST_MAX) tab.back.remove(0);
+        tab.back.push(tab.url);
+    }
+    navigate_url(tab, u.c_str(), false);
+}
+
+static void new_tab(BrowserState* st) {
+    int idx = -1;
+    for (int i = 0; i < MAX_TABS; i++) {
+        if (!st->tabs[i].used) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    st->tabs[idx].used = true;
+    st->active = idx;
+    st->tab_count++;
+    go_home(st, st->tabs[idx]);
+}
+
+static void close_tab(BrowserState* st) {
+    if (st->tab_count <= 1) {
+        go_home(st, st->tabs[st->active]);
         return;
     }
-
-    // http/https: try platform_http_get first
-    if (strncmp(url, "http://", 7) == 0 || strncmp(url, "https://", 8) == 0) {
-        uint8_t* body = 0; uint32_t body_len = 0;
-        if (platform_http_get(url, &body, &body_len) && body && body_len > 0) {
-            st->lines.erase_all();
-            add_line(st->lines, "HTTP fetch", 1);
-            add_line(st->lines, url, 2);
-            char hdr[80];
-            ksprintf(hdr, sizeof(hdr), "%u bytes received", (unsigned)body_len);
-            add_line(st->lines, hdr, 0);
-            add_line(st->lines, "", 0);
-            char* txt = (char*)kalloc((size_t)body_len + 1);
-            if (txt) {
-                memcpy(txt, body, body_len);
-                txt[body_len] = 0;
-                char ttl[160]; ttl[0] = 0;
-                html_parse(txt, (int)body_len, st->lines, ttl, (int)sizeof(ttl), url);
-                kfree(txt);
-                page_fallback(st->lines, url, ttl);
-            }
-            kfree(body);
-            st->status = 2;
-            st->scroll = 0;
-            st->load_done = true;
-            return;
+    TabState& tab = st->tabs[st->active];
+    if (tab.job) tab.job->cancelled = true;
+    tab.~TabState();               // free page / dom / history (waits for worker)
+    new (&tab) TabState();         // fresh empty slot (used == false)
+    st->tab_count--;
+    if (st->active > 0 && st->tabs[st->active - 1].used) {
+        st->active--;
+    } else {
+        for (int i = 0; i < MAX_TABS; i++) {
+            if (st->tabs[i].used) { st->active = i; break; }
         }
-        // fall back to bare TCP for IP literals
-        int off = (strncmp(url, "http://", 7) == 0) ? 7 : 8;
-        const char* p = ltrim_ws(url + off);
-        char host[64];
-        char path[256];
-        int hi = 0;
-        while (*p && *p != ':' && *p != '/' && hi < 63) host[hi++] = *p++;
-        host[hi] = 0;
-        uint16_t port = 80;
-        if (*p == ':') {
-            p++;
-            int pi = 0;
-            while (*p >= '0' && *p <= '9' && pi < 4) { port = (uint16_t)(port*10 + (*p-'0')); p++; pi++; }
-        }
-        if (*p != '/') { path[0]='/'; path[1]=0; }
-        else {
-            int pi = 0;
-            while (*p && pi < 255) path[pi++] = *p++;
-            path[pi] = 0;
-        }
-        uint32_t ip;
-        if (!parse_ip(host, &ip)) {
-            st->load_error = true;
-            st->load_done = true;
-            return;
-        }
-        if (!load_http(st, ip, port, path)) {
-            st->load_error = true;
-            st->load_done = true;
-            return;
-        }
-        st->load_done = true;
-        return;
     }
+    st->input_focus = false;
+}
 
-    // plain word -> search; path-like -> file; domain-like -> http
-    if (url[0] == '/' || url[0] == '.') {
-        load_file(st, url);
-    } else if (looks_like_domain(url)) {
-        // looks like a domain (e.g. "github.com", "www.github.com/foo") -> fetch as http
-        char full[300];
-        ksprintf(full, sizeof(full), "http://%s", url);
-        uint8_t* body = 0; uint32_t body_len = 0;
-        if (platform_http_get(full, &body, &body_len) && body && body_len > 0) {
-            st->lines.erase_all();
-            add_line(st->lines, "HTTP fetch", 1);
-            add_line(st->lines, full, 2);
-            char hdr[80];
-            ksprintf(hdr, sizeof(hdr), "%u bytes received", (unsigned)body_len);
-            add_line(st->lines, hdr, 0);
-            add_line(st->lines, "", 0);
-            char* txt = (char*)kalloc((size_t)body_len + 1);
-            if (txt) {
-                memcpy(txt, body, body_len);
-                txt[body_len] = 0;
-                char ttl[160]; ttl[0] = 0;
-                html_parse(txt, (int)body_len, st->lines, ttl, (int)sizeof(ttl), full);
-                kfree(txt);
-                page_fallback(st->lines, full, ttl);
-            }
-            kfree(body);
-            st->status = 2;
-            st->scroll = 0;
-        } else {
-            show_net_error(st, full, "Connection failed or timed out");
+// ===================== geometry (shared by paint & hit-testing) =====================
+struct Rect { int x, y, w, h; };
+
+static Rect tab_rect(int i)      { return { 4 + i * 88, 4, 84, TAB_H }; }
+static Rect tab_close_rect(int i){ return { 4 + i * 88 + 84 - 16, 4, 14, TAB_H }; }
+static Rect plus_rect()          { return { 4 + MAX_TABS * 88 + 6, 4, 26, TAB_H }; }
+static Rect back_rect()          { return { 4, 32, 24, NAV_H }; }
+static Rect fwd_rect()           { return { 32, 32, 24, NAV_H }; }
+static Rect reload_rect()        { return { 60, 32, 24, NAV_H }; }
+static Rect home_rect()          { return { 88, 32, 24, NAV_H }; }
+static Rect addr_rect(int cw)    { return { 116, 32, maxi(40, cw - 120), NAV_H }; }
+
+// ===================== painting =====================
+static void paint_tab(Surface& s, const TabState& tab, int i, int active, int cw) {
+    Rect rc = tab_rect(i);
+    if (rc.x >= cw) return;
+    uint32_t bg = (i == active) ? C_TAB_ACT : C_TAB_IDLE;
+    uint32_t fg = (i == active) ? 0xFFFFFF : C_TEXT_LT;
+    gfx::fillrect(s, rc.x, rc.y, rc.w, rc.h, bg);
+
+    const char* label = tab.title[0] ? tab.title : (i == 0 ? "Home" : "New Tab");
+    int maxc = (rc.w - 22) / 8;
+    if (maxc < 1) maxc = 1;
+    int len = (int)strlen(label);
+    int n = len < maxc ? len : maxc;
+    for (int k = 0; k < n; k++) {
+        unsigned char ch = (unsigned char)label[k];
+        if (ch < 128) gfx::char8x16(s, rc.x + 6 + k * 8, rc.y + 5, (char)ch, fg, bg);
+    }
+    gfx::char8x16(s, rc.x + rc.w - 14, rc.y + 5, 'x', (i == active) ? 0xFFFFFF : 0x64748B, bg);
+}
+
+static void paint_nav_btn(Surface& s, const Rect& rc, char glyph, bool enabled) {
+    uint32_t bg = enabled ? C_BTN : C_BTN_DIS;
+    uint32_t fg = enabled ? 0xFFFFFF : 0x64748B;
+    gfx::fillrect(s, rc.x, rc.y, rc.w, rc.h, bg);
+    gfx::char8x16(s, rc.x + 8, rc.y + 4, glyph, fg, bg);
+}
+
+static void paint_address(Surface& s, const TabState& tab, bool focus, int cw) {
+    Rect rc = addr_rect(cw);
+    gfx::fillrect(s, rc.x, rc.y, rc.w, rc.h, C_ADDR_BG);
+    gfx::rect(s, rc.x, rc.y, rc.w, rc.h, focus ? C_TAB_ACT : C_ADDR_BD);
+
+    int text_x = rc.x + 6;
+    int avail = rc.w - 12;
+    int total_w = tab.input_len * 8;
+    int disp = (total_w > avail) ? total_w - avail : 0;
+
+    if (tab.input_len > 0) {
+        for (int k = 0; k < tab.input_len; k++) {
+            int px = text_x + k * 8 - disp;
+            if (px < rc.x + 4 || px + 8 > rc.x + rc.w - 4) continue;
+            unsigned char ch = (unsigned char)tab.input[k];
+            if (ch < 128) gfx::char8x16(s, px, rc.y + 4, (char)ch, C_TEXT_DK, C_ADDR_BG);
         }
     } else {
-        browser_search(st, url);
+        // placeholder (dimmed while focused) so the bar is never blank
+        gfx::text(s, text_x, rc.y + 4, "Search or enter address",
+                  focus ? 0xCBD5E1 : C_ADDR_BD, C_ADDR_BG);
     }
-    st->load_done = true;
+    if (focus) {
+        int cx = text_x + tab.input_cursor * 8 - disp;
+        if (cx >= rc.x + 4 && cx < rc.x + rc.w - 4)
+            gfx::char8x16(s, cx, rc.y + 4, '|', C_TAB_ACT, C_ADDR_BG);
+    }
 }
 
-// =====================================================================
-// URL router (starts background thread for network URLs)
-// =====================================================================
-static void browser_load(BrowserState* st, const char* url) {
-    url = ltrim_ws(url);
-    st->url = url;
-    st->status = 1;
-    st->busy = true;
-    st->load_done = false;
-    st->load_error = false;
-    st->loaded_body = 0;
-    st->loaded_len = 0;
-    st->loaded_url = url;
-    // file:// loads synchronously (fast, no network)
-    if (strncmp(url, "file://", 7) == 0) {
-        const char* path = ltrim_ws(url + 7);
-        if (path[0] == 0) path = "/";
-        load_file(st, path);
-        st->busy = false;
-        st->load_done = true;
-        return;
+static void paint_page(Surface& s, const PageLayout& lay, int scroll,
+                       int vx, int vy, int vw, int vh, const Img* imgs = 0) {
+    // pass 1: block backgrounds (kind 3) underneath everything else
+    for (int i = 0; i < lay.runs.size(); i++) {
+        const Run& r = lay.runs[i];
+        if (r.kind != 3) continue;
+        int sy = r.y - scroll;
+        if (sy + r.h < 0 || sy > vh) continue;
+        gfx::fillrect(s, vx + r.x, vy + sy, r.w, r.h, r.color);
     }
-    // everything else (http/https/search/plain word) goes to background thread
-    st->load_thread = platform_thread_create(browser_page_thread, st);
-}
+    for (int i = 0; i < lay.runs.size(); i++) {
+        const Run& r = lay.runs[i];
+        int sy = r.y - scroll;
+        if (sy + r.h < 0 || sy > vh) continue;   // vertical culling
 
-// =====================================================================
-// UTF-8 decode for address bar rendering
-// =====================================================================
-static uint32_t decode_utf8(const char*& p) {
-    uint8_t c = (uint8_t)*p;
-    if (c < 0x80) { p++; return c; }
-    if ((c & 0xE0) == 0xC0) {
-        uint32_t r = (c & 0x1F) << 6; p++;
-        if (((uint8_t)*p & 0xC0) == 0x80) { r |= ((uint8_t)*p & 0x3F); p++; }
-        return r;
-    }
-    if ((c & 0xF0) == 0xE0) {
-        uint32_t r = (c & 0x0F) << 12; p++;
-        if (((uint8_t)*p & 0xC0) == 0x80) { r |= ((uint8_t)*p & 0x3F) << 6; p++; }
-        if (((uint8_t)*p & 0xC0) == 0x80) { r |= ((uint8_t)*p & 0x3F); p++; }
-        return r;
-    }
-    p++;
-    return 0xFFFD;
-}
-
-#include "../gui/gfx.h"   // gfx::char16x16 renders the shared CJK table
-static void draw_text_clip(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int maxx) {
-    int cx = x;
-    const char* p = str;
-    while (*p) {
-        uint32_t uc = decode_utf8(p);
-        int cw = (uc < 0x80) ? 8 : 16;
-        if (cx + cw > maxx) break;
-        if (uc < 0x80) gfx::char8x16(s, cx, y, (char)uc, fg, bg);
-        else {
-            // non-ASCII (CJK): render from the built-in 16x16 bitmap font
-            gfx::char16x16(s, cx, y, uc, fg, bg);
+        if (r.kind == 2) {   // horizontal rule
+            int x0 = vx + r.x, x1 = vx + r.x + r.w;
+            if (x0 < vx) x0 = vx;
+            if (x1 > vx + vw) x1 = vx + vw;
+            if (x1 > x0) gfx::hline(s, x0, x1 - 1, vy + sy, r.color);
+            continue;
         }
-        cx += cw;
-    }
-}
-
-// Record the visited URL in the browser history (/home/user/.nefu_history).
-static void history_add(BrowserState* st, const char* url) {
-    if (!url || !*url) return;
-    FSNode* f = g_vfs->resolve("/home/user/.nefu_history");
-    if (!f) f = g_vfs->create_file("/home/user/.nefu_history");
-    if (!f) return;
-    char* buf = (char*)kalloc(f->size + 1);
-    if (!buf) return;
-    memcpy(buf, f->data, f->size);
-    buf[f->size] = 0;
-    bool dup = (strstr(buf, url) != 0);
-    if (!dup) {
-        int lines = 1;
-        for (uint32_t i = 0; i < f->size; i++) if (buf[i] == '\n') lines++;
-        String nb;
-        if (lines >= 50) {
-            // keep last 49 lines
-            const char* p = buf;
-            int skip = lines - 49;
-            while (skip > 0 && *p) { if (*p == '\n') skip--; p++; }
-            if (*p == '\n') p++;
-            nb = p;
-        }
-        nb += url;
-        nb += '\n';
-        g_vfs->write_file(f, (const uint8_t*)nb.c_str(), (uint32_t)nb.len());
-    }
-    kfree(buf);
-    // cookie jar: count visits per site (host part of the URL)
-    const char* h = strstr(url, "://");
-    const char* host = h ? h + 3 : url;
-    char hb[96];
-    int hn = 0;
-    while (host[hn] && host[hn] != '/' && host[hn] != '?' && hn < 90) { hb[hn] = host[hn]; hn++; }
-    hb[hn] = 0;
-    if (hn > 0) {
-        FSNode* ck = g_vfs->resolve("/var/lib/nefuos/cookies.txt");
-        if (!ck) ck = g_vfs->create_file("/var/lib/nefuos/cookies.txt");
-        if (ck) {
-            char* cb = (char*)kalloc(ck->size + 1);
-            if (cb) {
-                memcpy(cb, ck->data, ck->size);
-                cb[ck->size] = 0;
-                char line[140];
-                int n = ksprintf(line, sizeof(line), "%s=%d; path=/; nefuOS\n", hb, 1);
-                // append (simple jar: one line per visit record)
-                String jar = cb;
-                jar += line;
-                g_vfs->write_file(ck, (const uint8_t*)jar.c_str(), (uint32_t)jar.len());
-                kfree(cb);
+        if (r.kind == 1) {   // image
+            if (r.img_id >= 0 && imgs && imgs[r.img_id].done && imgs[r.img_id].rgba) {
+                draw_img(s, vx + r.x, vy + sy, imgs[r.img_id]);
+                gfx::rect(s, vx + r.x, vy + sy, r.w, r.h, C_HRLINE);
+            } else {
+                gfx::fillrect(s, vx + r.x, vy + sy, r.w, r.h, C_IMG);
+                gfx::rect(s, vx + r.x, vy + sy, r.w, r.h, C_HRLINE);
+                int maxc = (r.w - 4) / 8;
+                if (maxc > r.text.len()) maxc = r.text.len();
+                for (int c = 0; c < maxc; c++) {
+                    unsigned char ch = (unsigned char)r.text[c];
+                    if (ch < 128) gfx::char8x16(s, vx + r.x + 4 + c * 8, vy + sy + r.h / 2 - 6, (char)ch, C_GRAY, C_IMG);
+                }
             }
+            continue;
         }
-    }
-    (void)st;
-}
-
-// =====================================================================
-// painting (checks background thread completion, renders images)
-// =====================================================================
-static void on_paint(Window* w) {
-    BrowserState* st = (BrowserState*)w->userdata;
-
-    // ---- check if background page download finished ----
-    if (st->busy && st->load_done) {
-        if (st->load_error) {
-            show_net_error(st, st->url.c_str(), "Connection failed or timed out");
-        } else {
-            history_add(st, st->url.c_str());
-        }
-        // lines already populated by the background thread
-        st->busy = false;
-        st->load_done = false;
-        if (st->loaded_body) { kfree(st->loaded_body); st->loaded_body = 0; }
-    }
-
-    Surface& s = w->back;
-    gfx::fillrect(s, 0, 0, w->content_w, w->content_h, color::WHITE);
-
-    // address bar
-    gfx::fillrect(s, 0, 0, w->content_w, BAR_H, color::PANEL);
-    gfx::rect(s, 3, 3, w->content_w - 6 - 250, BAR_H - 6, color::BORDER);
-    String disp = st->input.empty() ? st->url : st->input;
-    draw_text_clip(s, 8, 7, disp.c_str(), color::TEXT, color::PANEL, w->content_w - 270);
-    int cur_x = 8 + st->cursor * 8;
-    if (cur_x > w->content_w - 270) cur_x = w->content_w - 270;
-    gfx::char8x16(s, cur_x, 7, '|', color::TEXT2, color::PANEL);
-
-    // buttons
-    const char* labs[5] = { "Go", "S", "DL", "Bk", "Hist" };
-    for (int i = 0; i < 5; i++) {
-        Button& b = st->btns[i];
-        b.x = w->content_w - 240 + i * 48;
-        b.y = 3;
-        b.w = 44;
-        b.h = 24;
-        b.label = labs[i];
-        b.id = i;
-        b.on_click = 0;
-        ui::draw_button(s, b);
-    }
-
-    // content: render lines with variable height (text lines + images)
-    int y0 = BAR_H;
-    int content_bottom = w->content_h - STAT_H;
-    int cy = y0 + 2;
-    int line_height = 18;
-
-    // first pass: calculate y positions and start image loads
-    // We render from scroll position
-    int skipped = 0;
-    bool started = false;
-    for (int i = 0; i < st->lines.size(); i++) {
-        const Line& l = st->lines[i];
-        int this_h = line_height;
-        if (!l.image_url.empty()) {
-            this_h = MAX_IMG_H + 4;
-            if (l.image && l.image != (Surface*)-1 && l.image->addr) {
-                int ih = l.image->height;
-                if (ih > MAX_IMG_H) ih = MAX_IMG_H;
-                this_h = ih + 4;
-            }
-        }
-        if (!started) {
-            if (skipped < st->scroll) { skipped++; cy += this_h; continue; }
-            started = true;
-        }
-        if (cy + this_h > content_bottom) break;
-
-        if (!l.image_url.empty()) {
-            // image line
-            ensure_image_loading(st, (Line&)l);
-            if (l.image && l.image != (Surface*)-1 && l.image->addr) {
-                // render image scaled to fit
-                Surface* img = l.image;
-                int iw = img->width, ih = img->height;
-                if (iw > MAX_IMG_W) { ih = ih * MAX_IMG_W / iw; iw = MAX_IMG_W; }
-                if (ih > MAX_IMG_H) { iw = iw * MAX_IMG_H / ih; ih = MAX_IMG_H; }
-                int ix = 6 + l.indent * 8;
-                // draw image background
-                gfx::fillrect(s, ix, cy, iw, ih, 0xEEEEEE);
-                // copy pixels (simple nearest-neighbor scale)
-                for (int yy = 0; yy < ih; yy++) {
-                    for (int xx = 0; xx < iw; xx++) {
-                        int sx = xx * img->width / iw;
-                        int sy = yy * img->height / ih;
-                        if (sx < img->width && sy < img->height) {
-                            uint32_t px = img->getpx(sx, sy);
-                            if (cy + yy >= 0 && cy + yy < s.height && ix + xx >= 0 && ix + xx < s.width) {
-                                s.setpx(ix + xx, cy + yy, px);
-                            }
+        if (r.kind == 5) {   // canvas (WebGL frame or placeholder)
+            bool cv_matched = false;
+#ifndef NEFU_BARE
+            if (r.cid[0]) {
+                const char* cid = r.cid;
+                for (int i = 0; i < 4; i++) {
+                    const GlCanvas& gc = s_glcv[i];
+                    
+                    if (!gc.used || !gc.fb || !ci_eq(gc.cid, cid)) continue;
+                    int bw = gc.w < r.w ? gc.w : r.w;
+                    int bh = gc.h < r.h ? gc.h : r.h;
+                    for (int yy = 0; yy < bh; yy++) {
+                        int py = vy + sy + yy;
+                        if (py < 0 || py >= s.height) continue;
+                        const uint8_t* row = gc.fb + (size_t)(gc.h - 1 - yy) * (size_t)gc.w * 4;
+                        for (int xx = 0; xx < bw; xx++) {
+                            int px = vx + r.x + xx;
+                            if (px < 0 || px >= s.width) continue;
+                            const uint8_t* pp = row + (size_t)xx * 4;
+                            uint32_t cc = (uint32_t)pp[0] | ((uint32_t)pp[1] << 8) | ((uint32_t)pp[2] << 16);
+                            s.setpx(px, py, cc);
                         }
                     }
+                    cv_matched = true;
+                    break;
                 }
-                gfx::rect(s, ix, cy, iw, ih, color::BORDER);
-            } else if (l.image == (Surface*)-1) {
-                // failed to load
-                gfx::fillrect(s, 6, cy, MAX_IMG_W, 40, 0xFFEEEE);
-                gfx::text(s, 10, cy + 12, "[image failed to load]", 0xCC0000, 0xFFEEEE);
-            } else {
-                // loading
-                gfx::fillrect(s, 6, cy, MAX_IMG_W, 40, 0xF0F0F0);
-                gfx::text(s, 10, cy + 12, "[loading image...]", color::TEXT2, 0xF0F0F0);
             }
-            cy += this_h;
-        } else {
-            // text line
-            if (l.s.empty() && l.form_kind == 0) { cy += 10; continue; }
-            uint32_t fg = l.color ? l.color : color::TEXT;
-            if (l.style == 2) fg = color::BLUE;
-            int xoff = 6 + l.indent * 8;
-            if (l.form_kind == 1) {
-                // text input box
-                const char* val = (i == st->form_edit_row && !st->form_edit_val.empty())
-                                  ? st->form_edit_val.c_str() : l.form_val.c_str();
-                int bx = xoff + 6, bw = 200;
-                if (bw > w->content_w - bx - 8) bw = w->content_w - bx - 8;
-                bool edit = (i == st->form_edit_row);
-                gfx::fillrect(s, bx, cy, bw, 17, edit ? 0x00FFF8DC : color::WHITE);
-                gfx::rect(s, bx, cy, bw, 17, edit ? 0x00000080 : color::BORDER);
-                draw_text_clip(s, bx + 3, cy + 1, val, color::TEXT, edit ? 0x00FFF8DC : color::WHITE, bw - 6);
-                if (edit) gfx::char8x16(s, bx + 3 + st->form_edit_val.len() * 8, cy + 1, '|', color::TEXT2, 0x00FFF8DC);
-                // label (name attribute)
-                if (!l.form_name.empty()) {
-                    gfx::text(s, xoff, cy + 1, l.form_name.c_str(), color::TEXT2, color::WHITE);
-                }
-                cy += 20;
-            } else if (l.form_kind == 2) {
-                // submit button
-                int bw = (int)strlen(l.form_val.c_str()) * 8 + 16;
-                if (bw < 64) bw = 64;
-                gfx::fillrect(s, xoff + 6, cy, bw, 20, 0x003E7CB1);
-                gfx::rect(s, xoff + 6, cy, bw, 20, 0x002F6FB6);
-                gfx::text(s, xoff + 14, cy + 3, l.form_val.c_str(), color::WHITE, 0x003E7CB1);
-                cy += 24;
-            } else if (l.font_size >= 24) {
-                draw_text_clip(s, xoff, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
-                if (l.bold) draw_text_clip(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
-                cy += 36;
-            } else if (l.font_size >= 20) {
-                draw_text_clip(s, xoff, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
-                if (l.bold) draw_text_clip(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
-                cy += 22;
-            } else {
-                draw_text_clip(s, xoff, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
-                if (l.bold) draw_text_clip(s, xoff+1, cy, l.s.c_str(), fg, color::WHITE, w->content_w - xoff - 8);
-                cy += 18;
+#endif
+            if (!cv_matched) {
+                gfx::fillrect(s, vx + r.x, vy + sy, r.w, r.h, C_IMG);
+                gfx::rect(s, vx + r.x, vy + sy, r.w, r.h, C_HRLINE);
+            }
+            continue;
+        }
+        // text run (UTF-8 aware via gfx::text; glyphs are clipped by gfx)
+        if (r.text.len() > 0) {
+            gfx::text(s, vx + r.x, vy + sy, r.text.c_str(), r.color, C_PAGE_BG);
+            if (r.link) {
+                int x0 = vx + r.x, x1 = vx + r.x + r.w - 1;
+                if (x0 < vx) x0 = vx;
+                if (x1 > vx + vw - 1) x1 = vx + vw - 1;
+                if (x1 > x0) gfx::hline(s, x0, x1, vy + sy + 15, r.color);
             }
         }
     }
-
-    // status bar
-    gfx::fillrect(s, 0, w->content_h - STAT_H, w->content_w, STAT_H, color::PANEL);
-    const char* sttxt = "idle";
-    if (st->busy) sttxt = "loading...";
-    else if (st->status == 2) sttxt = "done";
-    else if (st->status == 3) sttxt = "error";
-    gfx::text(s, 6, w->content_h - STAT_H + 3, sttxt, color::TEXT2, color::PANEL);
-    char cnt[64];
-    ksprintf(cnt, sizeof(cnt), "%d lines", st->lines.size());
-    gfx::text(s, w->content_w - 80, w->content_h - STAT_H + 3, cnt, color::TEXT2, color::PANEL);
 }
 
-// =====================================================================
-// input
-// =====================================================================
-static void on_key(Window* w, const KeyEvent* e) {
+static void paint_scrollbar(Surface& s, int sbx, int vy, int vh, int scroll, int content_h) {
+    gfx::fillrect(s, sbx, vy, SB_W, vh, C_SB_TRACK);
+    if (content_h <= vh) return;
+    int thumb_h = vh * vh / content_h;
+    if (thumb_h < 10) thumb_h = 10;
+    if (thumb_h > vh) thumb_h = vh;
+    int max_scroll = content_h - vh;
+    int thumb_y = (vh - thumb_h) * scroll / max_scroll;
+    gfx::fillrect(s, sbx + 2, vy + thumb_y, SB_W - 4, thumb_h, C_SB_THUMB);
+}
+
+static void paint_status(Surface& s, const TabState& tab, int cw, int ch) {
+    int sy = ch - STAT_H;
+    gfx::fillrect(s, 0, sy, cw, STAT_H, C_STATUS);
+
+    char left[320];
+    if (tab.js_msg[0]) {
+        ksprintf(left, sizeof(left), "JS: %s", tab.js_msg);
+    } else if (tab.job) {
+        char u[128];
+        url_host(tab.url, u, sizeof(u));
+        if (!u[0]) clip_str(u, sizeof(u), tab.url);
+        if (tab.job->phase == 1)
+            ksprintf(left, sizeof(left), "Parsing %s (%d KB) ...", u[0] ? u : "...",
+                     (int)(tab.job->len / 1024));
+        else
+            ksprintf(left, sizeof(left), "Loading %s ...", u[0] ? u : "...");
+    } else if (tab.err[0]) {
+        clip_str(left, sizeof(left), tab.err);
+    } else if (tab.is_home || !tab.loaded) {
+        ksprintf(left, sizeof(left), "Ready");
+    } else if (tab.url[0]) {
+        clip_str(left, sizeof(left), tab.url);
+    } else {
+        ksprintf(left, sizeof(left), "Ready");
+    }
+    int lw = (int)strlen(left);
+    int maxl = (cw - 140) / 8;
+    if (maxl < 4) maxl = 4;
+    for (int k = 0; k < lw && k < maxl; k++) {
+        unsigned char c = (unsigned char)left[k];
+        if (c < 128) gfx::char8x16(s, 6 + k * 8, sy + 4, (char)c, C_TEXT_LT, C_STATUS);
+    }
+
+    char right[96];
+    if (tab.loaded && tab.page_len > 0 && !tab.is_home) {
+        int kb = (tab.page_len + 1023) / 1024;
+        ksprintf(right, sizeof(right), "%d KB | %d ms", kb, (int)tab.load_ms);
+    } else if (tab.err[0]) {
+        ksprintf(right, sizeof(right), "Error");
+    } else {
+        ksprintf(right, sizeof(right), "nefuOS v3.0");
+    }
+    int rlen = (int)strlen(right);
+    int rx = cw - 6 - rlen * 8;
+    for (int k = 0; k < rlen; k++) {
+        unsigned char c = (unsigned char)right[k];
+        if (c < 128) gfx::char8x16(s, rx + k * 8, sy + 4, (char)c, C_TAB_ACT, C_STATUS);
+    }
+}
+
+static void on_paint(Window* w) {
+    Surface* s = &w->back;
     BrowserState* st = (BrowserState*)w->userdata;
-    // ---- form field editing takes priority over the address bar ----
-    if (st->form_edit_row >= 0) {
-        if (e->utf8[0]) {
-            int n = 0;
-            while (n < 7 && e->utf8[n]) n++;
-            if (st->form_edit_val.len() + n <= 200) {
-                for (int i = 0; i < n; i++) st->form_edit_val += e->utf8[i];
+    if (!st) return;
+
+    poll_jobs(st);   // commit finished loads (also starts queued ones)
+
+    TabState& tab = st->tabs[st->active];
+    int cw = w->content_w;
+    int ch = w->content_h;
+
+    // ---- chrome ----
+    gfx::fillrect(*s, 0, 0, cw, BAR_H, C_TOOLBAR);
+
+    for (int i = 0; i < MAX_TABS; i++) {
+        if (st->tabs[i].used) paint_tab(*s, st->tabs[i], i, st->active, cw);
+    }
+    if (st->tab_count < MAX_TABS) {
+        Rect pr = plus_rect();
+        if (pr.x < cw) {
+            gfx::fillrect(*s, pr.x, pr.y, pr.w, pr.h, C_BTN);
+            gfx::char8x16(*s, pr.x + 9, pr.y + 5, '+', 0xFFFFFF, C_BTN);
+        }
+    }
+
+    paint_nav_btn(*s, back_rect(), '<', tab.back.size() > 0);
+    paint_nav_btn(*s, fwd_rect(), '>', tab.fwd.size() > 0);
+    paint_nav_btn(*s, reload_rect(), 'R', true);
+    paint_nav_btn(*s, home_rect(), 'H', true);
+    paint_address(*s, tab, st->input_focus, cw);
+
+    // ---- content ----
+    int vx = 2, vy = BAR_H + 2;
+    int vw = cw - SB_W - 4;
+    int vh = ch - STAT_H - vy - 2;
+    if (vw < 10) vw = 10;
+    if (vh < 10) vh = 10;
+    gfx::fillrect(*s, 0, BAR_H, cw, ch - STAT_H - BAR_H, C_PAGE_BG);
+
+    // build / rebuild the layout lazily (once per navigation or resize)
+    if (tab.layout_w != vw) {
+        tab.layout.runs.erase_all();
+        if (!tab.loaded || tab.is_home) {
+            build_home(tab.layout, vw);
+        } else if (tab.err[0] && !tab.page) {
+            build_error(tab.layout, vw, tab.url, tab.err);
+        } else if (tab.page && tab.page_len > 0) {
+            layout_page(tab.dom, vw, tab.layout, tab.imgs, tab.url,
+                        tab.css_n > 0 ? tab.css : 0, tab.css_n);
+            if (tab.truncated) {
+                Run tr;
+                tr.x = 8;
+                tr.y = tab.layout.height + 4;
+                tr.w = 200;
+                tr.h = 16;
+                tr.color = C_GRAY;
+                tr.kind = 0;
+                tr.link = false;
+                tr.img_id = -1;
+                char m[64];
+                ksprintf(m, sizeof(m), "[page truncated at %d MB]",
+                         (tab.page_cap + 524288) / 1048576);
+                tr.text = m;
+                tab.layout.runs.push(tr);
+                tab.layout.height += 24;
             }
-        } else if (e->ascii >= 32 && e->ascii < 127) {
-            if (st->form_edit_val.len() < 200) st->form_edit_val += (char)e->ascii;
-        } else if (e->keycode == KEY_SPACE) {
-            if (st->form_edit_val.len() < 200) st->form_edit_val += ' ';
-        } else if (e->keycode == KEY_BACKSPACE) {
-            if (st->form_edit_val.len() > 0) {
-                st->form_edit_val = st->form_edit_val.substr(0, st->form_edit_val.len() - 1);
-            }
-        } else if (e->keycode == KEY_ENTER) {
-            // blur field
-            st->form_edit_row = -1;
-            st->form_edit_val.clear();
-        } else if (e->keycode == KEY_ESC) {
-            st->form_edit_row = -1;
-            st->form_edit_val.clear();
         }
-        return;
+        tab.layout_w = vw;
     }
-    // UTF-8 IME input
-    if (e->utf8[0]) {
-        int n = 0;
-        while (n < 7 && e->utf8[n]) n++;
-        if (st->input.len() + n <= 120) {
-            String ns = st->input.substr(0, st->cursor);
-            for (int i = 0; i < n; i++) ns += e->utf8[i];
-            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
-            st->input = ns;
-            st->cursor += n;
-        }
-        return;
-    }
-    if (e->ascii >= 32 && e->ascii < 127) {
-        if (st->input.len() < 120) {
-            String ns = st->input.substr(0, st->cursor);
-            ns += (char)e->ascii;
-            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
-            st->input = ns;
-            st->cursor++;
-        }
-    } else if (e->keycode == KEY_SPACE) {
-        if (st->input.len() < 120) {
-            String ns = st->input.substr(0, st->cursor);
-            ns += ' ';
-            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
-            st->input = ns;
-            st->cursor++;
-        }
-    } else if (e->keycode == KEY_BACKSPACE) {
-        if (st->cursor > 0) {
-            String ns = st->input.substr(0, st->cursor - 1);
-            ns += st->input.substr(st->cursor, st->input.len() - st->cursor);
-            st->input = ns;
-            st->cursor--;
-        }
-    } else if (e->keycode == KEY_DEL) {
-        if (st->cursor < st->input.len()) {
-            String ns = st->input.substr(0, st->cursor);
-            ns += st->input.substr(st->cursor + 1, st->input.len() - st->cursor - 1);
-            st->input = ns;
-        }
-    } else if (e->keycode == KEY_LEFT) {
-        if (st->cursor > 0) st->cursor--;
-    } else if (e->keycode == KEY_RIGHT) {
-        if (st->cursor < st->input.len()) st->cursor++;
-    } else if (e->keycode == KEY_HOME) {
-        st->cursor = 0;
-    } else if (e->keycode == KEY_END) {
-        st->cursor = st->input.len();
-    } else if (e->keycode == KEY_ENTER) {
-        if (!st->input.empty()) browser_load(st, st->input.c_str());
-    } else if (e->keycode == KEY_ESC) {
-        st->input.clear();
-        st->cursor = 0;
-    }
+
+    tab.max_scroll = maxi(0, tab.layout.height - vh);
+    if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll;
+
+    paint_page(*s, tab.layout, tab.scroll, vx, vy, vw, vh, tab.imgs);
+    paint_scrollbar(*s, cw - SB_W, vy, vh, tab.scroll, tab.layout.height);
+
+    // ---- status ----
+    paint_status(*s, tab, cw, ch);
 }
 
-// Build a GET query from the form fields and navigate to it.
-// POST submit runs on a background thread so the UI never blocks.
-struct PostCtx { BrowserState* st; String url; String body; };
-static void browser_post_thread(void* arg) {
-    PostCtx* c = (PostCtx*)arg;
-    bool ok = http_post(c->st, c->url.c_str(), c->body.c_str());
-    c->st->status = ok ? 2 : 3;
-    c->st->busy = false;
-    c->st->load_done = true;
-    c->st->load_error = !ok;
-    delete c;
-}
+// ===================== input handlers =====================
+static void on_key(Window* w, const KeyEvent* e) {
+    if (!e || !e->down) return;
+    BrowserState* st = (BrowserState*)w->userdata;
+    if (!st) return;
+    TabState& tab = st->tabs[st->active];
 
-static void browser_submit_form(BrowserState* st, int submit_row) {
-    if (st->loaded_url.empty()) return;
-    String q;
-    int method = 0;
-    for (int i = 0; i < st->lines.size(); i++) {
-        const Line& l = st->lines[i];
-        if (l.form_kind == 2 && i == submit_row) method = l.form_method;
-        if (l.form_kind != 1 || l.form_name.empty()) continue;
-        if (!q.empty()) q += '&';
-        q += l.form_name;
-        q += '=';
-        String v = (i == st->form_edit_row && !st->form_edit_val.empty())
-                   ? st->form_edit_val : l.form_val;
-        q += v;
-    }
-    st->form_edit_row = -1;
-    st->form_edit_val.clear();
-    String target = st->loaded_url;
-    if (method == 1) {
-        // POST: send the form fields as the request body
-        PostCtx* c = new PostCtx();
-        c->st = st;
-        c->url = target;
-        c->body = q;
-        st->url = target;
-        st->status = 1;
-        st->busy = true;
-        st->load_done = false;
-        st->load_error = false;
-        st->loaded_url = target;
-        st->load_thread = platform_thread_create(browser_post_thread, c);
+    if (st->input_focus) {
+        // ---- address bar editing ----
+        if (e->keycode == KEY_ENTER) {
+            st->input_focus = false;
+            navigate_input(tab);
+            return;
+        }
+        if (e->keycode == KEY_BACKSPACE) {
+            if (tab.input_cursor > 0) {
+                memmove(tab.input + tab.input_cursor - 1, tab.input + tab.input_cursor,
+                        (size_t)(tab.input_len - tab.input_cursor) + 1);
+                tab.input_len--;
+                tab.input_cursor--;
+            }
+            return;
+        }
+        if (e->keycode == KEY_DEL) {
+            if (tab.input_cursor < tab.input_len) {
+                memmove(tab.input + tab.input_cursor, tab.input + tab.input_cursor + 1,
+                        (size_t)(tab.input_len - tab.input_cursor));
+                tab.input_len--;
+            }
+            return;
+        }
+        if (e->keycode == KEY_LEFT) { if (tab.input_cursor > 0) tab.input_cursor--; return; }
+        if (e->keycode == KEY_RIGHT) { if (tab.input_cursor < tab.input_len) tab.input_cursor++; return; }
+        if (e->keycode == KEY_HOME) { tab.input_cursor = 0; return; }
+        if (e->keycode == KEY_END) { tab.input_cursor = tab.input_len; return; }
+        if (e->keycode == KEY_TAB || e->keycode == KEY_UP || e->keycode == KEY_DOWN) {
+            st->input_focus = false;
+            return;
+        }
+        if ((unsigned char)e->ascii >= 32 && (unsigned char)e->ascii < 127) {
+            if (tab.input_len < (int)sizeof(tab.input) - 1) {
+                memmove(tab.input + tab.input_cursor + 1, tab.input + tab.input_cursor,
+                        (size_t)(tab.input_len - tab.input_cursor) + 1);
+                tab.input[tab.input_cursor] = e->ascii;
+                tab.input_len++;
+                tab.input_cursor++;
+            }
+            return;
+        }
         return;
     }
-    // GET: navigate to "target?query"
-    if (!q.empty()) {
-        target += (target.find('?') >= 0) ? '&' : '?';
-        target += q;
-    }
-    browser_load(st, target.c_str());
+
+    // ---- page shortcuts ----
+    int vh = w->content_h - STAT_H - BAR_H - 2;
+    if (e->keycode == KEY_UP) { tab.scroll -= 24; if (tab.scroll < 0) tab.scroll = 0; return; }
+    if (e->keycode == KEY_DOWN) { tab.scroll += 24; if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll; return; }
+    if (e->keycode == KEY_PGUP) { tab.scroll -= vh; if (tab.scroll < 0) tab.scroll = 0; return; }
+    if (e->keycode == KEY_PGDN) { tab.scroll += vh; if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll; return; }
+    if (e->keycode == KEY_HOME) { tab.scroll = 0; return; }
+    if (e->keycode == KEY_END) { tab.scroll = tab.max_scroll; return; }
+    if (e->keycode == KEY_F5) { reload(tab); return; }
+
+    // platform convention: Ctrl+letter arrives as the plain letter
+    if (e->ascii == 'l') { st->input_focus = true; tab.input_cursor = tab.input_len; return; }
+    if (e->ascii == 't') { new_tab(st); return; }
+    if (e->ascii == 'w') { close_tab(st); return; }
+    if (e->ascii == 'r') { reload(tab); return; }
+    if (e->ascii == 'h') { go_home(st, tab); return; }
 }
 
 static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
+    if (!(buttons & 1)) return;
     BrowserState* st = (BrowserState*)w->userdata;
-    bool pressed = buttons && !st->last_buttons;
-    bool released = !buttons && st->last_buttons;
-    st->last_buttons = buttons;
-    for (int i = 0; i < 3; i++) {
-        st->cur = &st->btns[i];
-        if (ui::button_event(st->btns[i], mx, my, buttons, pressed, released)) {
-            if (st->btns[i].id == 0 && !st->input.empty()) browser_load(st, st->input.c_str());
-            else if (st->btns[i].id == 1 && !st->input.empty()) {
-                String q = "search:";
-                q += st->input;
-                browser_load(st, q.c_str());
-            } else if (st->btns[i].id == 2) {
-                download_list_launch();
-            } else if (st->btns[i].id == 3) {
-                // Add bookmark
-                bookmarks_add(st, st->url.c_str());
-                st->lines.erase_all();
-                add_line(st->lines, "Bookmark added!", 1);
-                add_line(st->lines, "", 0);
-                add_line(st->lines, st->url.c_str(), 0);
-                add_line(st->lines, "", 0);
-                add_line(st->lines, "All bookmarks:", 2);
-                for (int b = 0; b < st->bookmark_count; b++) {
-                    add_line(st->lines, st->bookmarks[b].c_str(), 2);
-                }
-            } else if (st->btns[i].id == 4) {
-                // Show history
-                st->lines.erase_all();
-                add_line(st->lines, "History", 1);
-                add_line(st->lines, "", 0);
-                for (int h = st->history_count - 1; h >= 0 && h >= st->history_count - 20; h--) {
-                    add_line(st->lines, st->history[h].c_str(), 2);
-                }
-                if (st->history_count == 0) {
-                    add_line(st->lines, "No history yet", 0);
-                }
+    if (!st) return;
+    TabState& tab = st->tabs[st->active];
+    int cw = w->content_w;
+
+    // ---- tab strip ----
+    if (my < 30) {
+        for (int i = 0; i < MAX_TABS; i++) {
+            if (!st->tabs[i].used) continue;
+            Rect rc = tab_rect(i);
+            if (rc.x >= cw) break;
+            Rect cr = tab_close_rect(i);
+            if (mx >= cr.x && mx < cr.x + cr.w && my >= rc.y && my < rc.y + rc.h) {
+                st->active = i;
+                close_tab(st);
+                return;
+            }
+            if (mx >= rc.x && mx < rc.x + rc.w) {
+                st->active = i;
+                st->input_focus = false;
+                return;
             }
         }
-    }
-    st->cur = 0;
-
-    if (pressed && my >= 3 && my < BAR_H - 3 && mx >= 3 && mx < w->content_w - 250) {
-        int pos = (mx - 8) / 8;
-        if (pos < 0) pos = 0;
-        if (pos > st->input.len()) pos = st->input.len();
-        st->cursor = pos;
-    }
-
-    if (!pressed) return;
-    if (my < BAR_H || my >= w->content_h - STAT_H) return;
-    int row_h = 18;
-    int idx = st->scroll + (my - BAR_H) / row_h;
-    if (idx < 0 || idx >= st->lines.size()) return;
-    const Line& l = st->lines[idx];
-    // ---- form interactions ----
-    if (l.form_kind == 1) {
-        st->form_edit_row = idx;
-        st->form_edit_val = l.form_val;
-        st->cursor = 0;
+        Rect pr = plus_rect();
+        if (mx >= pr.x && mx < pr.x + pr.w && my >= pr.y && my < pr.y + pr.h) {
+            new_tab(st);
+            return;
+        }
         return;
     }
-    if (l.form_kind == 2) {
-        browser_submit_form(st, idx);
+
+    // ---- navigation row ----
+    if (my >= 32 && my < 54) {
+        Rect b = back_rect();
+        if (mx >= b.x && mx < b.x + b.w) { go_back(tab); return; }
+        Rect f = fwd_rect();
+        if (mx >= f.x && mx < f.x + f.w) { go_fwd(tab); return; }
+        Rect r = reload_rect();
+        if (mx >= r.x && mx < r.x + r.w) { reload(tab); return; }
+        Rect h = home_rect();
+        if (mx >= h.x && mx < h.x + h.w) { go_home(st, tab); return; }
+        Rect a = addr_rect(cw);
+        if (mx >= a.x && mx < a.x + a.w) {
+            st->input_focus = true;
+            int idx = (mx - (a.x + 6)) / 8;
+            if (idx < 0) idx = 0;
+            if (idx > tab.input_len) idx = tab.input_len;
+            tab.input_cursor = idx;
+            return;
+        }
         return;
     }
-    if (l.style == 2 || l.color == 0x0000EE) {
-        const char* txt = l.s.c_str();
-        while (*txt == ' ') txt++;
-        if (txt[0] == '/' || txt[0] == '.') {
-            browser_load(st, txt);
+
+    // ---- content ----
+    int vx = 2, vy = BAR_H + 2;
+    int vw = cw - SB_W - 4;
+    int vh = w->content_h - STAT_H - vy - 2;
+    if (my < vy || my >= vy + vh) return;
+
+    // scrollbar
+    if (mx >= vx + vw && mx < cw) {
+        if (tab.max_scroll > 0) {
+            int content_h = vh + tab.max_scroll;
+            int thumb_h = vh * vh / content_h;
+            if (thumb_h < 10) thumb_h = 10;
+            if (thumb_h > vh) thumb_h = vh;
+            int thumb_y = (vh - thumb_h) * tab.scroll / tab.max_scroll;
+            if (my < vy + thumb_y) tab.scroll -= vh / 2;
+            else tab.scroll += vh / 2;
+            if (tab.scroll < 0) tab.scroll = 0;
+            if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll;
+        }
+        return;
+    }
+
+    st->input_focus = false;
+
+    // run an inline onclick handler: mini JS executes, DOM commands from the
+    // output stream mutate the DOM, then the layout is invalidated
+    auto exec_onclick = [&](const char* script) {
+        if (!script || !script[0]) return;
+        char out[JS_OUT_MAX];
+        out[0] = 0;
+        mini_js_run(script, out, (int)sizeof(out));
+        if (out[0]) {
+            apply_js_commands(tab, out);
+            char vis[JS_OUT_MAX];
+            int vn = 0;
+            for (const char* c = out; *c && vn < JS_OUT_MAX - 1; ) {
+                if (*c == '\x01') { while (*c && *c != '\n') c++; if (*c) c++; continue; }
+                vis[vn++] = *c++;
+            }
+            vis[vn] = 0;
+            if (vis[0]) clip_str(tab.js_msg, sizeof(tab.js_msg), vis);
+        }
+        tab.layout_w = -1;   // re-layout on next paint
+    };
+
+    // hit-testing (reverse order: topmost run wins); onclick wins over href
+    int px = mx - vx;
+    int py = my - vy + tab.scroll;
+    for (int i = tab.layout.runs.size() - 1; i >= 0; i--) {
+        const Run& r = tab.layout.runs[i];
+        if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
+            if (r.node >= 0 && r.node < tab.dom.size()) {
+                const char* oc = tab.dom[r.node].onclick;
+                if (oc[0]) { exec_onclick(oc); return; }
+            }
+            if (!r.link) continue;
+            // ignore pseudo-protocols and in-page anchors (no anchor scrolling
+            // yet); navigating to javascript:/mailto:/tel:/data: would either
+            // be a wasted request or a security smell
+            if (r.href[0] == '#' ||
+                ci_starts(r.href.c_str(), "javascript:") ||
+                ci_starts(r.href.c_str(), "mailto:") ||
+                ci_starts(r.href.c_str(), "tel:") ||
+                ci_starts(r.href.c_str(), "data:") ||
+                ci_starts(r.href.c_str(), "about:")) return;
+            char u[256];
+            resolve_url(tab.url, r.href.c_str(), u, sizeof(u));
+            if (u[0]) navigate_url(tab, u, true);
+            return;
         }
     }
 }
 
 static void on_scroll(Window* w, int delta) {
     BrowserState* st = (BrowserState*)w->userdata;
-    st->scroll += delta;
-    if (st->scroll < 0) st->scroll = 0;
-    int max = st->lines.size() - 5;
-    if (max < 0) max = 0;
-    if (st->scroll > max) st->scroll = max;
+    if (!st) return;
+    TabState& tab = st->tabs[st->active];
+    tab.scroll += delta * 25;
+    if (tab.scroll < 0) tab.scroll = 0;
+    if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll;
+    // keep the chrome fixed: the WM auto-scrolls w->scroll_y, reset it
+    w->scroll_y = 0;
 }
 
 static void on_close(Window* w) {
     BrowserState* st = (BrowserState*)w->userdata;
-    // free image cache
-    for (int i = 0; i < st->img_cache.size(); i++) {
-        if (st->img_cache[i]->surf) {
-            if (st->img_cache[i]->surf->addr) kfree(st->img_cache[i]->surf->addr);
-            delete st->img_cache[i]->surf;
-        }
-        delete st->img_cache[i];
+    if (st) {
+        delete st;   // TabState destructors free pages / DOM / history / jobs
+        w->userdata = 0;
     }
-    delete st;
-    w->userdata = 0;
 }
 
-} // anonymous namespace
+} // namespace
+
+// ===================== entry points =====================
+
 
 void browser_launch_url(const char* url) {
     BrowserState* st = new BrowserState();
-    st->input = url ? url : "file:///README.txt";
-    st->cursor = st->input.len();
-    st->form_edit_row = -1;
-    Window* w = g_wm->create_window("Browser", 40, 30, 640, 440);
+    st->tab_count = 1;
+    st->tabs[0].used = true;
+    st->input_focus = true;
+    go_home(st, st->tabs[0]);
+
+    if (url && *url) {
+        char u[256];
+        smart_url(url, u, sizeof(u));
+        if (u[0]) navigate_url(st->tabs[0], u, false);
+    }
+
+    Window* w = g_wm->create_window("nefuOS Browser", 20, 20, 760, 560);
+    if (!w) { delete st; return; }
+
     w->userdata = st;
     w->on_paint = on_paint;
     w->on_key = on_key;
     w->on_mouse = on_mouse;
     w->on_scroll = on_scroll;
     w->on_close = on_close;
+
     g_wm->raise(w);
-    browser_load(st, st->input.c_str());
 }
 
 void browser_launch() {
-    browser_launch_url("file:///README.txt");
+    browser_launch_url(0);
 }
 
 } // namespace nefu

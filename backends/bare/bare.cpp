@@ -1,5 +1,5 @@
-// nefuOS （x86_64 ，QEMU/）
-// platform implementation：LFB 、PIT 、PS/2 +、RTC、UART debug、
+// nefuOS (x86_64, QEMU/)
+// platform implementation: LFB, PIT, PS/2 +, RTC, UART debug,
 #include <stdint.h>
 #include <stddef.h>
 #include "../../core/klib/klib.h"
@@ -40,7 +40,7 @@ static void uart_putc(char c) {
 // ===================== =====================
 #define ARENA_BASE 0x400000u
 #define ARENA_SIZE (64u * 1024u * 1024u)
-struct Blk { uint32_t size; Blk* next; };   // 8 bytes， 16
+struct Blk { uint32_t size; Blk* next; };   // 8 bytes, 16
 static uint32_t s_arena_next = ARENA_BASE;
 static Blk* s_free = 0;
 
@@ -174,7 +174,7 @@ static volatile int s_mouse_dx = 0, s_mouse_dy = 0;
 
 static bool s_shift = false, s_caps = false;
 
-// （set 1）：kc!=0 ，
+// (set 1): kc!=0,
 struct KeyRow { uint8_t sc; int kc; char unshifted; char shifted; };
 static const KeyRow KEYMAP[] = {
     { 0x01, KEY_ESC,     0, 0 },
@@ -190,7 +190,7 @@ static const KeyRow KEYMAP[] = {
     { 0x4F, KEY_END,     0, 0 },
     { 0x50, KEY_DOWN,    0, 0 },
     { 0x51, KEY_PGDN,    0, 0 },
-    { 0x52, 0, 0, 0 },               // Ins（ignore）
+    { 0x52, 0, 0, 0 },               // Ins (ignore)
     { 0x53, KEY_DEL,     0, 0 },
     { 0x3B, KEY_F1, 0, 0 }, { 0x3C, KEY_F2, 0, 0 }, { 0x3D, KEY_F3, 0, 0 },
     { 0x3E, KEY_F4, 0, 0 }, { 0x3F, KEY_F5, 0, 0 }, { 0x40, KEY_F6, 0, 0 },
@@ -299,7 +299,7 @@ __attribute__((interrupt)) static void irq12_handler(void* frame) {
 __attribute__((interrupt)) static void spurious_handler(void* frame) { (void)frame; }
 
 static void idt_init() {
-    // spurious， IRQ
+    // spurious, IRQ
     for (int i = 0; i < 256; i++) idt_set(i, (void*)spurious_handler);
     idt_set(32, (void*)irq0_handler);
     idt_set(33, (void*)irq1_handler);
@@ -333,7 +333,7 @@ static void pit_init() {
 static void ps2_init() {
 
     outb(0x64, 0xA8); io_wait();
-    // ， IRQ12
+    // , IRQ12
     outb(0x64, 0x20); io_wait();
     uint8_t cb = inb(0x60);
     cb |= 0x02;        // enable aux IRQ
@@ -420,30 +420,30 @@ void platform_poweroff() {
 }
 
 void platform_reboot() {
-    // 8042键盘控制器复位（标准x86重启方式）
+    // Reset via the 8042 keyboard controller (standard x86 reboot method)
     uint8_t good = 0x02;
     while (good & 0x02) good = inb(0x64);
-    outb(0x64, 0xFE);  // 脉冲CPU复位线
+    outb(0x64, 0xFE);  // Pulse the CPU reset line
     for(;;) { __asm__ volatile("hlt"); }
 }
 
 void platform_suspend() {
-    // 裸机待机：关屏后等待按键唤醒
+    // Bare-metal standby: blank the screen, wait for a key press to wake
     Screen* s = platform_screen();
-    // 清空屏幕为黑色
+    // Clear the screen to black
     for (int y=0; y<s->height; y++) {
         uint32_t* row = (uint32_t*)(s->addr + y*s->pitch);
         for (int x=0; x<s->width; x++) row[x] = 0;
     }
-    // 等待键盘输入唤醒
+    // Wait for keyboard input to wake
     for(;;) {
         __asm__ volatile("hlt");
-        // 有按键事件就唤醒回到锁屏流程
+        // A key event wakes back into the lock-screen flow
         if (s_kq_head != s_kq_tail) break;
     }
 }
 
-// CPUID指令读取CPU信息
+// Read CPU info via the CPUID instruction
 static void cpuid(uint32_t leaf, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
     __asm__ volatile("cpuid"
         : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
@@ -452,7 +452,7 @@ static void cpuid(uint32_t leaf, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t
 
 bool platform_hw_info(HwInfo* out) {
     memset(out, 0, sizeof(*out));
-    // 读CPU型号
+    // Read the CPU model
     uint32_t a,b,c,d;
     char model[49];
     memset(model, 0, sizeof(model));
@@ -463,11 +463,11 @@ bool platform_hw_info(HwInfo* out) {
     cpuid(0x80000004, &a,&b,&c,&d);
     memcpy(model+32, &a, 4); memcpy(model+36, &b, 4); memcpy(model+40, &c, 4); memcpy(model+44, &d, 4);
     strncpy(out->cpu_model, model, 63);
-    // CPU主频从CPUID 0x16读
+    // Read the CPU clock from CPUID leaf 0x16
     cpuid(0x16, &a,&b,&c,&d);
     out->cpu_mhz = a;
     out->cpu_cores = 1;
-    // 内存大小从CMOS读（低16MB以上的扩展内存）
+    // Read memory size from CMOS (extended memory above the low 16 MB)
     uint16_t mem_kb = cmos_read(0x17) | (cmos_read(0x18) << 8);
     out->mem_total_mb = (ARENA_SIZE / (1024*1024)) + (mem_kb / 1024);
     strncpy(out->bios_vendor, "SeaBIOS/QEMU", 31);
@@ -475,10 +475,10 @@ bool platform_hw_info(HwInfo* out) {
     return true;
 }
 
-// UEFI配置存在CMOS/CMOS掉电RAM的0x10-0x30偏移处
+// UEFI config lives in CMOS / CMOS battery-backed RAM at offsets 0x10-0x30
 bool platform_uefi_load(UefiConfig* out) {
     memset(out, 0, sizeof(*out));
-    // 默认值
+    // Default values
     strncpy(out->username, "user", 31);
     strncpy(out->password_hash, "", 63);
     out->boot_timeout = 3;
@@ -490,7 +490,7 @@ bool platform_uefi_load(UefiConfig* out) {
 
 bool platform_uefi_save(const UefiConfig* cfg) {
     (void)cfg;
-    // 裸机CMOS写入可以扩展，这里直接返回成功
+    // Bare-metal CMOS writes can be extended; just return success here
     return true;
 }
 
@@ -503,7 +503,7 @@ const char* platform_name() { return "bare (x86_64)"; }
 
 bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
     (void)out; (void)out_size;
-    return false;   // ，
+    return false;   // ,
 }
 void platform_fs_save(const uint8_t* data, uint32_t size) { (void)data; (void)size; }
 
@@ -607,7 +607,7 @@ extern "C" void nefuos_kernel_main(void* info) {
 
 } // namespace nefu
 
-// ===================== （bare） =====================
+// ===================== net (bare) =====================
 #include "../../core/net/net.h"
 namespace nefu {
 
@@ -936,6 +936,30 @@ void platform_stop_sound() {
     sb_dsp_write(0xD5);                // pause 16-bit DAC
     sb_dsp_write(0xD4);                // speaker off (16-bit)
     outb_p(DMA2_MASK, 0x05);           // mask DMA ch1 to halt transfer
+}
+
+// ===================== media (bare: no host decoder) =====================
+// The bare kernel has no Media Foundation; apps (video player, music player)
+// fall back to their demo content when these report false / -1.
+bool platform_media_available() { return false; }
+bool platform_media_open(const char* host_path, bool audio_only) {
+    (void)host_path; (void)audio_only;
+    return false;
+}
+void platform_media_close() {}
+bool platform_media_play() { return false; }
+bool platform_media_pause() { return false; }
+void platform_media_stop() {}
+bool platform_media_seek_sec(int sec) { (void)sec; return false; }
+int  platform_media_position_sec() { return 0; }
+int  platform_media_duration_sec() { return -1; }
+void platform_media_set_volume(int percent) { (void)percent; }
+bool platform_media_has_video() { return false; }
+bool platform_media_frame_info(int* w, int* h) { (void)w; (void)h; return false; }
+bool platform_media_grab_frame(uint8_t* out_rgba) { (void)out_rgba; return false; }
+bool platform_host_file_dialog(char* out_path, int max, const char* filter_desc, const char* filter_pattern) {
+    (void)out_path; (void)max; (void)filter_desc; (void)filter_pattern;
+    return false;
 }
 
 } // namespace nefu

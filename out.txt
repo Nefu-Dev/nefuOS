@@ -1,0 +1,23 @@
+== nefu::netproto self tests ==
+  common   : OK (0)
+  ethernet : OK (0)
+  arp      : OK (0)
+  ip       : OK (0)
+  icmp     : OK (0)
+  udp      : OK (0)
+  tcp      : OK (0)
+  dns      : OK (0)
+  http     : OK (0)
+  websocket: OK (0)
+  mqtt     : OK (0)
+  dhcp     : OK (0)
+  socket   : OK (0)
+  firewall : OK (0)
+  ntp      : OK (0)
+  netif    : OK (0)
+  pktlog   : OK (0)
+  netstack : OK (0)
+  dissect  : OK (0)
+== total failures: 0 ==
+
+=== netproto RESULT: ALL PASS (failures=0) ===

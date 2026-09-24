@@ -1,162 +1,143 @@
-// nefuOS snake - WM window (surface back + direct blit), arrows, timer in on_paint
+// nefuOS Snake Game
 #include "apps.h"
-#include "../gui/wm.h"
 #include "../gui/gfx.h"
-#include "../platform.h"
+#include "../gui/wm.h"
+#include "../klib/klib.h"
+#include <cstring>
 
 namespace nefu {
 
-struct SnakeCore {
-    int cols, rows;
-    int body[400][2];
+namespace {
+
+const int CELL = 16;
+const int GRID_W = 25;
+const int GRID_H = 25;
+
+struct SnakeState {
+    int x[100];
+    int y[100];
     int len;
-    int dir;
-    int next_dir;
-    int food[2];
+    int dx, dy;
+    int food_x, food_y;
     int score;
-    uint32_t last_move;
-    bool over;
-    bool paused;
+    bool game_over;
+    uint32_t last_tick;
+
+    SnakeState() : len(3), dx(1), dy(0), score(0), game_over(false) {
+        x[0] = 10; y[0] = 10;
+        x[1] = 9; y[1] = 10;
+        x[2] = 8; y[2] = 10;
+        food_x = 15; food_y = 15;
+        last_tick = 0;
+    }
 };
 
-static void snake_reset_food(SnakeCore* st) {
-    for (int attempt = 0; attempt < 200; attempt++) {
-        int fx = (int)((platform_tick_ms() * 2654435761u + attempt * 97) >> 13) % st->cols;
-        int fy = (int)((platform_tick_ms() * 40503u + attempt * 131) >> 13) % st->rows;
-        if (fx < 0) fx = 0;
-        if (fy < 0) fy = 0;
-        bool on = false;
-        for (int i = 0; i < st->len; i++) {
-            if (st->body[i][0] == fx && st->body[i][1] == fy) { on = true; break; }
-        }
-        if (!on) { st->food[0] = fx; st->food[1] = fy; return; }
-    }
-    st->food[0] = -1; st->food[1] = -1;
-}
+static void snake_paint(Window* w) {
+    SnakeState* st = (SnakeState*)w->userdata;
+    Surface& s = w->back;
 
-static void snake_tick(SnakeCore* st) {
-    if (st->over || st->paused) return;
-    uint32_t now = platform_tick_ms();
-    if (now - st->last_move < 160) return;
-    st->last_move = now;
-    st->dir = st->next_dir;
-    int nx = st->body[0][0], ny = st->body[0][1];
-    switch (st->dir) {
-    case 0: ny--; break;
-    case 1: ny++; break;
-    case 2: nx--; break;
-    case 3: nx++; break;
-    }
-    if (nx < 0 || ny < 0 || nx >= st->cols || ny >= st->rows) { st->over = true; return; }
+    gfx::fillrect(s, 0, 0, w->content_w, w->content_h, 0x000000);
+
+    // Draw snake
     for (int i = 0; i < st->len; i++) {
-        if (st->body[i][0] == nx && st->body[i][1] == ny) { st->over = true; return; }
+        int color = (i == 0) ? 0x00FF00 : 0x00CC00;
+        gfx::fillrect(s, st->x[i] * CELL, st->y[i] * CELL, CELL - 1, CELL - 1, color);
     }
-    for (int i = st->len - 1; i > 0; i--) { st->body[i][0] = st->body[i - 1][0]; st->body[i][1] = st->body[i - 1][1]; }
-    st->body[0][0] = nx; st->body[0][1] = ny;
-    if (st->food[0] == nx && st->food[1] == ny) {
-        if (st->len < 400) {
-            st->body[st->len][0] = st->body[st->len - 1][0];
-            st->body[st->len][1] = st->body[st->len - 1][1];
-            st->len++;
+
+    // Draw food
+    gfx::fillrect(s, st->food_x * CELL, st->food_y * CELL, CELL - 1, CELL - 1, 0xFF0000);
+
+    // Score
+    char score[32];
+    ksprintf(score, sizeof(score), "Score: %d", st->score);
+    gfx::text(s, 5, w->content_h - 15, score, 0xFFFFFF, 0x000000);
+
+    if (st->game_over) {
+        gfx::text(s, 100, 120, "GAME OVER!", 0xFF0000, 0x000000);
+    }
+}
+
+static void snake_tick(SnakeState* st) {
+    if (st->game_over) return;
+
+    // Move body
+    for (int i = st->len - 1; i > 0; i--) {
+        st->x[i] = st->x[i - 1];
+        st->y[i] = st->y[i - 1];
+    }
+
+    // Move head
+    st->x[0] += st->dx;
+    st->y[0] += st->dy;
+
+    // Check wall collision
+    if (st->x[0] < 0 || st->x[0] >= GRID_W || st->y[0] < 0 || st->y[0] >= GRID_H) {
+        st->game_over = true;
+    }
+
+    // Check self collision
+    for (int i = 1; i < st->len; i++) {
+        if (st->x[0] == st->x[i] && st->y[0] == st->y[i]) {
+            st->game_over = true;
         }
+    }
+
+    // Check food
+    if (st->x[0] == st->food_x && st->y[0] == st->food_y) {
         st->score += 10;
-        snake_reset_food(st);
+        if (st->len < 100) st->len++;
+        st->food_x = (st->x[0] + 7) % GRID_W;
+        st->food_y = (st->y[0] + 13) % GRID_H;
     }
 }
 
-struct SnakeLvState {
-    SnakeCore core;
-    int w, h;
-};
-
-static void snake_draw(Surface& s, SnakeCore* c) {
-    int w = s.width, h = s.height;
-    int cw = c->cols, ch = c->rows;
-    int cs = 12;
-    if (cw * cs + 16 > w || ch * cs + 40 > h) { cs = 8; }
-    s.fill(0x00101418);
-    int ox = (w - cw * cs) / 2, oy = 24 + (h - 40 - ch * cs) / 2;
-    if (ox < 0) ox = 0;
-    if (oy < 0) oy = 0;
-    gfx::rect(s, ox, oy, cw * cs, ch * cs, 0x0030465A);
-    for (int x = 1; x < cw; x++) gfx::vline(s, ox + x * cs, oy, oy + ch * cs - 1, 0x00182638);
-    for (int y = 1; y < ch; y++) gfx::hline(s, ox, ox + cw * cs - 1, oy + y * cs, 0x00182638);
-    if (c->food[0] >= 0) {
-        gfx::fillrect(s, ox + c->food[0] * cs + 2, oy + c->food[1] * cs + 2, cs - 4, cs - 4, color::RED);
-    }
-    for (int i = c->len - 1; i >= 0; i--) {
-        int px = ox + c->body[i][0] * cs, py = oy + c->body[i][1] * cs;
-        uint32_t col = (i == 0) ? 0x0073E06B : 0x0047B33D;
-        gfx::fillrect(s, px + 1, py + 1, cs - 2, cs - 2, col);
-    }
-    char buf[48];
-    ksprintf(buf, sizeof(buf), "Score: %d   Len: %d", c->score, c->len);
-    gfx::text(s, 8, 4, buf, color::WHITE, 0x00101418);
-    if (c->over) gfx::text(s, 10, h - 20, "GAME OVER - press R to restart", color::RED, 0x00101418);
-    else if (c->paused) gfx::text(s, 10, h - 20, "PAUSED - press P", color::YELLOW, 0x00101418);
-}
-
-static void snake_wm_paint(Window* w) {
-    SnakeLvState* st = (SnakeLvState*)w->userdata;
+// Periodic heartbeat: advance the game at a fixed rate (driven by WM::tick)
+static void snake_tick_driver(Window* w) {
+    SnakeState* st = (SnakeState*)w->userdata;
     if (!st) return;
-    if (platform_tick_ms() - st->core.last_move >= 160) snake_tick(&st->core);
-    snake_draw(w->back, &st->core);
+    uint32_t now = platform_tick_ms();
+    if (now - st->last_tick < 110) return;   // ~9 steps/sec
+    st->last_tick = now;
+    snake_tick(st);
 }
 
-static void snake_wm_key(Window* w, const KeyEvent* e) {
-    SnakeLvState* st = (SnakeLvState*)w->userdata;
-    if (!st) return;
-    SnakeCore* c = &st->core;
+static void snake_key(Window* w, const KeyEvent* e) {
+    SnakeState* st = (SnakeState*)w->userdata;
     if (!e->down) return;
+
     switch (e->keycode) {
-    case KEY_UP:    if (c->dir != 1) c->next_dir = 0; break;
-    case KEY_DOWN:  if (c->dir != 0) c->next_dir = 1; break;
-    case KEY_LEFT:  if (c->dir != 3) c->next_dir = 2; break;
-    case KEY_RIGHT: if (c->dir != 2) c->next_dir = 3; break;
-    default: break;
+        case KEY_UP:    st->dx = 0; st->dy = -1; break;
+        case KEY_DOWN:  st->dx = 0; st->dy = 1; break;
+        case KEY_LEFT:  st->dx = -1; st->dy = 0; break;
+        case KEY_RIGHT: st->dx = 1; st->dy = 0; break;
     }
-    char a = e->ascii;
-    if (a == 'p' || a == 'P') { if (!c->over) c->paused = !c->paused; }
-    if (a == 'r' || a == 'R') {
-        c->len = 4;
-        c->body[0][0] = c->cols / 2; c->body[0][1] = c->rows / 2;
-        c->body[1][0] = c->body[0][0] - 1; c->body[1][1] = c->body[0][1];
-        c->body[2][0] = c->body[0][0] - 2; c->body[2][1] = c->body[0][1];
-        c->body[3][0] = c->body[0][0] - 3; c->body[3][1] = c->body[0][1];
-        c->dir = 3; c->next_dir = 3;
-        c->score = 0;
-        c->over = false;
-        c->paused = false;
-        c->last_move = platform_tick_ms();
-        snake_reset_food(c);
+    // R key = restart
+    if (e->ascii == 'r' || e->ascii == 'R') {
+        st->len = 3; st->dx = 1; st->dy = 0;
+        st->x[0] = 10; st->y[0] = 10;
+        st->x[1] = 9; st->y[1] = 10;
+        st->x[2] = 8; st->y[2] = 10;
+        st->score = 0; st->game_over = false;
     }
 }
+
+static void snake_close(Window* w) {
+    SnakeState* st = (SnakeState*)w->userdata;
+    delete st;
+}
+
+} // namespace
 
 void snake_launch() {
-    int x, y;
-    cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Snake", x, y, 430, 470);
-    if (!w) return;
-    SnakeLvState* st = new SnakeLvState();
-    st->w = w->content_w;
-    st->h = w->content_h;
+    SnakeState* st = new SnakeState();
+    st->last_tick = platform_tick_ms();
+    Window* w = g_wm->create_window("Snake", 100, 100, GRID_W * CELL, GRID_H * CELL + 20);
     w->userdata = st;
-    w->on_paint = snake_wm_paint;
-    w->on_key = snake_wm_key;
-
-    SnakeCore* c = &st->core;
-    c->cols = 30; c->rows = 26;
-    c->len = 4;
-    c->body[0][0] = 15; c->body[0][1] = 13;
-    c->body[1][0] = 14; c->body[1][1] = 13;
-    c->body[2][0] = 13; c->body[2][1] = 13;
-    c->body[3][0] = 12; c->body[3][1] = 13;
-    c->dir = 3; c->next_dir = 3;
-    c->score = 0;
-    c->last_move = platform_tick_ms();
-    c->over = false;
-    c->paused = false;
-    snake_reset_food(c);
+    w->on_paint = snake_paint;
+    w->on_tick = snake_tick_driver;
+    w->on_key = snake_key;
+    w->on_close = snake_close;
     g_wm->raise(w);
 }
+
 } // namespace nefu

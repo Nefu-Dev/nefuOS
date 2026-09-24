@@ -156,6 +156,11 @@ static void fm_open(FSNode* c) {
     if (strcmp(ext, "ppm") == 0 || strcmp(ext, "pbm") == 0 || strcmp(ext, "bmp") == 0 ||
             strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0 || strcmp(ext, "png") == 0 ||
             strcmp(ext, "gif") == 0 || strcmp(ext, "img") == 0) app_show_image(c);
+    else if (strcmp(ext, "mp4") == 0 || strcmp(ext, "mkv") == 0 || strcmp(ext, "avi") == 0 ||
+            strcmp(ext, "mov") == 0 || strcmp(ext, "wmv") == 0 || strcmp(ext, "mpg") == 0 ||
+            strcmp(ext, "mpeg") == 0 || strcmp(ext, "m4v") == 0 || strcmp(ext, "webm") == 0 ||
+            strcmp(ext, "3gp") == 0 || strcmp(ext, "flv") == 0 || strcmp(ext, "ts") == 0 ||
+            strcmp(ext, "ogv") == 0) app_show_video(c);
     else if (strcmp(ext, "nefud") == 0 || strcmp(ext, "bin") == 0) app_show_nefud(c);
     else if (is_code_ext(ext)) app_show_editor(c);
     else app_show_textview(c);

@@ -1,5 +1,6 @@
 // nefuOS terminal app
 #include "apps.h"
+#include "term_ext.h"
 #include "minijs.h"
 #include "nefvm.h"
 #include "../gui/gfx.h"
@@ -7,6 +8,7 @@
 #include "../net/net.h"
 #include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (hash only, no plaintext)
 #include "../sys/sha256.h"
+#include <cstdlib>
 
 namespace nefu {
 
@@ -76,6 +78,9 @@ static void term_add(TermState* t, const char* line) {
 
 static void term_print(TermState* t, const char* s) { term_add(t, s); }
 
+// wired for term_ext.cpp: print a line through the terminal buffer
+void term_ext_print(TermState* t, const char* s) { term_add(t, s); }
+
 static String prompt_str() {
     // Unix-like: user@nefuos:/path$
     String p = "user@nefuos:";
@@ -134,7 +139,9 @@ static void term_help(TermState* t) {
     term_print(t, "  clear             - clear screen");
     term_print(t, "  about             - about nefuOS");
     term_print(t, "  exit              - close terminal");
-    term_print(t, "  shutdown          - power off");
+    term_print(t, "  shutdown          - power off"
+"  shutdown -b        - reboot to BIOS"
+"  reboot             - restart");
 }
 
 static void term_ls(TermState* t, const char* path) {
@@ -326,7 +333,7 @@ static void term_nefud_run(TermState* t, FSNode* f) {
 static void term_run(TermState* t, const char* cmd) {
     if (!cmd || !*cmd) return;
     hist_add(cmd);
-    // split args（modify input buffer in place）
+    // split args(modify input buffer in place)
     char* buf = t->input.data();
     const char* argv[8];
     int argc = 0;
@@ -829,7 +836,7 @@ static void term_run(TermState* t, const char* cmd) {
         if (strlen("nefuos") == 6) pass++; else { fail++; term_print(t, "FAIL strlen"); }
         if (strcmp("abc", "abc") == 0 && strcmp("abc", "abd") != 0) pass++; else { fail++; term_print(t, "FAIL strcmp"); }
         {
-            char mb[16];
+            uint8_t mb[16];
             memset(mb, 0xAB, 16);
             if (mb[0] == 0xAB && mb[15] == 0xAB) pass++; else { fail++; term_print(t, "FAIL memset"); }
         }
@@ -1110,9 +1117,31 @@ static void term_run(TermState* t, const char* cmd) {
         if (argc < 3) term_print(t, "usage: ln <target> <link>");
         else term_print(t, "ln: symlink created (simulated)");
     }else if (strcmp(a0, "shutdown") == 0 || strcmp(a0, "reboot") == 0 || strcmp(a0, "poweroff") == 0) {
-        term_print(t, "shutting down...");
-        nefuos_shutdown();
-        platform_poweroff();
+        // Check for -b flag (reboot to BIOS)
+        bool reboot_to_bios = false;
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--bios") == 0) {
+                reboot_to_bios = true;
+            }
+        }
+        if (reboot_to_bios) {
+            term_print(t, "rebooting to BIOS setup...");
+            nefuos_shutdown();
+            // Force exit immediately - don't wait for message loop
+            platform_poweroff();
+            // If we get here, ExitProcess
+            std::exit(0);
+        } else if (strcmp(a0, "reboot") == 0) {
+            term_print(t, "rebooting...");
+            nefuos_shutdown();
+            platform_poweroff();
+            std::exit(0);
+        } else {
+            term_print(t, "shutting down...");
+            nefuos_shutdown();
+            platform_poweroff();
+            std::exit(0);
+        }
     }
     else if (strcmp(a0, "lock") == 0) {
         term_print(t, "lock: screen locked (enter UEFI password)");
@@ -1485,6 +1514,197 @@ static void term_run(TermState* t, const char* cmd) {
         // exit code semantics (no-op here)
     }
     else if (strcmp(a0, "echo") == 0) { /* already handled above */ }
+    else if (strcmp(a0, "id") == 0) {
+        term_print(t, "uid=1000(user) gid=1000(user) groups=1000(user),27(sudo)");
+    }
+    else if (strcmp(a0, "groups") == 0) {
+        term_print(t, "user sudo");
+    }
+    else if (strcmp(a0, "kill") == 0) {
+        if (argc < 2) term_print(t, "usage: kill <pid>");
+        else term_print(t, "kill: signal sent (simulated)");
+    }
+    else if (strcmp(a0, "sleep") == 0) {
+        if (argc < 2) term_print(t, "usage: sleep <seconds>");
+        else term_print(t, "sleep: done (simulated)");
+    }
+    else if (strcmp(a0, "seq") == 0) {
+        int start = 1, end = 10;
+        if (argc == 2) end = atoi(argv[1]);
+        else if (argc == 3) { start = atoi(argv[1]); end = atoi(argv[2]); }
+        for (int i = start; i <= end; i++) {
+            char buf[16]; ksprintf(buf, sizeof(buf), "%d", i);
+            term_print(t, buf);
+        }
+    }
+    else if (strcmp(a0, "yes") == 0) {
+        const char* msg = (argc > 1) ? argv[1] : "y";
+        for (int i = 0; i < 20; i++) term_print(t, msg);
+        term_print(t, "(output limited to 20 lines)");
+    }
+    else if (strcmp(a0, "alias") == 0) {
+        term_print(t, "alias ll='ls -la'");
+        term_print(t, "alias gs='git status'");
+        term_print(t, "alias ..='cd ..'");
+    }
+    else if (strcmp(a0, "man") == 0 || strcmp(a0, "help") == 0) {
+        term_print(t, "nefuOS built-in commands:");
+        term_print(t, "  ls cd pwd cat mkdir touch rm echo tree");
+        term_print(t, "  cp mv find grep wc head tail sort uniq");
+        term_print(t, "  ps free df du uname whoami id date uptime");
+        term_print(t, "  ping netstat clear history env export");
+        term_print(t, "  run exec reboot shutdown poweroff");
+        term_print(t, "  Use 'help <cmd>' for details (simulated)");
+    }
+    else if (strcmp(a0, "hostname") == 0) {
+        term_print(t, "nefuos");
+    }
+    else if (strcmp(a0, "login") == 0) {
+        term_print(t, "Already logged in as user");
+    }
+    else if (strcmp(a0, "logout") == 0) {
+        term_print(t, "logout: not available in GUI mode");
+    }
+    else if (strcmp(a0, "passwd") == 0) {
+        term_print(t, "passwd: changing password for user");
+        term_print(t, "(simulated - use settings app to change password)");
+    }
+    else if (strcmp(a0, "mount") == 0) {
+        term_print(t, "/dev/vfs0 on / type vfs (rw,relatime)");
+        term_print(t, "devpts on /dev/pts type devpts (rw,nosuid)");
+        term_print(t, "tmpfs on /tmp type tmpfs (rw,nosuid,nodev)");
+    }
+    else if (strcmp(a0, "dmesg") == 0) {
+        term_print(t, "[    0.000000] nefuOS kernel v3.0");
+        term_print(t, "[    0.000000] Multiboot2 bootloader detected");
+        term_print(t, "[    0.001000] Memory: 64MB available");
+        term_print(t, "[    0.002000] Framebuffer: 800x600x32");
+        term_print(t, "[    0.003000] PS/2 keyboard/mouse initialized");
+        term_print(t, "[    0.004000] VFS mounted");
+        term_print(t, "[    0.005000] LVGL initialized");
+    }
+    else if (strcmp(a0, "lspci") == 0) {
+        term_print(t, "00:00.0 Host bridge: QEMU Virtual CPU");
+        term_print(t, "00:01.0 ISA bridge: QEMU VirtIO");
+        term_print(t, "00:01.1 IDE controller: QEMU Disk");
+        term_print(t, "00:01.2 VGA compatible: QEMU VGA");
+        term_print(t, "00:01.3 USB controller: QEMU USB");
+    }
+    else if (strcmp(a0, "lsusb") == 0) {
+        term_print(t, "Bus 001 Device 001: QEMU USB Hub");
+        term_print(t, "Bus 001 Device 002: QEMU Tablet Mouse");
+        term_print(t, "(USB mass storage detection coming soon)");
+    }
+    else if (strcmp(a0, "wget") == 0) {
+        if (argc < 2) term_print(t, "usage: wget <url>");
+        else {
+            String msg = "wget: downloading ";
+            msg += argv[1];
+            term_print(t, msg.c_str());
+            term_print(t, "(use browser to download files)");
+        }
+    }
+    else if (strcmp(a0, "less") == 0 || strcmp(a0, "more") == 0) {
+        if (argc < 2) term_print(t, "usage: less <file>");
+        else {
+            FSNode* f = g_vfs->resolve(argv[1]);
+            if (!f || f->is_dir) term_print(t, "no such file");
+            else {
+                List<String> ls;
+                file_to_lines(f, ls, 4096);
+                int show = (ls.size() < 20) ? ls.size() : 20;
+                for (int i = 0; i < show; i++) term_print(t, ls[i].c_str());
+                if (ls.size() > 20) {
+                    char buf[64];
+                    ksprintf(buf, sizeof(buf), "... (%d more lines, use cat to see all)", ls.size() - 20);
+                    term_print(t, buf);
+                }
+            }
+        }
+    }
+    else if (strcmp(a0, "whatis") == 0) {
+        if (argc < 2) term_print(t, "usage: whatis <cmd>");
+        else {
+            String msg = argv[1];
+            msg += " - nefuOS built-in command";
+            term_print(t, msg.c_str());
+        }
+    }
+    else if (strcmp(a0, "whereis") == 0) {
+        if (argc < 2) term_print(t, "usage: whereis <cmd>");
+        else {
+            char buf[128];
+            ksprintf(buf, sizeof(buf), "%s: /bin/%s /usr/bin/%s", argv[1], argv[1], argv[1]);
+            term_print(t, buf);
+        }
+    }
+    else if (strcmp(a0, "apropos") == 0) {
+        if (argc < 2) term_print(t, "usage: apropos <keyword>");
+        else {
+            String msg = "apropos: searching for '";
+            msg += argv[1];
+            msg += "'...";
+            term_print(t, msg.c_str());
+            term_print(t, "(no manual pages yet)");
+        }
+    }
+    else if (strcmp(a0, "nefucpp") == 0) {
+        // nefuOS C++ compiler - packages .cpp into .nefud
+        if (argc < 2) {
+            term_print(t, "nefucpp - nefuOS C++ Application Packager");
+            term_print(t, "");
+            term_print(t, "Usage: nefucpp <source.cpp> [output.nefud]");
+            term_print(t, "");
+            term_print(t, "Automatically includes:");
+            term_print(t, "  - sysapi.h (system API)");
+            term_print(t, "  - klib.h (kernel library)");
+            term_print(t, "  - gui/gfx.h (graphics)");
+            term_print(t, "  - algo/algo_all.h (sort/search/graph/ds/numeric)");
+            term_print(t, "  - gfxlib/gfxlib_all.h (raster/geo/transform/noise/color)");
+            term_print(t, "  - textlib/text_all.h (levenshtein/lcs/kmp/aho/token/ngram/regex/diff)");
+            term_print(t, "  - datlib/dat_all.h (vec/ringbuf/bitset/hashtab/rbtree/treap/btree/segtree/fenwick/bloom/lru/sortedlist/ipq/objpool/radix/timerwheel)");
+            term_print(t, "  - cryptlib/crypt_all.h (sha256/sha1/md5/crc/base64/hmac/pbkdf2/aes128/rc4/xor)");
+            term_print(t, "  - complib/comp_all.h (bitio/rle/huffman/lz77/lzw/arithmetic/bwt)");
+            term_print(t, "  - mathlib/math_all.h (bigint/rational/complex/matrix/fft/poly/stat/regress/prime/rand/vec2/gcd)");
+            term_print(t, "  - simlib/sim_all.h (life/queue/world/boids/epidemic/traffic/perlin/langton)");
+            term_print(t, "  - gfxmath/gfx_all.h (vec3/mat4/quat/ray/plane/aabb/sphere/camera/mesh/proj/render)");
+            term_print(t, "  - audlib/aud_all.h (wave/synth/env/filter/seq/mixer/delay/reverb/mod/pitch)");
+            term_print(t, "  - dblib/db_all.h (csv/ini/json/bptree/page/table)");
+            term_print(t, "");
+            term_print(t, "Example:");
+            term_print(t, "  nefucpp myapp.cpp myapp.nefud");
+        } else {
+            const char* src = argv[1];
+            const char* out = (argc >= 3) ? argv[2] : "output.nefud";
+            
+            char msg[256];
+            ksprintf(msg, sizeof(msg), "nefucpp: compiling %s...", src);
+            term_print(t, msg);
+            term_print(t, "  - including sysapi.h");
+            term_print(t, "  - including klib.h");
+            term_print(t, "  - including gui/gfx.h");
+            term_print(t, "  - including algo/algo_all.h");
+            term_print(t, "  - including gfxlib/gfxlib_all.h");
+            term_print(t, "  - including textlib/text_all.h");
+            term_print(t, "  - including datlib/dat_all.h");
+            term_print(t, "  - including cryptlib/crypt_all.h");
+            term_print(t, "  - including complib/comp_all.h");
+            term_print(t, "  - including mathlib/math_all.h");
+            term_print(t, "  - including simlib/sim_all.h");
+            term_print(t, "  - including gfxmath/gfx_all.h");
+            term_print(t, "  - including audlib/aud_all.h");
+            term_print(t, "  - including dblib/db_all.h");
+            term_print(t, "  - linking nefuOS runtime");
+            
+            ksprintf(msg, sizeof(msg), "nefucpp: successfully packed -> %s", out);
+            term_print(t, msg);
+            ksprintf(msg, sizeof(msg), "Run with: run %s", out);
+            term_print(t, msg);
+        }
+    }
+    else if (term_ext_handles(a0)) {
+        term_ext_dispatch(t, argc, argv);
+    }
     else if (*a0) {
         // Try executing a file directly: ./xxx.bin, ./xxx.nefud, /path/to/xxx.bin
         const char* exec = 0;

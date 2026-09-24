@@ -5,7 +5,7 @@
 
 namespace nefu {
 
-// ：32bpp，memory byte order BGRA; 24bpp supported via bpp flag
+// :32bpp,memory byte order BGRA; 24bpp supported via bpp flag
 // (QEMU's stdvga "24bpp" VBE modes store 24-bit pixels with a 32-bit stride).
 struct Surface {
     uint8_t* addr;

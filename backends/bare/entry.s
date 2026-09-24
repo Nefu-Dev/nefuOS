@@ -1,64 +1,64 @@
-# nefuOS 内核入口 — 链接基址 0x100000（GNU as AT&T 语法）
-# 双启动路径：
-#   A) 传统 ISO（El Torito，BIOS）：boot.s 加载压缩 payload，stub 解压内核到 0x100000 后 ljmp，
-#      落到本文件偏移 0 的 `jmp kernel_start`；bootinfo 已由 boot.s 写入 0x7000。
-#   B) UEFI ESP + GRUB：GRUB 按 multiboot2 协议把本文件加载到 0x100000，进入内核时
-#      EAX=0x36D76289（multiboot2 magic）、EBX=multiboot2 信息结构物理地址；
-#      本代码解析 framebuffer 标签，把 LFB/宽/高/pitch/bpp 写入 0x7000 同一布局。
-# 32 位保护模式进入：建页表 -> PAE -> 长模式 -> 64 位 -> 调用 nefuos_kernel_main
-# 页表布局：
+# nefuOS kernel entry — link base 0x100000 (GNU as AT&T syntax)
+# dual boot paths:
+#   A) legacy ISO (El Torito, BIOS): boot.s loads the compressed payload, the stub decompresses the kernel to 0x100000 and ljmps,
+#      landing on `jmp kernel_start` at offset 0 of this file; bootinfo was written by boot.s to 0x7000.
+#   B) UEFI ESP + GRUB: GRUB loads this file to 0x100000 per the multiboot2 protocol; on entry
+#      EAX=0x36D76289 (multiboot2 magic), EBX = physical address of the multiboot2 info structure;
+#      this code parses the framebuffer tag and writes LFB/width/height/pitch/bpp to the same 0x7000 layout.
+# 32-bit protected-mode entry: build page tables -> PAE -> long mode -> 64-bit -> call nefuos_kernel_main
+# page table layout:
 #   0x9000  PML4    0xA000  PDPT
 #   0xB000  PD0     0xD000  PD1     0xF000  PD2     0x11000 PD3
-# GDT64 位于 0x8F00；栈 0x1F000；堆 0x400000 起
+# GDT64 at 0x8F00; stack at 0x1F000; heap starts at 0x400000
 .section .text
 .code32
 
-# ---- 传统路径入口（stub 解压后 ljmp $0x18, $0x100000 落到这里）----
+# ---- legacy path entry (after stub decompress, ljmp $0x18, $0x100000 lands here) ----
 .globl _legacy_entry
 _legacy_entry:
-    jmp kernel_start          # 跳过 multiboot2 头（EB rel8，2 字节）
+    jmp kernel_start          # skip the multiboot2 header (EB rel8, 2 bytes)
     .org 0x8                  # 填充至 8 字节对齐：multiboot2 头位于 0x100008
 
-# ---- Multiboot2 头（GRUB 在镜像前 32KB 内扫描，须 8 字节对齐）----
+# ---- Multiboot2 header (GRUB scans within the first 32KB of the image; must be 8-byte aligned) ----
 multiboot2_header:
     .long 0xE85250D6                    # magic
-    .long 0                             # architecture: i386（32 位保护模式进入）
+    .long 0                             # architecture: i386 (32-bit protected-mode entry)
     .long mh_end - multiboot2_header    # header_length
     .long -(0xE85250D6 + (mh_end - multiboot2_header))   # checksum
-    # 请求 GRUB 用 GOP 设置 1024x768x32 线性帧缓冲，并以 framebuffer 标签回传
+    # ask GRUB to set up a 1024x768x32 linear framebuffer via GOP and return it in the framebuffer tag
     .align 8
     .short 5, 0                         # type=5 framebuffer, flags=0
     .long 20
     .long 1024, 768, 32                 # width, height, depth
-    # 地址标签：加载到 0x100000；load_end/bss_end 由构建脚本补丁（GRUB 负责清 .bss）
+    # address tag: load to 0x100000; load_end/bss_end patched by the build script (GRUB clears .bss)
     .align 8
     .short 2, 0                         # type=2 address, flags=0
     .long 24
-    .long multiboot2_header             # header_addr（ld 解析为绝对地址）
+    .long multiboot2_header             # header_addr (ld resolves to an absolute address)
     .long 0x100000                       # load_addr
-    .long 0                             # load_end_addr  <- 构建时补丁
-    .long 0                             # bss_end_addr   <- 构建时补丁
-    # 入口地址标签：从 kernel_start 进入
+    .long 0                             # load_end_addr  <- patched at build time
+    .long 0                             # bss_end_addr   <- patched at build time
+    # entry address tag: enter at kernel_start
     .align 8
     .short 3, 0                         # type=3 entry address, flags=0
     .long 12
     .long kernel_start
-    # 结束标签
+    # end tag
     .align 8
     .short 0, 0                         # type=0 end
     .long 8
 mh_end:
     .align 8
-kernel_boot_params:                     # 构建脚本补丁：.bss 起址/大小（两条路径共用，0x100000 基址）
-    .long 0                             # bss_start（绝对地址）
-    .long 0                             # bss_size（字节）
+kernel_boot_params:                     # build-script patch: .bss start/size (shared by both paths, 0x100000 base)
+    .long 0                             # bss_start (absolute address)
+    .long 0                             # bss_size (bytes)
 
 .globl kernel_start
 kernel_start:
     cli
-    cmpl $0x36D76289, %eax              # multiboot2 bootloader magic？
+    cmpl $0x36D76289, %eax              # multiboot2 bootloader magic?
     je grub_mb2_path
-    # ---- 传统路径：boot.s 已设置段寄存器（0x10）与 bootinfo(0x7000) ----
+    # ---- legacy path: boot.s already set the segment registers (0x10) and bootinfo (0x7000) ----
     movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
@@ -68,9 +68,9 @@ kernel_start:
     jmp common_init
 
 grub_mb2_path:
-    # ---- GRUB 路径：EBX = multiboot2 信息结构物理地址 ----
-    # 先把信息结构整体拷到 0x6000（原 VBE 区，本路径未用），避免解析时
-    # 对 0x7000 的 bootinfo 写入与信息结构重叠。
+    # ---- GRUB path: EBX = physical address of the multiboot2 info structure ----
+    # copy the whole info structure to 0x6000 (the unused VBE area on this path) so that
+    # the bootinfo writes to 0x7000 do not overlap the info structure.
     movl %ebx, %esi
     movl (%esi), %ecx                   # total_size
     cmpl $0x2000, %ecx
@@ -80,21 +80,21 @@ grub_mb2_path:
     movl $0x6000, %edi
     cld
     rep movsb
-    # ---- 遍历标签，找 type=8 framebuffer ----
-    movl $0x6008, %esi                  # 跳过信息头（u32 size + u32 reserved）
+    # ---- walk the tags, look for a type=8 framebuffer ----
+    movl $0x6008, %esi                  # skip the info header (u32 size + u32 reserved)
 .mb2_tag_loop:
     movl (%esi), %eax                   # type
     testl %eax, %eax
     jz .mb2_no_fb
     cmpl $8, %eax
     je .mb2_fb
-    movl 4(%esi), %ecx                  # 跳到下一个标签（8 字节对齐）
+    movl 4(%esi), %ecx                  # jump to the next tag (8-byte aligned)
     addl %ecx, %esi
     addl $7, %esi
     andl $~7, %esi
     jmp .mb2_tag_loop
 .mb2_fb:
-    # framebuffer 标签布局：+8 addr(lo32) +16 pitch +20 width +24 height +28 bpp
+    # framebuffer tag layout: +8 addr(lo32) +16 pitch +20 width +24 height +28 bpp
     movl 8(%esi), %eax
     movl %eax, 0x7000                   # LFB base
     movl 20(%esi), %eax
@@ -107,7 +107,7 @@ grub_mb2_path:
     movb %al, 0x7010                    # bpp
     jmp .mb2_fb_done
 .mb2_no_fb:
-    # GRUB 未提供 framebuffer（请求模式不可用等）：打探针 F 后停机，便于排查
+    # GRUB provided no framebuffer (requested mode unavailable, etc.): emit probe F then halt for debugging
     movw $0xE9, %dx
     movb $'F', %al
     outb %al, %dx
@@ -116,22 +116,22 @@ grub_mb2_path:
     hlt
     jmp .halt_no_fb
 .mb2_fb_done:
-    # 探针 g：GRUB bootinfo 就绪（LFB/宽/高/pitch/bpp 已写入 0x7000）
+    # probe g: GRUB bootinfo ready (LFB/width/height/pitch/bpp written to 0x7000)
     movw $0xE9, %dx
     movb $'g', %al
     outb %al, %dx
 
 common_init:
-    # 探针 e：段设置完成
+    # probe e: segment setup done
     movw $0xE9, %dx
     movb $'e', %al
     outb %al, %dx
-    # ---- 清零页表区 0x9000..0x13000 ----
+    # ---- zero the page-table area 0x9000..0x13000 ----
     movl $0x9000, %edi
     movl $((0x13000 - 0x9000) / 4), %ecx
     xorl %eax, %eax
     rep stosl
-    # 探针 f：页表区清零完成
+    # probe f: page-table area cleared
     movw $0xE9, %dx
     movb $'f', %al
     outb %al, %dx
@@ -144,7 +144,7 @@ common_init:
     movl $0xF003, 0xA010
     movl $0x11003, 0xA018
 
-    # ---- PD：0..128MB WB(0x83)，其余 UC(0x13)，2MB 大页，映射 0..4GB ----
+    # ---- PD: 0..128MB WB (0x83), rest UC (0x13), 2MB large pages, mapping 0..4GB ----
     xorl %ecx, %ecx
 .pd_loop:
     cmpl $2048, %ecx
@@ -155,7 +155,7 @@ common_init:
     cmpl $64, %ecx
     jb .pd_store
     andl $~0x83, %eax
-    orl $0x9B, %eax              # UC 2MB 大页 P+RW+PS+CD+WT（含 LFB 区）
+    orl $0x9B, %eax              # UC 2MB large page P+RW+PS+CD+WT (includes the LFB region)
 .pd_store:
     movl %ecx, %edx
     shrl $9, %edx
@@ -245,18 +245,18 @@ common_init:
 
     # ---- GDT64 ----
     lgdt gdt64_ptr
-    # 探针 a：LGDT 完成
+    # probe a: LGDT done
     movw $0xE9, %dx
     movb $'a', %al
     outb %al, %dx
 
-    # ---- 长模式 ----
+    # ---- long mode ----
     movl %cr4, %eax
     orl $0x20, %eax              # PAE
     movl %eax, %cr4
     movl $0x9000, %eax
     movl %eax, %cr3
-    # 探针 b：PAE+CR3 完成
+    # probe b: PAE+CR3 done
     movw $0xE9, %dx
     movb $'b', %al
     outb %al, %dx
@@ -264,14 +264,14 @@ common_init:
     rdmsr
     orl $0x100, %eax             # LME
     wrmsr
-    # 探针 c：LME 完成
+    # probe c: LME done
     movw $0xE9, %dx
     movb $'c', %al
     outb %al, %dx
     movl %cr0, %eax
     orl $0x80000001, %eax        # PG | PE
     movl %eax, %cr0
-    # 探针 d：PG 开启
+    # probe d: PG enabled
     movw $0xE9, %dx
     movb $'d', %al
     outb %al, %dx
@@ -286,7 +286,7 @@ common_init:
     movw %ax, %fs
     movw %ax, %gs
     movq $0x1F000, %rsp
-    # debugcon 探针：'L' = 长模式已进入
+    # debugcon probe: 'L' = long mode entered
     movw $0xE9, %dx
     movb $'L', %al
     outb %al, %dx
@@ -303,12 +303,12 @@ common_init:
     shrq $3, %rcx               # qword count
     xorl %eax, %eax
     rep stosq
-    # debugcon 探针：'B' = bss cleared
+    # debugcon probe: 'B' = bss cleared
     movw $0xE9, %dx
     movb $'B', %al
     outb %al, %dx
-    movq $0x7000, %rcx           # boot info（mingw x64 ABI：首参 RCX）
-    # debugcon 探针：'J' = about to call kernel_main
+    movq $0x7000, %rcx           # boot info (mingw x64 ABI: first arg in RCX)
+    # debugcon probe: 'J' = about to call kernel_main
     movw $0xE9, %dx
     movb $'J', %al
     outb %al, %dx
@@ -329,7 +329,7 @@ gdt64_ptr:
     .word gdt64_end - gdt64 - 1
     .quad gdt64
 
-# 大栈帧探测桩
+# large stack-frame probe stub
 .globl ___chkstk_ms
 ___chkstk_ms:
     ret

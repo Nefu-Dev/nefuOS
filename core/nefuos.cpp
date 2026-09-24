@@ -1,10 +1,11 @@
-// nefuOS system main entry：init、input dispatch、frame loop
+// nefuOS system main entry:init,input dispatch,frame loop
 #include "platform.h"
 #include "klib/klib.h"
 #include "gui/desktop.h"
 #include "gui/gfx.h"
 #include "gui/wm.h"
 #include "vfs/vfs.h"
+#include "vfs/nvfs.h"
 #include "apps/apps.h"
 #include "sys/settings.h"
 #include "sys/power.h"
@@ -149,7 +150,7 @@ static void lock_verify() {
     }
 }
 
-// （8x13，MSB=left）
+// (8x13,MSB=left)
 static const unsigned char CURSOR[13] = { 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xF0, 0xF0,
                                           0xF0, 0xE8, 0xCC, 0x8C, 0x0C, 0x08 };
 
@@ -172,19 +173,28 @@ void nefuos_init() {
     g_vfs = new VFS();
     uint8_t* data = 0;
     uint32_t sz = 0;
-    if (platform_fs_load(&data, &sz) && data && g_vfs->load(data, sz)) {
-        klogf("VFS loaded from storage (%u bytes)\n", sz);
+    bool storage = platform_fs_load(&data, &sz) && data;
+    if (storage && nvfs::load_image(data, sz) && nvfs::mount(0)) {
+        // Real NVFS image: journal replay already ran inside mount().
+        nvfs::nvfs_to_vfs();
+        klogf("NVFS mounted: %u bytes image, %u blocks free (%u inodes)\n",
+              sz, (unsigned)(nvfs::free_space() / 512), nvfs::used_inode_count());
+    } else if (storage && g_vfs->load(data, sz)) {
+        // Legacy NFS1 snapshot: keep the tree, convert it to NVFS on save.
+        klogf("legacy VFS snapshot loaded (%u bytes); converting to NVFS on save\n", sz);
+        nvfs::init();
     } else {
+        if (storage) nvfs::unmount();   // release the unreadable buffer
+        nvfs::init();
         g_vfs->create_default_tree();
-        klogf("VFS default tree created\n");
+        klogf("no NVFS image found: fresh filesystem + default tree\n");
     }
-    // even after loading an old snapshot the standard hierarchy must exist
+    // even after loading a snapshot the standard hierarchy must exist
     g_vfs->ensure_standard_dirs();
     g_vfs->ensure_default_files();
     // remove stray nodes left by an older browser_save_page that flattened
     // the whole path into a single name (e.g. "_usr_downloads_page_...")
     g_vfs->cleanup_stray_nodes();
-    if (data) kfree(data);
     settings_load();
     apps_preinstall_defaults();   // ship store apps pre-installed
     store_load();
@@ -219,11 +229,26 @@ void nefuos_init() {
 void nefuos_shutdown() {
     if (!s_inited) return;
     klogf("nefuOS shutdown\n");
-    uint8_t* data = 0;
-    uint32_t sz = 0;
-    if (g_vfs->save(&data, &sz)) {
-        platform_fs_save(data, sz);
-        kfree(data);
+    if (nvfs::is_mounted()) {
+        // Serialize the VFS tree into the NVFS image and flush the journal,
+        // then hand the whole image to the platform for persistence.
+        nvfs::vfs_to_nvfs();
+        uint8_t* img = 0;
+        uint32_t isz = 0;
+        if (nvfs::image(&img, &isz) && img) {
+            platform_fs_save(img, isz);
+            klogf("NVFS saved: %u bytes (%u blocks free, %u inodes)\n",
+                  isz, (unsigned)(nvfs::free_space() / 512), nvfs::used_inode_count());
+        }
+        nvfs::unmount();
+    } else {
+        // Defensive fallback: legacy flat snapshot (NVFS should always be up).
+        uint8_t* data = 0;
+        uint32_t sz = 0;
+        if (g_vfs->save(&data, &sz)) {
+            platform_fs_save(data, sz);
+            kfree(data);
+        }
     }
     s_inited = false;
 }
@@ -334,7 +359,8 @@ void nefuos_tick() {
             }
         }
     }
-    // animation /
+    // per-window animation / game update heartbeat
+    if (g_wm) g_wm->tick();
 }
 
 void nefuos_frame() {

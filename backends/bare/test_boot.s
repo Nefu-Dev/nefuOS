@@ -1,4 +1,4 @@
-# 最小测试引导扇区：VBE -> 读1扇区 -> 打印结果
+# minimal test boot sector: VBE -> read 1 sector -> print result
 .code16
 .org 0
 .section .text
@@ -12,7 +12,7 @@ _start:
     movw $0x7C00, %sp
     sti
     movb %dl, (0x7E00)
-    # 探针1: 'A' = 已启动
+    # probe 1: 'A' = started
     call dbg
     .byte 'A'
     # VBE 800x600x32
@@ -23,7 +23,7 @@ _start:
     jne .nofail
     call dbg
     .byte 'V'
-    # 0x4F01 模式信息回读到 0x6000（主引导同款）
+    # read the 0x4F01 mode-info block back to 0x6000 (same as the main bootloader)
     movw $0x4F01, %ax
     movw $0x4115, %cx
     xorw %di, %di
@@ -35,9 +35,9 @@ _start:
     call dbg
     .byte 'M'
 .nofail:
-    # cli 对照测试
+    # cli control test
     cli
-    # 读1：扇区 1-16（CHS 0,0,1）到 0x20000；用 0x7E02 存 count
+    # read 1: sectors 1-16 (CHS 0,0,1) to 0x20000; store the count in 0x7E02
     movw $0, (0x7E02)
     movb $0x02, %ah
     movb $16, %al
@@ -58,7 +58,7 @@ _start:
 .ok1:
     call dbg
     .byte 'D'
-    # 读2：扇区 17-18（CHS 0,0,17）到 0x22000；count 先加 16
+    # read 2: sectors 17-18 (CHS 0,0,17) to 0x22000; add 16 to count first
     movw $16, (0x7E02)
     movb $0x02, %ah
     movb $2, %al
@@ -73,7 +73,7 @@ _start:
     xorw %bx, %bx
     int $0x13
     jnc .ok
-    # 打印 AH 高四位
+    # print the high nibble of AH
     pushw %ax
     movb %ah, %al
     shrb $4, %al

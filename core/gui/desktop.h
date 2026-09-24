@@ -33,4 +33,9 @@ void nefuos_lock_screen();
 void lvgl_key_push(int keycode, char ascii);
 lv_group_t* lvgl_kb_group();
 
+// Start menu state: used by the window manager so open windows never draw
+// over the menu (the menu floats above windows) and clicks reach it first.
+bool start_menu_visible();
+void start_menu_rect(int* x1, int* y1, int* x2, int* y2);
+
 } // namespace nefu

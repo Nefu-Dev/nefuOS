@@ -1,22 +1,20 @@
-// nefuOS base library：memory、string、list、format
-// supports both host（Win32）and bare（freestanding）compile
+// nefuOS base library:memory,string,list,format
+// supports both host(Win32)and bare(freestanding)compile
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include <new>
 
-// ===================== global new/delete（use kalloc/kfree，） =====================
+// ===================== global new/delete(use kalloc/kfree,) =====================
 void* operator new(size_t sz);
 void* operator new[](size_t sz);
 void  operator delete(void* p) noexcept;
 void  operator delete[](void* p) noexcept;
-inline void* operator new(size_t sz, void* p) noexcept { (void)sz; return p; }
-inline void* operator new[](size_t sz, void* p) noexcept { (void)sz; return p; }
-inline void  operator delete(void* p, void* place) noexcept { (void)p; (void)place; }
-inline void  operator delete[](void* p, void* place) noexcept { (void)p; (void)place; }
+// placement new/delete 由标准 <new> 提供（上面已 include），此处不再重复定义
 
 namespace nefu {
 
-// ===================== memory（extern "C"，for compiler and library） =====================
+// ===================== memory(extern "C",for compiler and library) =====================
 extern "C" {
 void*  memcpy(void* dst, const void* src, size_t n);
 void*  memmove(void* dst, const void* src, size_t n);
@@ -29,15 +27,17 @@ char*  strcpy(char* dst, const char* src);
 char*  strncpy(char* dst, const char* src, size_t n);
 char*  strcat(char* dst, const char* src);
 char*  strchr(const char* s, int c);
+char*  strrchr(const char* s, int c);
 char*  strstr(const char* hay, const char* needle);
 int    atoi(const char* s);
 }
 
-// ===================== memory（extern "C"，for compiler and library） =====================
+// ===================== memory(extern "C",for compiler and library) =====================
 class String {
 public:
     String();
     String(const char* s);
+    String(const char* s, int len);   // binary-safe (may contain NULs)
     String(const String& o);
     ~String();
     String& operator=(const String& o);

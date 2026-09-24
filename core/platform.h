@@ -75,31 +75,42 @@ void platform_fs_save(const uint8_t* data, uint32_t size);
 
 // ===================== power off / exit =====================
 void platform_poweroff();
-void platform_reboot();    // 真实重启
-void platform_suspend();  // 待机/挂起
+void platform_reboot();    // really reboot
+void platform_suspend();  // standby / suspend
 
-// ===================== 完整硬件识别信息 =====================
+// ===================== full hardware identification info =====================
 struct HwInfo {
-    char cpu_model[64];      // CPU型号字符串
-    uint32_t cpu_mhz;        // CPU主频
-    uint64_t mem_total_mb;  // 物理总内存（MB）
-    char bios_version[32];   // BIOS/UEFI版本
-    char bios_vendor[32];    // BIOS厂商
-    uint8_t  cpu_cores;      // 核心数
+    char cpu_model[64];      // CPU model string
+    uint32_t cpu_mhz;        // CPU clock (MHz)
+    uint64_t mem_total_mb;  // total physical memory (MB)
+    char bios_version[32];   // BIOS/UEFI version
+    char bios_vendor[32];    // BIOS vendor
+    uint8_t  cpu_cores;      // core count
 };
-// 获取完整硬件信息（CPUID/系统探测）
+// get full hardware info (CPUID / system probing)
 bool platform_hw_info(HwInfo* out);
 
-// ===================== UEFI/BIOS配置 =====================
-struct UefiConfig {
-    char username[32];       // UEFI设置的用户名
-    char password_hash[65];  // login password hash (64 hex chars + NUL)
-    uint8_t  boot_timeout;   // 开机等待时间（秒）
-    bool     boot_splash;    // 是否显示开机启动页
-    char wallpaper_boot[32]; // 开机壁纸
-    char wallpaper_lock[32]; // 锁屏壁纸
+// ===================== UEFI/BIOS config =====================
+// custom boot entries: for dual/multi-boot (name + target device + type)
+#define NEFU_MAX_BOOT_ENTRIES 8
+struct UefiBootEntry {
+    char name[32];       // boot entry display name (e.g. "nefuOS", "Windows")
+    char device[16];     // target device / system id (e.g. "C:", "D:", "nefuOS")
+    char kind[16];       // type tag: "OS" / "Disk" / "ISO"
 };
-// 读取/写入UEFI配置（存在CMOS/RTC掉电存储区或VFS）
+struct UefiConfig {
+    char username[32];       // username set in UEFI settings
+    char password_hash[65];  // login password hash (64 hex chars + NUL)
+    uint8_t  boot_timeout;   // boot wait time (seconds)
+    bool     boot_splash;    // whether to show the boot splash page
+    char wallpaper_boot[32]; // boot wallpaper
+    char wallpaper_lock[32]; // lock-screen wallpaper
+    // ---- boot entries (multi-boot) ----
+    int  boot_first;         // index of the first boot device (uses the disk list when there are no custom entries)
+    int  boot_entry_count;   // number of custom boot entries
+    UefiBootEntry boot_entries[NEFU_MAX_BOOT_ENTRIES];
+};
+// read/write UEFI config (stored in CMOS/RTC battery-backed storage or VFS)
 bool platform_uefi_load(UefiConfig* out);
 bool platform_uefi_save(const UefiConfig* cfg);
 
@@ -116,6 +127,7 @@ struct NetAdapterInfo {
 };
 // Fills out with the active adapter. Returns false when no adapter is usable.
 bool platform_net_get(NetAdapterInfo* out);
+int platform_net_get_all(NetAdapterInfo* list, int max);  // returns count
 
 // host: real Wi-Fi scan via WlanGetAvailableNetworkList; bare: returns 0
 // (e1000 is wired). ssid is NUL-terminated, rssi in 0..100, open=true when
@@ -149,6 +161,34 @@ bool platform_play_wav(const char* path);
 bool platform_play_wav_mem(const uint8_t* data, uint32_t size);
 bool platform_play_wav_path(const char* path);   // core helper: VFS load + play_wav_mem
 void platform_stop_sound();
+
+// ===================== media (host: Media Foundation) =====================
+// Real decode + playback of common audio/video formats (whatever the OS
+// codecs provide: WAV/MP3/FLAC/AAC/M4A/WMA audio, MP4/MOV/AVI/WMV/MPG/3GP
+// video). The host backend streams decoded PCM through waveOut and hands
+// decoded RGB32 video frames to the caller. The bare backend stubs return
+// false / -1 and apps fall back to their demo content.
+bool  platform_media_available();
+// Open a REAL host-side media file. audio_only=true plays just the audio
+// track (music player); false decodes video frames too (video player).
+bool  platform_media_open(const char* host_path, bool audio_only);
+void  platform_media_close();
+bool  platform_media_play();
+bool  platform_media_pause();
+void  platform_media_stop();
+bool  platform_media_seek_sec(int sec);
+int   platform_media_position_sec();     // -1 = unknown
+int   platform_media_duration_sec();     // -1 = unknown
+void  platform_media_set_volume(int percent);  // 0..100
+bool  platform_media_has_video();
+// Native decoded video size (false when no video stream / no frame yet).
+bool  platform_media_frame_info(int* w, int* h);
+// Copy the newest decoded frame into out_rgba (RGB32, w*h*4 bytes, BGRA
+// memory order = nefuOS 0x00RRGGBB). Returns false when no frame available.
+bool  platform_media_grab_frame(uint8_t* out_rgba);
+// Real "open file" dialog on the host. Returns true and fills out_path with
+// the picked file. filter_desc/filter_pattern e.g. ("Media files","*.mp4;*.avi").
+bool  platform_host_file_dialog(char* out_path, int max, const char* filter_desc, const char* filter_pattern);
 
 // ===================== disk / block devices =====================
 // Real block-device enumeration. bare: ATA IDENTIFY probe on the legacy

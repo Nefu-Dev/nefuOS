@@ -352,9 +352,9 @@ bool jpeg_decode(const uint8_t* data, uint32_t size, Surface& out) {
                     int R = (y * 1024 + 1436 * crd) >> 10;
                     int G = (y * 1024 - 352 * cbd - 731 * crd) >> 10;
                     int B = (y * 1024 + 1815 * cbd) >> 10;
-                    if (R < 0) R = 0; if (R > 255) R = 255;
-                    if (G < 0) G = 0; if (G > 255) G = 255;
-                    if (B < 0) B = 0; if (B > 255) B = 255;
+                    if (R < 0) R = 0; else if (R > 255) R = 255;
+                    if (G < 0) G = 0; else if (G > 255) G = 255;
+                    if (B < 0) B = 0; else if (B > 255) B = 255;
                     out.setpx(gx, gy, ((uint32_t)R << 16) | ((uint32_t)G << 8) | (uint32_t)B);
                 }
             }
