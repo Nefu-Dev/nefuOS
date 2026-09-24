@@ -26,7 +26,7 @@ struct LabState {
     bool    generated;
 
     LabState() {
-        wave = WAVE_SINE;
+        wave = audsp::WAVE_SINE;
         freq = 440.0;
         attack = 0.01; decay = 0.1; sustain = 0.7; release = 0.2;
         cutoff = 4000.0;
@@ -178,7 +178,7 @@ static void lab_key(Window* w, const KeyEvent* e) {
     if (e->keycode == KEY_UP)   { s->freq *= 1.1; if (s->freq > 4000) s->freq = 4000; }
     if (e->keycode == KEY_DOWN) { s->freq /= 1.1; if (s->freq < 20) s->freq = 20; }
     if (e->keycode == KEY_ESC) g_wm->close_window(w);
-    w->invalidate();
+
 }
 
 static void lab_close(Window* w) {

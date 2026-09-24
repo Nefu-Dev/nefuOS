@@ -14,6 +14,8 @@
 
 namespace nefu {
 namespace mlapp {
+using namespace ml;
+using fx::fix;
 
 const int W = 520, H = 440;
 const int MAXPTS = 120;

@@ -85,7 +85,7 @@ struct FsView {
     }
 
     void paint(Surface& s) {
-        gfx::fill(0x001E1E2E);
+        gfx::fillrect(s, 0, 0, FS_W, FS_H, 0x001E1E2E);
         gfx::text_scale(s, 10, 10, "nefuOS File System Viewer", 0x0089B4FA, 0x001E1E2E, 2);
 
         // ---- 磁盘布局条 ----

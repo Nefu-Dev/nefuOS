@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 优化器实现
+// SGD+momentum / Adam / AdamW / RMSprop / AdaGrad。动量缓冲 fix** 数组在析构释放。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "optimizers.h"
 #include "autograd.h"
@@ -195,6 +197,38 @@ int optimizers_self_test() {
         fix l0 = lr_step(fx::fxf(1,10), 0, 100);
         fix l1 = lr_step(fx::fxf(1,10), 100, 100);
         if (l1 > l0) fails++;
+    }
+    // AdamW 步进不崩溃
+    {
+        fix v[2]={fx::FX_ONE,fx::FX_ONE};
+        Tensor p=t_from_flat(1,(int[1]){2},v); requires_grad(p);
+        p.grad[0]=fx::FX_HALF; p.grad[1]=fx::FX_HALF;
+        AdamW opt(fx::fxf(1,100)); opt.add(&p);
+        opt.step(); opt.zero_grad();
+        if (p.data[0] == fx::FX_ONE) fails++;  // 权重应被更新
+    }
+    // RMSprop 步进
+    {
+        fix v[2]={fx::FX_ONE,fx::FX_ONE};
+        Tensor p=t_from_flat(1,(int[1]){2},v); requires_grad(p);
+        p.grad[0]=fx::FX_HALF; p.grad[1]=fx::FX_HALF;
+        RMSprop opt(fx::fxf(1,100)); opt.add(&p);
+        opt.step(); opt.zero_grad();
+    }
+    // AdaGrad 步进
+    {
+        fix v[2]={fx::FX_ONE,fx::FX_ONE};
+        Tensor p=t_from_flat(1,(int[1]){2},v); requires_grad(p);
+        p.grad[0]=fx::FX_HALF; p.grad[1]=fx::FX_HALF;
+        AdaGrad opt(fx::fxf(1,100)); opt.add(&p);
+        opt.step(); opt.zero_grad();
+    }
+    // lr_step：起点=base，终点=base*final_ratio
+    {
+        fix l0 = lr_step(fx::FX_ONE, 0, 100);
+        fix le = lr_step(fx::FX_ONE, 100, 100);
+        if (!fx_close(l0, fx::FX_ONE, fx::fxf(2,100))) fails++;
+        if (le > fx::FX_HALF) fails++;
     }
     return fails;
 }

@@ -86,6 +86,14 @@ struct Camera {
     fix screen_to_world_x(int sx) const { return x + fx::itofix(sx); }
     fix screen_to_world_y(int sy) const { return y + fx::itofix(sy); }
 
+    // 平滑跟随目标点（居中）
+    void follow(const Vec2& target, fix dt_s, fix lerp_rate) {
+        fix tx = target.x - fx::itofix(view_w / 2);
+        fix ty = target.y - fx::itofix(view_h / 2);
+        x = x + fx::fx_mul(fx::fx_mul(tx - x, lerp_rate), dt_s);
+        y = y + fx::fx_mul(fx::fx_mul(ty - y, lerp_rate), dt_s);
+    }
+
     // 夹取相机到地图边界（不允许看到地图外）
     void clamp_to_map() {
         if (map_w_px > view_w && x > fx::itofix(map_w_px - view_w))

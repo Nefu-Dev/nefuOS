@@ -1,4 +1,8 @@
 ﻿// nefuOS 深度学习库 —— 自动微分磁带实现
+// 磁带：nefu::List<FnNode*> 全局 g_tape。
+// backward 逆序遍历：loss->grad=1，然后每个节点 apply() 把上游梯度按链式法则累加到输入。
+// tape_reset 释放全部节点（delete），但不释放张量数据/梯度。
+// step_clear = tape_reset + 把所有叶子 grad 清零（训练循环收尾）。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "autograd.h"
 #include "tensor.h"
@@ -97,6 +101,21 @@ int autograd_self_test() {
     if (!fx_close(ng[1], x.grad[0], fx::fxf(2,10))) fails++;
     if (!fx_close(ng[2], b.grad[0], fx::fxf(2,10))) fails++;
 
+    tape_reset();
+
+    // 第二个用例：z = matmul(W, x) 的链法则
+    tape_reset();
+    {
+        fix wv[4]={fx::FX_ONE,fx::FX_HALF, fx::FX_HALF,fx::FX_ONE};
+        fix xv[2]={fx::FX_ONE,fx::FX_ONE};
+        Tensor W=t_from_flat(2,(int[2]){2,2},wv); requires_grad(W);
+        Tensor x=t_from_flat(2,(int[2]){2,1},xv); requires_grad(x);
+        Tensor z=t_matmul(W,x);
+        Tensor s=t_sum_all(z);
+        backward(s);
+        if (!fx_close(W.grad[0], fx::FX_ONE, fx::fxf(5,100))) fails++;
+        if (!fx_close(x.grad[0], fx::fxf(15,10), fx::fxf(5,100))) fails++;
+    }
     tape_reset();
     return fails;
 }

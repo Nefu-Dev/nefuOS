@@ -1,6 +1,20 @@
-// nefuOS 深度学习库 —— 优化器
+﻿// nefuOS 深度学习库 —— 优化器
 // SGD+momentum / Adam / AdamW / RMSprop / AdaGrad / 学习率调度。
 // 优化器持有参数张量指针列表，step() 用 grad 更新 data 并清 grad。
+//
+// 基类约定：
+//   * params 持有 Tensor* 裸指针（生命期由调用方保证）；
+//   * step() 用 grad 更新 data，不分配新张量；
+//   * zero_grad() 把所有参数 grad 清零（朴素循环防 memset 优化）；
+//   * 析构时释放每个参数的动量/二阶矩缓冲（fix** 数组）。
+//
+// 学习率：fix 定点，base_lr 常用 fxf(1,100)=0.01。
+// SGD+momentum: v = mom*v + g; w -= lr*v
+// Adam:         m=b1*m+(1-b1)*g; v=b2*v+(1-b2)*g^2; w-=lr*m_hat/(sqrt(v_hat)+eps)
+// AdamW:        同 Adam，但权重衰减解耦：w -= lr*wd*w
+// RMSprop:      v=a*v+(1-a)*g^2; w-=lr*g/(sqrt(v)+eps)
+// AdaGrad:      v+=g^2; w-=lr*g/(sqrt(v)+eps)
+// 典型用法：Adam opt(lr); opt.add(&w); opt.step(); opt.zero_grad();
 #pragma once
 #include "tensor.h"
 

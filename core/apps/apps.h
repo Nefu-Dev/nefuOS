@@ -100,6 +100,14 @@ enum AppId {
     APP_MINESWEEPER2,      // advanced minesweeper
     APP_LIFE,              // game of life
     APP_MLLAB,             // machine learning lab
+    APP_REPL,
+    APP_SYSMON,
+    APP_NETLAB,
+    APP_FSVIEW,
+    APP_RAYVIEW,
+    APP_COMPILERLAB,
+    APP_GEDEMO,
+    APP_DEEPVIZ,
     APP_COUNT
 };
 
@@ -202,6 +210,8 @@ void netlab_launch();
 void fsview_launch();
 void rayview_launch();
 void compilerlab_launch();
+void gedemo_launch();
+void deepviz_launch();
 void wiki_launch();
 void download_list_launch();
 void lockscreen_launch();

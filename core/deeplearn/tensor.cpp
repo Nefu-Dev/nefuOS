@@ -3,6 +3,14 @@
 // 反向节点约定：输入张量以裸指针引用（调用方命名局部，生命期覆盖 backward）；
 // 输出的上游梯度只存堆缓冲指针 go（Tensor move 后堆地址不变），形状标量在前向时捕获。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")  // 防 -O2 把清零循环优化成 memset 栈崩溃
+//
+// 实现要点：
+//   * t_alloc 分配新张量（路由 kalloc）；t_zeros/t_ones/t_rand 为工厂。
+//   * elementwise 广播：某维为 1 时 map_coord 折叠；点积 int64 累加。
+//   * matmul [M,K]x[K,N] -> [M,N]，三重循环 int64 累加后 >>16。
+//   * softmax_row 减最大值防 exp 溢出；反向雅可比列和为 0。
+//   * t_gather_rows / t_where / t_l2_normalize_rows 为推理辅助。
+//   * 每个算子若输入 requires_grad，则输出挂对应 FnNode 推入磁带。
 #include "tensor.h"
 #include "autograd.h"
 
@@ -697,6 +705,64 @@ int tensor_self_test() {
         if (!fx_close(r0, fx::FX_ONE, fx::fxf(2,100))) fails++;
         if (!fx_close(r1, fx::FX_ONE, fx::fxf(2,100))) fails++;
     }
+    // sigmoid 反向：dL/dx = s(1-s)*dL/ds
+    {
+        tape_reset();
+        fix v[2] = {0, 0};
+        Tensor x = t_from_flat(1,(int[1]){2},v);
+        requires_grad(x);
+        Tensor s = t_sigmoid(x);   // s=0.5
+        Tensor sum = t_sum_all(s);
+        backward(sum);
+        // dL/dx = 0.5*0.5 = 0.25
+        if (!fx_close(x.grad[0], fx::FX_HALF/2, fx::fxf(15,100))) fails++;
+        tape_reset();
+    }
+    // softmax_row 反向：行和梯度为 0
+    {
+        tape_reset();
+        fix v[3]={fx::itofix(1),fx::itofix(2),fx::itofix(3)};
+        Tensor x = t_from_flat(2,(int[2]){1,3},v);
+        requires_grad(x);
+        Tensor s = t_softmax_row(x);
+        Tensor sum = t_sum_all(s);
+        backward(sum);
+        // 行梯度和应为 0（softmax 雅尔奇列和为 0）
+        fix64 g=0; for(int i=0;i<3;i++) g+=x.grad[i];
+        if (!fx_close((fix)g, 0, fx::fxf(20,100))) fails++;
+        tape_reset();
+    }
+    // t_gather_rows：按索引取行
+    {
+        fix v[6] = {fx::itofix(1),fx::itofix(2), fx::itofix(3),fx::itofix(4), fx::itofix(5),fx::itofix(6)};
+        Tensor x = t_from_flat(2,(int[2]){3,2},v);
+        int idx[3] = {2,0,1};
+        Tensor g = t_gather_rows(x, idx, 3);
+        if (g.shape[0]!=3 || g.shape[1]!=2) fails++;
+        if (!fx_close(g.data[0], fx::itofix(5), fx::fxf(1,100))) fails++;  // row2
+        if (!fx_close(g.data[2], fx::itofix(1), fx::fxf(1,100))) fails++;  // row0
+    }
+    // t_where：正取 a，负取 b
+    {
+        fix m[2]={fx::FX_ONE, -fx::FX_ONE};
+        fix a[2]={fx::itofix(5),fx::itofix(5)};
+        fix b[2]={fx::itofix(9),fx::itofix(9)};
+        Tensor M=t_from_flat(1,(int[1]){2},m);
+        Tensor A=t_from_flat(1,(int[1]){2},a);
+        Tensor B=t_from_flat(1,(int[1]){2},b);
+        Tensor r=t_where(M,A,B);
+        if (!fx_close(r.data[0], fx::itofix(5), fx::fxf(1,100))) fails++;
+        if (!fx_close(r.data[1], fx::itofix(9), fx::fxf(1,100))) fails++;
+    }
+    // l2_normalize_rows：单位行
+    {
+        fix v[4]={fx::itofix(3),fx::itofix(4), 0,0};
+        Tensor x=t_from_flat(2,(int[2]){2,2},v);
+        Tensor y=t_l2_normalize_rows(x);
+        // 第一行 [3,4] 归一化为 [0.6,0.8]
+        if (!fx_close(y.data[0], fx::fxf(6,10), fx::fxf(5,100))) fails++;
+        if (!fx_close(y.data[1], fx::fxf(8,10), fx::fxf(5,100))) fails++;
+    }
     return fails;
 }
 // ==================== 扩展 elementwise（追加） ====================
@@ -1002,7 +1068,7 @@ struct SoftmaxRowNode : FnNode {
             fix64 sdot = 0;
             for (int c=0;c<C;c++)
                 sdot += (fix64)fx::fx_mul(go[i*C+c], rdata[i*C+c]);
-            fix s = (fix)(sdot >> 16);
+            fix s = (fix)sdot;   // sdot 已是 Q16.16 累加
             for (int c=0;c<C;c++) {
                 fix diff = go[i*C+c] - s;
                 in->grad[i*C+c] += fx::fx_mul(rdata[i*C+c], diff);
@@ -1031,6 +1097,43 @@ Tensor t_softmax_row(const Tensor& a) {
         SoftmaxRowNode* n = new SoftmaxRowNode();
         n->in=(Tensor*)&a; n->go=r.grad; n->rdata=r.data; n->N=N; n->C=C;
         r.fn=n; tape_push(n);
+    }
+    return r;
+}
+
+// t_gather_rows：沿 dim=0 按索引取行（用于 Embedding）
+Tensor t_gather_rows(const Tensor& x, const int* idx, int M) {
+    int inner = x.size / x.shape[0];   // 每行元素数
+    int ns[Tensor::MAX_DIM]; ns[0] = M;
+    for (int d = 1; d < x.nd; d++) ns[d] = x.shape[d];
+    Tensor r = t_alloc(x.nd, ns);
+    for (int i = 0; i < M; i++) {
+        int row = idx[i];
+        if (row < 0) row = 0;
+        if (row >= x.shape[0]) row = x.shape[0]-1;
+        for (int j = 0; j < inner; j++)
+            r.data[i*inner+j] = x.data[row*inner+j];
+    }
+    return r;
+}
+
+// t_where：逐元素选择
+Tensor t_where(const Tensor& mask, const Tensor& a, const Tensor& b) {
+    Tensor r = t_alloc(a.nd, a.shape);
+    for (int i = 0; i < a.size; i++)
+        r.data[i] = (mask.data[i] >= 0) ? a.data[i] : b.data[i];
+    return r;
+}
+
+// t_l2_normalize_rows：每行 L2 归一化
+Tensor t_l2_normalize_rows(const Tensor& x) {
+    int N=x.shape[0], D=x.shape[1];
+    Tensor r = t_alloc(2, x.shape);
+    for (int i=0;i<N;i++) {
+        fix64 s=0;
+        for (int j=0;j<D;j++) { fix v=x.data[i*D+j]; s += (fix64)v*v; }
+        fix inv = fx::fx_div(fx::FX_ONE, fx::fx_sqrt((fix)(s>>16)) + fx::FX_HALF/100);
+        for (int j=0;j<D;j++) r.data[i*D+j]=fx::fx_mul(x.data[i*D+j], inv);
     }
     return r;
 }

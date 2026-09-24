@@ -1,4 +1,6 @@
-// nefuOS 深度学习库 —— 评估指标实现
+﻿// nefuOS 深度学习库 —— 评估指标实现
+// 准确率/精确率/召回率/F1/MAE，全定点。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "metrics.h"
 #include "activations.h"
@@ -92,6 +94,19 @@ int metrics_self_test() {
         fix f1 = metric_f1(tp,fp,fn);
         // tp=1,fp=1,fn=1 -> P=0.5,R=0.5 -> F1=0.5
         if (!fx_close(f1, fx::FX_HALF, tol)) fails++;
+    }
+    // MAE：pred=0, labels=[1,1] -> 1
+    {
+        fix p[2]={0,0};
+        Tensor pr=t_from_flat(1,(int[1]){2},p);
+        fix l[2]={fx::FX_ONE,fx::FX_ONE};
+        fix m=metric_mae(pr,l,2);
+        if (!fx_close(m, fx::FX_ONE, fx::fxf(5,100))) fails++;
+    }
+    // F1：tp=2,fp=0,fn=0 -> 1
+    {
+        fix f1=metric_f1(2,0,0);
+        if (!fx_close(f1, fx::FX_ONE, fx::fxf(5,100))) fails++;
     }
     return fails;
 }

@@ -1,4 +1,12 @@
-// nefuOS 深度学习库 —— 训练循环封装
+﻿// nefuOS 深度学习库 —— 训练循环封装
+// 典型用法：
+//   Trainer tr(epochs, print_every);
+//   tr.run([&](int ep){ /* 前向+反向+step */ });
+//   CosineScheduler cs(base_lr, final_lr, warmup, total);
+//   lr = cs.lr(step);
+//
+// Trainer 只驱动 epoch，不持有模型结构；fn 回调负责前向+反向+step。
+// CosineScheduler：先 warmup 线性升，再余弦衰减到 final_lr。
 // Trainer：把 DataSet + 参数列表 + 优化器绑在一起，按 epoch/batch 训练，
 // 记录损失历史。仅负责驱动，不持有模型结构（模型 forward 由调用方提供回调）。
 #pragma once

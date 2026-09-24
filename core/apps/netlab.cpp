@@ -28,6 +28,7 @@
 
 namespace nefu {
 namespace netlab {
+using namespace netproto;
 
 const int LAB_W = 620, LAB_H = 440;
 
@@ -43,6 +44,7 @@ enum Page {
     PAGE_HTTP,        // HTTP 演示
     PAGE_MQTT,        // MQTT 演示
     PAGE_WS,          // WebSocket 演示
+    PAGE_DHCP,        // DHCP 演示
     PAGE_HELP,        // 帮助
     PAGE_TEST,        // self_test 结果
     PAGE_COUNT

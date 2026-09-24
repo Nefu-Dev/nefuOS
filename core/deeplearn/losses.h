@@ -1,4 +1,15 @@
-// nefuOS 深度学习库 —— 损失函数（全定点）
+﻿// nefuOS 深度学习库 —— 损失函数（全定点）
+//
+// 所有损失返回标量张量（size=1），可直接 backward。
+// 典型用法：Tensor l = loss_mse(pred, target); backward(l);
+// MSE:     mean((pred-target)^2)
+// BCE:     sigmoid 交叉熵（数值稳定）
+// Huber:   二次/线性混合，抗异常值
+// CE:      softmax + NLL，梯度为 (softmax-onehot)/N
+// NLL:     已有 log_softmax 上的 -lp[label]
+// KL:      target*(log(target)-log_p)
+// Hinge:   多类 SVM margin loss
+// Contrastive: 正样本对拉近，负样本对推远
 // MSE / BCE / Huber / CrossEntropy(带标签) / Contrastive。
 // 所有损失返回标量张量（size=1），可直接 backward。
 #pragma once

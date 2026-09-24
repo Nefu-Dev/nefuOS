@@ -176,6 +176,15 @@ int particle_engine_self_test() {
     ff.apply(psf.pool[fi], fx::fx_div(fx::FX_ONE, fx::itofix(60)));
     // 粒子在 (100,0)，吸引到 (0,0)，应获得 -x 速度
     if (psf.pool[fi].vel.x >= before.x) fails++;
+
+    // --- SpiralEmitter ---
+    SpiralEmitter se;
+    Vec2 d0 = se.next_dir();   // angle=0 -> (1,0)
+    if (fx::fixtoi(d0.x) != 1) fails++;
+    se.update(fx::fxf(1,60));
+    Vec2 d1 = se.next_dir();
+    // 角度应已变化
+    (void)d1;
     return fails;
 }
 

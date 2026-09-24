@@ -1,4 +1,19 @@
-// nefuOS 深度学习库 —— 激活函数（全定点 Q16.16）
+﻿// nefuOS 深度学习库 —— 激活函数（全定点 Q16.16）
+//
+// 全部定点实现：
+//   ReLU:      max(0,x)
+//   LeakyReLU: x>0 ? x : 0.01*x
+//   ELU:       x>0 ? x : alpha*(e^x-1)
+//   GELU:      x*sigmoid(1.702*x)（近似）
+//   Sigmoid:   1/(1+e^-x)
+//   Tanh:      (e^{2x}-1)/(e^{2x}+1)
+//   Softmax:   每行 exp/sum exp（数值稳定减最大值）
+//   Swish:     x*sigmoid(x)
+//   Hardswish: x*relu6(x+3)/6
+//   Mish:      x*tanh(softplus(x))
+//   Softplus:  ln(1+e^x)
+// 所有激活自动挂反向节点。
+// 典型用法：Tensor y = act_relu(x);
 // 每个激活返回新张量并注册反向节点。Sigmoid/Tanh 用 fx_exp，
 // GELU/Swish 用近似。Softmax 沿最后一维归一。
 #pragma once

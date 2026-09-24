@@ -1,7 +1,19 @@
-// nefuOS 深度学习库 —— 层实现
+﻿// nefuOS 深度学习库 —— 层实现
 // Dense / Conv2D / MaxPool2D / AvgPool2D / Flatten / Dropout /
 // BatchNorm / LayerNorm / Embedding。
 // 层是持有参数 Tensor 的结构体；forward 复用 tensor/activations 的反向节点。
+//
+// 各层形状约定：
+//   Dense:     x[B,in] @ W[in,out] + b[out] -> [B,out]（广播加偏置）
+//   Conv2D:    x[N,Ci,H,W] -> [N,K,OH,OW]，核 [K,Ci,R,S]
+//   MaxPool:   2x2 步长 2 -> 减半
+//   AvgPool:   2x2 平均 -> 减半
+//   Flatten:   [N,...] -> [N,-1]
+//   Dropout:   训练时按 p 置零并缩放，推理直通
+//   BatchNorm: 按通道归一化（训练用 batch 统计）
+//   LayerNorm: 最后一维归一化（gamma/beta 可学习）
+//   Embedding: ids[N] -> [N,D]，查表 table[V,D]
+// 所有参数 requires_grad=true，forward 自动挂反向节点。
 // 参数通过 params() 收集，交给优化器更新。
 #pragma once
 #include "tensor.h"

@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 激活函数实现
+// 全部激活函数定点实现，自动挂反向节点。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "activations.h"
 #include "autograd.h"
@@ -319,6 +321,38 @@ int activations_self_test() {
         Tensor x = t_from_flat(1,(int[1]){1},v);
         Tensor y = act_gelu(x);
         if (!fx_close(y.data[0], 0, fx::fxf(5,100))) fails++;
+    }
+    // LeakyReLU：正段直通，负段斜率 0.01
+    {
+        fix v[2]={fx::FX_ONE, -fx::FX_ONE};
+        Tensor x=t_from_flat(1,(int[1]){2},v);
+        Tensor y=act_leaky_relu(x);
+        if (!fx_close(y.data[0], fx::FX_ONE, fx::fxf(2,100))) fails++;
+        if (y.data[1] >= 0) fails++;  // 负段保留负值
+    }
+    // ELU(0)=0
+    {
+        fix v[1]={0};
+        Tensor x=t_from_flat(1,(int[1]){1},v);
+        Tensor y=act_elu(x);
+        if (!fx_close(y.data[0], 0, fx::fxf(2,100))) fails++;
+    }
+    // Swish(0)=0
+    {
+        fix v[1]={0};
+        Tensor x=t_from_flat(1,(int[1]){1},v);
+        Tensor y=act_swish(x);
+        if (!fx_close(y.data[0], 0, fx::fxf(2,100))) fails++;
+    }
+    // Softmax 每行和为 1
+    {
+        fix v[6]={fx::itofix(1),fx::itofix(2),fx::itofix(3), 0,0,0};
+        Tensor x=t_from_flat(2,(int[2]){2,3},v);
+        Tensor y=act_softmax(x);
+        fix s0=y.data[0]+y.data[1]+y.data[2];
+        fix s1=y.data[3]+y.data[4]+y.data[5];
+        if (!fx_close(s0, fx::FX_ONE, fx::fxf(5,100))) fails++;
+        if (!fx_close(s1, fx::FX_ONE, fx::fxf(5,100))) fails++;
     }
     return fails;
 }

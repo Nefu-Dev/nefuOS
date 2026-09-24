@@ -164,7 +164,15 @@ const char* app_name(int id) {
     case APP_CONNECT4: return T("四子棋", "Connect Four");
     case APP_MINESWEEPER2: return T("高级扫雷", "Minesweeper Pro");
     case APP_LIFE: return T("生命游戏", "Game of Life");
-    case APP_MLLAB: return T("机器学习实验室", "ML Lab");`r`n    case APP_REPL: return T("迷你解释器", "Mini REPL");`r`n    case APP_SYSMON: return T("系统监视器", "SysMon");`r`n    case APP_NETLAB: return T("网络实验室", "NetLab");`r`n    case APP_FSVIEW: return T("文件系统查看器", "FSView");`r`n    case APP_RAYVIEW: return T("光线追踪", "RayView");`r`n    case APP_COMPILERLAB: return T("编译器实验室", "CompilerLab");
+    case APP_MLLAB: return T("机器学习实验室", "ML Lab");
+    case APP_REPL: return T("迷你解释器", "Mini REPL");
+    case APP_SYSMON: return T("系统监视器", "SysMon");
+    case APP_NETLAB: return T("网络实验室", "NetLab");
+    case APP_FSVIEW: return T("文件系统查看器", "FSView");
+    case APP_RAYVIEW: return T("光线追踪", "RayView");
+    case APP_COMPILERLAB: return T("编译器实验室", "CompilerLab");
+    case APP_GEDEMO: return T("游戏引擎演示", "GE Demo");
+    case APP_DEEPVIZ: return T("深度学习可视化", "DeepViz");
     default: return "?";
     }
 }
@@ -457,7 +465,15 @@ void app_launch(int id) {
     case APP_CONNECT4: connect4_launch(); break;
     case APP_MINESWEEPER2: minesweeper2_launch(); break;
     case APP_LIFE: life_launch(); break;
-    case APP_MLLAB: mllab_launch(); break;`r`n    case APP_REPL: repl_launch(); break;`r`n    case APP_SYSMON: sysmon_launch(); break;`r`n    case APP_NETLAB: netlab_launch(); break;`r`n    case APP_FSVIEW: fsview_launch(); break;`r`n    case APP_RAYVIEW: rayview_launch(); break;`r`n    case APP_COMPILERLAB: compilerlab_launch(); break;
+    case APP_MLLAB: mllab_launch(); break;
+    case APP_REPL: repl_launch(); break;
+    case APP_SYSMON: sysmon_launch(); break;
+    case APP_NETLAB: netlab_launch(); break;
+    case APP_FSVIEW: fsview_launch(); break;
+    case APP_RAYVIEW: rayview_launch(); break;
+    case APP_COMPILERLAB: compilerlab_launch(); break;
+    case APP_GEDEMO: gedemo_launch(); break;
+    case APP_DEEPVIZ: deepviz_launch(); break;
 #ifdef NEFU_LVGL_DEMO
     case APP_LVGLDEMO: lvgl_demo_launch(); break;
 #endif

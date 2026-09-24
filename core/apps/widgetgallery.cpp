@@ -11,6 +11,7 @@
 namespace nefu {
 namespace {
 
+using namespace ui;
 const int GW = 680, GH = 460;   // 离屏缓冲尺寸
 
 // 画廊状态

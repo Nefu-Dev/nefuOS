@@ -166,7 +166,15 @@ static const char* icon_label(int app) {
     case APP_CONNECT4:  return T("四子棋", "Connect Four");
     case APP_MINESWEEPER2: return T("高级扫雷", "Minesweeper Pro");
     case APP_LIFE:      return T("生命游戏", "Game of Life");
-    case APP_MLLAB:     return T("机器学习实验室", "ML Lab");`r`n    case APP_REPL:      return T("迷你解释器", "Mini REPL");`r`n    case APP_SYSMON:    return T("系统监视器", "SysMon");`r`n    case APP_NETLAB:    return T("网络实验室", "NetLab");`r`n    case APP_FSVIEW:    return T("文件系统", "FSView");`r`n    case APP_RAYVIEW:   return T("光线追踪", "RayView");`r`n    case APP_COMPILERLAB: return T("编译器", "Compiler");
+    case APP_MLLAB:     return T("机器学习实验室", "ML Lab");
+    case APP_REPL:      return T("迷你解释器", "Mini REPL");
+    case APP_SYSMON:    return T("系统监视器", "SysMon");
+    case APP_NETLAB:    return T("网络实验室", "NetLab");
+    case APP_FSVIEW:    return T("文件系统", "FSView");
+    case APP_RAYVIEW:   return T("光线追踪", "RayView");
+    case APP_COMPILERLAB: return T("编译器", "Compiler");
+    case APP_GEDEMO: return T("游戏引擎", "GE Demo");
+    case APP_DEEPVIZ: return T("深度学习", "DeepViz");
     default: return T("未知应用", "Unknown");
     }
 }
@@ -846,7 +854,15 @@ static uint32_t icon_color(int app) {
     case APP_CONNECT4:    return 0x2980B9;
     case APP_MINESWEEPER2: return 0x27AE60;
     case APP_LIFE:        return 0x9B59B6;
-    case APP_MLLAB:       return 0xE74C3C;`r`n    case APP_REPL:        return 0x2C3E50;`r`n    case APP_SYSMON:      return 0x1ABC9C;`r`n    case APP_NETLAB:      return 0x2980B9;`r`n    case APP_FSVIEW:      return 0x89B4FA;`r`n    case APP_RAYVIEW:     return 0x3498DB;`r`n    case APP_COMPILERLAB: return 0xE67E22;
+    case APP_MLLAB:       return 0xE74C3C;
+    case APP_REPL:        return 0x2C3E50;
+    case APP_SYSMON:      return 0x1ABC9C;
+    case APP_NETLAB:      return 0x2980B9;
+    case APP_FSVIEW:      return 0x89B4FA;
+    case APP_RAYVIEW:     return 0x3498DB;
+    case APP_COMPILERLAB: return 0xE67E22;
+    case APP_GEDEMO: return 0x27AE60;
+    case APP_DEEPVIZ: return 0x9B59B6;
     case APP_WEATHER:    return 0x3498DB;
     case APP_HELP:       return 0x9B59B6;
     case APP_DICTIONARY: return 0xE67E22;

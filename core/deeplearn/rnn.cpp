@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 循环网络实现
+// RNN/LSTM/GRU cell 融合前向（不挂反向节点，BPTT 由高层展开）。BiRNN 双向拼接。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "rnn.h"
 #include "autograd.h"
@@ -222,4 +224,58 @@ int rnn_self_test() {
     }
     // LSTM cell 单步（2D 输入 [1,D]）
     {
-        LSTMCell lst
+        LSTMCell lstm(3,4,7);
+        fix xv[3]={fx::FX_HALF,0,fx::FX_HALF};
+        fix hv[4]={0,0,0,0};
+        fix cv[4]={0,0,0,0};
+        Tensor x=t_from_flat(2,(int[2]){1,3},xv);
+        Tensor h=t_from_flat(2,(int[2]){1,4},hv);
+        Tensor c=t_from_flat(2,(int[2]){1,4},cv);
+        Tensor oc=t_zeros(2,(int[2]){1,4});
+        Tensor nh=lstm.forward(x,h,c,oc);
+        if (nh.shape[1]!=4) fails++;
+    }
+    // GRU cell 单步
+    {
+        GRUCell gru(3,4,8);
+        fix xv[3]={fx::FX_HALF,0,fx::FX_HALF};
+        fix hv[4]={0,0,0,0};
+        Tensor x=t_from_flat(2,(int[2]){1,3},xv);
+        Tensor h=t_from_flat(2,(int[2]){1,4},hv);
+        Tensor nh=gru.forward(x,h);
+        if (nh.shape[1]!=4) fails++;
+    }
+    // RNN 序列前向：[T=3,D=2] -> [3,H=4]
+    {
+        RNNCell cell(2,4,9);
+        fix xs[6]={fx::FX_ONE,0, 0,fx::FX_ONE, fx::FX_HALF,fx::FX_HALF};
+        fix h0[4]={0,0,0,0};
+        Tensor seq=t_from_flat(2,(int[2]){3,2},xs);
+        Tensor hid=t_from_flat(2,(int[2]){1,4},h0);
+        Tensor out=rnn_forward_sequence(cell,seq,hid);
+        if (out.shape[0]!=3 || out.shape[1]!=4) fails++;
+    }
+    // RNNCell params 数量
+    {
+        RNNCell cell(4,6,1);
+        List<Tensor*> ps; cell.params(ps);
+        if (ps.size() != 3) fails++;  // Wxh Whh b
+    }
+    // LSTM params 数量
+    {
+        LSTMCell cell(4,6,2);
+        List<Tensor*> ps; cell.params(ps);
+        if (ps.size() != 3) fails++;  // Wx Wh b
+    }
+    // GRU params 数量
+    {
+        GRUCell cell(4,6,3);
+        List<Tensor*> ps; cell.params(ps);
+        if (ps.size() != 3) fails++;
+    }
+    return fails;
+}
+
+
+} // namespace deeplearn
+} // namespace nefu

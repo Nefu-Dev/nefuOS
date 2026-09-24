@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 损失函数实现
+// 损失函数返回标量，可直接 backward。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "losses.h"
 #include "autograd.h"
@@ -165,8 +167,7 @@ Tensor loss_cross_entropy(const Tensor& pred, const int* labels, int N) {
 struct ContrastiveNode : FnNode {
     Tensor* a; Tensor* b;
     fix* go;
-    const uint8_t* match;
-    int N, D; fix margin;
+    int N, D; const uint8_t* match; fix margin;
     void apply() override {
         if (!a->grad || !b->grad) return;
         for (int i = 0; i < N; i++) {
@@ -199,10 +200,10 @@ Tensor loss_contrastive(const Tensor& a, const Tensor& b, const uint8_t* match, 
         fix64 d2 = 0;
         for (int d = 0; d < D; d++) { fix df = a.data[i*D+d]-b.data[i*D+d]; d2 += (fix64)df*df; }
         fix dist = fx::fx_sqrt((fix)(d2 >> 16));
-        fix l;
-        if (match[i]) l = fx::fx_mul(fx::fxf(1,2), fx::fx_div((fix)(d2>>16), fx::FX_ONE));
-        else { fix m = margin-dist; l = m > 0 ? fx::fx_mul(fx::fxf(1,2), fx::fx_mul(m,m)) : 0; }
-        acc += l;
+        fix li;
+        if (match[i]) li = fx::fx_mul(fx::fxf(1,2), fx::fx_div((fix)(d2>>16), fx::FX_ONE));
+        else { fix m = margin-dist; li = m > 0 ? fx::fx_mul(fx::fxf(1,2), fx::fx_mul(m,m)) : 0; }
+        acc += li;
     }
     fix sh[1] = { 1 };
     Tensor r = t_zeros(1, sh);
@@ -401,6 +402,17 @@ int losses_self_test() {
         Tensor P = t_from_flat(2,(int[2]){2,2},q);
         Tensor kl = loss_kl_div(P, Q);
         if (!fx_close(kl.data[0], 0, fx::fxf(50,100))) fails++;  // 输入为概率近似，仅检查量级
+    }
+    // CrossEntropy：错误类别 logit 最大 -> loss 较大
+    {
+        tape_reset();
+        fix v[3]={fx::itofix(5),0,0};
+        Tensor lg=t_from_flat(2,(int[2]){1,3},v);
+        requires_grad(lg);
+        int labels[1]={1};
+        Tensor l=loss_cross_entropy(lg,labels,1);
+        if (l.data[0] < fx::fxf(5,10)) fails++;
+        tape_reset();
     }
     return fails;
 }

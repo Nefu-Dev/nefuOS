@@ -340,6 +340,14 @@ int ge_math_self_test() {
     if (fx::fixtoi(m) != 50) fails++;
     fix s = fx_smooth(fx::itofix(0), fx::itofix(100), fx::itofix(2), fx::fxf(1,60));
     if (s <= 0 || s >= fx::itofix(100)) fails++;
+
+    // --- ColorGradient ---
+    ColorGradient gr;
+    gr.add(0, 0xFF000000);
+    gr.add(fx::FX_ONE, 0xFFFFFFFF);
+    uint32_t mid = gr.sample(fx::FX_HALF);
+    Color mg = Color::unpack(mid);
+    if (mg.r < 100 || mg.r > 155) fails++;
     return fails;
 }
 

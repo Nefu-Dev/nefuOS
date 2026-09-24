@@ -1,4 +1,14 @@
-// nefuOS 深度学习库 —— 高阶模型包装
+﻿// nefuOS 深度学习库 —— 高阶模型包装
+// 典型用法：
+//   MLP net({2,3,1});
+//   auto p = net.forward(x);  // 注意：跨函数 backward 会悬空
+//   // self_test 只做形状检查，不做收敛训练。
+//
+// MLP：sizes[0..n-1] 指定每层宽度，构造 n-1 个 Dense。
+//   hidden_act: 0=ReLU 1=tanh 2=线性。
+//   注意：跨函数 forward 返回的中间张量在返回后析构，
+//   不要在另一个函数里对其 backward（会悬空死循环）。
+// TinyCNN：Conv2d->ReLU->MaxPool->Flatten->Dense->out，单通道。
 // Sequential MLP / 简单卷积分类器 / 回归头。
 // 复用 Dense/Conv2D/Pool/激活，统一 forward + params + save/load 占位。
 #pragma once

@@ -73,9 +73,9 @@ struct ViewState {
 
         // 相机
         Vec3 eye(0, 0, dist);
-        Vec3 target(0, 0, 0);
+        Vec3 center(0, 0, 0);
         Vec3 up(0, 1, 0);
-        Mat4 view = mat4_look_at(eye, target, up);
+        Mat4 view = mat4_look_at(eye, center, up);
         Mat4 proj = mat4_perspective(deg2rad(60.0), (double)VW / VH, 0.1, 100);
         Mat4 vp = proj * view;
 

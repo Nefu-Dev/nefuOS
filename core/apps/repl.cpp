@@ -173,7 +173,7 @@ static void repl_close(Window* w) {
     w->userdata = 0;
 }
 
-void minilang_repl_launch() {
+void nefu::repl_launch() {
     int x, y;
     cascade_pos(&x, &y);
     Window* w = g_wm->create_window("MiniLang REPL", x, y, REPL_W, REPL_H);

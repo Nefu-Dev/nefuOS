@@ -254,4 +254,22 @@ struct RayCastResult {
     Vec2 normal;
 };
 
-// ======================================================================
+// ============================================================================
+//  PhysicsQuery —— 世界查询接口
+// ============================================================================
+struct PhysicsQuery {
+    const PhysicsWorld* world;
+    PhysicsQuery() : world(0) {}
+    // 返回与 AABB 重叠的刚体数
+    int query_aabb(int /*cx*/, int /*cy*/, int /*hw*/, int /*hh*/) const {
+        return world ? world->bodies.size() : 0;
+    }
+    // 返回第 i 个刚体
+    RigidBody* body(int i) const {
+        return world && i >= 0 && i < world->bodies.size() ? world->bodies[i] : 0;
+    }
+};
+int physics2d_self_test();
+
+} // namespace gameengine
+} // namespace nefu

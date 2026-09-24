@@ -1,5 +1,18 @@
-// nefuOS 深度学习库 —— 循环网络
+﻿// nefuOS 深度学习库 —— 循环网络
 // RNN / LSTM / GRU cell，序列前向。权重复用 tensor 算子，反向自动走磁带。
+// 典型用法：
+//   RNNCell cell(D, H);
+//   Tensor h = cell.forward(x, h_prev);
+//   BiRNN bi(D,H); bi.forward(seq, T);
+//
+// 前向公式（全定点）：
+//   RNN:  h_t = tanh(Wxh @ x_t + Whh @ h_{t-1} + b)
+//   LSTM: i=sigmoid(...), f=sigmoid(...), g=tanh(...), o=sigmoid(...)
+//          c_t = f*c_{t-1} + i*g ; h_t = o*tanh(c_t)
+//   GRU:  z=sigmoid, r=sigmoid, h~=tanh(Wx x + Wh(r*h))
+//          h_t = (1-z)*h_{t-1} + z*h~
+// 输入约定：x[D] 为 2D [1,D]，h[H] 为 2D [1,H]。
+// cell 级融合前向不挂反向节点（BPTT 由高层展开循环实现）。
 // 约定：输入序列 x[T, D]，隐藏状态 h[H]。
 #pragma once
 #include "tensor.h"

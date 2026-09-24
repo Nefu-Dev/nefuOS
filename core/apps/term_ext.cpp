@@ -49,6 +49,8 @@
 #include "../filesystem/filesystem_all.h"
 #include "../raytrace/raytrace_all.h"
 #include "../compiler/compiler_all.h"
+#include "../gameengine/gameengine_all.h"
+#include "../deeplearn/deeplearn_all.h"
 #include "../sys/sha256.h"
 
 namespace nefu {
@@ -1762,6 +1764,26 @@ static void cmd_compilertest(TermState* t, int argc, const char** argv) {
     term_ext_print(t, f == 0 ? "ALL COMPILER TESTS PASSED" : "COMPILER FAILURES");
 }
 
+static void cmd_getest(TermState* t, int argc, const char** argv) {
+    (void)argc; (void)argv;
+    int f = nefu::gameengine::gameengine_self_test();
+    char out[160];
+    ksprintf(out, sizeof(out), "gameengine self test failures = %d", f);
+    term_ext_print(t, out);
+    term_ext_print(t, f == 0 ? "ALL GAMEENGINE TESTS PASSED" : "GAMEENGINE FAILURES");
+}
+
+static void cmd_deeptest(TermState* t, int argc, const char** argv) {
+    (void)argc; (void)argv;
+    int f = nefu::deeplearn::deeplearn_self_test();
+    char out[160];
+    ksprintf(out, sizeof(out), "deeplearn self test failures = %d", f);
+    term_ext_print(t, out);
+    term_ext_print(t, f == 0 ? "ALL DEEPLEARN TESTS PASSED" : "DEEPLEARN FAILURES");
+}
+
+
+
 
 
 
@@ -1781,7 +1803,7 @@ static const char* EXT_COMMANDS[] = {
     "nextprime", "extselftest", "algotest", "gfxtest", "texttest", "datlibtest", "crypttest", "comptest", "complibtest", "mathlibtest", "simlibtest", "gfxmathtest", "audlibtest", "dblibtest",
     "cryptotest", "comptest", "serialtest", "audtest", "gfx3dtest",
     "life", "particle", "pendulum", "lsystem", "boids", "simtest",
-    "mathtest", "uitest", "kvput", "kvget", "kvdel", "sql", "dbtest", "mltest", "termcmdstest", "minilangtest", "sysutiltest", "netprototest", "fstest", "raytest", "compilertest"
+    "mathtest", "uitest", "kvput", "kvget", "kvdel", "sql", "dbtest", "mltest", "termcmdstest", "minilangtest", "sysutiltest", "netprototest", "fstest", "raytest", "compilertest", "getest", "deeptest"
 };
 static const int EXT_COUNT = (int)(sizeof(EXT_COMMANDS) / sizeof(EXT_COMMANDS[0]));
 
@@ -1889,6 +1911,8 @@ void term_ext_dispatch(TermState* t, int argc, const char** argv) {
     else if (strcmp(a0, "fstest") == 0) cmd_fstest(t, argc, argv);
     else if (strcmp(a0, "raytest") == 0) cmd_raytest(t, argc, argv);
     else if (strcmp(a0, "compilertest") == 0) cmd_compilertest(t, argc, argv);
+    else if (strcmp(a0, "getest") == 0) cmd_getest(t, argc, argv);
+    else if (strcmp(a0, "deeptest") == 0) cmd_deeptest(t, argc, argv);
     else term_ext_print(t, "ext: unknown command");
 }
 

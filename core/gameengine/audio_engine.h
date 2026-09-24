@@ -251,4 +251,31 @@ struct NoiseGenerator {
     int16_t next() { return type == 0 ? next_white() : next_pink(); }
 };
 
-// =========================================================================
+// ============================================================================
+//  DrumSequencer —— 简易鼓点音序器
+// ============================================================================
+struct DrumSequencer {
+    int pattern[16];     // 每步: 0=空,1=底鼓,2=军鼓,3=踩镲
+    int step;
+    int bpm;
+    int step_ms;
+    int elapsed;
+
+    DrumSequencer() : step(0), bpm(120), elapsed(0) {
+        for (int i = 0; i < 16; i++) pattern[i] = 0;
+        step_ms = 60000 / bpm / 4;   // 16 分音符
+    }
+    // 返回当前步应触发的鼓类型（0=无）
+    int update(int dt_ms) {
+        elapsed += dt_ms;
+        if (elapsed < step_ms) return 0;
+        elapsed -= step_ms;
+        int hit = pattern[step];
+        step = (step + 1) & 15;
+        return hit;
+    }
+};
+int audio_engine_self_test();
+
+} // namespace gameengine
+} // namespace nefu

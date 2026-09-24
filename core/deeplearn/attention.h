@@ -1,5 +1,13 @@
-// nefuOS 深度学习库 —— 注意力机制
+﻿// nefuOS 深度学习库 —— 注意力机制
 // Scaled Dot-Product / Multi-Head Attention / Positional Encoding / Transformer Block。
+// 典型用法：
+//   MultiHeadAttention mha(d_model, nhead);
+//   Tensor out = mha.forward(Q, K, V);
+//
+// 缩放点积：Attention(Q,K,V)=softmax(QK^T/sqrt(d_k))V
+// 多头：把 d_model 分成 nhead 份，各自做注意力再拼接。
+// 位置编码：sin/cos 固定位置向量，加入输入以携带顺序信息。
+// Transformer Block：MHA + 残差 + LayerNorm + FFN + 残差 + LayerNorm。
 #pragma once
 #include "tensor.h"
 

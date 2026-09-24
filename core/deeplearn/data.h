@@ -1,4 +1,13 @@
-// nefuOS 深度学习库 —— 微型数据集工具
+﻿// nefuOS 深度学习库 —— 微型数据集工具
+// 典型用法：
+//   DataSet ds = make_regression(N, D);
+//   ds.shuffle();
+//   Tensor xb = ds.batch_x(bi, bs);
+//   Tensor yb = ds.batch_y(bi, bs);
+//
+// 内存：DataSet 持有拷贝后的张量，不共享调用方缓冲。
+// shuffle 用 LCG（确定性），便于复现。
+// normalize_columns 做 z-score：(x-mean)/sqrt(var+eps)。
 // 不依赖 STL，用 new[] 持有样本张量；提供按批迭代、归一化、打乱（LCG）。
 #pragma once
 #include "tensor.h"

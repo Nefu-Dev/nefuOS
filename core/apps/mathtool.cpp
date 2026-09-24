@@ -15,6 +15,7 @@ namespace nefu {
 
 namespace {
 
+using namespace mathext;
 const int MT_W = 640, MT_H = 440;
 
 // ksprintf 不支持 %f，这里手写一个 double -> "xx.xx" 的小格式化器。
@@ -74,7 +75,7 @@ void MathTool::rebuild() {
         ksprintf(L, 128, "inv(A) = [[");
         char b[24]; fmt_dbl(b, 24, Ai(0, 0));
         ksprintf(L, 128, "inv(A)[0][0]=");
-        strcat(L, b, 128);
+        strcat(L, b);
         // 幂迭代特征值
         double dd[4] = {2, 0, 0, 1};
         Matrix D(2, 2, dd);
@@ -118,8 +119,8 @@ void MathTool::rebuild() {
         ksprintf(L, 128, "roots found: ");
         for (int i = 0; i < rc && i < 2; i++) {
             char b[24]; fmt_dbl(b, 24, roots[i]);
-            strcat(L, " ", 128);
-            strcat(L, b, 128);
+            strcat(L, " ");
+            strcat(L, b);
         }
         L = lines[nlines++];
         ksprintf(L, 128, "expected roots: 1.00, 2.00");

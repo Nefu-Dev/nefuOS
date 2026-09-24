@@ -291,4 +291,13 @@ int audio_engine_self_test() {
 
     // --- DrumSequencer ---
     DrumSequencer ds;
-    ds.pattern[
+    ds.pattern[0] = 1;   // 底鼓
+    ds.pattern[4] = 2;   // 军鼓
+    int hit0 = 0;
+    for (int i = 0; i < ds.step_ms; i++) hit0 = ds.update(1);
+    if (hit0 != 1) fails++;   // 第一步底鼓
+    return fails;
+}
+
+} // namespace gameengine
+} // namespace nefu

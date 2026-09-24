@@ -55,8 +55,22 @@ $coreSrc = @(
   "core\apps\flappy.cpp", "core\apps\spaceinv.cpp", "core\apps\pacman.cpp",
   "core\apps\tictactoe.cpp", "core\apps\connect4.cpp", "core\apps\minesweeper2.cpp",
   "core\apps\life.cpp",
-  "core\ml\matrix.cpp", "core\ml\dataset.cpp", "core\ml\linear.cpp", "core\ml\knn.cpp",`r`n  "core\ml\decisiontree.cpp", "core\ml\randomforest.cpp", "core\ml\kmeans.cpp",`r`n  "core\ml\pca.cpp", "core\ml\neuralnet.cpp", "core\ml\bayes.cpp",`r`n  "core\apps\mllab.cpp",
-  "core\termcmds\termcmds_all.cpp", "core\termcmds\filecmd.cpp", "core\termcmds\textcmd.cpp",`r`n  "core\termcmds\syscmd.cpp", "core\termcmds\netcmd.cpp", "core\termcmds\devcmd.cpp",`r`n  "core\termcmds\funcmd.cpp", "core\termcmds\extracmd.cpp",`r`n`r`n
+  "core\ml\matrix.cpp", "core\ml\dataset.cpp", "core\ml\linear.cpp", "core\ml\knn.cpp",
+
+  "core\ml\decisiontree.cpp", "core\ml\randomforest.cpp", "core\ml\kmeans.cpp",
+
+  "core\ml\pca.cpp", "core\ml\neuralnet.cpp", "core\ml\bayes.cpp",
+
+  "core\apps\mllab.cpp",
+  "core\termcmds\termcmds_all.cpp", "core\termcmds\filecmd.cpp", "core\termcmds\textcmd.cpp",
+
+  "core\termcmds\syscmd.cpp", "core\termcmds\netcmd.cpp", "core\termcmds\devcmd.cpp",
+
+  "core\termcmds\funcmd.cpp", "core\termcmds\extracmd.cpp",
+
+
+
+
   "core\textlib\levenshtein.cpp", "core\textlib\lcs.cpp", "core\textlib\kmp.cpp",
   "core\textlib\aho.cpp", "core\textlib\token.cpp", "core\textlib\ngram.cpp",
   "core\textlib\regexlite.cpp", "core\textlib\diff.cpp",
@@ -108,6 +122,64 @@ $coreSrc = @(
     "core\gfx3d\tonemap.cpp", "core\gfx3d\texture.cpp", "core\gfx3d\camera.cpp",
     "core\apps\cryptolab.cpp", "core\apps\compresstool.cpp", "core\apps\serialab.cpp",
     "core\apps\audiolab.cpp", "core\apps\gfx3dview.cpp",
+
+  "core\netproto\arp.cpp", "core\netproto\dhcp.cpp", "core\netproto\dns.cpp", "core\netproto\ethernet.cpp",
+
+  "core\netproto\firewall.cpp", "core\netproto\http.cpp", "core\netproto\icmp.cpp", "core\netproto\ip.cpp",
+
+  "core\netproto\mqtt.cpp", "core\netproto\netif.cpp", "core\netproto\netproto_all.cpp", "core\netproto\netproto_common.cpp",
+
+  "core\netproto\netstack.cpp", "core\netproto\ntp.cpp", "core\netproto\pkt_dissect.cpp", "core\netproto\pktlog.cpp",
+
+  "core\netproto\socket.cpp", "core\netproto\tcp.cpp", "core\netproto\udp.cpp", "core\netproto\websocket.cpp",
+
+  "core\sysutil\config.cpp", "core\sysutil\eventlog.cpp", "core\sysutil\permissions.cpp", "core\sysutil\process.cpp",
+
+  "core\sysutil\scheduler.cpp", "core\sysutil\services.cpp", "core\sysutil\sysinfo.cpp", "core\minilang\ast.cpp",
+
+  "core\minilang\builtin.cpp", "core\minilang\compiler.cpp", "core\minilang\env.cpp", "core\minilang\eval.cpp",
+
+  "core\minilang\parser.cpp", "core\minilang\stdlib.cpp", "core\minilang\token.cpp", "core\minilang\value.cpp",
+
+  "core\minilang\vm.cpp", "core\filesystem\cache.cpp", "core\filesystem\disk.cpp", "core\filesystem\ext2.cpp",
+
+  "core\filesystem\fat16.cpp", "core\filesystem\journal.cpp", "core\filesystem\minixfs.cpp", "core\filesystem\vfs_layer.cpp",
+
+  "core\raytrace\bvh.cpp", "core\raytrace\camera.cpp", "core\raytrace\lights.cpp", "core\raytrace\materials.cpp",
+
+  "core\raytrace\pathtracer.cpp", "core\raytrace\primitives.cpp", "core\raytrace\rtaccel.cpp", "core\raytrace\rtaccum.cpp",
+
+  "core\raytrace\rtbake.cpp", "core\raytrace\rtbrdf.cpp", "core\raytrace\rtcampath.cpp", "core\raytrace\rtenv.cpp",
+
+  "core\raytrace\rtfilter.cpp", "core\raytrace\rtinstance.cpp", "core\raytrace\rtintegrator.cpp", "core\raytrace\rtlightprobe.cpp",
+
+  "core\raytrace\rtlighttree.cpp", "core\raytrace\rtmath.cpp", "core\raytrace\rtmesh.cpp", "core\raytrace\rtmesh2.cpp",
+
+  "core\raytrace\rtmis.cpp", "core\raytrace\rtnoise.cpp", "core\raytrace\rtonemap.cpp", "core\raytrace\rtpost.cpp",
+
+  "core\raytrace\rtraypool.cpp", "core\raytrace\rtrender.cpp", "core\raytrace\rtsampler.cpp", "core\raytrace\rtserialize.cpp",
+
+  "core\raytrace\rtshader.cpp", "core\raytrace\rtsky.cpp", "core\raytrace\rtstats.cpp", "core\raytrace\rtutil.cpp",
+
+  "core\raytrace\rtworld.cpp", "core\raytrace\scene.cpp", "core\raytrace\texture.cpp", "core\compiler\assembler.cpp",
+
+  "core\compiler\ast.cpp", "core\compiler\codegen.cpp", "core\compiler\ir.cpp", "core\compiler\lexer.cpp",
+
+  "core\compiler\linker.cpp", "core\compiler\parser.cpp", "core\compiler\preprocessor.cpp", "core\gameengine\audio_engine.cpp",
+
+  "core\gameengine\ge_math.cpp", "core\gameengine\input.cpp", "core\gameengine\particle_engine.cpp", "core\gameengine\physics2d.cpp",
+
+  "core\gameengine\scene.cpp", "core\gameengine\sprite.cpp", "core\gameengine\tilemap.cpp", "core\gameengine\ui.cpp",
+
+  "core\deeplearn\activations.cpp", "core\deeplearn\attention.cpp", "core\deeplearn\autograd.cpp", "core\deeplearn\data.cpp",
+
+  "core\deeplearn\layers.cpp", "core\deeplearn\losses.cpp", "core\deeplearn\metrics.cpp", "core\deeplearn\models.cpp",
+
+  "core\deeplearn\optimizers.cpp", "core\deeplearn\rnn.cpp", "core\deeplearn\tensor.cpp", "core\deeplearn\trainer.cpp",
+
+  "core\deeplearn\weights.cpp", "core\apps\netlab.cpp", "core\apps\sysmon.cpp", "core\apps\repl.cpp", "core\apps\fsview.cpp",
+
+  "core\apps\rayview.cpp", "core\apps\compilerlab.cpp", "core\apps\gedemo.cpp", "core\apps\deepviz.cpp"
 
   "third_party\stb_image_wrap.cpp"
 )
@@ -175,6 +247,11 @@ foreach ($q in $qjSrc) {
   }
   $lvglHostObjs += $qobj
 }
-& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party @lvglInclude -o $hostExe ($coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp")) $lvglHostObjs -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32
+# Write response file to avoid Windows 32K command-line limit
+$respFile = Join-Path $bareOut "host_sources.rsp"
+$allSrc = $coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp") + $lvglHostObjs
+$respContent = ($allSrc | ForEach-Object { '"' + $_ + '"' }) -join "`r`n"
+[IO.File]::WriteAllText($respFile, $respContent, (New-Object Text.UTF8Encoding $false))
+& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party @lvglInclude -o $hostExe "@$respFile" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32
 if ($LASTEXITCODE -ne 0) { throw "host build failed" }
 Write-Output "host exe OK: $((Get-Item $hostExe).Length) bytes -> $hostExe"

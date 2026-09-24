@@ -464,6 +464,36 @@ inline fix fx_angle_lerp(fix a, fix b, fix t) {
     while (diff < -fx::FX_PI) diff += fx::FX_2PI;
     return a + fx::fx_mul(diff, t);
 }
+
+// ============================================================================
+//  Color 工具扩展 —— 颜色渐变表
+// ============================================================================
+struct GradientStop {
+    fix    t;       // 0..1
+    uint32_t color;
+};
+struct ColorGradient {
+    GradientStop stops[8];
+    int count;
+    ColorGradient() : count(0) {}
+    void add(fix t, uint32_t c) {
+        if (count < 8) { stops[count].t = t; stops[count].color = c; count++; }
+    }
+    // 采样 t(0..1) 处的颜色
+    uint32_t sample(fix t) const {
+        if (count == 0) return 0;
+        if (t <= stops[0].t) return stops[0].color;
+        if (t >= stops[count-1].t) return stops[count-1].color;
+        for (int i = 0; i < count - 1; i++) {
+            if (t >= stops[i].t && t <= stops[i+1].t) {
+                fix span = stops[i+1].t - stops[i].t;
+                fix local = (span > 0) ? fx::fx_mul(t - stops[i].t, fx::fx_div(fx::FX_ONE, span)) : 0;
+                return lerp_color(stops[i].color, stops[i+1].color, local);
+            }
+        }
+        return stops[0].color;
+    }
+};
 int ge_math_self_test();
 
 } // namespace gameengine

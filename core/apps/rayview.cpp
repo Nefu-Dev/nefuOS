@@ -121,7 +121,7 @@ static void rv_close(Window* w) {
     w->userdata = 0;
 }
 
-void rayview_launch() {
+void nefu::rayview_launch() {
     int x, y;
     cascade_pos(&x, &y);
     Window* w = g_wm->create_window("Ray Trace Viewer", x, y, RV_W, RV_H);

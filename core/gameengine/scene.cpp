@@ -182,6 +182,8 @@ int scene_self_test() {
     if (!st.half_done) fails++;
     st.update(600);
     if (st.active) fails++;
+
+
     return fails;
 }
 

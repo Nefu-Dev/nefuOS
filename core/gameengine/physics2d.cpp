@@ -371,4 +371,13 @@ if (fx::fx_abs(d_after - d_before) > fx::itofix(5)) fails++;
 
     // --- PhysicsQuery ---
     PhysicsWorld wq;
-    wq.add_body(S
+    wq.add_body(Shape::make_aabb(5,5), BODY_STATIC);
+    wq.add_body(Shape::make_aabb(5,5), BODY_DYNAMIC);
+    PhysicsQuery pq; pq.world = &wq;
+    if (pq.query_aabb(0,0,100,100) != 2) fails++;
+    if (!pq.body(0)) fails++;
+    return fails;
+}
+
+} // namespace gameengine
+} // namespace nefu

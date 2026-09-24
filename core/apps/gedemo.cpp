@@ -109,6 +109,8 @@ struct GeDemo {
             note.show("Jump!", 800);
         }
 
+        cam.follow(ball->position, fx::fxf(1,60), fx::itofix(5));
+        cam.follow(ball->position, fx::fxf(1,60), fx::itofix(5));
         world.gravity = Vec2(0, nefu::fx::itofix(500));
         world.step(dt);
 
@@ -142,6 +144,15 @@ struct GeDemo {
 
         // 粒子
         draw_particles(s, psys);
+
+        // 浮动通知
+        if (note.active) gfx::text(s, 300, 200, note.text, 0xFFFDE68A, 0xFF1E293B);
+        // particle count would go here (no count_active API)
+        // ksprintf(pbuf, sizeof(pbuf), "particles %d", psys.count);
+
+
+        // 浮动通知
+        if (note.active) gfx::text(s, 300, 200, note.text, 0xFFFDE68A, 0xFF1E293B);
 
         // UI：血条 + 按钮 + 菜单
         draw_healthbar(s, hp);

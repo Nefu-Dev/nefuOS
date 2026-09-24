@@ -21,6 +21,7 @@
 #include "../gui/gfx.h"
 #include "../platform.h"
 #include "../crypto/crypto_all.h"
+#include "../lib/hash.h"
 
 namespace nefu {
 namespace {
@@ -139,8 +140,7 @@ struct CryptoLab {
         }
         case ALG_B64: {
             // 复用 core::lib::hash.h 的 Base64
-            extern int nefu_hash_b64_encode(const uint8_t*, int, char*);
-            nefu_hash_b64_encode(pt, n, result);
+            hash::base64_encode(pt, n, result, sizeof(result));
             ksprintf(status, sizeof(status), "Base64 编码");
             break;
         }
@@ -179,8 +179,7 @@ struct CryptoLab {
             ksprintf(status, sizeof(status), "ROT13");
             break;
         case ALG_B64: {
-            extern int nefu_hash_b64_decode(const char*, uint8_t*, int);
-            uint8_t out[256]; int n = nefu_hash_b64_decode(text, out, sizeof(out));
+            uint8_t out[256]; int n = hash::base64_decode(text, out, sizeof(out));
             for (int i = 0; i < n; i++) result[i] = (char)out[i]; result[n] = 0;
             ksprintf(status, sizeof(status), "Base64 解码");
             break;

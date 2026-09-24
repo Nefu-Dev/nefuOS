@@ -45,23 +45,23 @@ struct CompressTool {
 
     int run_compress() {
         switch (algo) {
-        case 0: return rle_byte_encode(src, srclen, dst, sizeof(dst));
-        case 1: return huffman_static_encode(src, srclen, dst, sizeof(dst));
-        case 2: return lzw_encode(src, srclen, dst, sizeof(dst));
-        case 3: return lz77_encode(src, srclen, dst, sizeof(dst));
-        case 4: return bwt_encode(src, srclen, dst, sizeof(dst));
-        case 5: return arith_encode(src, srclen, dst, sizeof(dst));
+        case 0: return compress::rle_byte_encode(src, srclen, dst, sizeof(dst));
+        case 1: return compress::huffman_static_encode(src, srclen, dst, sizeof(dst));
+        case 2: return compress::lzw_encode(src, srclen, dst, sizeof(dst));
+        case 3: return compress::lz77_encode(src, srclen, dst, sizeof(dst));
+        case 4: return compress::bwt_encode(src, srclen, dst, sizeof(dst));
+        case 5: return compress::arith_encode(src, srclen, dst, sizeof(dst));
         }
         return -1;
     }
     int run_decompress() {
         switch (algo) {
-        case 0: return rle_byte_decode(dst, comp_len, back, sizeof(back));
-        case 1: return huffman_static_decode(dst, comp_len, back, sizeof(back));
-        case 2: return lzw_decode(dst, comp_len, back, sizeof(back));
-        case 3: return lz77_decode(dst, comp_len, back, sizeof(back));
-        case 4: return bwt_decode(dst, comp_len, back, sizeof(back));
-        case 5: return arith_decode(dst, comp_len, back, sizeof(back));
+        case 0: return compress::rle_byte_decode(dst, comp_len, back, sizeof(back));
+        case 1: return compress::huffman_static_decode(dst, comp_len, back, sizeof(back));
+        case 2: return compress::lzw_decode(dst, comp_len, back, sizeof(back));
+        case 3: return compress::lz77_decode(dst, comp_len, back, sizeof(back));
+        case 4: return compress::bwt_decode(dst, comp_len, back, sizeof(back));
+        case 5: return compress::arith_decode(dst, comp_len, back, sizeof(back));
         }
         return -1;
     }

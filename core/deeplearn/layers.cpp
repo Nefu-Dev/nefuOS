@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 层实现
+// 层实现要点：Dense 复用 matmul+broadcast add；Conv2D 直接 im2col 风格三重循环；Pool 取块内极值/均值；BatchNorm/LayerNorm 用批量/特征维统计。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "layers.h"
 #include "autograd.h"
@@ -496,6 +498,28 @@ int layers_self_test() {
         Tensor y = ap.forward(x);
         if (y.shape[0]!=1 || y.shape[2]!=1) fails++;  // 形状检查
     }
+    // Conv2D 已知值：单通道 3x3 输入，1 个 2x2 核全 1 -> 输出为 2x2 求和
+    {
+        Conv2D conv(1, 1, 2, 2, 7);
+        // 强制核为全 1，偏置 0
+        for(int i=0;i<conv.kernel.size;i++) conv.kernel.data[i]=fx::FX_ONE;
+        for(int i=0;i<conv.bias.size;i++) conv.bias.data[i]=0;
+        fix v[9]={fx::FX_ONE,fx::FX_ONE,fx::FX_ONE,
+                  fx::FX_ONE,fx::FX_ONE,fx::FX_ONE,
+                  fx::FX_ONE,fx::FX_ONE,fx::FX_ONE};
+        Tensor x=t_from_flat(4,(int[4]){1,1,3,3},v);
+        Tensor y=conv.forward(x);
+        // 每个 2x2 窗口和=4
+        if (!fx_close(y.data[0], fx::itofix(4), fx::fxf(5,100))) fails++;
+    }
+    // MaxPool2D：取 2x2 最大
+    {
+        fix v[4]={fx::itofix(1),fx::itofix(3), fx::itofix(2),fx::itofix(4)};
+        Tensor x=t_from_flat(4,(int[4]){1,1,2,2},v);
+        MaxPool2D mp;
+        Tensor y=mp.forward(x);
+        if (!fx_close(y.data[0], fx::itofix(4), fx::fxf(5,100))) fails++;
+    }
     return fails;
 
 }
@@ -550,4 +574,4 @@ Tensor global_avg_pool(const Tensor& x) {
 }
 
 } // namespace deeplearn
-} // names
+} // namespace nefu

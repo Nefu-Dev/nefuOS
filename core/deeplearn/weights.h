@@ -1,4 +1,13 @@
-// nefuOS 深度学习库 —— 参数序列化
+﻿// nefuOS 深度学习库 —— 参数序列化
+// 典型用法：
+//   n = pack_params_size(params, n);
+//   buf = new uint8[n]; pack_params(params, n, buf);
+//   // 写 flash / 通过串口发送 ...
+//   unpack_params(params, n, buf);  // 形状必须与打包时一致
+//
+// 格式：[u32 count][每张量: u32 nd][shape[nd]][u32 size][size*fix]
+// fix 以 int32 小端原样写入。解包时形状必须完全一致。
+// 用于保存/加载训练好的模型权重，裸机下可写入 flash。
 // 把一组参数张量打包成连续字节缓冲（用于保存/加载模型权重）。
 // 格式：[u32 count][每个张量: u32 nd][shape[nd]][u32 size][size*fix data]
 // fix 以 int32 原样写入。无 STL，用 new[]。

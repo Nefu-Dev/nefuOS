@@ -1,5 +1,19 @@
-﻿// nefuOS deepviz —— 训练一个小型 MLP 求解 XOR，实时绘制损失曲线与网络结构。
+// nefuOS deepviz —— 训练一个小型 MLP 求解 XOR，实时绘制损失曲线与网络结构。
+// 本应用演示 nefu::deeplearn 全定点自动微分库：
+//   - 2-3-1 MLP，Adam 优化，MSE 损失；
+//   - 实时绘制损失曲线、决策区域、权重直方图、输出条形图；
+//   - 无 FPU，所有计算走 Q16.16 整数定点。
+// 教学目标：验证 bare-metal 深度学习栈可端到端训练非线性分类问题。
 // 控制：
+//
+// 数据：XOR 四象限 (0,0)->0, (0,1)->1, (1,0)->1, (1,1)->0
+// 网络：l1(2->3) + tanh + l2(3->1)，Adam lr=0.03，MSE
+// 可视化：
+//   左上：损失折线（最近 120 步）
+//   右上：网络结构（输入2-隐层3-输出1）
+//   左下：决策区域 8x8 网格
+//   右中：权重直方图、统计面板、输出条形
+// 每帧跑 3 步训练，共 400 步后停止。
 //   Space/Enter : 开始/暂停训练
 //   R           : 重新初始化网络
 //   Esc         : 关闭窗口
@@ -20,12 +34,15 @@ namespace nefu {
 
 namespace {
 
+using fx::fix;
+using namespace deeplearn;
+
 const int VIZ_W = 640, VIZ_H = 460;
 const int HIST_N = 120;   // 损失曲线保留点数
 
 struct DeepViz {
     // XOR 数据集
-    fix xor_x[4][2];
+    fx::fix xor_x[4][2];
     int xor_y[4];
     // 网络：2 -> 3 -> 1（手工两层 Dense + tanh + 线性输出）
     deeplearn::Dense l1;
@@ -34,9 +51,9 @@ struct DeepViz {
     bool running;
     bool done;
     int  step;
-    fix  history[HIST_N];
+    fx::fix  history[HIST_N];
     int  hist_n;
-    fix  cur_loss;
+    fx::fix  cur_loss;
 
     DeepViz()
         : l1(2, 3, 20240601u), l2(3, 1, 20240602u),
@@ -58,7 +75,7 @@ struct DeepViz {
     }
 
     // 执行一个训练步，返回损失
-    fix train_step() {
+    fx::fix train_step() {
         deeplearn::tape_reset();
         int sx[2]={4,2};
         deeplearn::Tensor X = deeplearn::t_from_flat(2,sx,(fix*)xor_x[0]);
@@ -66,7 +83,7 @@ struct DeepViz {
         deeplearn::Tensor ht = deeplearn::act_tanh(h);
         deeplearn::Tensor y = l2.forward(ht);   // [4,1]
         // 目标：[0,1,1,0]
-        fix tv[4] = {0, fx::FX_ONE, fx::FX_ONE, 0};
+        fx::fix tv[4] = {0, fx::FX_ONE, fx::FX_ONE, 0};
         int sy[2]={4,1};
         deeplearn::Tensor T = deeplearn::t_from_flat(2,sy,tv);
         deeplearn::Tensor loss = deeplearn::loss_mse(y, T);
@@ -81,7 +98,7 @@ struct DeepViz {
     void tick() {
         if (!running || done) return;
         for (int t=0;t<3;t++) {
-            fix l = train_step();
+            fx::fix l = train_step();
             cur_loss = l;
             history[hist_n % HIST_N] = l;
             hist_n++;
@@ -94,7 +111,7 @@ struct DeepViz {
         gfx::fillrect(s, 0, 0, VIZ_W, VIZ_H, color::CREAM);
         gfx::text(s, 10, 8, "DeepViz: XOR with 2-3-1 MLP", color::TEXT, color::CREAM);
         char buf[80];
-        nefu::ksprintf(buf, sizeof(buf), "step=%d  loss=%.3f", step, cur_loss/65536.0);
+        int loss_int = (int)((long long)cur_loss * 1000 / 65536); nefu::ksprintf(buf, sizeof(buf), "step=%d  loss=%d.%03d", step, loss_int/1000, loss_int%1000);
         gfx::text(s, 10, 26, buf, color::TEXT2, color::CREAM);
 
         // ---- 损失曲线 ----
@@ -102,7 +119,7 @@ struct DeepViz {
         gfx::rect(s, px0, py0, pw, ph, color::BORDER);
         gfx::text(s, px0, py0-14, "loss", color::TEXT2, color::CREAM);
         // 找最大值归一
-        fix mx = 1;
+        fx::fix mx = 1;
         for (int i=0;i<hist_n && i<HIST_N;i++) if (history[i]>mx) mx=history[i];
         int prev_x=0, prev_y=0;
         for (int i=0;i<hist_n && i<HIST_N;i++) {
@@ -177,6 +194,83 @@ struct DeepViz {
         gfx::fillrect(s, bx, by, fill, 8, color::GREEN);
         nefu::ksprintf(sb, sizeof(sb), "progress %d%%", (step*100)/400);
         gfx::text(s, bx, by+12, sb, color::TEXT2, color::CREAM);
+
+
+        // ---- 第二曲线：训练准确率随步数 ----
+        int ax0=20, ay0=240, aw=380, ah=60;
+        gfx::text(s, ax0, ay0-14, "accuracy", color::TEXT2, color::CREAM);
+        gfx::rect(s, ax0, ay0, aw, ah, color::BORDER);
+        // 当前准确率（粗算）
+        int corr=0;
+        for (int i=0;i<4;i++){
+            deeplearn::Tensor X=deeplearn::t_zeros(2,(int[2]){1,2});
+            X.data[0]=fx::itofix((i>>0)&1); X.data[1]=fx::itofix((i>>1)&1);
+            deeplearn::Tensor h=l1.forward(X);
+            deeplearn::Tensor ht=deeplearn::act_tanh(h);
+            deeplearn::Tensor y=l2.forward(ht);
+            bool pos=y.data[0]>0;
+            if ((pos && xor_y[i]) || (!pos && !xor_y[i])) corr++;
+        }
+        int ay = ay0+ah - (corr*ah)/4;
+        gfx::fillcircle(s, ax0+((step%HIST_N)*aw)/HIST_N, ay, 3, color::GREEN);
+        // ---- 权重分布小图（l1 的 W 权重直方图） ----
+        int hx=240, hy=260, hw=180, hh=60;
+        gfx::text(s, hx, hy-16, "weight hist (l1.W)", color::TEXT2, color::CREAM);
+        gfx::rect(s, hx, hy, hw, hh, color::BORDER);
+        // 8 个桶
+        int bins[8]={0,0,0,0,0,0,0,0};
+        int Wcount = l1.W.size;
+        for (int i=0;i<Wcount;i++){
+            fix w = l1.W.data[i];
+            int b = (w > fx::itofix(1)) ? 7 : (w < -fx::itofix(1) ? 0 : (int)((w + fx::itofix(2)) >> 16));
+            if (b<0) b=0; if (b>7) b=7; bins[b]++;
+        }
+        int bmx=1; for(int i=0;i<8;i++) if(bins[i]>bmx) bmx=bins[i];
+        for (int i=0;i<8;i++){
+            int bh = (bins[i]*hh)/bmx;
+            gfx::fillrect(s, hx+i*(hw/8), hy+hh-bh, hw/8-2, bh, color::BLUE);
+        }
+
+        // ---- 图例 ----
+        int lx=20, ly=380;
+        gfx::text(s, lx, ly, "legend:", color::TEXT2, color::CREAM);
+        gfx::fillcircle(s, lx+60, ly+4, 4, color::BLUE);
+        gfx::text(s, lx+70, ly, "input", color::TEXT2, color::CREAM);
+        gfx::fillcircle(s, lx+130, ly+4, 4, color::GREEN);
+        gfx::text(s, lx+140, ly, "hidden", color::TEXT2, color::CREAM);
+        gfx::fillcircle(s, lx+200, ly+4, 4, color::ORANGE);
+        gfx::text(s, lx+210, ly, "output", color::TEXT2, color::CREAM);
+        gfx::line(s, lx+280, ly+4, lx+310, ly+4, color::RED);
+        gfx::text(s, lx+315, ly, "loss", color::TEXT2, color::CREAM);
+        // 状态提示
+        char sb_status[80];
+        if (done) nefu::ksprintf(sb_status, sizeof(sb), "training complete");
+        else if (running) nefu::ksprintf(sb_status, sizeof(sb), "training...");
+        else nefu::ksprintf(sb_status, sizeof(sb), "paused");
+        gfx::text(s, lx, ly+20, sb_status, color::TEXT, color::CREAM);
+
+        // ---- 当前 4 个样本输出条形图 ----
+        int bx0=440, by0=380;
+        gfx::text(s, bx0, by0-16, "outputs", color::TEXT2, color::CREAM);
+        for (int i=0;i<4;i++){
+            fix xv[2]={fx::itofix((i>>0)&1), fx::itofix((i>>1)&1)};
+            deeplearn::Tensor X=deeplearn::t_zeros(2,(int[2]){1,2});
+            X.data[0]=xv[0]; X.data[1]=xv[1];
+            deeplearn::Tensor h=l1.forward(X);
+            deeplearn::Tensor ht=deeplearn::act_tanh(h);
+            deeplearn::Tensor y=l2.forward(ht);
+            int w = (y.data[0] > 0) ? (int)(y.data[0]/655) : 0;
+            if (w>80) w=80;
+            gfx::fillrect(s, bx0, by0+i*12, w, 8, color::GREEN);
+            char lb[16]; nefu::ksprintf(lb,sizeof(lb),"%d%d",(i>>0)&1,(i>>1)&1);
+            gfx::text(s, bx0+86, by0+i*12, lb, color::TEXT2, color::CREAM);
+        }
+
+        // ---- 底部状态栏 ----
+        gfx::rect(s, 0, VIZ_H-22, VIZ_W, 22, color::BORDER);
+        char sb2[96];
+        nefu::ksprintf(sb2, sizeof(sb2), "nefuOS deeplearn v0.1 | Q16.16 fixed-point | no FPU");
+        gfx::text(s, 8, VIZ_H-16, sb2, color::TEXT2, color::CREAM);
         gfx::text(s, 10, VIZ_H-18, "Space: run/pause   R: reset   Esc: close",
                   color::TEXT2, color::CREAM);
     }

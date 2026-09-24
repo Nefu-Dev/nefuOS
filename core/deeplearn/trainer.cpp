@@ -1,4 +1,6 @@
-// nefuOS 深度学习库 —— 训练循环封装实现
+﻿// nefuOS 深度学习库 —— 训练循环封装实现
+// Trainer 驱动 epoch，CosineScheduler 余弦衰减。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "trainer.h"
 

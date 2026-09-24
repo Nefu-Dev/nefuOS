@@ -388,6 +388,7 @@ struct UILayout {
     }
     void reset(int x_, int y_) { x = x_; y = y_; }
 };
+
 int ui_self_test();
 
 } // namespace gameengine

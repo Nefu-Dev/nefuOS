@@ -18,6 +18,7 @@ namespace nefu {
 
 namespace {
 
+using namespace serialize;
 const int SA_W = 620, SA_H = 440;
 
 // 源/目标格式枚举（本应用内部）

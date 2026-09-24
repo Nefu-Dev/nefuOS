@@ -1,4 +1,11 @@
-// nefuOS 深度学习库 —— 评估指标
+﻿// nefuOS 深度学习库 —— 评估指标
+// 典型用法：
+//   acc = accuracy(pred, labels, N);  // 0..1
+//   f1  = f1_score(tp, fp, fn);
+//   mae = mae(pred, target, N);
+//
+// 全部定点 Q16.16，不依赖 FPU。
+// accuracy 返回 0..1；F1 = 2PR/(P+R)。
 // 分类准确率、二分类精确率/召回率/F1、回归 MAE/RMSE。全定点。
 #pragma once
 #include "tensor.h"

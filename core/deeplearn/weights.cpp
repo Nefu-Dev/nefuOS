@@ -1,4 +1,6 @@
-// nefuOS 深度学习库 —— 参数序列化实现
+﻿// nefuOS 深度学习库 —— 参数序列化实现
+// 参数打包/解包为连续字节缓冲，小端 int32。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "weights.h"
 #include "../platform.h"
@@ -92,6 +94,17 @@ int weights_self_test() {
         if (!fx_close(a.data[0], fx::itofix(1), fx::fxf(1,100))) fails++;
         if (!fx_close(b.data[1], fx::FX_ONE, fx::fxf(1,100))) fails++;
         kfree(buf);
+    }
+    // 打包大小：2 个张量（2x2 + 2）
+    {
+        fix v1[4]={1,2,3,4};
+        fix v2[2]={fx::FX_HALF,fx::FX_ONE};
+        Tensor a=t_from_flat(2,(int[2]){2,2},v1);
+        Tensor b=t_from_flat(1,(int[1]){2},v2);
+        List<Tensor*> ps; ps.push(&a); ps.push(&b);
+        size_t sz=pack_params_size(ps);
+        // count(4) + nd(4)+shape(8)+size(4)+data(16) + nd(4)+shape(4)+size(4)+data(8)
+        if (sz < 40) fails++;
     }
     return fails;
 }

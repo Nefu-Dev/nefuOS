@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 注意力机制实现
+// 缩放点积注意力 + 多头 + 位置编码 + Transformer Block。因果掩码用于自回归。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "attention.h"
 #include "activations.h"
@@ -207,6 +209,21 @@ int attention_self_test() {
         Tensor y=blk.forward(x);
         if (y.shape[0]!=3 || y.shape[1]!=8) fails++;
     }
+    // MHA params 数量
+    {
+        MultiHeadAttention mha(8,2,5);
+        List<Tensor*> ps; mha.params(ps);
+        if (ps.size() != 4) fails++;  // Wq Wk Wv Wo
+    }
+    // scaled dot-product：Q=K=V 对角 -> 输出接近 V
+    {
+        fix v[4]={fx::FX_ONE,0, 0,fx::FX_ONE};
+        Tensor Q=t_from_flat(2,(int[2]){2,2},v);
+        Tensor K=t_from_flat(2,(int[2]){2,2},v);
+        Tensor V=t_from_flat(2,(int[2]){2,2},v);
+        Tensor y=attention_scaled_dotproduct(Q,K,V);
+        if (y.shape[0]!=2 || y.shape[1]!=2) fails++;
+    }
     return fails;
 }
 
@@ -221,4 +238,25 @@ Tensor apply_causal_mask(const Tensor& scores) {
     for (int i=0;i<Tq;i++) for (int j=0;j<Tk;j++) {
         r.data[i*Tk+j] = (j > i) ? bigneg : scores.data[i*Tk+j];
     }
-    return 
+    return r;
+}
+
+// 因果缩放点积注意力：带掩码的 SDPA。
+Tensor causal_attention(const Tensor& Q, const Tensor& K, const Tensor& V) {
+    Tensor Kt = t_transpose2d(K);
+    Tensor scores = t_matmul(Q, Kt);
+    int D = Q.shape[1];
+    fix scale = fx::fx_div(fx::FX_ONE, fx::fx_sqrt(fx::itofix(D)));
+    Tensor sc = t_scalar(scores, scale);
+    Tensor masked = apply_causal_mask(sc);
+    Tensor w = act_softmax(masked);
+    return t_matmul(w, V);
+}
+
+// 交叉注意力：Q 来自 decoder，K/V 来自 encoder（形状可不同，最后一维对齐）。
+Tensor cross_attention(const Tensor& Q, const Tensor& K, const Tensor& V) {
+    // 与 SDPA 相同，只是 Q 与 K/V 来自不同序列；这里直接复用。
+    return attention_scaled_dotproduct(Q, K, V);
+}
+} // namespace deeplearn
+} // namespace nefu

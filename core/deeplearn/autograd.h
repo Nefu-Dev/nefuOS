@@ -1,4 +1,4 @@
-// nefuOS 深度学习库 —— 自动微分（动态计算图 + 磁带反向）
+﻿// nefuOS 深度学习库 —— 自动微分（动态计算图 + 磁带反向）
 // 设计：
 //   * 每次前向 op 创建一个 FnNode 派生对象，记录"输出 -> 输入"的反向闭包；
 //   * 所有节点推入全局磁带 g_tape（List<FnNode*>）；
@@ -47,6 +47,7 @@ Tensor& requires_grad(Tensor& t);
 
 // ---------------- 自检 ----------------
 // 用一个二元表达式 y = (w*x + b)^2 验证解析梯度与数值梯度一致。
+// 典型用法：tape_reset(); 前向; backward(loss); opt.step(); opt.zero_grad();
 int autograd_self_test();
 
 } // namespace deeplearn

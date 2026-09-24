@@ -5,6 +5,26 @@
 //   * 支持任意维形状（<= MAX_DIM），reshape / transpose / broadcast / elementwise / matmul；
 //   * 每个张量可携带梯度缓冲 grad，并挂一个反向节点 FnNode（见 autograd.h）。
 // 内存：禁止 STL，用 new[]/delete[]；深拷贝语义（拷贝构造禁用，仅移动）。
+//
+// 定点约定：
+//   * 1.0 = FX_ONE = 65536；0.5 = FX_HALF = 32768。
+//   * 乘法用 fx_mul(a,b)=(a*b)>>16，除法用 fx_div；点积用 int64 累加后 >>16。
+//   * 构造定点常量：fx::itofix(n) 整数；fx::fxf(a,b)=a/b 的定点近似。
+//   * 注意 fx::fxf(693,1000)=0.693，不要写成 fx::fxf(693,100)=6.93。
+//
+// 自动微分约定：
+//   * requires_grad(t) 标记叶子需反传；forward 时若输入 requires_grad，输出挂 FnNode。
+//   * FnNode 子类只堆上存 go（输出梯度缓冲指针）+ 形状标量；输入用调用方命名局部指针。
+//   * 中间张量必须在调用帧内命名，生命期覆盖 backward()，否则悬空死循环。
+//   * tape_reset() 清磁带；backward(loss) 从 loss 反向到叶子。
+//
+// 支持的算子速查：
+//   构造：t_alloc/t_zeros/t_ones/t_rand/t_from_flat/t_like
+//   形状：reshape/transpose2d/flatten
+//   逐元素：add/sub/mul/div/neg/pow2/exp/log/abs/clip/maximum
+//   规约：mean(sum over dim)/sum/all/t_max/t_argmax_row
+//   神经网络：matmul/softmax_row/gather_rows/where/l2_normalize_rows
+//   拼接：concat(沿 0 维)/slice_row
 #pragma once
 #include <stdint.h>
 #include "../lib/softmath.h"
@@ -139,6 +159,12 @@ Tensor t_sigmoid(const Tensor& a);
 Tensor t_tanh(const Tensor& a);
 // 每行 softmax（2D [N,C] -> [N,C]），带反向
 Tensor t_softmax_row(const Tensor& a);
+// 沿 dim=0 按索引取行：x[N,...], idx[M] -> [M,...]
+Tensor t_gather_rows(const Tensor& x, const int* idx, int M);
+// 逐元素选择：mask[i]>=0 取 a[i]，否则取 b[i]
+Tensor t_where(const Tensor& mask, const Tensor& a, const Tensor& b);
+// 每行 L2 归一化（2D [N,D] -> [N,D]）
+Tensor t_l2_normalize_rows(const Tensor& x);
 
 int tensor_self_test();
 

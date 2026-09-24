@@ -9,11 +9,13 @@
 #include "../platform.h"
 #include "../gfxlib/gfxlib_all.h"
 #include "../simulate/simulate_all.h"
+#include <cmath>
 
 namespace nefu {
 
 namespace {
 
+using namespace simulate;
 const int LAB_W = 640, LAB_H = 440;
 
 const char* SIM_NAMES[5] = {
@@ -49,7 +51,7 @@ void SimLab::reset(int s) {
     tick = 0;
     // Life: 60x40 环形边界，撒一个滑翔机
     if (sim == 0) {
-        life.init(60, 40, simulate::Boundary::Wrap);
+        life.init(60, 40, simulate::Boundary::Torus);
         life.set(20, 20, true); life.set(21, 20, true); life.set(22, 20, true);
         life.set(22, 19, true); life.set(21, 18, true);
     } else if (sim == 1) {

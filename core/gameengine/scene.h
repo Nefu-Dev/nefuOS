@@ -334,6 +334,7 @@ struct SceneTransition {
         return true;
     }
 };
+
 int scene_self_test();
 
 } // namespace gameengine

@@ -163,6 +163,29 @@ struct ForceField {
         p.vel.y += nefu::fx::fx_mul(dir.y, f);
     }
 };
+
+// ============================================================================
+//  SpiralEmitter —— 螺旋发射器（绕中心旋转喷出）
+// ============================================================================
+struct SpiralEmitter {
+    Vec2 center;
+    fix  angle;
+    fix  speed;
+    fix  radius;
+    fix  angular_speed;
+    int  particles_per_sec;
+
+    SpiralEmitter() : angle(0), speed(fx::itofix(100)), radius(fx::itofix(50)),
+                      angular_speed(fx::itofix(2)), particles_per_sec(60) {}
+
+    void update(fix dt_s) {
+        angle += fx::fx_mul(angular_speed, dt_s);
+    }
+    // 生成一个粒子的初速度方向
+    Vec2 next_dir() const {
+        return Vec2(fx::fx_cos(angle), fx::fx_sin(angle));
+    }
+};
 int particle_engine_self_test();
 
 } // namespace gameengine

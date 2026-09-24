@@ -127,6 +127,12 @@ int tilemap_self_test() {
     if (!tc.solid_at(40, 40)) fails++;     // 在固体里
     if (tc.solid_at(0, 0)) fails++;        // 空
 
+
+    // --- Camera.follow ---
+    Camera cf;
+    cf.view_w = 100; cf.view_h = 100;
+    cf.follow(Vec2(fx::itofix(500), fx::itofix(500)), fx::fxf(1,60), fx::itofix(5));
+    if (cf.x <= 0) fails++;
     return fails;
 }
 

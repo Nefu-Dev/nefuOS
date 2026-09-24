@@ -1,4 +1,6 @@
 ﻿// nefuOS 深度学习库 —— 高阶模型包装实现
+// MLP/TinyCNN 高阶包装。注意跨函数 forward 后不要直接 backward。
+// 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 #include "models.h"
 #include "autograd.h"
@@ -115,6 +117,21 @@ int models_self_test() {
         MLP mlp(sizes,3,5,0);
         List<Tensor*> ps; mlp.params(ps);
         if (ps.size() != 4) fails++;
+    }
+    // TinyCNN 前向：[1,1,8,8] -> [1, classes]
+    {
+        TinyCNN cnn(8, 8, 3, 21);
+        fix v[64]; for(int i=0;i<64;i++) v[i]=fx::itofix(i%4);
+        Tensor x=t_from_flat(4,(int[4]){1,1,8,8},v);
+        Tensor y=cnn.forward(x);
+        if (y.shape[0]!=1 || y.shape[1]!=3) fails++;
+    }
+    // MLP params 数量校验（三层）
+    {
+        int sizes[4]={4,6,6,2};
+        MLP mlp(sizes,4,33,0);
+        List<Tensor*> ps; mlp.params(ps);
+        if (ps.size() != 6) fails++;  // 3 层 W+b
     }
     return fails;
 }
