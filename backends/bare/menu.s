@@ -46,11 +46,11 @@ main16:
     movw $0x1000, %ax
     movw %ax, %ds           # address this stage's data at 0x10000
     call tramp_install      # PM->RM trampoline at 0x8000 (before any cd_pm)
-    movw $0x0003, %ax       # 80x25 text mode (idempotent)
-    int $0x10
     call detect_hd          # ax = 1 multi-boot, 0 single
     testw %ax, %ax
     jz  boot_nefuos         # single boot -> straight to nefuOS, no page
+    movw $0x0003, %ax       # 80x25 text mode (picker page only; keep the
+    int $0x10               # boot.s VBE 1024x768x32 mode for single boot)
     movb $0, sel_idx        # default highlight: nefuOS
     call render             # draw the full picker page
     call probe
@@ -229,11 +229,36 @@ boot_windows:
 boot_nefuos:
     call probe
     .byte 'N'
+    call vbe_again          # picker reverted to text mode; re-apply the VBE
     xorw %ax, %ax
     movw %ax, %ds           # restore DS=0: boot.s cd_load_kernel reads 0x7Cxx
     .byte 0xEA              # ljmp 0:0x7CC1 -> boot.s cd_load_kernel
     .word 0x7CC1
     .word 0x0000
+
+# ---- re-apply the VBE 1024x768x32 mode after the picker's int10 text-mode
+# reset.  Entered with DS=0x1000 (this stage's data) from boot_nefuos; the
+# single-boot path never called int10, so this is a harmless idempotent
+# re-apply there too.  Same Bochs VBE register sequence as boot.s vbe_setup.
+vbe_again:
+    movw $0x1000, %ax
+    movw %ax, %ds           # always address this stage's data (idempotent)
+    leaw vbe_idx, %si
+    leaw vbe_val, %di
+    movw $4, %cx
+.vl:
+    movw $0x1CE, %dx
+    lodsw
+    outw %ax, %dx
+    movw $0x1CF, %dx
+    movw (%di), %ax
+    outw %ax, %dx
+    incw %di
+    incw %di
+    loop .vl
+    ret
+vbe_idx: .word 1, 2, 3, 4
+vbe_val: .word 1024, 768, 32, 0x0081
 
 # ---- PM->RM trampoline installer: writes 27 bytes to physical 0x8000.
 # The stub far-jumps (PM) here after each non-final window.  PROBLEM: the
