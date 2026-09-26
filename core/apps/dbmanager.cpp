@@ -14,6 +14,16 @@
 
 namespace nefu {
 
+// ---- you-sql connector ----
+// The manager database is exposed as a "you-sql" connection that guests can
+// read without registering; only the admin user (lbinm) may write.  Admin
+// auth is the shared salted SHA-256 check from terminal.cpp (admin_login):
+// only a hash is ever stored/compared, no plaintext in source/ISO/logs.
+bool admin_is_admin();
+bool admin_login(const char* pw);
+void admin_logout();
+static const char* YOUSQL_DSN = "you-sql://lbinm@nefuos/manager";
+
 namespace {
 
 const int DBG_W = 640, DBG_H = 440;   // 窗口尺寸
@@ -42,6 +52,7 @@ DbMgr::DbMgr() : db(0), input_len(0), cursor_on(true), scroll(0) {
     input[0] = 0;
     db = new database::Database();
     seed_demo();
+    status = String("you-sql:") + " " + YOUSQL_DSN + "  [guest read-only]  LOGIN <password> to write";
 }
 
 DbMgr::~DbMgr() { delete db; db = 0; }
@@ -54,13 +65,56 @@ void DbMgr::seed_demo() {
     db->exec("INSERT INTO emp VALUES (3, 'Carol','Eng', 12000)");
     db->exec("INSERT INTO emp VALUES (4, 'Dan',  'Eng', 8000)");
     db->exec("INSERT INTO emp VALUES (5, 'Eve',  'HR', 6000)");
-    status = String("ready. try: SELECT * FROM emp WHERE dept='Eng' ORDER BY salary");
 }
 
 // 执行输入框里的 SQL,把结果填到 result_cols/result_rows
 void DbMgr::exec_input() {
     String sql(input, input_len);
     if (sql.len() == 0) return;
+
+    // you-sql: "LOGIN <password>" authenticates as admin (lbinm).  The
+    // password is hashed (salted SHA-256) and compared to the stored hash;
+    // the plaintext never appears in source, README, ISO or logs.
+    {
+        const char* q = sql.c_str();
+        int i = 0;
+        while (q[i] == ' ') i++;
+        if (q[i]=='L' && q[i+1]=='O' && q[i+2]=='G' && q[i+3]=='I' && q[i+4]=='N' &&
+            (q[i+5]==' ' || q[i+5]==0)) {
+            const char* pw = q + i + 5;
+            while (*pw == ' ') pw++;
+            if (admin_login(pw)) {
+                status = String("you-sql: admin logged in (lbinm) — writes enabled");
+            } else {
+                status = String("ERR: wrong password (admin user is lbinm)");
+            }
+            input[0] = 0; input_len = 0; scroll = 0;
+            return;
+        }
+    }
+
+    // guests are read-only: writes would pollute the admin-managed data
+    if (!admin_is_admin()) {
+        const char* p = sql.c_str();
+        int i = 0;
+        while (p[i] == ' ' || p[i] == '\t') i++;
+        bool write = false;
+        static const char* kws[] = { "create", "insert", "delete", "update",
+                                     "drop", "alter", "replace", "truncate" };
+        for (int k = 0; k < 8 && !write; k++) {
+            const char* w = kws[k];
+            int j = 0;
+            while (w[j] && (p[i + j] | 32) == w[j]) j++;
+            if (w[j] == 0 && (p[i + j] == ' ' || p[i + j] == '\t' || p[i + j] == 0))
+                write = true;
+        }
+        if (write) {
+            status = String("ERR: guest read-only — LOGIN <password> to write (admin: lbinm)");
+            input[0] = 0; input_len = 0; scroll = 0;
+            return;
+        }
+    }
+
     database::SqlResult r = db->exec(sql.c_str());
     result_cols = r.col_names;
     result_rows = r.rows;
