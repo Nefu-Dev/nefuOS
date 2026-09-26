@@ -45,6 +45,7 @@ main16:
     cld
     movw $0x1000, %ax
     movw %ax, %ds           # address this stage's data at 0x10000
+    call tramp_install      # PM->RM trampoline at 0x8000 (before any cd_pm)
     movw $0x0003, %ax       # 80x25 text mode (idempotent)
     int $0x10
     call detect_hd          # ax = 1 multi-boot, 0 single
@@ -233,6 +234,81 @@ boot_nefuos:
     .byte 0xEA              # ljmp 0:0x7CC1 -> boot.s cd_load_kernel
     .word 0x7CC1
     .word 0x0000
+
+# ---- PM->RM trampoline installer: writes 27 bytes to physical 0x8000.
+# The stub far-jumps (PM) here after each non-final window.  PROBLEM: the
+# stub's code32 CS cache has D=1; clearing CR0.PE in place leaves the cached
+# D-bit set, so the real-mode far jump's target decodes 32-bit (empirically:
+# cd_resume at 0x7D3F decoded `BA` as a 5-byte mov edx,imm32 and died).  FIX:
+# first far-jump (PM, 32-bit) to the GDT's code16 selector (0x0018, base 0,
+# D=0) so the CPU decodes 16-bit from that point on; then clear PE; then the
+# 16-bit EA far-jumps to cd_resume (which decodes 16-bit correctly).  Layout:
+#   EA <off32=0x8007> <sel16=0x0018>   (PM: switch to the 16-bit code segment)
+#   FA | 0F 20 C0 | 83 E0 FE | 0F 22 C0 (cli; clear CR0.PE -- 16-bit decode)
+#   B2 E9 B0 54 EE                       probe T (decode-agnostic)
+#   EA <ip16> <cs16=0>                    real-mode far jump to cd_resume
+# ip16 comes from boot.s's real_resume slot (0x7C0A); sel16 from real_sel
+# (0x7C0E = 0x0018).  The extra 00 00 after the 16-bit EA operand is harmless.
+tramp_install:
+    xorw %ax, %ax
+    movw %ax, %es
+    movw %ax, %ds           # DS=0 for the 0x7C0A/0x7C0E slot reads
+    movw $0x8000, %di
+    # -- PM far jump: 0x0018:0x8007 (code16; the 16-bit code starts at 0x8007)
+    movb $0xEA, %al
+    stosb
+    movb $0x07, %al
+    stosb
+    movb $0x80, %al
+    stosb
+    movb $0x00, %al
+    stosb
+    movb $0x00, %al
+    stosb
+    movw 0x7C0E, %ax         # sel16 = real_sel (0x0018 code16)
+    stosw
+    # -- 16-bit code from here on (CS cache D=0)
+    movb $0xFA, %al
+    stosb
+    movb $0x0F, %al
+    stosb
+    movb $0x20, %al
+    stosb
+    movb $0xC0, %al
+    stosb
+    movb $0x83, %al
+    stosb
+    movb $0xE0, %al
+    stosb
+    movb $0xFE, %al
+    stosb
+    movb $0x0F, %al
+    stosb
+    movb $0x22, %al
+    stosb
+    movb $0xC0, %al
+    stosb
+    # probe T: trampoline entered (PE just cleared, 16-bit decode)
+    movb $0xB2, %al
+    stosb
+    movb $0xE9, %al
+    stosb
+    movb $0xB0, %al
+    stosb
+    movb $0x54, %al
+    stosb
+    movb $0xEE, %al
+    stosb
+    movb $0xEA, %al
+    stosb
+    movw 0x7C0A, %ax         # ip16 = real_resume (absolute cd_resume)
+    stosw
+    xorw %ax, %ax
+    stosw                    # cs16 = 0 (real-mode CS)
+    stosw                    # extra (unread by the 16-bit EA; harmless)
+    movw $0x1000, %ax
+    movw %ax, %ds           # restore menu.s's DS
+    ret
 
 # ---- strings (ASCII only; BIOS text mode has no CJK font) ----
 .org 0x300
