@@ -26,8 +26,9 @@ const char* nefuos_lock_pwd();
 uint32_t nefuos_lock_fail_ms();
 
 static const int TASKBAR_H = 30;
-static const int ICON_W = 72, ICON_H = 72;
-static const int TILE = 52;
+static const int ICON_W = 60, ICON_H = 60;
+static const int ICON_GAP = 4;   // gap between desktop icons
+static const int TILE = 40;
 
 // aggregate-only (no ctor): bare kernel never runs C++ static ctors
 struct DesktopIcon {
@@ -38,49 +39,111 @@ struct DesktopIcon {
     bool used;             // slot occupied (runtime-created shortcuts use free slots)
 };
 
-static const int GRID_COLS = 3;             // desktop icon grid
-// Rows that actually fit above the taskbar on the 800x600 screen:
-// (600 - 30 taskbar - 14 margin) / (72 icon + 10 gap) = 6. Icon rows beyond
-// this used to be placed below the taskbar / off-screen ("apps at the bottom").
-static const int GRID_ROWS = (600 - TASKBAR_H - 14) / (ICON_H + 10);
-static const int MAX_ICONS = 40;            // total slots (builtin + runtime shortcuts)
+// Desktop icon grid: every usable app is a shortcut, laid out horizontally
+// (fill the width first), and everything must fit above the taskbar on the
+// 800x600 screen so no icon overflows off-screen:
+//   (800 - 2*14 margin + 4 gap) / (60 icon + 4 gap)     = 12 columns
+//   (600 - 30 taskbar - 14 margin + 4 gap) / (60 + 4)   = 8 rows  -> 96 slots
+static const int GRID_COLS = (800 - 2 * 14 + ICON_GAP) / (ICON_W + ICON_GAP);
+static const int GRID_ROWS = (600 - TASKBAR_H - 14 + ICON_GAP) / (ICON_H + ICON_GAP);
+static const int MAX_ICONS = 96;            // total slots (builtin + runtime shortcuts)
 
+// All usable apps as desktop shortcuts. Positions are assigned at init from
+// the slot index (horizontal-first grid), so x/y are zero here.
 static DesktopIcon s_icons[MAX_ICONS] = {
-    {14, 14, "文件管理器", APP_FILEMGR, false, true},
-    {14 + ICON_W + 8, 14, "终端", APP_TERMINAL, false, true},
-    {14 + 2 * (ICON_W + 8), 14, "计算器", APP_CALC, false, true},
-    {14, 14 + ICON_H + 10, "文本查看器", APP_TEXTVIEW, false, true},
-    {14 + ICON_W + 8, 14 + ICON_H + 10, "数据库维基", APP_WIKI, false, true},
-    {14, 14 + 2 * (ICON_H + 10), "设置", APP_SETTINGS, false, true},
-    {14 + ICON_W + 8, 14 + 2 * (ICON_H + 10), "软件商店", APP_STORE, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 2 * (ICON_H + 10), "图片查看器", APP_IMAGEVIEWER, false, true},
-    {14, 14 + 3 * (ICON_H + 10), "音乐播放器", APP_MUSIC, false, true},
-    {14 + ICON_W + 8, 14 + 3 * (ICON_H + 10), "系统监视器", APP_MONITOR, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 3 * (ICON_H + 10), "浏览器", APP_BROWSER, false, true},
-    {14, 14 + 4 * (ICON_H + 10), "网络", APP_NETCFG, false, true},
-    {14 + ICON_W + 8, 14 + 4 * (ICON_H + 10), "应用启动器", APP_NEFUD, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 4 * (ICON_H + 10), "日历", APP_CALENDAR, false, true},
-    {14, 14 + 5 * (ICON_H + 10), "磁盘分析", APP_DISKUSAGE, false, true},
-    {14 + ICON_W + 8, 14 + 5 * (ICON_H + 10), "密码生成器", APP_PASSGEN, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 5 * (ICON_H + 10), "便签", APP_STICKY, false, true},
-    {14, 14 + 6 * (ICON_H + 10), "邮箱", APP_EMAIL, false, true},
-    {14 + ICON_W + 8, 14 + 6 * (ICON_H + 10), "游戏中心", APP_GAMECENTER, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 6 * (ICON_H + 10), "小组件", APP_WIDGETS, false, true},
-    {14, 14 + 7 * (ICON_H + 10), "时钟", APP_CLOCK_TIMER, false, true},
-    {14 + ICON_W + 8, 14 + 7 * (ICON_H + 10), "单位换算", APP_CONVERTER, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 7 * (ICON_H + 10), "视频播放器", APP_VIDEOPLAYER, false, true},
-    {14, 14 + 8 * (ICON_H + 10), "俄罗斯方块", APP_TETRIS, false, true},
-    {14 + ICON_W + 8, 14 + 8 * (ICON_H + 10), "2048", APP_GAME2048, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 8 * (ICON_H + 10), "数独", APP_SUDOKU, false, true},
-    {14, 14 + 9 * (ICON_H + 10), "十六进制编辑器", APP_HEXEDIT, false, true},
-    {14 + ICON_W + 8, 14 + 9 * (ICON_H + 10), "番茄钟", APP_POMODORO, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 9 * (ICON_H + 10), "记忆翻牌", APP_MEMORYMATCH, false, true},
-    {14, 14 + 10 * (ICON_H + 10), "JSON 查看器", APP_JSONVIEW, false, true},
-    {14 + ICON_W + 8, 14 + 10 * (ICON_H + 10), "文件查找", APP_FINDFILES, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 10 * (ICON_H + 10), "秒表", APP_STOPWATCH, false, true},
-    {14, 14 + 11 * (ICON_H + 10), "字数统计", APP_WORDCOUNT, false, true},
-    {14 + ICON_W + 8, 14 + 11 * (ICON_H + 10), "排序可视化", APP_ALGOVIZ, false, true},
-    {14 + 2 * (ICON_W + 8), 14 + 11 * (ICON_H + 10), "图形实验室", APP_GFXLAB, false, true},
+    // --- core apps (kept in the original order) ---
+    {0, 0, "文件管理器", APP_FILEMGR, false, true},
+    {0, 0, "终端", APP_TERMINAL, false, true},
+    {0, 0, "计算器", APP_CALC, false, true},
+    {0, 0, "文本查看器", APP_TEXTVIEW, false, true},
+    {0, 0, "数据库维基", APP_WIKI, false, true},
+    {0, 0, "设置", APP_SETTINGS, false, true},
+    {0, 0, "软件商店", APP_STORE, false, true},
+    {0, 0, "图片查看器", APP_IMAGEVIEWER, false, true},
+    {0, 0, "音乐播放器", APP_MUSIC, false, true},
+    {0, 0, "系统监视器", APP_MONITOR, false, true},
+    {0, 0, "浏览器", APP_BROWSER, false, true},
+    {0, 0, "网络", APP_NETCFG, false, true},
+    {0, 0, "应用启动器", APP_NEFUD, false, true},
+    {0, 0, "日历", APP_CALENDAR, false, true},
+    {0, 0, "磁盘分析", APP_DISKUSAGE, false, true},
+    {0, 0, "密码生成器", APP_PASSGEN, false, true},
+    {0, 0, "便签", APP_STICKY, false, true},
+    {0, 0, "邮箱", APP_EMAIL, false, true},
+    {0, 0, "游戏中心", APP_GAMECENTER, false, true},
+    {0, 0, "小组件", APP_WIDGETS, false, true},
+    {0, 0, "时钟", APP_CLOCK_TIMER, false, true},
+    {0, 0, "单位换算", APP_CONVERTER, false, true},
+    {0, 0, "视频播放器", APP_VIDEOPLAYER, false, true},
+    {0, 0, "俄罗斯方块", APP_TETRIS, false, true},
+    {0, 0, "2048", APP_GAME2048, false, true},
+    {0, 0, "数独", APP_SUDOKU, false, true},
+    {0, 0, "十六进制编辑器", APP_HEXEDIT, false, true},
+    {0, 0, "番茄钟", APP_POMODORO, false, true},
+    {0, 0, "记忆翻牌", APP_MEMORYMATCH, false, true},
+    {0, 0, "JSON 查看器", APP_JSONVIEW, false, true},
+    {0, 0, "文件查找", APP_FINDFILES, false, true},
+    {0, 0, "秒表", APP_STOPWATCH, false, true},
+    {0, 0, "字数统计", APP_WORDCOUNT, false, true},
+    {0, 0, "排序可视化", APP_ALGOVIZ, false, true},
+    {0, 0, "图形实验室", APP_GFXLAB, false, true},
+    // --- system / tools / games / labs added so every usable app is on the desktop ---
+    {0, 0, "系统信息", APP_SYSINFO, false, true},
+    {0, 0, "关于", APP_ABOUT, false, true},
+    {0, 0, "贪吃蛇", APP_SNAKE, false, true},
+    {0, 0, "画图", APP_PAINT, false, true},
+    {0, 0, "记事本", APP_NOTEPAD, false, true},
+    {0, 0, "扫雷", APP_MINER, false, true},
+    {0, 0, "字体查看器", APP_FONTVIEW, false, true},
+    {0, 0, "代码编辑器", APP_EDITOR, false, true},
+    {0, 0, "截图", APP_SCREENSHOT, false, true},
+    {0, 0, "取色器", APP_COLORPICKER, false, true},
+    {0, 0, "搜索", APP_SEARCH, false, true},
+    {0, 0, "回收站", APP_RECYCLEBIN, false, true},
+    {0, 0, "天气", APP_WEATHER, false, true},
+    {0, 0, "帮助", APP_HELP, false, true},
+    {0, 0, "词典", APP_DICTIONARY, false, true},
+    {0, 0, "任务管理器", APP_TASKMGR, false, true},
+    {0, 0, "输入法", APP_INPUTMETHOD, false, true},
+    {0, 0, "剪贴板", APP_CLIPBOARD, false, true},
+    {0, 0, "通知中心", APP_NOTIFCENTER, false, true},
+    {0, 0, "快捷键", APP_SHORTCUTS, false, true},
+    {0, 0, "壁纸", APP_WALLPAPER, false, true},
+    {0, 0, "主题", APP_THEME, false, true},
+    {0, 0, "进程列表", APP_PROCESSLIST, false, true},
+    {0, 0, "关于详细", APP_ABOUTFULL, false, true},
+    {0, 0, "详细系统信息", APP_SYSINFOEXT, false, true},
+    {0, 0, "致谢", APP_CREDITS, false, true},
+    {0, 0, "更新日志", APP_RELEASENOTES, false, true},
+    {0, 0, "安装程序", APP_INSTALLER, false, true},
+    {0, 0, "仿真实验室", APP_SIMLAB, false, true},
+    {0, 0, "文本工具", APP_TEXTTOOL, false, true},
+    {0, 0, "密码学实验室", APP_CRYPTOLAB, false, true},
+    {0, 0, "压缩工具", APP_COMPRESSTOOL, false, true},
+    {0, 0, "格式转换台", APP_SERIALAB, false, true},
+    {0, 0, "音频实验室", APP_AUDIOLAB, false, true},
+    {0, 0, "3D 查看器", APP_GFX3DVIEW, false, true},
+    {0, 0, "数学工具箱", APP_MATHTOOL, false, true},
+    {0, 0, "UI 组件库", APP_WIDGETGALLERY, false, true},
+    {0, 0, "数据库管理", APP_DBMANAGER, false, true},
+    {0, 0, "打砖块", APP_BREAKOUT, false, true},
+    {0, 0, "乒乓球", APP_PONG, false, true},
+    {0, 0, "像素鸟", APP_FLAPPY, false, true},
+    {0, 0, "太空侵略者", APP_SPACEINV, false, true},
+    {0, 0, "吃豆人", APP_PACMAN, false, true},
+    {0, 0, "井字棋", APP_TICTACTOE, false, true},
+    {0, 0, "四子棋", APP_CONNECT4, false, true},
+    {0, 0, "高级扫雷", APP_MINESWEEPER2, false, true},
+    {0, 0, "生命游戏", APP_LIFE, false, true},
+    {0, 0, "机器学习实验室", APP_MLLAB, false, true},
+    {0, 0, "迷你解释器", APP_REPL, false, true},
+    {0, 0, "系统监视器", APP_SYSMON, false, true},
+    {0, 0, "网络实验室", APP_NETLAB, false, true},
+    {0, 0, "文件系统", APP_FSVIEW, false, true},
+    {0, 0, "光线追踪", APP_RAYVIEW, false, true},
+    {0, 0, "编译器", APP_COMPILERLAB, false, true},
+    {0, 0, "游戏引擎", APP_GEDEMO, false, true},
+    {0, 0, "深度学习", APP_DEEPVIZ, false, true},
 };
 
 static const char* icon_label(int app) {
@@ -97,6 +160,7 @@ static const char* icon_label(int app) {
     case APP_SNAKE:      return T("贪吃蛇", "Snake");
     case APP_PAINT:      return T("画图", "Paint");
     case APP_CLOCK_TIMER:      return T("时钟", "Clock");
+    case APP_CONVERTER:        return T("单位换算", "Unit Converter");
     case APP_NOTEPAD:    return T("记事本", "Notepad");
     case APP_MINER:      return T("扫雷", "Minesweeper");
     case APP_IMAGEVIEWER:return T("图片查看器", "Images");
@@ -166,14 +230,14 @@ static const char* icon_label(int app) {
     case APP_CONNECT4:  return T("四子棋", "Connect Four");
     case APP_MINESWEEPER2: return T("高级扫雷", "Minesweeper Pro");
     case APP_LIFE:      return T("生命游戏", "Game of Life");
-    case APP_MLLAB:     return T("机器学习实验室", "ML Lab");
-    case APP_REPL:      return T("迷你解释器", "Mini REPL");
-    case APP_SYSMON:    return T("系统监视器", "SysMon");
-    case APP_NETLAB:    return T("网络实验室", "NetLab");
-    case APP_FSVIEW:    return T("文件系统", "FSView");
-    case APP_RAYVIEW:   return T("光线追踪", "RayView");
-    case APP_COMPILERLAB: return T("编译器", "Compiler");
-    case APP_GEDEMO: return T("游戏引擎", "GE Demo");
+    case APP_MLLAB:     return T("机器学习实验室", "ML Lab");
+    case APP_REPL:      return T("迷你解释器", "Mini REPL");
+    case APP_SYSMON:    return T("系统监视器", "SysMon");
+    case APP_NETLAB:    return T("网络实验室", "NetLab");
+    case APP_FSVIEW:    return T("文件系统", "FSView");
+    case APP_RAYVIEW:   return T("光线追踪", "RayView");
+    case APP_COMPILERLAB: return T("编译器", "Compiler");
+    case APP_GEDEMO: return T("游戏引擎", "GE Demo");
     case APP_DEEPVIZ: return T("深度学习", "DeepViz");
     default: return T("未知应用", "Unknown");
     }
@@ -202,7 +266,7 @@ static int s_mx = 10, s_my = 10;
 static bool s_btn = false;
 static bool s_initialized = false;
 static uint8_t s_last_buttons = 0;
-static uint32_t s_icon_color[40];
+static uint32_t s_icon_color[MAX_ICONS];
 static bool s_dirty = false;
 static uint32_t s_last_sig = 0;
 static int s_menu_apps[32];
@@ -278,6 +342,36 @@ void lvgl_key_push(int keycode, char ascii) {
     if (k && s_lv_key_n < 32) s_lv_keys[s_lv_key_n++] = k;
 }
 
+bool lvgl_key_push_utf8(const char* utf8) {
+    if (!utf8 || !utf8[0]) return false;
+    // Only deliver IME text into a focused LVGL textarea; classic windows
+    // (editor / terminal) receive it through WM::handle_key instead.
+    lv_obj_t* fo = s_kb_group ? lv_group_get_focused(s_kb_group) : 0;
+    if (!fo || !lv_obj_check_type(fo, &lv_textarea_class)) return false;
+    // Decode UTF-8 and feed each codepoint to the textarea via the key queue.
+    const unsigned char* p = (const unsigned char*)utf8;
+    while (*p) {
+        uint32_t cp;
+        if ((*p & 0xE0) == 0xC0 && p[1]) {
+            cp = ((uint32_t)(*p & 0x1F) << 6) | (uint32_t)(p[1] & 0x3F);
+            p += 2;
+        } else if ((*p & 0xF0) == 0xE0 && p[1] && p[2]) {
+            cp = ((uint32_t)(*p & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6)
+               | (uint32_t)(p[2] & 0x3F);
+            p += 3;
+        } else if ((*p & 0xF8) == 0xF0 && p[1] && p[2] && p[3]) {
+            cp = ((uint32_t)(*p & 0x07) << 18) | ((uint32_t)(p[1] & 0x3F) << 12)
+               | ((uint32_t)(p[2] & 0x3F) << 6) | (uint32_t)(p[3] & 0x3F);
+            p += 4;
+        } else {
+            cp = *p;
+            p += 1;
+        }
+        if (s_lv_key_n < 32) s_lv_keys[s_lv_key_n++] = cp;
+    }
+    return true;
+}
+
 lv_group_t* lvgl_kb_group() {
     return s_kb_group;
 }
@@ -291,6 +385,39 @@ static void lvgl_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
     if (s_lvdbg < 60 && (data->state == LV_INDEV_STATE_PRESSED || s_mx != 10 || s_my != 10)) {
         s_lvdbg++; klogf("lvgl in=%d,%d st=%d\n", s_mx, s_my, (int)data->state);
     }
+}
+
+// The platform wheel event never reaches LVGL (LVGL 9 has no wheel field in
+// the pointer indev; its drivers deliver the wheel through an encoder indev
+// that nefuOS does not register). Instead of that, hit-test the object tree
+// under the cursor and scroll the innermost scrollable object (store list,
+// start menu, ...). Children are walked back-to-front to respect z-order.
+static lv_obj_t* lvgl_hit_scrollable(lv_obj_t* o, int x, int y, lv_dir_t dir) {
+    if (!o) return 0;
+    uint32_t n = lv_obj_get_child_count(o);
+    for (uint32_t i = n; i > 0; i--) {
+        lv_obj_t* c = lv_obj_get_child(o, i - 1);
+        if (!c || lv_obj_has_flag(c, LV_OBJ_FLAG_HIDDEN)) continue;
+        lv_area_t a;
+        lv_obj_get_coords(c, &a);
+        if (x >= a.x1 && x <= a.x2 && y >= a.y1 && y <= a.y2) {
+            lv_obj_t* inner = lvgl_hit_scrollable(c, x, y, dir);
+            if (inner) return inner;
+            if (lv_obj_has_flag(c, LV_OBJ_FLAG_SCROLLABLE) &&
+                (lv_obj_get_scroll_dir(c) & dir)) return c;
+        }
+    }
+    return 0;
+}
+
+bool desktop_handle_scroll(int delta) {
+    if (!s_initialized) return false;
+    lv_obj_update_layout(lv_screen_active());
+    lv_obj_t* t = lvgl_hit_scrollable(lv_screen_active(), s_mx, s_my, LV_DIR_VER);
+    if (!t) return false;
+    lv_obj_scroll_by(t, 0, delta > 0 ? -60 : 60, LV_ANIM_OFF);
+    s_dirty = true;
+    return true;
 }
 
 void desktop_redraw() {
@@ -327,8 +454,8 @@ static void on_icon_release(lv_event_t* e) {
     lv_obj_get_coords(obj, &a);
     ic.x = a.x1;
     ic.y = a.y1;
-    int col = (ic.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
-    int row = (ic.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
+    int col = (ic.x - 14 + (ICON_W + ICON_GAP) / 2) / (ICON_W + ICON_GAP);
+    int row = (ic.y - 14 + (ICON_H + ICON_GAP) / 2) / (ICON_H + ICON_GAP);
     if (col < 0) col = 0;
     if (row < 0) row = 0;
     int best_c = col, best_r = row, best_d2 = 0x7FFFFFFF;
@@ -338,8 +465,8 @@ static void on_icon_release(lv_event_t* e) {
             for (int k = 0; k < MAX_ICONS; k++) {
                 if (k == i || !s_icons[k].used || s_icons[k].deleted) continue;
                 DesktopIcon& o = s_icons[k];
-                int oc = (o.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
-                int orw = (o.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
+                int oc = (o.x - 14 + (ICON_W + ICON_GAP) / 2) / (ICON_W + ICON_GAP);
+                int orw = (o.y - 14 + (ICON_H + ICON_GAP) / 2) / (ICON_H + ICON_GAP);
                 if (oc == c && orw == r) { taken = true; break; }
             }
             if (!taken) {
@@ -348,8 +475,8 @@ static void on_icon_release(lv_event_t* e) {
             }
         }
     }
-    ic.x = 14 + best_c * (ICON_W + 8);
-    ic.y = 14 + best_r * (ICON_H + 10);
+    ic.x = 14 + best_c * (ICON_W + ICON_GAP);
+    ic.y = 14 + best_r * (ICON_H + ICON_GAP);
     lv_obj_set_pos(obj, ic.x, ic.y);
 }
 
@@ -649,8 +776,8 @@ static void rmenu_props_icon(int i) {
     lv_obj_set_style_text_color(title, lv_color_hex(0x22262A), 0);
     lv_obj_set_pos(title, 16, 12);
     DesktopIcon& ic = s_icons[i];
-    int col = (ic.x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
-    int row = (ic.y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
+    int col = (ic.x - 14 + (ICON_W + ICON_GAP) / 2) / (ICON_W + ICON_GAP);
+    int row = (ic.y - 14 + (ICON_H + ICON_GAP) / 2) / (ICON_H + ICON_GAP);
     if (col < 0) col = 0;
     if (row < 0) row = 0;
     char buf[160];
@@ -679,8 +806,8 @@ static bool icon_free_cell(int* cx, int* cy) {
             bool taken = false;
             for (int k = 0; k < MAX_ICONS; k++) {
                 if (!s_icons[k].used || s_icons[k].deleted) continue;
-                int kc = (s_icons[k].x - 14 + (ICON_W + 8) / 2) / (ICON_W + 8);
-                int kr = (s_icons[k].y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
+                int kc = (s_icons[k].x - 14 + (ICON_W + ICON_GAP) / 2) / (ICON_W + ICON_GAP);
+                int kr = (s_icons[k].y - 14 + (ICON_H + ICON_GAP) / 2) / (ICON_H + ICON_GAP);
                 if (kc == c && kr == r) { taken = true; break; }
             }
             if (!taken) { *cx = c; *cy = r; return true; }
@@ -699,8 +826,8 @@ static void arrange_icons() {
             n++;
             continue;
         }
-        s_icons[i].x = 14 + (n % GRID_COLS) * (ICON_W + 8);
-        s_icons[i].y = 14 + row * (ICON_H + 10);
+        s_icons[i].x = 14 + (n % GRID_COLS) * (ICON_W + ICON_GAP);
+        s_icons[i].y = 14 + row * (ICON_H + ICON_GAP);
         if (s_icon_objs[i]) {
             lv_obj_remove_flag(s_icon_objs[i], LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_pos(s_icon_objs[i], s_icons[i].x, s_icons[i].y);
@@ -723,8 +850,8 @@ static void on_pick_app(lv_event_t* e) {
             ic.used = true;
             ic.deleted = false;
             ic.app = app;
-            ic.x = 14 + cx * (ICON_W + 8);
-            ic.y = 14 + cy * (ICON_H + 10);
+            ic.x = 14 + cx * (ICON_W + ICON_GAP);
+            ic.y = 14 + cy * (ICON_H + ICON_GAP);
             const char* lbl = icon_label(app);
             strncpy(ic.label, lbl, sizeof(ic.label) - 1);
             ic.label[sizeof(ic.label) - 1] = 0;
@@ -854,14 +981,14 @@ static uint32_t icon_color(int app) {
     case APP_CONNECT4:    return 0x2980B9;
     case APP_MINESWEEPER2: return 0x27AE60;
     case APP_LIFE:        return 0x9B59B6;
-    case APP_MLLAB:       return 0xE74C3C;
-    case APP_REPL:        return 0x2C3E50;
-    case APP_SYSMON:      return 0x1ABC9C;
-    case APP_NETLAB:      return 0x2980B9;
-    case APP_FSVIEW:      return 0x89B4FA;
-    case APP_RAYVIEW:     return 0x3498DB;
-    case APP_COMPILERLAB: return 0xE67E22;
-    case APP_GEDEMO: return 0x27AE60;
+    case APP_MLLAB:       return 0xE74C3C;
+    case APP_REPL:        return 0x2C3E50;
+    case APP_SYSMON:      return 0x1ABC9C;
+    case APP_NETLAB:      return 0x2980B9;
+    case APP_FSVIEW:      return 0x89B4FA;
+    case APP_RAYVIEW:     return 0x3498DB;
+    case APP_COMPILERLAB: return 0xE67E22;
+    case APP_GEDEMO: return 0x27AE60;
     case APP_DEEPVIZ: return 0x9B59B6;
     case APP_WEATHER:    return 0x3498DB;
     case APP_HELP:       return 0x9B59B6;
@@ -917,8 +1044,7 @@ static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
 }
 
 // start menu entries: built-in apps + settings + store + installed store apps
-// + every desktop shortcut (games, tools, ...) so no app becomes unreachable
-// when the desktop grid hides rows that no longer fit above the taskbar.
+// + every desktop shortcut (games, tools, ...) so no app becomes unreachable.
 static int build_menu(int* list) {
     int n = 0;
     for (int i = 0; i < APP_BUILTIN_COUNT && n < 30; i++) list[n++] = i;
@@ -959,7 +1085,7 @@ static void build_taskbar(lv_obj_t* scr, int W, int H) {
     lv_obj_set_style_radius(sb, 4, 0);
     lv_obj_add_event_cb(sb, on_start_click, LV_EVENT_CLICKED, 0);
     lv_obj_t* sl = lv_label_create(sb);
-    lv_label_set_text(sl, "Start");
+    lv_label_set_text(sl, T("开始", "Start"));
     lv_obj_set_style_text_color(sl, lv_color_hex(0xFFFFFF), 0);
     lv_obj_center(sl);
 
@@ -1024,7 +1150,7 @@ static void build_start_menu(lv_obj_t* scr, int W, int H) {
     lv_obj_set_style_radius(po, 4, 0);
     lv_obj_add_event_cb(po, on_menu_launch, LV_EVENT_CLICKED, (void*)(intptr_t)(-1));
     lv_obj_t* pl = lv_label_create(po);
-    lv_label_set_text(pl, "Power Off");
+    lv_label_set_text(pl, T("关机", "Power Off"));
     lv_obj_set_style_text_color(pl, lv_color_hex(0xC22A2A), 0);
     lv_obj_align(pl, LV_ALIGN_LEFT_MID, 10, 0);
 }
@@ -1123,15 +1249,18 @@ static void desktop_lvgl_init(Surface& fb) {
 
     lv_obj_t* scr = lv_screen_active();
     build_wallpaper(scr, W, H);
-    // Keep each icon at its configured grid position; rows that no longer fit
-    // above the taskbar (GRID_ROWS) are not drawn at all instead of being put
-    // below the taskbar / off-screen ("apps at the bottom"). Those shortcuts
-    // stay available via the Start menu (build_menu includes every icon app).
+    // Icons are stored as a horizontal-first list: assign each shortcut its
+    // grid cell (GRID_COLS wide, GRID_ROWS tall) so every usable app is on
+    // the desktop and nothing overflows below the taskbar / off-screen.
+    int grid_i = 0;
     for (int i = 0; i < MAX_ICONS; i++) {
         if (!s_icons[i].used || s_icons[i].deleted) continue;
-        int row = (s_icons[i].y - 14 + (ICON_H + 10) / 2) / (ICON_H + 10);
-        if (row >= GRID_ROWS) { s_icon_objs[i] = 0; continue; }
+        int col = grid_i % GRID_COLS, row = grid_i / GRID_COLS;
+        if (row >= GRID_ROWS) { s_icon_objs[i] = 0; continue; }  // defensive
+        s_icons[i].x = 14 + col * (ICON_W + ICON_GAP);
+        s_icons[i].y = 14 + row * (ICON_H + ICON_GAP);
         s_icon_objs[i] = make_icon(scr, i, s_icons[i].x, s_icons[i].y);
+        grid_i++;
     }
     build_taskbar(scr, W, H);
     build_start_menu(scr, W, H);
@@ -1373,12 +1502,30 @@ bool desktop_handle_mouse(int x, int y, uint8_t buttons) {
     return true; // desktop consumes clicks (LVGL widget events fire via timer)
 }
 
-bool desktop_handle_key(int keycode, char ascii) {
+bool desktop_handle_key(int keycode, char ascii, uint8_t mods, const char* utf8) {
     // modal dialog: all keys go to LVGL (textarea); ESC cancels the dialog
     if (s_dialog) {
         if (keycode == KEY_ESC) { rmenu_dialog_close(); return true; }
+        if (utf8 && utf8[0]) { if (lvgl_key_push_utf8(utf8)) return true; }
         lvgl_key_push(keycode, ascii);
         return true;
+    }
+    // IME committed text: a focused LVGL textarea gets it directly, otherwise
+    // fall through to the classic WM (editor / terminal insert the UTF-8).
+    if (utf8 && utf8[0]) {
+        if (lvgl_key_push_utf8(utf8)) return true;
+        return false;
+    }
+    // ---- system shortcuts (Shift+/Ctrl+ combinations) ----
+    const bool shift = (mods & 0x01) != 0;
+    const bool ctrl  = (mods & 0x02) != 0;
+    const bool alt   = (mods & 0x04) != 0;
+    if (ctrl || alt) {
+        if (ctrl && alt && (keycode == KEY_DEL || ascii == 'l' || ascii == 'L')) { nefuos_lock_screen(); return true; }     // Ctrl+Alt+Del / Ctrl+Alt+L: lock
+        if (ctrl && shift && keycode == KEY_ESC) { app_launch(APP_TASKMGR); return true; } // Ctrl+Shift+Esc: task manager
+        if (ctrl && !alt && keycode == KEY_ESC) { start_menu_toggle(); return true; }      // Ctrl+Esc: start menu
+        if (ctrl && keycode == KEY_TAB) { g_wm->cycle_focus(shift); return true; }         // Ctrl+Tab / Ctrl+Shift+Tab: cycle windows
+        return false;   // other Ctrl/Alt combos go to the focused app (Ctrl+S, ...)
     }
     lvgl_key_push(keycode, ascii);
     // ESC closes an open context menu first

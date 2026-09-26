@@ -5,7 +5,7 @@ Layout:
   LBA 16: PVD, 17: Boot Record VD, 18: Terminator VD, 19: Boot Catalog,
   20: PathTable L, 21: PathTable M, 22: root dir data,
   23: boot.s (2048B-aligned, padded), 24-25: menu.bin (multi-boot picker,
-  2 x 2048B), 26+: kernel.bin (padded to 1024 x 2048B).
+  2 x 2048B), 26+: kernel.bin (padded to 2048 x 2048B).
 
 Boot chain (no-emulation):
   SeaBIOS reads 1 sector (2048B) at LBA 23 = boot.s into 0x7C00,
@@ -31,7 +31,7 @@ LBA_ROOT = 22
 LBA_IMG = 23          # boot.s (no-emulation boot image, 1 sector)
 LBA_MENU = 24         # menu.bin (multi-boot picker, 2 sectors)
 LBA_KERNEL = 26       # kernel.bin
-KERNEL_BLOCKS = 1024   # padded (2 MiB cap); boot.s dynamic loader reads any size
+KERNEL_BLOCKS = 2048   # padded (4 MiB cap); boot.s dynamic loader reads any size
 
 VOL = b"NEFUOS"
 

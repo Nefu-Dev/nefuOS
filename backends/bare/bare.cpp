@@ -38,11 +38,33 @@ static void uart_putc(char c) {
 }
 
 // ===================== =====================
-#define ARENA_BASE 0x400000u
-#define ARENA_SIZE (64u * 1024u * 1024u)
+// Arena starts at 0x920000: above the kernel image (linked at 0x100000,
+// ends < 0x620000, enforced at build time) and above the entry/stub stacks
+// (0x900000) and the stub staging region (0x620000..~0x8A0000).
+// Kernel arena: 512 MB budget (kernel + NVFS + network). Browser arena:
+// a separate 2 GB region (BROWSER_ARENA_BASE..+2GB) so the browser can grow
+// up to its own 2 GB budget without starving the kernel.
+#define ARENA_BASE 0x920000u
+#define ARENA_SIZE (512u * 1024u * 1024u)      // kernel + NVFS + network
+#define BROWSER_ARENA_BASE 0x40000000u
+#define BROWSER_ARENA_SIZE (2048u * 1024u * 1024u)  // browser, 2 GB
 struct Blk { uint32_t size; Blk* next; };   // 8 bytes, 16
 static uint32_t s_arena_next = ARENA_BASE;
 static Blk* s_free = 0;
+// ---- browser arena (independent bump + free list) ----
+static uint32_t s_bnext = BROWSER_ARENA_BASE;
+static Blk* s_bfree = 0;
+uint64_t browser_mem_used_bytes = 0;
+
+static void* b_alloc_from_bump(uint32_t sz) {
+    uint32_t need = (sz + 15) & ~15u;
+    uint32_t cur = s_bnext;
+    if (cur + need + 16 > BROWSER_ARENA_BASE + BROWSER_ARENA_SIZE) return 0;
+    s_bnext = cur + need + 16;
+    Blk* b = (Blk*)cur;
+    b->size = need;
+    return (void*)(b + 1);
+}
 
 static void* alloc_from_bump(uint32_t sz) {
     uint32_t need = (sz + 15) & ~15u;
@@ -81,6 +103,44 @@ void kfree(void* p) {
     Blk* b = (Blk*)p - 1;
     b->next = s_free;
     s_free = b;
+}
+
+void* balloc(size_t sz) {
+    if (sz == 0) sz = 8;
+    uint32_t need = ((uint32_t)sz + 15) & ~15u;
+    Blk** pp = &s_bfree;
+    while (*pp) {
+        if ((*pp)->size >= need) {
+            Blk* b = *pp;
+            *pp = b->next;
+            browser_mem_used_bytes += b->size;
+            return (void*)(b + 1);
+        }
+        pp = &(*pp)->next;
+    }
+    void* r = b_alloc_from_bump(need);
+    if (r) browser_mem_used_bytes += need;
+    return r;
+}
+
+void bfree(void* p) {
+    if (!p) return;
+    Blk* b = (Blk*)p - 1;
+    if (browser_mem_used_bytes >= b->size) browser_mem_used_bytes -= b->size;
+    b->next = s_bfree;
+    s_bfree = b;
+}
+
+void* brealloc(void* p, size_t sz) {
+    if (!p) return balloc(sz);
+    Blk* b = (Blk*)p - 1;
+    uint32_t old = b->size;
+    if ((uint32_t)sz <= old) return p;
+    void* np = balloc(sz);
+    if (!np) return 0;
+    memcpy(np, p, old);
+    bfree(p);
+    return np;
 }
 
 void* krealloc(void* p, size_t sz) {
@@ -227,7 +287,7 @@ static void kbd_scancode(uint8_t sc) {
     outb(0xE9, hexd[sc & 0xF]);
     bool down = !(sc & 0x80);
     uint8_t code = sc & 0x7F;
-    if (code == 0x2A || code == 0x36) { s_shift = down; return; }
+    if (code == 0x2A || code == 0x36) { s_shift = down; kq_push(KEY_SHIFT, 0, down); return; }
     if (code == 0x3A) {
         if (down) { s_caps = !s_caps; kq_push(KEY_CAPS, 0, true); }
         return;
@@ -277,6 +337,12 @@ static void mouse_byte(uint8_t b) {
     s_mouse_dirty = true;
 }
 
+// IRQ handlers must stay integer-only: GCC's interrupt attribute rejects SSE
+// instructions inside an ISR ("SSE instructions aren't allowed in an interrupt
+// service routine"), so the handlers below cannot touch the FPU state of the
+// interrupted context, and everything they call (scancode/mouse decode, PIC
+// EOI) is pure integer/port-IO code.  The main loop's XMM registers are thus
+// preserved across interrupts by construction.
 __attribute__((interrupt)) static void irq0_handler(void* frame) {
     (void)frame;
     s_ticks++;
@@ -297,7 +363,6 @@ __attribute__((interrupt)) static void irq12_handler(void* frame) {
     pic_eoi(12);
 }
 __attribute__((interrupt)) static void spurious_handler(void* frame) { (void)frame; }
-
 static void idt_init() {
     // spurious, IRQ
     for (int i = 0; i < 256; i++) idt_set(i, (void*)spurious_handler);
@@ -469,7 +534,9 @@ bool platform_hw_info(HwInfo* out) {
     out->cpu_cores = 1;
     // Read memory size from CMOS (extended memory above the low 16 MB)
     uint16_t mem_kb = cmos_read(0x17) | (cmos_read(0x18) << 8);
-    out->mem_total_mb = (ARENA_SIZE / (1024*1024)) + (mem_kb / 1024);
+    (void)mem_kb;
+    // Logical system cap: 4 GB (kernel 512MB + browser 2GB + reserve 1.5GB)
+    out->mem_total_mb = (uint64_t)SYS_MEM_TOTAL_MB;
     strncpy(out->bios_vendor, "SeaBIOS/QEMU", 31);
     strncpy(out->bios_version, "1.0.0-nefuOS", 31);
     return true;
@@ -632,6 +699,12 @@ bool platform_ping(uint32_t ip, int timeout_ms) {
     return net_ping(ip, timeout_ms);
 }
 
+bool platform_http_stream(const char* url, void* ctx,
+                          bool (*cb)(void*, const uint8_t*, uint32_t)) {
+    (void)url; (void)ctx; (void)cb;
+    return false;   // bare: HTTP fetch is not yet wired on bare metal
+}
+
 bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     (void)url;
     if (out) *out = 0;
@@ -750,6 +823,11 @@ int platform_disk_scan(DiskInfo* list, int max) {
 
 
 // ---- threading (bare: cooperative, run synchronously) ----
+void* platform_thread_create_stk(void (*func)(void*), void* arg, uint32_t) {
+    func(arg);
+    return (void*)1;
+}
+
 void* platform_thread_create(void (*func)(void*), void* arg) {
     func(arg);   // bare metal: run synchronously (no preemptive scheduler yet)
     return (void*)1;

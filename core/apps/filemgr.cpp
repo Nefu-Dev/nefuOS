@@ -9,8 +9,8 @@ namespace nefu {
 struct TreeRow { FSNode* n; int depth; };
 
 enum {
-    MENU_OPEN = 0, MENU_RENAME, MENU_TRASH, MENU_DELETE, MENU_RESTORE,
-    MENU_EMPTY_TRASH, MENU_PROPS, MENU_N
+    MENU_NEW_FILE = 0, MENU_NEW_FOLDER, MENU_OPEN, MENU_RENAME, MENU_TRASH,
+    MENU_DELETE, MENU_RESTORE, MENU_EMPTY_TRASH, MENU_PROPS, MENU_N
 };
 
 struct FMState {
@@ -27,7 +27,7 @@ struct FMState {
     int sort_mode;
     int sort_desc;
     int view_mode;
-    Button btns[6];
+    Button btns[7];
     Button* cur;
     uint8_t last_buttons;
     // context menu
@@ -166,9 +166,47 @@ static void fm_open(FSNode* c) {
     else app_show_textview(c);
 }
 
+// ---------- create new file / folder ----------
+// Creates the entry immediately with a unique default name, selects it and
+// starts the existing inline-rename flow so the user types the real name and
+// presses Enter (Esc keeps the default name).
+static void fm_new_entry(FMState* st, int mode) {
+    FSNode* d = st->sel_dir ? st->sel_dir : g_vfs->root();
+    const char* prefix = (mode == 2) ? "New Folder" : "New File";
+    const char* suffix = (mode == 2) ? "" : ".txt";
+    char buf[96];
+    String name = String(prefix) + suffix;
+    for (int k = 1; g_vfs->resolve_from(d, name.c_str()); k++) {
+        ksprintf(buf, sizeof(buf), "%s_%d%s", prefix, k, suffix);
+        name = buf;
+    }
+    String path = node_path(d);
+    if (path.len() > 1) path += "/";
+    path += name;
+    FSNode* n = (mode == 2) ? g_vfs->mkdir(path.c_str()) : g_vfs->create_file(path.c_str());
+    if (!n) {
+        ksprintf(st->status_msg, sizeof(st->status_msg), "Cannot create %s here",
+                 mode == 2 ? "folder" : "file");
+        return;
+    }
+    st->sel_file = n->name;
+    st->list_scroll = 0;
+    st->menu_node = n;
+    st->renaming = true;
+    st->rename_buf = n->name;
+    ksprintf(st->status_msg, sizeof(st->status_msg),
+             "Type a name, Enter to confirm (%s)", name.c_str());
+}
+
 // ---------- context menu actions ----------
 static void menu_do(FMState* st, int action) {
     st->menu_open = false;
+    if (action == MENU_NEW_FILE || action == MENU_NEW_FOLDER) {
+        // create in the current directory; keep menu_node = new entry so the
+        // inline rename can commit the typed name
+        fm_new_entry(st, action == MENU_NEW_FILE ? 1 : 2);
+        return;
+    }
     if (!st->menu_node) return;
     FSNode* n = st->menu_node;
     if (action == MENU_OPEN) {
@@ -215,9 +253,9 @@ static void fm_paint(Window* w) {
 
     gfx::fillrect(s, 0, 0, W, TOOL_H, FM_HEAD);
     gfx::hline(s, 0, W - 1, TOOL_H, color::BORDER);
-    for (int i = 0; i < 6; i++) ui::draw_button(s, st->btns[i]);
+    for (int i = 0; i < 7; i++) ui::draw_button(s, st->btns[i]);
     String path = node_path(st->sel_dir ? st->sel_dir : g_vfs->root());
-    int px = 6 + 6 * 44 + 8;
+    int px = 6 + 7 * 44 + 8;
     gfx::fillrect(s, px, 5, W - px - 10, 24, color::WHITE);
     gfx::rect(s, px, 5, W - px - 10, 24, 0x00B0AFA8);
     gfx::text(s, px + 6, 9, path.c_str(), color::BLUE, color::WHITE);
@@ -354,16 +392,19 @@ static void fm_paint(Window* w) {
     if (st->menu_open) {
         const char* items[MENU_N];
         if (st->menu_node && st->menu_node->is_dir && in_trash_dir(st->sel_dir)) {
+            items[MENU_NEW_FILE] = "New File"; items[MENU_NEW_FOLDER] = "New Folder";
             items[MENU_OPEN] = "Open"; items[MENU_RENAME] = "Rename";
             items[MENU_TRASH] = "Delete folder"; items[MENU_DELETE] = "Delete";
             items[MENU_RESTORE] = "Restore"; items[MENU_EMPTY_TRASH] = "Empty Trash";
             items[MENU_PROPS] = "Properties";
         } else if (st->menu_node && st->menu_node->is_dir) {
+            items[MENU_NEW_FILE] = "New File"; items[MENU_NEW_FOLDER] = "New Folder";
             items[MENU_OPEN] = "Open"; items[MENU_RENAME] = "Rename";
             items[MENU_TRASH] = "Move to Trash"; items[MENU_DELETE] = "Delete folder";
             items[MENU_RESTORE] = "Restore"; items[MENU_EMPTY_TRASH] = "Empty Trash";
             items[MENU_PROPS] = "Properties";
         } else {
+            items[MENU_NEW_FILE] = "New File"; items[MENU_NEW_FOLDER] = "New Folder";
             items[MENU_OPEN] = "Open"; items[MENU_RENAME] = "Rename";
             items[MENU_TRASH] = "Move to Trash"; items[MENU_DELETE] = "Delete";
             items[MENU_RESTORE] = "Restore"; items[MENU_EMPTY_TRASH] = "Empty Trash";
@@ -394,7 +435,7 @@ static void fm_mouse(Window* w, int mx, int my, uint8_t buttons) {
     bool r_pressed = (buttons & 0x02) && !(st->last_buttons & 0x02);
     st->last_buttons = buttons;
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
         st->cur = &st->btns[i];
         ui::button_event(st->btns[i], mx, my, buttons, pressed, released);
     }
@@ -606,12 +647,24 @@ static void fm_key(Window* w, const KeyEvent* e) {
         } else if (e->keycode == KEY_BACKSPACE) {
             if (st->rename_buf.len() > 0) st->rename_buf = st->rename_buf.substr(0, st->rename_buf.len() - 1);
         } else if (e->keycode == KEY_ENTER) {
-            if (st->menu_node && !st->rename_buf.empty() &&
-                strcmp(st->rename_buf.c_str(), st->menu_node->name.c_str()) != 0) {
-                FSNode* p = st->menu_node->parent;
-                g_vfs->move_node(st->menu_node, p, st->rename_buf.c_str());
-                st->sel_file = st->rename_buf;
-                ksprintf(st->status_msg, sizeof(st->status_msg), "Renamed: %s", st->rename_buf.c_str());
+            if (st->menu_node) {
+                const char* nm = st->rename_buf.c_str();
+                bool bad = st->rename_buf.empty() ||
+                           strchr(nm, '/') || strchr(nm, '\\') ||
+                           strcmp(nm, ".") == 0 || strcmp(nm, "..") == 0;
+                if (bad) {
+                    ksprintf(st->status_msg, sizeof(st->status_msg), "Invalid name");
+                } else if (strcmp(nm, st->menu_node->name.c_str()) != 0) {
+                    FSNode* p = st->menu_node->parent;
+                    if (g_vfs->move_node(st->menu_node, p, nm)) {
+                        st->sel_file = st->rename_buf;
+                        ksprintf(st->status_msg, sizeof(st->status_msg), "Renamed: %s", st->rename_buf.c_str());
+                    } else {
+                        ksprintf(st->status_msg, sizeof(st->status_msg), "Name already exists");
+                    }
+                } else {
+                    st->sel_file = st->rename_buf;   // kept default name
+                }
             }
             st->renaming = false;
             st->menu_node = 0;
@@ -681,6 +734,8 @@ static void fm_click(void* ud) {
     } else if (strcmp(lab, "Icons") == 0) {
         st->view_mode = 1;
         st->list_scroll = 0;
+    } else if (strcmp(lab, "New") == 0) {
+        fm_new_entry(st, 1);   // new file in the current directory
     }
 }
 
@@ -707,8 +762,8 @@ void fm_launch() {
     st->view_mode = 0;
     st->cur = 0;
     st->last_buttons = 0;
-    const char* labels[6] = { "Back", "Fwd", "Up", "Ref", "List", "Icons" };
-    for (int i = 0; i < 6; i++) {
+    const char* labels[7] = { "Back", "Fwd", "Up", "Ref", "List", "Icons", "New" };
+    for (int i = 0; i < 7; i++) {
         Button& b = st->btns[i];
         b.x = 6 + i * 44;
         b.y = 5;

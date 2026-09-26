@@ -19,19 +19,19 @@ struct WallpaperOption {
 };
 
 static WallpaperOption wallpapers[] = {
-    { "Blue Sky", 0, 0x1E88E5, 0x1565C0 },
-    { "Sunset", 1, 0xFF7043, 0xBF360C },
-    { "Dark", 2, 0x263238, 0x102027 },
-    { "Green Forest", 3, 0x43A047, 0x1B5E20 },
-    { "Purple", 4, 0x8E24AA, 0x4A148C },
-    { "Orange", 5, 0xFB8C00, 0xE65100 },
+    { T("蔚蓝天空", "Blue Sky"), 0, 0x1E88E5, 0x1565C0 },
+    { T("落日余晖", "Sunset"), 1, 0xFF7043, 0xBF360C },
+    { T("暗夜", "Dark"), 2, 0x263238, 0x102027 },
+    { T("绿意森林", "Green Forest"), 3, 0x43A047, 0x1B5E20 },
+    { T("紫色幻境", "Purple"), 4, 0x8E24AA, 0x4A148C },
+    { T("橙韵暖阳", "Orange"), 5, 0xFB8C00, 0xE65100 },
 };
 
 // Paint function
 static void paint_wallpaper(Window* w) {
     // Header
     gfx::fillrect(w->back, 0, 0, w->content_w, 36, 0x4A90D9);
-    gfx::text(w->back, 12, 10, "Desktop Wallpaper", 0xFFFFFF, 0x4A90D9);
+    gfx::text(w->back, 12, 10, T("桌面壁纸", "Desktop Wallpaper"), 0xFFFFFF, 0x4A90D9);
     
     // Grid of wallpaper previews
     int grid_x = 20;

@@ -1,4 +1,4 @@
-﻿# nefuOS �?exe + + + ISO�?GrubEsp 閺冨爼顤傛径鏍晸閹?ESP+GRUB 绾句胶娲忛梹婊冨剼閿?
+# nefuOS �?exe + + + ISO�?GrubEsp 閺冨爼顤傛径鏍晸閹?ESP+GRUB 绾句胶娲忛梹婊冨剼閿?
 param(
     [switch]$GrubEsp
 )
@@ -20,85 +20,24 @@ $adminPw = [Environment]::GetEnvironmentVariable("NEFU_ADMIN_PASSWORD")
 & $python3 "tools\admin_hash.py" $adminPw | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "admin hash gen failed" }
 
-$coreSrc = @(
-  "core\nefuos.cpp", "core\klib\memory.cpp", "core\klib\string.cpp", "core\klib\printf.cpp",
-  "core\vfs\vfs.cpp", "core\vfs\nvfs.cpp", "core\gui\gfx.cpp", "core\gui\lv_cjk_font.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
-  "core\apps\apps.cpp", "core\apps\terminal.cpp", "core\apps\filemgr.cpp", "core\apps\calc.cpp",
-  "core\apps\textview.cpp", "core\apps\sysinfo.cpp", "core\apps\settings.cpp", "core\apps\store.cpp",
-  "core\apps\snake.cpp", "core\apps\paint.cpp", "core\apps\clock.cpp", "core\apps\notepad.cpp",
-  "core\apps\editor.cpp",
-  "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\videoplayer.cpp", "core\apps\monitor.cpp",
-  "core\apps\browser.cpp", "core\apps\browser_engine.cpp", "core\apps\netcfg.cpp",
-  "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\apps\minijs.cpp",
-  "core\net\net.cpp",
-  "core\gui\ttfont.cpp", "core\apps\fontview.cpp",
-  "core\gui\lvgl_win.cpp",
-    "core\sys\settings.cpp", "core\sys\sha256.cpp",
-  "core\apps\wiki.cpp",
-  "core\apps\calendar.cpp", "core\apps\diskusage.cpp",
-  "core\apps\passgen.cpp", "core\apps\sticky.cpp", "core\apps\weather.cpp", "core\apps\help.cpp", "core\apps\dictionary.cpp", "core\apps\screenshot.cpp", "core\apps\colorpicker.cpp", "core\apps\search.cpp", "core\apps\recyclebin.cpp", "core\apps\taskmgr.cpp",
-  "core\apps\inputmethod.cpp",
-  "core\apps\clipboard.cpp",
-  "core\apps\notifcenter.cpp",
-  "core\apps\shortcuts.cpp",
-  "core\apps\wallpaper.cpp",
-  "core\apps\theme.cpp",
-  "core\apps\processlist.cpp",
-  "core\apps\about_full.cpp",
-  "core\apps\sysinfo_ext.cpp",
-  "core\apps\credits.cpp",
-  "core\apps\releasenotes.cpp",
-  "core\apps\installer.cpp",
-  "core\apps\downloadmgr.cpp",
-  "core\sys\power.cpp",
-  "core\sys\sysapi.cpp",
-
-  "core\apps\bios.cpp",
-  "core\audio.cpp",
-    "core\lib\json.cpp", "core\lib\regex.cpp", "core\lib\softmath.cpp", "core\lib\hash.cpp",
-  "core\lib\deflate.cpp", "core\lib\bigint.cpp", "core\lib\prime.cpp",
-  "core\net\dns.cpp",
-  "core\apps\term_ext.cpp", "core\apps\tetris.cpp", "core\apps\game2048.cpp", "core\apps\sudoku.cpp",
-  "core\apps\memorymatch.cpp", "core\apps\hexedit.cpp", "core\apps\jsonview.cpp", "core\apps\findfiles.cpp",
-  "core\apps\pomodoro.cpp", "core\apps\stopwatch.cpp", "core\apps\wordcount.cpp",
-  "core\algo\sort.cpp", "core\algo\search.cpp", "core\algo\graph.cpp", "core\algo\ds.cpp",
-  "core\algo\numeric.cpp", "core\apps\algoviz.cpp",
-  "core\gfxlib\raster.cpp", "core\gfxlib\geo.cpp", "core\gfxlib\transform.cpp",
-  "core\gfxlib\noise.cpp", "core\gfxlib\color.cpp", "core\apps\gfxlab.cpp",
-  "core\textlib\levenshtein.cpp", "core\textlib\lcs.cpp", "core\textlib\kmp.cpp",
-  "core\textlib\aho.cpp", "core\textlib\token.cpp", "core\textlib\ngram.cpp",
-  "core\textlib\regexlite.cpp", "core\textlib\diff.cpp",
-    "core\datlib\vec.cpp", "core\datlib\ringbuf.cpp", "core\datlib\bitset.cpp",
-    "core\datlib\hashtab.cpp", "core\datlib\rbtree.cpp", "core\datlib\treap.cpp",
-    "core\datlib\btree.cpp", "core\datlib\segtree.cpp", "core\datlib\fenwick.cpp",
-    "core\datlib\bloom.cpp", "core\datlib\lru.cpp", "core\datlib\sortedlist.cpp",
-    "core\datlib\ipq.cpp", "core\datlib\objpool.cpp", "core\datlib\radix.cpp",
-    "core\datlib\timerwheel.cpp",
-    "core\cryptlib\sha256.cpp", "core\cryptlib\sha1.cpp", "core\cryptlib\md5.cpp",
-    "core\cryptlib\crc.cpp", "core\cryptlib\b64.cpp", "core\cryptlib\hmac.cpp",
-    "core\cryptlib\pbkdf2.cpp", "core\cryptlib\aes.cpp", "core\cryptlib\rc4.cpp",
-    "core\cryptlib\xor.cpp",
-    "core\complib\bitio.cpp", "core\complib\rle.cpp", "core\complib\huffman.cpp",
-    "core\complib\lz77.cpp", "core\complib\lzw.cpp", "core\complib\arithmetic.cpp",
-    "core\complib\bwt.cpp",
-    "core\mathlib\bigint.cpp", "core\mathlib\rational.cpp", "core\mathlib\complex.cpp",
-    "core\mathlib\matrix.cpp", "core\mathlib\fft.cpp", "core\mathlib\polynomial.cpp",
-    "core\mathlib\stat.cpp", "core\mathlib\regression.cpp", "core\mathlib\prime.cpp",
-    "core\mathlib\random.cpp", "core\mathlib\vector2.cpp", "core\mathlib\gcd.cpp",
-    "core\simlib\life.cpp", "core\simlib\queue.cpp", "core\simlib\world.cpp",
-    "core\simlib\boids.cpp", "core\simlib\epidemic.cpp", "core\simlib\traffic.cpp",
-    "core\simlib\perlin.cpp", "core\simlib\langton.cpp",
-    "core\gfxmath\vec3.cpp", "core\gfxmath\mat4.cpp", "core\gfxmath\quat.cpp",
-    "core\gfxmath\ray.cpp", "core\gfxmath\aabb.cpp", "core\gfxmath\camera.cpp",
-    "core\gfxmath\mesh.cpp", "core\gfxmath\proj.cpp",
-    "core\audlib\wave.cpp", "core\audlib\synth.cpp", "core\audlib\env.cpp",
-    "core\audlib\filter.cpp", "core\audlib\seq.cpp", "core\audlib\mixer.cpp",
-    "core\audlib\modulate.cpp",
-    "core\dblib\csv.cpp", "core\dblib\ini.cpp", "core\dblib\jsonstore.cpp",
-    "core\dblib\bptree.cpp", "core\dblib\page.cpp", "core\dblib\table.cpp",
-
-  "third_party\stb_image_wrap.cpp"
+# The old hand-kept source array was dropped: it had drifted ~230 files behind
+# the tree (whole module directories: raytrace, deeplearn, compiler, minilang,
+# netproto, ...), which broke the link with undefined *_launch() references.
+# core/**/*.cpp is enumerated from disk below so it cannot go stale again; only
+# these retired files are left out (nothing references them and neither build
+# list ever had them).
+$coreExclude = @(
+  "core\apps\calculator.cpp", "core\apps\html5.cpp", "core\apps\lockscreen.cpp",
+  "core\apps\recycle.cpp", "core\apps\stubs.cpp",
+  "core\apps\terminal_commands.cpp", "core\apps\terminal_extra.cpp",
+  "core\sys\sysapi_extended.cpp"
 )
+$coreRoot = (Get-Location).Path
+$coreSrc = @(Get-ChildItem "core" -Recurse -Filter *.cpp |
+  ForEach-Object { $_.FullName.Substring($coreRoot.Length + 1) } |
+  Where-Object { $coreExclude -notcontains $_ } |
+  Sort-Object) + @("third_party\stb_image_wrap.cpp")
+Write-Output "core sources: $($coreSrc.Count)"
 
 # LVGL 9.2.0 sources (third_party/lvgl_src/lvgl-9.2.0/src/*.c)
 $gcc = "D:\CLion\bin\mingw\bin\gcc.exe"
@@ -184,19 +123,55 @@ foreach ($q in $qjSrc) {
   $lvglHostObjs += $qobj
 }
 $linkErr = Join-Path $env:TEMP "nefu_link.log"
-& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party @lvglInclude -o $hostExe ($coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp")) $lvglHostObjs -lgdi32 -luser32 -lgdiplus -lole32 -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 2> $linkErr
+# Windows caps a process command line at ~32KB; with lvgl + quickjs + core the
+# link line blows past it and CreateProcess fails before g++ even starts (which
+# also left $LASTEXITCODE unset, silently reusing a stale exe).  Pass the args
+# through a response file instead.
+$hostLinkRsp = Join-Path $env:TEMP "nefu_host_link.rsp"
+$hostLinkArgs = @("-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-fno-builtin",
+                  "-Wall", "-Wextra", "-Wno-sized-deallocation", "-I", "core", "-I", "third_party",
+                  "-DNEFU_LVGL_DEMO") +
+                $lvglInclude + @("-o", $hostExe) +
+                $coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp") +
+                $lvglHostObjs +
+                @("-lgdi32", "-luser32", "-lgdiplus", "-lole32", "-lws2_32", "-liphlpapi",
+                  "-lwlanapi", "-lwininet", "-lwinmm", "-lmfplat", "-lmfreadwrite", "-lmf",
+                  "-lmfuuid", "-lcomdlg32")
+$hostLinkArgs | ForEach-Object { $_ -replace '\\', '/' } |
+    ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } } |
+    Set-Content -Path $hostLinkRsp -Encoding ASCII
+& $g "@$hostLinkRsp" 2> $linkErr
 if ($LASTEXITCODE -ne 0) { throw "host build failed" }
 Write-Output "host exe OK: $((Get-Item $hostExe).Length) bytes"
 
 # 2)
 $bareFlags = @(
-  "-std=c++17", "-ffreestanding", "-fno-exceptions", "-fno-rtti", "-fno-builtin",
-  "-fno-stack-protector", "-mno-red-zone", "-mgeneral-regs-only", "-O2", "-Wall", "-Wextra",
-  "-ffunction-sections", "-fdata-sections",
-  "-Wno-sized-deallocation", "-DNEFU_BARE", "-I", "core", "-I", "third_party",
+  "-std=c++17", "-fno-exceptions", "-fno-rtti", "-fno-builtin",
+  "-fno-stack-protector", "-mno-red-zone", "-O2", "-Wall", "-Wextra",
+  "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
+  "-Wno-sized-deallocation", "-DNEFU_BARE", "-DNEFU_LVGL_DEMO", "-I", "core", "-I", "third_party",
   "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
   "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c"
 )
+# NOTE: no -ffreestanding here.  GCC 15's libstdc++ refuses <string>/<vector>/
+# <map> in freestanding mode (requires_hosted.h #error), and kernel apps use
+# them.  bare_libc.cpp therefore also provides operator new/delete and the
+# std::__throw_* abort stubs so STL containers link against the bare heap.
+# The whole kernel is compiled WITHOUT -mgeneral-regs-only (entry.s
+# initializes the x87/SSE state at boot and the IRQ handlers save/restore the
+# FPU state), so double math emits real x87/SSE code instead of a pile of
+# undefined __adddf3/__muldf3 soft-float libgcc helpers, and every TU shares
+# one calling convention for float/double arguments.
+$bareFpuFlags = @()
+foreach ($f in $bareFlags) { if ($f -ne "-mgeneral-regs-only") { $bareFpuFlags += $f } }
+# bare.cpp hosts the IDT/ISRs; GCC's interrupt attribute REQUIRES the
+# -mgeneral-regs-only model (it errors on SSE in an ISR), so the platform
+# file alone keeps the integer ABI.  Its public platform_* API is entirely
+# integer/pointer, which is ABI-identical across both models, and the ISR
+# bodies are integer-only, so the kernel stays coherent.
+$bareIntFlags = @()
+foreach ($f in $bareFlags) { $bareIntFlags += $f }
+$bareIntFlags += "-mgeneral-regs-only"
 $objs = @()
 foreach ($s in $coreSrc) {
   # numeric.cpp is double-based and the bare kernel has no soft-double:
@@ -204,14 +179,17 @@ foreach ($s in $coreSrc) {
   if ($s -like "*numeric.cpp") { continue }
   $name = $s -replace '[\\/]', '_' -replace '\.cpp$', '.o'
   $obj = "$bareOut\$name"
-  & $g @bareFlags $s -o $obj
+  $cflags = $bareFlags
+  if ($s -like "*minijs.cpp") { $cflags = $bareFpuFlags }
+  & $g @cflags $s -o $obj
   if ($LASTEXITCODE -ne 0) { throw "bare compile failed: $s" }
   $objs += $obj
 }
-# LVGL 9.2.0 bare objects (pure C, compiled with gcc -mgeneral-regs-only so
-# any float math resolves to the kernel soft-float library)
+# LVGL 9.2.0 bare objects (pure C; LV_USE_FLOAT=0 so the public API is
+# integer/struct only -- same FPU calling convention as the core)
 $lvglBareFlags = @("-std=gnu11", "-ffreestanding", "-fno-stack-protector", "-mno-red-zone",
-                   "-mgeneral-regs-only", "-O2", "-Wall", "-ffunction-sections", "-fdata-sections",
+                   "-O2", "-Wall", "-ffunction-sections", "-fdata-sections",
+                   "-fno-asynchronous-unwind-tables",
                    "-I", "third_party",
                    "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
                    "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c")
@@ -224,13 +202,34 @@ foreach ($lv in $lvglSrc) {
   }
   $objs += $lobj
 }
-& $g @bareFlags "backends\bare\bare.cpp" -o "$bareOut\bare_bare.o"
+& $g @bareIntFlags "backends\bare\bare.cpp" -o "$bareOut\bare_bare.o"
 if ($LASTEXITCODE -ne 0) { throw "bare.cpp failed" }
 $objs += "$bareOut\bare_bare.o"
-# minimal soft-float (IEEE-754 single precision) for the bare kernel
-& $g @bareFlags "backends\bare\softfloat.cpp" -o "$bareOut\bare_softfloat.o"
+# minimal soft-float (IEEE-754 single precision) for the bare kernel; integer
+# ABI keeps it linkable by any leftover soft-float references
+& $g @bareIntFlags "backends\bare\softfloat.cpp" -o "$bareOut\bare_softfloat.o"
 if ($LASTEXITCODE -ne 0) { throw "softfloat.cpp failed" }
 $objs += "$bareOut\bare_softfloat.o"
+# bare libc for QuickJS: malloc family, printf family, full libm (x87/SSE),
+# time functions.  Must NOT be built with -mgeneral-regs-only.
+& $g @bareFpuFlags "backends\bare\bare_libc.cpp" -o "$bareOut\bare_barelibc.o"
+if ($LASTEXITCODE -ne 0) { throw "bare_libc.cpp failed" }
+$objs += "$bareOut\bare_barelibc.o"
+# QuickJS (bare kernel): same sources as the host engine, but single-threaded
+# (CONFIG_DISABLE_ATOMICS kills the pthread path), assert-free (NDEBUG; there
+# is no __assert_fail in a freestanding kernel) and linked against bare_libc.
+$qjBareFlags = @("-std=gnu11", "-ffreestanding", "-fno-builtin", "-fno-stack-protector",
+                 "-fno-asynchronous-unwind-tables", "-Os", "-w", "-D_GNU_SOURCE",
+                 "-DCONFIG_DISABLE_ATOMICS", "-DNDEBUG",
+                 "-I", "third_party\quickjs", "-I", "third_party", "-c")
+foreach ($q in $qjSrc) {
+  $qobj = "$bareOut\bare_quickjs_" + [IO.Path]::GetFileNameWithoutExtension($q) + ".o"
+  if (-not (Test-Path $qobj)) {
+    & $gcc @qjBareFlags "third_party\quickjs\$q" -o $qobj
+    if ($LASTEXITCODE -ne 0) { throw "quickjs bare compile failed: $q" }
+  }
+  $objs += $qobj
+}
 $webpBareSrc = @(
   "third_party\libwebp\src\dec\alpha_dec.c", "third_party\libwebp\src\dec\buffer_dec.c",
   "third_party\libwebp\src\dec\frame_dec.c", "third_party\libwebp\src\dec\idec_dec.c",
@@ -242,6 +241,10 @@ $webpBareSrc = @(
   "third_party\libwebp\src\dsp\filters.c", "third_party\libwebp\src\dsp\lossless.c",
   "third_party\libwebp\src\dsp\rescaler.c", "third_party\libwebp\src\dsp\upsampling.c",
   "third_party\libwebp\src\dsp\yuv.c",
+  "third_party\libwebp\src\dsp\alpha_processing_sse2.c", "third_party\libwebp\src\dsp\dec_sse2.c",
+  "third_party\libwebp\src\dsp\filters_sse2.c", "third_party\libwebp\src\dsp\lossless_sse2.c",
+  "third_party\libwebp\src\dsp\rescaler_sse2.c", "third_party\libwebp\src\dsp\upsampling_sse2.c",
+  "third_party\libwebp\src\dsp\yuv_sse2.c",
   "third_party\libwebp\src\utils\bit_reader_utils.c", "third_party\libwebp\src\utils\color_cache_utils.c",
   "third_party\libwebp\src\utils\filters_utils.c", "third_party\libwebp\src\utils\huffman_utils.c",
   "third_party\libwebp\src\utils\palette.c", "third_party\libwebp\src\utils\quant_levels_dec_utils.c",
@@ -249,8 +252,8 @@ $webpBareSrc = @(
   "third_party\libwebp\src\utils\thread_utils.c", "third_party\libwebp\src\utils\utils.c"
 )
 $webpBareFlags = @("-std=gnu11", "-ffreestanding", "-fno-stack-protector", "-mno-red-zone",
-                   "-mgeneral-regs-only", "-mno-sse", "-mno-sse2", "-O2", "-Wall",
-                   "-ffunction-sections", "-fdata-sections",
+                   "-O2", "-Wall",
+                   "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
                    "-I", "third_party\libwebp", "-I", "third_party",
                    "-include", "third_party\webp_impl.h",
                    "-DWEBP_MALLOC=nefu_kalloc_x", "-DWEBP_CALLOC=nefu_kcalloc_x",
@@ -269,6 +272,20 @@ if (-not (Test-Path $webpImplBare)) {
   if ($LASTEXITCODE -ne 0) { throw "webp impl bare compile failed" }
 }
 $objs += $webpImplBare
+# nanosvg (SVG rasterizer) is used unconditionally by stb_image_wrap.cpp
+# (nsvg_decode_mem), but was only ever compiled for the HOST build -- the bare
+# link failed with undefined nsvg* references.  Compile it for the kernel too,
+# with the FPU calling convention (nsvgParse takes a float dpi argument), and
+# let it use the bare malloc/free + float wrappers from bare_libc.
+$nanosvgBare = "$bareOut\nanosvg_impl.o"
+if (-not (Test-Path $nanosvgBare)) {
+  & $gcc @("-std=gnu11", "-fno-stack-protector", "-mno-red-zone", "-O2",
+           "-ffunction-sections", "-fdata-sections", "-fno-asynchronous-unwind-tables",
+           "-I", "third_party", "-c") `
+        "third_party\nanosvg_impl.c" -o $nanosvgBare
+  if ($LASTEXITCODE -ne 0) { throw "nanosvg bare compile failed" }
+}
+$objs += $nanosvgBare
 
 # 3) 閿涙瓬oot sector + kernel entry + multi-boot picker
 & $as "backends\bare\boot.s" -o "$bareOut\boot.o"
@@ -287,86 +304,53 @@ Write-Output "menu.bin OK: $menuLen bytes"
 $objs = @("$bareOut\entry.o") + $objs
 
 # 4) link閿涘湧E �?>
-& $ld -mi386pep --image-base 0x100000 --gc-sections -T "backends\bare\linker.ld" -o "$bareOut\kernel.exe" -Map "$bareOut\kernel.map" $objs
+# Same 32KB command-line cap as the host link: pass the object list via a
+# response file so ld actually runs.
+$bareLinkRsp = Join-Path $env:TEMP "nefu_bare_link.rsp"
+$bareLinkArgs = @("-mi386pep", "--image-base", "0x100000", "--gc-sections",
+                  "-T", "backends\bare\linker.ld", "-o", "$bareOut\kernel.exe",
+                  "-Map", "$bareOut\kernel.map") + $objs
+$bareLinkArgs | ForEach-Object { $_ -replace '\\', '/' } |
+    ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } } |
+    Set-Content -Path $bareLinkRsp -Encoding ASCII
+& $ld "@$bareLinkRsp"
 if ($LASTEXITCODE -ne 0) { throw "link failed" }
-# mingw ld of PE �?section(.text) of VirtualAddress = absoluteVMA - image_base(=0)�?# rest section of VirtualAddress = absoluteVMA�?objcopy -O binary閿涘MA �?# loaded to 0x20000 after .rdata/.data/.bss 0x20000閿涘澃tring/閿涘矉绱氶妴?# 閿涙arse PE section �?section by RVA(absoluteVMA-0x100000) 閿涘異ss 0�?
-function Rebin-Kernel {
-    param([string]$InExe, [string]$OutBin)
-    $fs = [IO.File]::OpenRead($InExe)
-    $br = New-Object IO.BinaryReader($fs)
-    try {
-        $fs.Seek(0x3C, 0) | Out-Null
-        $peOff = $br.ReadInt32()
-        $fs.Seek($peOff + 6, 0) | Out-Null
-        $numSec = $br.ReadUInt16()
-        $fs.Seek($peOff + 20, 0) | Out-Null
-        $optSize = $br.ReadUInt16()
-        $secTab = $peOff + 24 + $optSize
-        $secs = @()
-        for ($i = 0; $i -lt $numSec; $i++) {
-            $fs.Seek($secTab + $i * 40, 0) | Out-Null
-            $nameBytes = $br.ReadBytes(8)
-            $name = ([Text.Encoding]::ASCII.GetString($nameBytes)).Trim([char]0)
-            $vs = $br.ReadUInt32()      # VirtualSize
-            $va = $br.ReadUInt32()      # VirtualAddress
-            $rawSize = $br.ReadUInt32() # SizeOfRawData
-            $rawPtr = $br.ReadUInt32()  # PointerToRawData
-            # PE section VirtualAddress image-base(0x100000) of RVA�?            # loaded to 0x100000 after�?= RVA�?text VA=0 -> 0x100000 閿涘鈧?            # note�?>= 0x100000 of VA 0x100000�?.pdata/.data
-            # 0x40000 �?.text entry閿涘鈧?            $rva = $va
-            $secs += [pscustomobject]@{ Name = $name; RVA = $rva; RawSize = $rawSize; RawPtr = $rawPtr; VSize = $vs }
-        }
-        $maxEnd = 0
-        $bssRva = 0
-        $bssVSize = 0
-        foreach ($s in $secs) {
-            if ($s.Name -eq ".bss") {
-                $bssRva = $s.RVA
-                $bssVSize = $s.VSize
-            }
-            # .bss has no raw data (zeroed by entry.s at runtime); .reloc is
-            # not needed for a flat kernel image. Skip both so kernel.bin
-            # stays compact (no 42KB zero padding).
-            if ($s.Name -eq ".reloc") { continue }
-            if ($s.RawSize -eq 0) { continue }
-            $end = $s.RVA + $s.RawSize
-            if ($end -gt $maxEnd) { $maxEnd = $end }
-        }
-        if ($bssVSize -gt 0 -and $bssRva -gt 0) {
-            # bss runtime address = load base (0x100000) + RVA. Store it with
-            # the size so entry.s can zero-fill the correct region.
-            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x100000) -Scope Script
-            Set-Variable -Name kernelBssSize -Value $bssVSize -Scope Script
-        } elseif ($bssRva -gt 0) {
-            # mingw ld may leave VirtualSize=0 for .bss; derive the size from
-            # the next section's VirtualAddress instead.
-            $next = 0x7FFFFFFF
-            foreach ($s2 in $secs) {
-                if ($s2.RVA -gt $bssRva -and $s2.RVA -lt $next) { $next = $s2.RVA }
-            }
-            if ($next -eq 0x7FFFFFFF) { $next = $maxEnd }
-            Set-Variable -Name kernelBssStart -Value ($bssRva + 0x100000) -Scope Script
-            Set-Variable -Name kernelBssSize -Value ($next - $bssRva) -Scope Script
-        }
-        $out = New-Object byte[] $maxEnd
-        foreach ($s in $secs) {
-            if ($s.Name -eq ".reloc") { continue }
-            if ($s.RawSize -eq 0 -or $s.RawPtr -eq 0) { continue }
-            $fs.Seek($s.RawPtr, 0) | Out-Null
-            $data = $br.ReadBytes($s.RawSize)
-            [Array]::Copy($data, 0, $out, $s.RVA, $s.RawSize)
-        }
-        [IO.File]::WriteAllBytes($OutBin, $out)
-    } finally {
-        $fs.Close()
-    }
+# Rebin-Kernel -> tools\rebin_kernel.py (deterministic; parses the PE section
+# table, assembles the flat image by RVA, skips .reloc / zero-raw sections).
+# It SELF-VERIFIES that the multiboot2 header is at flat offset 8, so a stale
+# or misassembled kernel fails loudly here instead of silently dying later in
+# patch_mb2.  Prints "REBIN_OK <maxEnd> <bssStart> <bssSize>" for parsing.
+$rebinOut = & $python3 "tools\rebin_kernel.py" "$bareOut\kernel.exe" "$bareOut\kernel.bin"
+if ($LASTEXITCODE -ne 0) { throw "rebin_kernel failed" }
+$kernelBssStart = 0
+$kernelBssSize = 0
+$rebinText = ($rebinOut -join "`n")
+if ($rebinText -match "REBIN_OK\s+\d+\s+0x([0-9A-Fa-f]+)\s+0x([0-9A-Fa-f]+)") {
+    $kernelBssStart = [Convert]::ToUInt32($matches[1], 16)
+    $kernelBssSize = [Convert]::ToUInt32($matches[2], 16)
+} else {
+    throw "rebin_kernel output unparsable: $rebinText"
 }
-Rebin-Kernel "$bareOut\kernel.exe" "$bareOut\kernel.bin"
-if (-not $kernelBssStart) { $kernelBssStart = 0x1073020 }  # 0x100000 + old 0x73020 RVA fallback
+# This PE layout has no .bss section (all static state is in .data), so the
+# bss start/size are 0 and entry.s zero-fills nothing -- correct, keep as-is.
+Write-Output "rebin OK: bss_start=0x$('{0:X}' -f $kernelBssStart) bss_size=0x$('{0:X}' -f $kernelBssSize)"
+if (-not $kernelBssStart) { $kernelBssStart = 0 }  # no .bss in this PE layout
 if (-not $kernelBssSize) { $kernelBssSize = 0 }
 $kSize = (Get-Item "$bareOut\kernel.bin").Length
 Write-Output "kernel.bin OK: $kSize bytes"
-$isoKernelMax = 1024 * 2048   # ISO layout: kernel occupies up to 1024 x 2048B blocks at LBA24
+$isoKernelMax = 4194304 * 2048   # ISO layout: kernel occupies up to 1024 x 2048B blocks at LBA24
+Write-Output "isoKernelMax=$isoKernelMax kSize=$kSize (make_iso cap = 4194304)"
 if ($kSize -gt $isoKernelMax) { throw "kernel too large for ISO (max $isoKernelMax bytes, got $kSize)" }
+# memory map check: the flat kernel loads at 0x100000 and must stay BELOW the
+# stub staging base 0x620000 -- otherwise the stub's inflate destination
+# (0x100000..0x100000+kSize) overlaps the staging/source region and corrupts
+# the compressed stream (observed as inflate error -24).  Fixed in stub.s /
+# entry.s / bare.cpp.  Fail loudly instead of producing a broken image.
+$kEnd = 0x100000 + $kSize
+if ($kEnd -ge 0x620000) {
+    throw "kernel image ends at 0x$('{0:X}' -f $kEnd) >= 0x620000 (staging base): raise STAGE_BASE/stacks/ARENA_BASE"
+}
+Write-Output "memmap OK: kernel ends at 0x$('{0:X}' -f $kEnd) (< 0x620000 staging, < 0x900000 stacks, < 0x920000 arena)"
 
 # 4b) patch the multiboot2 header (entry.s) so GRUB/ESP boot works:
 #     Address-tag load_end_addr/bss_end_addr + in-kernel kernel_boot_params
@@ -374,7 +358,7 @@ if ($kSize -gt $isoKernelMax) { throw "kernel too large for ISO (max $isoKernelM
 & $python3 "tools\patch_mb2.py" "$bareOut\kernel.bin" $kernelBssStart $kernelBssSize
 if ($LASTEXITCODE -ne 0) { throw "patch_mb2 failed" }
 
-# 4c) compressed payload: stub + gzip(kernel.bin).  The 1.14MB kernel cannot
+# 4c) compressed payload: stub + gzip(kernel.bin).  The multi-MB kernel cannot
 #     be loaded at 0x20000 directly (VGA/ROM hole 0xA0000-0xBFFFF + 16-bit
 #     segment wrap + real-mode 1.06MB cap), so boot.s loads a ~507KB payload
 #     (stub + raw-DEFLATE kernel) to 0x20000; the stub inflates the kernel to
@@ -424,7 +408,7 @@ if ($bootLen -ne 512) { throw "boot.bin size $bootLen != 512" }
 $payloadSize = (Get-Item "$bareOut\payload.bin").Length
 $kSectors = [Math]::Ceiling($payloadSize / 512)
 $fs = [IO.File]::OpenWrite("$bareOut\boot.bin")
-# 0x58�?x7C58閿涘矉绱氶敍?$fs.Position = 0x58
+$fs.Position = 0x58   # kernel_count lives at file offset 0x58 (runtime 0x7C58)
 $fs.WriteByte([byte]($kSectors -band 0xFF))
 $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
 # CD load is fully dynamic in boot.s now (single DAP at 0x7D60 rewritten

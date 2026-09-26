@@ -9,7 +9,10 @@ namespace nefu {
 void desktop_init();
 void desktop_paint(Surface& fb);
 bool desktop_handle_mouse(int x, int y, uint8_t buttons);
-bool desktop_handle_key(int keycode, char ascii);
+bool desktop_handle_key(int keycode, char ascii, uint8_t mods, const char* utf8);
+// Scroll the LVGL object under the cursor (store list, start menu, ...).
+// Returns true when the wheel was consumed by an LVGL object.
+bool desktop_handle_scroll(int delta);
 void desktop_paint_boot(Surface& fb);
 void desktop_paint_lock(Surface& fb);   // lock screen (UEFI password gate)
 void desktop_paint_setup(Surface& fb);  // first-boot setup wizard
@@ -31,6 +34,10 @@ void nefuos_lock_screen();
 
 // LVGL keyboard input: push a host key to LVGL, get the shared keypad group.
 void lvgl_key_push(int keycode, char ascii);
+// Push a UTF-8 string (IME commit) into the focused LVGL textarea, char by char.
+// Returns false when no LVGL textarea has keyboard focus (caller falls back
+// to the classic WM, i.e. the editor / terminal on_key handler).
+bool lvgl_key_push_utf8(const char* utf8);
 lv_group_t* lvgl_kb_group();
 
 // Start menu state: used by the window manager so open windows never draw

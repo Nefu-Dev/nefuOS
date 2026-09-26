@@ -121,6 +121,11 @@ void app_help_launch();
 void app_dictionary_launch();
 void app_taskmgr_launch();
 void app_launch(const char* name);  // resolve by app name (for autostart)
+
+// system clipboard (history kept in core/apps/clipboard.cpp)
+void clipboard_add(const char* text);
+const char* clipboard_get(int idx);
+int clipboard_count();
 void app_show_textview(FSNode* file);
 void app_show_image(FSNode* file);
 bool decode_image_any(const uint8_t* data, uint32_t size, struct Surface& out);

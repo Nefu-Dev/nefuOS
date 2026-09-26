@@ -161,7 +161,7 @@ static void paint_converter(Window* w) {
     gfx::text(s, 88, 171, units[s_to_unit].name, 0x2C3E50, 0xEAFAF1);
     gfx::text(s, 180, 171, "v", 0x27AE60, 0xEAFAF1);
     
-    // Dropdown lists
+    // Dropdown lists (drawn last so they stay on top of the result box)
     if (s_drop_open != 0) {
         int dy = (s_drop_open == 1) ? 152 : 192;  // below the box
         int dh = count * 20 + 6;
@@ -177,9 +177,12 @@ static void paint_converter(Window* w) {
         }
     }
     
-    // Result
-    gfx::fillrect(s, 20, 210, w->content_w - 40, 50, 0xF8F9FA);
-    gfx::rect(s, 20, 210, w->content_w - 40, 50, 0xDEE2E6);
+    // Result + hint are anchored to the bottom of the content area so they
+    // never collide with each other regardless of the LVGL title bar height.
+    int hint_y = w->content_h - 18;
+    int box_y = hint_y - 58;
+    gfx::fillrect(s, 20, box_y, w->content_w - 40, 46, 0xF8F9FA);
+    gfx::rect(s, 20, box_y, w->content_w - 40, 46, 0xDEE2E6);
     
     double input_val = parse_input(s_input);
     
@@ -202,10 +205,10 @@ static void paint_converter(Window* w) {
     char result_str[32];
     ksprintf(result_str, sizeof(result_str), "%.4f %s", result, units[s_to_unit].name);
     
-    gfx::text(s, 35, 225, result_str, 0x2C3E50, 0xF8F9FA);
+    gfx::text(s, 35, box_y + 13, result_str, 0x2C3E50, 0xF8F9FA);
     
     // Hint
-    gfx::text(s, 20, w->content_h - 30, "Click a box, type a value, pick units", 0x95A5A6, 0xFFFFFF);
+    gfx::text(s, 20, hint_y, "Click a box, type a value, pick units", 0x95A5A6, 0xFFFFFF);
 }
 
 static void on_converter_mouse(Window* w, int mx, int my, uint8_t buttons) {

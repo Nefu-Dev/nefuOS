@@ -25,6 +25,7 @@ $coreSrc = @(
   "core\apps\screenshot.cpp", "core\apps\colorpicker.cpp", "core\apps\search.cpp",
   "core\apps\recyclebin.cpp", "core\apps\weather.cpp", "core\apps\help.cpp",
   "core\apps\dictionary.cpp", "core\apps\taskmgr.cpp", "core\apps\inputmethod.cpp",
+  "core\ime\pinyin.cpp",
   "core\apps\clipboard.cpp", "core\apps\notifcenter.cpp", "core\apps\shortcuts.cpp",
   "core\apps\wallpaper.cpp", "core\apps\theme.cpp", "core\apps\processlist.cpp",
   "core\apps\about_full.cpp", "core\apps\sysinfo_ext.cpp", "core\apps\credits.cpp",

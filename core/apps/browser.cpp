@@ -66,8 +66,10 @@ const int BAR_H = 58;          // total chrome height (tabs + nav)
 const int STAT_H = 24;         // status bar height
 const int SB_W  = 10;          // scrollbar width
 const int MAX_TABS  = 8;       // maximum open tabs
-const int MAX_PAGE  = 34 * 1024 * 1024;   // page buffer cap (34 MB per tab)
-const int DOM_MAX   = 16384;   // DOM node arena cap
+const int MAX_PAGE  = 2048 * 1024 * 1024;  // page buffer cap (2 GB per tab, browser arena)
+const int DOM_MAX   = 3000;    // DOM node arena cap (pages beyond this are
+                               // truncated: overflow is logged, rest of page
+                               // keeps rendering)
 const int DOM_DEPTH = 48;      // DOM nesting depth cap
 const int HIST_MAX  = 24;      // per-tab history entries
 const int RUN_MAX   = 32768;   // layout run cap
@@ -76,9 +78,14 @@ const int RUN_MAX   = 32768;   // layout run cap
 const int IMG_MAX      = 12;    // cached images per tab
 const int MAX_IMG_PIX  = 262144; // decoded pixel cap per image (e.g. 512x512)
 const int MAX_IMG_DISP = 200;   // max display width (px); height scales
+const int MAX_BG_DISP  = 1280;  // background-image decode cap: cover needs >=
+                                // the viewport, never the raw file resolution
 
 // ===================== CSS subset + JS =====================
-const int CSS_MAX     = 64;      // style-sheet rules per tab
+const int CSS_MAX     = 512;     // style-sheet rules per tab (large sheets are
+                                 // cut off at this count; a full 5000-rule
+                                 // sheet would cost ~1.8 MB per tab in CSSRule
+                                 // storage, 512 keeps big-site styling useful)
 const int SCRIPT_MAX  = 8192;    // accumulated <script> bytes per page
 const int JS_OUT_MAX  = 2048;    // JS console output buffer
 
@@ -97,9 +104,14 @@ struct CSSRule {
     int padding;         // px, -1 = not set
     int width;           // px, -1 = auto
     int height;          // px, -1 = auto
+    char bgimg[256];     // background-image url ("" = none)
+    int border_w;        // border width px (0 = none)
+    uint32_t border_col; // border color (0 = not set)
+    int line_h;          // line-height px (-1 = not set)
     CSSRule() : color(0), font_size(0), bold_set(false), bold(false),
                 none(false), bg(0), align(0), margin(-1), padding(-1),
-                width(-1), height(-1) { sel[0] = 0; }
+                width(-1), height(-1), border_w(0), border_col(0), line_h(-1)
+                { sel[0] = 0; bgimg[0] = 0; }
 };
 
 // ===================== colors (dark Ladybird-style chrome) =====================
@@ -323,10 +335,13 @@ struct DomNode {
     char cls[48];      // class attribute (space-separated)
     char id[32];       // id attribute
     char onclick[96];  // inline onclick="" handler (mini JS)
+    char tag_name[24]; // lowercased tag name (selector fidelity for body/html)
     int cw, ch;        // canvas element size (width/height attrs, default 300x150)
     CSSRule inl;       // inline style="" (selector unused)
     bool has_inl;
-    DomNode() : has_inl(false), cw(300), ch(150) { cls[0] = id[0] = onclick[0] = 0; }
+    int nfu_idx;       // data-nfu index (JS DOM shim element), -1 = none
+    DomNode() : has_inl(false), cw(300), ch(150), nfu_idx(-1)
+        { cls[0] = id[0] = onclick[0] = tag_name[0] = 0; }
 };
 
 struct DomArena {
@@ -345,12 +360,13 @@ struct DomArena {
 
     void open(Tag t, const char* href, const char* src, const char* alt,
               const char* cls = 0, const char* id = 0, const CSSRule* inl = 0,
-              const char* onclick = 0) {
+              const char* onclick = 0, const char* tagname = 0) {
         if (overflow) return;
         if (nodes.size() >= DOM_MAX || stack.size() >= DOM_DEPTH) { overflow = true; return; }
         int idx = nodes.size();
         DomNode n;
         n.tag = t;
+        if (tagname && tagname[0]) clip_str(n.tag_name, sizeof(n.tag_name), tagname);
         if (href && href[0]) n.href = href;
         if (src && src[0]) n.src = src;
         if (alt && alt[0]) n.alt = alt;
@@ -460,6 +476,47 @@ static uint32_t css_color(const char* v) {
     if (ci_eq(v, "gray") || ci_eq(v, "grey")) return 0x64748B;
     if (ci_eq(v, "yellow")) return 0xFACC15;
     if (ci_eq(v, "orange")) return 0xF97316;
+    if (ci_eq(v, "purple")) return 0x9333EA;
+    if (ci_eq(v, "pink")) return 0xEC4899;
+    if (ci_eq(v, "cyan") || ci_eq(v, "aqua")) return 0x06B6D4;
+    if (ci_eq(v, "magenta") || ci_eq(v, "fuchsia")) return 0xE879F9;
+    if (ci_eq(v, "brown")) return 0x92400E;
+    if (ci_eq(v, "silver")) return 0xC0C0C0;
+    if (ci_eq(v, "navy")) return 0x1E3A8A;
+    if (ci_eq(v, "teal")) return 0x0D9488;
+    if (ci_eq(v, "olive")) return 0x7C8C1F;
+    if (ci_eq(v, "maroon")) return 0x800000;
+    if (ci_eq(v, "lime")) return 0x84CC16;
+    if (ci_eq(v, "lightgray") || ci_eq(v, "lightgrey")) return 0xD3D3D3;
+    if (ci_eq(v, "darkgray") || ci_eq(v, "darkgrey")) return 0x555555;
+    return 0;
+}
+
+// color inside a border shorthand ("1px solid #ccc", "solid red 2px", ...):
+// the first #hex wins, else the first named-color token
+static uint32_t css_border_col(const char* val) {
+    for (const char* p = val; *p; p++)
+        if (*p == '#') return css_color(p);
+    const char* names[] = {"red","green","blue","black","white","gray","grey",
+                           "yellow","orange","purple","pink","cyan","magenta",
+                           "brown","silver","navy","teal","olive","maroon",
+                           "aqua","lime","fuchsia","transparent",0};
+    for (int i = 0; names[i]; i++) {
+        int L = (int)strlen(names[i]);
+        const char* q = val;
+        while (*q) {
+            while (*q == ' ' || *q == '\t' || *q == ',') q++;
+            const char* st = q;
+            while (*q && *q != ' ' && *q != '\t' && *q != ',') q++;
+            int l = (int)(q - st);
+            if (l == L) {
+                bool eq = true;
+                for (int k = 0; k < L; k++)
+                    if (lower_char(st[k]) != names[i][k]) { eq = false; break; }
+                if (eq) return css_color(names[i]);
+            }
+        }
+    }
     return 0;
 }
 
@@ -476,7 +533,14 @@ static int css_px(const char* v) {
 
 // Does a selector match this node? Supports: tag, .class, #id, tag.class,
 // tag#id, .class#id, tag.class#id and '*'. The rest is ignored.
-static bool css_match(const char* sel, Tag tag, const char* cls, const char* id) {
+static bool css_match(const char* sel, Tag tag, const char* name, const char* cls, const char* id) {
+    // complex selectors (descendant/child combinators, pseudo-classes,
+    // attribute selectors, selector groups) are unsupported: matching them
+    // correctly is expensive, so they are dropped wholesale instead of being
+    // half-parsed. tag/class/id selectors are unaffected.
+    for (const char* q = sel; *q; q++)
+        if (*q == '>' || *q == '+' || *q == '~' || *q == ':' ||
+            *q == '[' || *q == ',') return false;
     const char* s = sel;
     while (*s == ' ' || *s == '\t' || *s == '\n') s++;
     int sl = (int)strlen(s);
@@ -496,7 +560,12 @@ static bool css_match(const char* sel, Tag tag, const char* cls, const char* id)
         else if (mode == 2 && in < 31) idbuf[in++] = lower_char(c);
     }
     tagbuf[tn] = 0; clsbuf[cn] = 0; idbuf[in] = 0;
-    if (tn > 0 && tag_of(tagbuf) != tag) return false;
+    if (tn > 0) {
+        Tag st = tag_of(tagbuf);
+        bool ok = (st == tag);
+        if (!ok && name && name[0]) ok = ci_eq(tagbuf, name);
+        if (!ok) return false;
+    }
     if (cn > 0) {
         bool hit = false;
         int cl = (int)strlen(cls), p = 0;
@@ -521,6 +590,24 @@ static bool css_match(const char* sel, Tag tag, const char* cls, const char* id)
     return true;
 }
 
+// Extract the first url(...) from a background value into out (quote-stripped).
+static void css_bg_url(const char* val, int vn, char* out, int cap) {
+    out[0] = 0;
+    for (int k = 0; k + 3 < vn; k++) {
+        if (lower_char(val[k]) == 'u' && lower_char(val[k+1]) == 'r' &&
+            lower_char(val[k+2]) == 'l' && val[k+3] == '(') {
+            int p = k + 4;
+            while (p < vn && (val[p]==' ' || val[p]=='\t')) p++;
+            if (p < vn && (val[p]=='"' || val[p]=='\'')) p++;
+            int q = p;
+            while (q < vn && val[q] != ')' && val[q] != '"' && val[q] != '\'') q++;
+            int ul = q - p;
+            if (ul > cap - 1) ul = cap - 1;
+            if (ul > 0) { memcpy(out, val + p, (size_t)ul); out[ul] = 0; }
+            return;
+        }
+    }
+}
 // Parse a "prop: value; prop: value" declaration block into a CSSRule.
 static void css_parse_decls(const char* d, int len, CSSRule& r) {
     int i = 0;
@@ -552,6 +639,12 @@ static void css_parse_decls(const char* d, int len, CSSRule& r) {
         } else if (ci_eq(prop, "background-color")) {
             uint32_t c = css_color(val);
             if (c) r.bg = c;
+        } else if (ci_eq(prop, "background-image")) {
+            css_bg_url(val, vn, r.bgimg, (int)sizeof(r.bgimg));
+        } else if (ci_eq(prop, "background")) {
+            css_bg_url(val, vn, r.bgimg, (int)sizeof(r.bgimg));
+            uint32_t c = css_color(val);
+            if (c) r.bg = c;
         } else if (ci_eq(prop, "text-align")) {
             if (ci_eq(val, "center")) r.align = 1;
             else if (ci_eq(val, "right")) r.align = 2;
@@ -567,6 +660,22 @@ static void css_parse_decls(const char* d, int len, CSSRule& r) {
         } else if (ci_eq(prop, "height")) {
             int v = css_px(val);
             if (v > 0) r.height = v;
+        } else if (ci_eq(prop, "border") || ci_eq(prop, "border-top") ||
+                   ci_eq(prop, "border-bottom") || ci_eq(prop, "border-left") ||
+                   ci_eq(prop, "border-right")) {
+            int v = css_px(val);
+            if (v > 0) r.border_w = v;
+            uint32_t bc = css_border_col(val);
+            if (bc) r.border_col = bc;
+        } else if (ci_eq(prop, "border-width")) {
+            int v = css_px(val);
+            if (v > 0) r.border_w = v;
+        } else if (ci_eq(prop, "border-color")) {
+            uint32_t bc = css_color(val);
+            if (bc) r.border_col = bc;
+        } else if (ci_eq(prop, "line-height")) {
+            int v = css_px(val);
+            if (v > 0) r.line_h = v;
         }
     }
 }
@@ -602,7 +711,8 @@ static int css_parse(const char* css, int len, CSSRule* out, int max) {
         clip_str(r.sel, sizeof(r.sel), sel);
         css_parse_decls(css + dstart, i - dstart, r);
         if (i < len) i++;   // '}'
-        if (r.sel[0] && (r.color || r.font_size || r.bold_set || r.none || r.bg || r.align))
+        if (r.sel[0] && (r.color || r.font_size || r.bold_set || r.none || r.bg ||
+                        r.align || r.bgimg[0] || r.border_w))
             out[n++] = r;
     }
     return n;
@@ -618,7 +728,7 @@ static void bgra_swap(uint8_t* p, int npix) {
 
 // ===================== HTML tokenizer + tree builder =====================
 struct PageParser {
-    const char* html;
+    const char* html;   // parse cursor source (points into sstream when streaming)
     int len;
     int pos;
     DomArena dom;
@@ -632,11 +742,24 @@ struct PageParser {
     CSSRule* css_out;
     int* css_n;
     int css_max;
+    // streaming state: owned accumulation buffer; a partial tag/comment tail
+    // is held back until the next chunk completes it, so chunk boundaries
+    // never split a tag
+    char* sstream;
+    int scap, slen;
+    char* title_out;    // <title> text sink (tab title)
+    int title_cap;
+    char (*srcs)[256];   // external <script src> urls (document order)
+    int* src_n;
+    int src_cap;
 
-    PageParser(const char* h, int l, char* sbuf = 0, int* slen = 0,
-               CSSRule* cso = 0, int* csn = 0, int csmax = 0)
-        : html(h), len(l), pos(0), tlen(0), script_buf(sbuf), script_len(slen),
-          csslen(0), css_out(cso), css_n(csn), css_max(csmax) {}
+    PageParser(char* sbuf0 = 0, int* slen0 = 0, CSSRule* cso = 0,
+               int* csn = 0, int csmax = 0,
+               char (*srs)[256] = 0, int* srn = 0, int srcap = 0)
+        : html(0), len(0), pos(0), tlen(0), script_buf(sbuf0), script_len(slen0),
+          csslen(0), css_out(cso), css_n(csn), css_max(csmax),
+          sstream(0), scap(0), slen(0), title_out(0), title_cap(0),
+          srcs(srs), src_n(srn), src_cap(srcap) {}
 
     void push_char(char c) {
         if (tlen >= (int)sizeof(tbuf) - 1) flush_text();
@@ -657,6 +780,52 @@ struct PageParser {
         tlen = 0;
     }
 
+    void parse() { parse_until(len); }
+
+    // streaming feed: append bytes, parse up to a safe boundary (an unclosed
+    // '<' tail is held back), return the number of bytes still pending
+    int feed(const char* data, int n, bool final) {
+        if (dom.overflow) return 0;
+        if (!sstream) {
+            scap = 65536;
+            sstream = (char*)balloc((size_t)scap);
+            if (!sstream) { dom.overflow = true; return 0; }
+        }
+        if (slen + n > scap) {
+            while (slen + n > scap && scap < MAX_PAGE) scap *= 2;
+            if (slen + n > scap) { dom.overflow = true; return 0; }   // page cap
+            char* nb = (char*)balloc((size_t)scap);
+            if (!nb) { dom.overflow = true; return 0; }
+            memcpy(nb, sstream, (size_t)slen);
+            bfree(sstream);
+            sstream = nb;
+        }
+        memcpy(sstream + slen, data, (size_t)n);
+        slen += n;
+        int limit = slen;
+        if (!final) {
+            // hold back a partial tag/comment at the tail: the last '<' with
+            // no '>' after it stays buffered until the next chunk completes it
+            for (int i = slen - 1; i >= 0; i--) {
+                if (sstream[i] == '<') {
+                    bool closed = false;
+                    for (int j = i + 1; j < slen; j++)
+                        if (sstream[j] == '>') { closed = true; break; }
+                    if (!closed) { limit = i; break; }
+                }
+            }
+        }
+        html = sstream;
+        parse_until(limit);
+        int rest = slen - limit;
+        if (rest > 0 && !dom.overflow)
+            memmove(sstream, sstream + limit, (size_t)rest);
+        slen = rest;
+        pos -= limit;
+        if (pos < 0) pos = 0;
+        return rest;
+    }
+
     void skip_until(const char* close_tag) {
         while (pos < len) {
             if (html[pos] == '<' && ci_starts(html + pos + 1, close_tag)) break;
@@ -666,7 +835,8 @@ struct PageParser {
         if (pos < len) pos++;
     }
 
-    void parse() {
+    void parse_until(int limit) {
+        len = limit;   // all internal bounds checks use the current limit
         char tagbuf[24];
         char href[96], src[96], alt[64];
         while (pos < len && !dom.overflow) {
@@ -700,10 +870,39 @@ struct PageParser {
             tagbuf[nl] = 0;
             Tag t = tag_of(tagbuf);
 
-            // <script>: collect raw text (run later through mini_js_run)
+            // <script>: inline text is collected; a src=... attribute is
+            // remembered (download + run in document order after parsing)
             if (!closing && t == Tag::Script) {
-                while (pos < len && html[pos] != '>') pos++;
+                int tagend = pos;
+                while (tagend < len && html[tagend] != '>') tagend++;
+                char srcur[256]; int srn2 = 0; int srl = 0;
+                {
+                    const char* a = html + pos;
+                    int al = tagend - pos;
+                    for (int ai = 0; ai + 5 <= al; ai++) {
+                        if (ci_starts(a + ai, "src=")) {
+                            int q = ai + 4;
+                            char quote = 0;
+                            while (q < al && (a[q] == ' ' || a[q] == '\t')) q++;
+                            if (q < al && (a[q] == '"' || a[q] == '\'')) { quote = a[q]; q++; }
+                            int q2 = q;
+                            while (q2 < al && a[q2] != '>' && a[q2] != ' ' && a[q2] != '\t' &&
+                                   (!quote || a[q2] != quote)) q2++;
+                            int ul = q2 - q;
+                            if (ul > 0) { if (ul > 255) ul = 255; memcpy(srcur, a + q, (size_t)ul); srcur[ul] = 0; srn2 = 1; }
+                            break;
+                        }
+                    }
+                }
+                pos = tagend;
                 if (pos < len) pos++;
+                if (srn2) {
+                    if (srcs && src_n && src_cap && *src_n < src_cap) {
+                        clip_str(srcs[*src_n], 256, srcur);
+                        (*src_n)++;
+                    }
+                    continue;
+                }
                 while (pos < len) {
                     if (html[pos] == '<' && ci_starts(html + pos + 1, "/script")) break;
                     if (script_buf && script_len && *script_len < SCRIPT_MAX - 1)
@@ -727,9 +926,23 @@ struct PageParser {
                 if (pos < len) pos++;
                 continue;
             }
-            // <title>: handled separately by extract_title(), skip its content
+            // <title>: capture the text for the tab title, then skip content
             if (!closing && ci_eq(tagbuf, "title")) {
-                skip_until("/title");
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
+                while (pos < len) {
+                    if (html[pos] == '<' && ci_starts(html + pos + 1, "/title")) break;
+                    if (title_out) {
+                        int tl = (int)strlen(title_out);
+                        if (tl < title_cap - 1 && html[pos] != '\n' && html[pos] != '\r') {
+                            title_out[tl] = html[pos];
+                            title_out[tl + 1] = 0;
+                        }
+                    }
+                    pos++;
+                }
+                while (pos < len && html[pos] != '>') pos++;
+                if (pos < len) pos++;
                 continue;
             }
             // <html>/<head>: no node
@@ -742,7 +955,7 @@ struct PageParser {
 
             // attributes
             char cls[48] = {0}, id[32] = {0}, onclick[96] = {0};
-            int cw = 300, ch = 150;
+            int cw = 300, ch = 150, nfu = -1;
             CSSRule inl;
             bool has_inl = false;
             href[0] = src[0] = alt[0] = 0;
@@ -780,11 +993,12 @@ struct PageParser {
                 else if (ci_eq(aname, "onclick")) clip_str(onclick, sizeof(onclick), aval);
                 else if (ci_eq(aname, "width")) cw = atoi(aval);
                 else if (ci_eq(aname, "height")) ch = atoi(aval);
+                else if (ci_eq(aname, "data-nfu")) nfu = atoi(aval);
                 else if (ci_eq(aname, "style")) {
                     inl = CSSRule();
                     css_parse_decls(aval, (int)strlen(aval), inl);
                     has_inl = (inl.color || inl.font_size || inl.bold_set ||
-                               inl.none || inl.bg || inl.align);
+                               inl.none || inl.bg || inl.align || inl.bgimg[0]);
                     if (!has_inl) inl = CSSRule();
                 }
             }
@@ -802,7 +1016,8 @@ struct PageParser {
             // void elements: br/hr/img produce a leaf node, others are dropped
             if (is_void_tag(tagbuf)) {
                 if (t == Tag::Br || t == Tag::Hr || t == Tag::Img) {
-                    dom.open(t, href, src, alt, cls, id, has_inl ? &inl : 0, onclick);
+                    dom.open(t, href, src, alt, cls, id, has_inl ? &inl : 0, onclick, tagbuf);
+                    if (nfu >= 0) dom.nodes[dom.top()].nfu_idx = nfu;
                     dom.close_top();
                 }
                 continue;
@@ -818,7 +1033,8 @@ struct PageParser {
                 while (stack_top_is_inline()) dom.close_top();
             }
 
-            dom.open(t, href, src, alt, cls, id, has_inl ? &inl : 0, onclick);
+            dom.open(t, href, src, alt, cls, id, has_inl ? &inl : 0, onclick, tagbuf);
+            if (nfu >= 0) dom.nodes[dom.top()].nfu_idx = nfu;
             if (t == Tag::Canvas) {
                 DomNode& cn = dom.nodes[dom.top()];
                 cn.cw = cw; cn.ch = ch;
@@ -860,14 +1076,18 @@ struct Img {
     bool loading;       // fetch in flight
     bool done;          // decoded and cached
     bool fail;          // fetch / decode failed (incl. too large)
+    bool as_bg;         // used as a background image (keep full resolution)
+    bool is565;         // rgba holds RGB565 (2 bytes/px) instead of BGRA
 
     Img() : job(0), rgba(0), w(0), h(0), disp_w(0), disp_h(0),
-            used(false), loading(false), done(false), fail(false) {
+            used(false), loading(false), done(false), fail(false), as_bg(false),
+            is565(false) {
         url[0] = 0;
     }
 };
 
 static void start_img_job(Img& im, const char* url);   // defined with the loader
+static int img_lookup_or_start(Img* imgs, const char* base_url, const char* src);
 
 // ===================== layout engine =====================
 struct Run {
@@ -880,6 +1100,11 @@ struct Run {
     int img_id;    // index into TabState::imgs, -1 = none
     int node;      // originating DomNode index, -1 = none (click hit-testing)
     char cid[32];  // canvas element id (kind==5 only)
+    bool full_page; // kind 4 only: background must fill the viewport (body/html)
+    int border;    // border width px (kind 3 only, 0 = none)
+    uint32_t bcol; // border color
+    Run() : kind(0), link(false), img_id(-1), node(-1), full_page(false),
+           border(0), bcol(0) { x = y = w = h = 0; color = 0; cid[0] = 0; }
 };
 
 struct PageLayout {
@@ -981,7 +1206,10 @@ static void flow_text(Flow& f, const char* s) {
 struct Eff {
     uint32_t bg; int align;
     int margin, padding, width, height;
-    Eff() : bg(0), align(0), margin(0), padding(0), width(-1), height(-1) {}
+    char bgimg[256];
+    int border_w; uint32_t border_col;
+    Eff() : bg(0), align(0), margin(0), padding(0), width(-1), height(-1),
+           border_w(0), border_col(0) { bgimg[0] = 0; }
 };
 
 // Apply the per-node effective style (matched rules + inline style) around
@@ -999,17 +1227,21 @@ static void layout_node(const List<DomNode>& nodes, int idx, Flow& f, int depth)
     if (f.css) {
         for (int i = 0; i < f.css_n; i++) {
             const CSSRule& r = f.css[i];
-            if (!css_match(r.sel, n.tag, n.cls, n.id)) continue;
+            if (!css_match(r.sel, n.tag, n.tag_name, n.cls, n.id)) continue;
             if (r.color) col = r.color;
             if (r.font_size) fs = r.font_size;
             if (r.bold_set) { bold = r.bold; bset = true; }
             if (r.none) none = true;
             if (r.bg) e.bg = r.bg;
+            if (r.bgimg[0]) clip_str(e.bgimg, sizeof(e.bgimg), r.bgimg);
             if (r.align) e.align = r.align;
             if (r.margin > 0) e.margin = r.margin;
             if (r.padding > 0) e.padding = r.padding;
             if (r.width > 0) e.width = r.width;
             if (r.height > 0) e.height = r.height;
+            if (r.border_w > 0) e.border_w = r.border_w;
+            if (r.border_col) e.border_col = r.border_col;
+            if (r.line_h > 0) f.line_h = r.line_h;
         }
     }
     if (n.has_inl) {
@@ -1018,6 +1250,7 @@ static void layout_node(const List<DomNode>& nodes, int idx, Flow& f, int depth)
         if (n.inl.bold_set) { bold = n.inl.bold; bset = true; }
         if (n.inl.none) none = true;
         if (n.inl.bg) e.bg = n.inl.bg;
+        if (n.inl.bgimg[0]) clip_str(e.bgimg, sizeof(e.bgimg), n.inl.bgimg);
         if (n.inl.align) e.align = n.inl.align;
         if (n.inl.margin > 0) e.margin = n.inl.margin;
         if (n.inl.padding > 0) e.padding = n.inl.padding;
@@ -1078,29 +1311,7 @@ static void layout_node_inner(const List<DomNode>& nodes, int idx, Flow& f,
             return;
         }
         case Tag::Img: {
-            int img_id = -1;
-            if (f.imgs && n.src[0]) {
-                char u[256];
-                resolve_url(f.base_url ? f.base_url : "", n.src.c_str(), u, sizeof(u));
-                if (u[0]) {
-                    for (int k = 0; k < IMG_MAX; k++) {
-                        if (f.imgs[k].used && strcmp(f.imgs[k].url, u) == 0) { img_id = k; break; }
-                    }
-                    if (img_id < 0) {
-                        for (int k = 0; k < IMG_MAX; k++) {
-                            if (!f.imgs[k].used) {
-                                Img& im = f.imgs[k];
-                                im.used = true;
-                                im.loading = true;
-                                clip_str(im.url, sizeof(im.url), u);
-                                start_img_job(im, u);
-                                img_id = k;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            int img_id = img_lookup_or_start(f.imgs, f.base_url, n.src.c_str());
             Run r;
             r.x = f.x; r.y = f.y;
             r.color = C_GRAY; r.kind = 1; r.link = false; r.img_id = img_id; r.node = idx;
@@ -1112,9 +1323,8 @@ static void layout_node_inner(const List<DomNode>& nodes, int idx, Flow& f,
                 r.w = 64; r.h = 48;
             }
             if (img_id >= 0 && f.imgs[img_id].loading) r.text = "[loading...]";
-            else if (img_id >= 0 && f.imgs[img_id].fail) r.text = "[image failed]";
             else if (alt && alt[0]) { for (int i = 0; alt[i] && i < 55; i++) r.text += alt[i]; }
-            else r.text = "[img]";
+            else r.text = "[img]";   // failed images: silent box, logged by poll_img_jobs
             f.out->runs.push(r);
             f.x += r.w + 8;
             if (f.line_h < r.h + 4) f.line_h = r.h + 4;
@@ -1150,6 +1360,21 @@ static void layout_node_inner(const List<DomNode>& nodes, int idx, Flow& f,
                 b.h = (ey + f.line_h) - by; if (b.h < 4) b.h = 4;
                 if (e.height > 0 && b.h < e.height) b.h = e.height;
                 b.color = e.bg; b.kind = 3; b.link = false; b.img_id = -1; b.node = idx;
+                b.border = e.border_w; b.bcol = e.border_col;
+                f.out->runs.push(b);
+            }
+            if (e.bgimg[0] && f.out->runs.size() < RUN_MAX) {
+                Run b;
+                b.x = bx; b.y = by;
+                b.w = (e.width > 0 && bx + e.width < f.w) ? e.width : (f.w - bx);
+                if (b.w < 8) b.w = 8;
+                b.h = (ey + f.line_h) - by; if (b.h < 4) b.h = 4;
+                if (e.height > 0 && b.h < e.height) b.h = e.height;
+                b.color = 0; b.kind = 4; b.link = false;
+                b.img_id = img_lookup_or_start(f.imgs, f.base_url, e.bgimg);
+                b.node = idx;
+                b.full_page = (n.tag_name[0] &&
+                               (ci_eq(n.tag_name, "body") || ci_eq(n.tag_name, "html")));
                 f.out->runs.push(b);
             }
             if (e.align) align_runs(f.out, s, f.out->runs.size(), e.align, f.w);
@@ -1178,6 +1403,21 @@ static void layout_node_inner(const List<DomNode>& nodes, int idx, Flow& f,
                 b.h = (ey + f.line_h) - by; if (b.h < 4) b.h = 4;
                 if (e.height > 0 && b.h < e.height) b.h = e.height;
                 b.color = e.bg; b.kind = 3; b.link = false; b.img_id = -1; b.node = idx;
+                b.border = e.border_w; b.bcol = e.border_col;
+                f.out->runs.push(b);
+            }
+            if (e.bgimg[0] && f.out->runs.size() < RUN_MAX) {
+                Run b;
+                b.x = bx; b.y = by;
+                b.w = (e.width > 0 && bx + e.width < f.w) ? e.width : (f.w - bx);
+                if (b.w < 8) b.w = 8;
+                b.h = (ey + f.line_h) - by; if (b.h < 4) b.h = 4;
+                if (e.height > 0 && b.h < e.height) b.h = e.height;
+                b.color = 0; b.kind = 4; b.link = false;
+                b.img_id = img_lookup_or_start(f.imgs, f.base_url, e.bgimg);
+                b.node = idx;
+                b.full_page = (n.tag_name[0] &&
+                               (ci_eq(n.tag_name, "body") || ci_eq(n.tag_name, "html")));
                 f.out->runs.push(b);
             }
             if (e.align) align_runs(f.out, s, f.out->runs.size(), e.align, f.w);
@@ -1349,17 +1589,23 @@ struct LoadJob {
     bool cancelled;
     bool truncated;
     bool push_hist;
+    volatile int aborted;   // download aborted by the consumer (overflow/cancel)
     uint32_t start_ms;
     char url[256];
-    char* data;          // kalloc'd page bytes (cap MAX_PAGE)
+    char* data;          // legacy kalloc'd page bytes (unused in streamed mode)
     uint32_t len;
     DomArena* dom;       // DOM built on the worker thread (0 = parse skipped)
-    char title[96];      // <title> extracted on the worker thread
-    char script[SCRIPT_MAX];   // accumulated <script> bytes (NUL at end)
+    char title[96];      // <title> captured by the parser on the worker thread
+    char script[SCRIPT_MAX];   // accumulated inline <script> bytes
     int script_len;
-    char js_out[JS_OUT_MAX];   // mini_js_run console output
+    char script_srcs[8][256];  // external <script src> urls (document order)
+    int script_src_n;
+    char* js_html;       // DOM shim re-sync buffer (worker alloc, main frees)
+    int js_html_sz;
+    char js_out[4096];   // mini_js_run console output (accumulated)
     CSSRule css[CSS_MAX];      // parsed <style> sheet
     int css_n;
+    void* parser;        // worker-local PageParser (streaming only)
 };
 
 // Image fetch job — same ownership pattern as LoadJob: the worker fills it
@@ -1406,18 +1652,27 @@ struct TabState {
     CSSRule css[CSS_MAX]; // style sheet (fixed array, copied from the job)
     int css_n;
     char js_msg[160];     // last JS console output (shown in the status bar)
+    char* js_html;        // DOM shim re-sync buffer (event re-render)
+    int js_html_sz;
+    int pending_nfu;      // JS element under a click (data-nfu index), -1 none
+    bool has_pending_nfu;
+    int img_gen;          // paint generation counter (visible-image tracking)
+    int img_last_used[IMG_MAX];
 
     TabState()
         : input_len(0), input_cursor(0), page(0), page_len(0), page_cap(0),
           used(false), loaded(false), is_home(false), truncated(false),
           scroll(0), max_scroll(0), layout_w(-1), job(0), has_queued(false),
-          load_ms(0), css_n(0) {
+          load_ms(0), css_n(0), img_gen(0), js_html(0), js_html_sz(0),
+          pending_nfu(-1), has_pending_nfu(false) {
+        for (int i = 0; i < IMG_MAX; i++) img_last_used[i] = 0;
         input[0] = url[0] = title[0] = err[0] = queued[0] = 0;
         js_msg[0] = 0;
     }
 
     ~TabState() {
         if (page) kfree(page);
+        if (js_html) { bfree(js_html); js_html = 0; }
         layout.runs.erase_all();
         dom.erase_all();
         back.erase_all();
@@ -1566,13 +1821,17 @@ static void start_job(TabState& tab, const char* url, bool push_hist) {
     j->ok = false;
     j->cancelled = false;
     j->truncated = false;
+    j->aborted = 0;
+    j->parser = 0;
     j->push_hist = push_hist;
     j->start_ms = platform_tick_ms();
     j->data = 0;
     j->len = 0;
     clip_str(j->url, sizeof(j->url), url);
     tab.job = j;
-    platform_thread_create(load_worker, j);
+    // load_worker hosts the JS engine: QuickJS compiles/evaluates on the
+    // stack, so give it a real stack (1MB); img_worker stays small (256KB)
+    platform_thread_create_stk(load_worker, j, 1024 * 1024);
 }
 
 // ---- image pipeline -------------------------------------------------
@@ -1602,7 +1861,35 @@ static void start_img_job(Img& im, const char* url) {
     j->len = 0;
     clip_str(j->url, sizeof(j->url), url);
     im.job = j;
-    platform_thread_create(img_worker, j);
+    platform_thread_create_stk(img_worker, j, 256 * 1024);
+}
+
+// resolve + dedupe + start a fetch for an image URL; returns the cache slot.
+static int img_lookup_or_start(Img* imgs, const char* base_url, const char* src) {
+    if (!imgs || !src || !src[0]) return -1;
+    char u[256];
+    resolve_url(base_url ? base_url : "", src, u, sizeof(u));
+    if (!u[0]) return -1;
+    for (int k = 0; k < IMG_MAX; k++)
+        if (imgs[k].used && strcmp(imgs[k].url, u) == 0) {
+            Img& im = imgs[k];
+            // offscreen reclamation dropped the pixels: refetch on demand
+            if (!im.done && !im.loading && !im.fail && !im.job) {
+                im.loading = true;
+                start_img_job(im, u);
+            }
+            return k;
+        }
+    for (int k = 0; k < IMG_MAX; k++)
+        if (!imgs[k].used) {
+            Img& im = imgs[k];
+            im.used = true;
+            im.loading = true;
+            clip_str(im.url, sizeof(im.url), u);
+            start_img_job(im, u);
+            return k;
+        }
+    return -1;
 }
 
 // Scan JPEG markers for a SOF0..SOF3 segment and return its dimensions.
@@ -1633,6 +1920,39 @@ static bool jpeg_probe_size(const uint8_t* d, uint32_t len, int* w, int* h) {
     return false;
 }
 
+// RGB565 <-> BGRA (cached images keep 2 bytes/px; converted per-pixel on draw)
+static uint16_t rgb_to_565(const uint8_t* p) {
+    return (uint16_t)(((uint16_t)(p[2] >> 3) << 11) |
+                      ((uint16_t)(p[1] >> 2) << 5) |
+                      (uint16_t)(p[0] >> 3));
+}
+static uint32_t c565_to_rgb(uint16_t c) {
+    // Surface::setpx stores 0xRRGGBB little-endian (memory bytes B,G,R),
+    // exactly like the 4-byte blit path: R lives in the high byte.
+    int r = (c >> 11) & 31, g = (c >> 5) & 63, b = c & 31;
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+    return (uint32_t)b | ((uint32_t)g << 8) | ((uint32_t)r << 16);
+}
+// convert a BGRA Surface to a kalloc'd RGB565 buffer of the same size
+static uint8_t* surf_to_565(const Surface& s) {
+    size_t need = (size_t)s.width * (size_t)s.height * 2;
+    uint8_t* buf = (uint8_t*)kalloc(need);
+    if (!buf) return 0;
+    for (int y = 0; y < s.height; y++) {
+        const uint8_t* row = s.addr + (size_t)y * (size_t)s.pitch;
+        uint8_t* d = buf + (size_t)y * (size_t)s.width * 2;
+        for (int x = 0; x < s.width; x++) {
+            const uint8_t* pp = row + (size_t)x * 4;
+            uint16_t c = rgb_to_565(pp);
+            d[x * 2] = (uint8_t)(c & 0xFF);
+            d[x * 2 + 1] = (uint8_t)(c >> 8);
+        }
+    }
+    return buf;
+}
+
 // nearest-neighbour downscale (integer math only, bare-metal safe)
 static void scale_surface(Surface& dst, const Surface& src) {
     for (int y = 0; y < dst.height; y++) {
@@ -1649,6 +1969,20 @@ static void scale_surface(Surface& dst, const Surface& src) {
 // blit a cached image 1:1 into the page surface at (dx,dy)
 static void draw_img(Surface& s, int dx, int dy, const Img& im) {
     if (!im.rgba || im.disp_w <= 0 || im.disp_h <= 0) return;
+    if (im.is565) {
+        for (int y = 0; y < im.disp_h; y++) {
+            int gy = dy + y;
+            if (gy < 0 || gy >= s.height) continue;
+            const uint8_t* row = im.rgba + (size_t)y * (size_t)im.disp_w * 2;
+            for (int x = 0; x < im.disp_w; x++) {
+                int gx = dx + x;
+                if (gx < 0 || gx >= s.width) continue;
+                uint16_t c = (uint16_t)(row[x * 2] | ((uint16_t)row[x * 2 + 1] << 8));
+                s.setpx(gx, gy, c565_to_rgb(c));
+            }
+        }
+        return;
+    }
     for (int y = 0; y < im.disp_h; y++) {
         int gy = dy + y;
         if (gy < 0 || gy >= s.height) continue;
@@ -1657,6 +1991,53 @@ static void draw_img(Surface& s, int dx, int dy, const Img& im) {
             int gx = dx + x;
             if (gx < 0 || gx >= s.width) continue;
             const uint8_t* pp = row + (size_t)x * 4;
+            uint32_t c = (uint32_t)pp[0] | ((uint32_t)pp[1] << 8) | ((uint32_t)pp[2] << 16);
+            s.setpx(gx, gy, c);
+        }
+    }
+}
+
+// cover-scale the cached image into the box (dx,dy,dw,dh), centered, cropping
+// overflow 鈥?used for element background boxes (kind 4 runs).
+static void draw_img_cover(Surface& s, int dx, int dy, int dw, int dh, const Img& im) {
+    if (!im.rgba || im.w <= 0 || im.h <= 0 || dw <= 0 || dh <= 0) return;
+    float sc = (float)dw / (float)im.w;
+    float sc2 = (float)dh / (float)im.h;
+    if (sc2 > sc) sc = sc2;
+    int iw2 = (int)(im.w * sc + 0.5f);
+    int ih2 = (int)(im.h * sc + 0.5f);
+    int ox = (dw - iw2) / 2;
+    int oy = (dh - ih2) / 2;
+    if (im.is565) {
+        for (int y = 0; y < dh; y++) {
+            int gy = dy + y;
+            if (gy < 0 || gy >= s.height) continue;
+            int sy = (int)((y - oy) / sc);
+            if (sy < 0 || sy >= im.h) continue;
+            const uint8_t* row = im.rgba + (size_t)sy * (size_t)im.w * 2;
+            for (int x = 0; x < dw; x++) {
+                int gx = dx + x;
+                if (gx < 0 || gx >= s.width) continue;
+                int sx = (int)((x - ox) / sc);
+                if (sx < 0 || sx >= im.w) continue;
+                uint16_t c = (uint16_t)(row[sx * 2] | ((uint16_t)row[sx * 2 + 1] << 8));
+                s.setpx(gx, gy, c565_to_rgb(c));
+            }
+        }
+        return;
+    }
+    for (int y = 0; y < dh; y++) {
+        int gy = dy + y;
+        if (gy < 0 || gy >= s.height) continue;
+        int sy = (int)((y - oy) / sc);
+        if (sy < 0 || sy >= im.h) continue;
+        const uint8_t* row = im.rgba + (size_t)sy * (size_t)im.w * 4;
+        for (int x = 0; x < dw; x++) {
+            int gx = dx + x;
+            if (gx < 0 || gx >= s.width) continue;
+            int sx = (int)((x - ox) / sc);
+            if (sx < 0 || sx >= im.w) continue;
+            const uint8_t* pp = row + (size_t)sx * 4;
             uint32_t c = (uint32_t)pp[0] | ((uint32_t)pp[1] << 8) | ((uint32_t)pp[2] << 16);
             s.setpx(gx, gy, c);
         }
@@ -1684,8 +2065,14 @@ static void poll_img_jobs(BrowserState* st) {
                         bgra_swap(out, w * h);
                         im.w = w; im.h = h;
                         im.disp_w = w; im.disp_h = h;
-                        im.rgba = out;
-                        im.done = true;
+                        Surface big;
+                        big.addr = out;
+                        big.width = w; big.height = h; big.pitch = w * 4;
+                        uint8_t* b5 = surf_to_565(big);
+                        kfree(out);
+                        im.rgba = b5;
+                        im.is565 = true;
+                        im.done = b5 != 0;
                     } else {
                         im.fail = true;
                     }
@@ -1707,27 +2094,62 @@ static void poll_img_jobs(BrowserState* st) {
                     if (dec_ok) {
                             bgra_swap(out, w * h);   // RGBA -> BGRA cache
                             im.w = w; im.h = h;
-                            im.disp_w = im.w;
-                            if (im.disp_w > MAX_IMG_DISP) im.disp_w = MAX_IMG_DISP;
-                            if (im.disp_w < 1) im.disp_w = 1;
-                            im.disp_h = (im.h * im.disp_w) / im.w;
-                            if (im.disp_h < 1) im.disp_h = 1;
-                            uint32_t need = (uint32_t)im.disp_w * (uint32_t)im.disp_h * 4;
-                            uint8_t* buf = (uint8_t*)kalloc(need);
-                            if (buf) {
-                                Surface small;
-                                small.addr = buf;
-                                small.width = im.disp_w;
-                                small.height = im.disp_h;
-                                small.pitch = im.disp_w * 4;
-                                Surface big;
-                                big.addr = out;
-                                big.width = w; big.height = h; big.pitch = w * 4;
-                                scale_surface(small, big);
-                                im.rgba = buf;
-                                im.done = true;
+                            if (im.as_bg) {
+                                // background: decode at a display-capped size
+                                // (cover needs >= the viewport, never the raw
+                                // file resolution)
+                                int dw = w, dh = h;
+                                if (dw > MAX_BG_DISP) {
+                                    dh = (h * MAX_BG_DISP) / dw;
+                                    dw = MAX_BG_DISP;
+                                }
+                                if (dh < 1) dh = 1;
+                                uint32_t need = (uint32_t)dw * (uint32_t)dh * 4;
+                                uint8_t* buf = (uint8_t*)kalloc(need);
+                                if (buf) {
+                                    Surface small;
+                                    small.addr = buf;
+                                    small.width = dw; small.height = dh;
+                                    small.pitch = dw * 4;
+                                    Surface big;
+                                    big.addr = out;
+                                    big.width = w; big.height = h; big.pitch = w * 4;
+                                    scale_surface(small, big);
+                                    uint8_t* b5 = surf_to_565(small);
+                                    kfree(buf);
+                                    im.rgba = b5;
+                                    im.is565 = true;
+                                    im.disp_w = dw; im.disp_h = dh;
+                                    im.done = b5 != 0;
+                                } else {
+                                    im.fail = true;
+                                }
                             } else {
-                                im.fail = true;
+                                im.disp_w = im.w;
+                                if (im.disp_w > MAX_IMG_DISP) im.disp_w = MAX_IMG_DISP;
+                                if (im.disp_w < 1) im.disp_w = 1;
+                                im.disp_h = (im.h * im.disp_w) / im.w;
+                                if (im.disp_h < 1) im.disp_h = 1;
+                                uint32_t need = (uint32_t)im.disp_w * (uint32_t)im.disp_h * 4;
+                                uint8_t* buf = (uint8_t*)kalloc(need);
+                                if (buf) {
+                                    Surface small;
+                                    small.addr = buf;
+                                    small.width = im.disp_w;
+                                    small.height = im.disp_h;
+                                    small.pitch = im.disp_w * 4;
+                                    Surface big;
+                                    big.addr = out;
+                                    big.width = w; big.height = h; big.pitch = w * 4;
+                                    scale_surface(small, big);
+                                    uint8_t* b5 = surf_to_565(small);
+                                    kfree(buf);
+                                    im.rgba = b5;
+                                    im.is565 = true;
+                                    im.done = b5 != 0;
+                                } else {
+                                    im.fail = true;
+                                }
                             }
                             kfree(out);
                         } else {
@@ -1742,6 +2164,7 @@ static void poll_img_jobs(BrowserState* st) {
             if (j->data) kfree(j->data);
             delete j;
             if (tab.used && (im.done || im.fail)) {
+                if (im.fail) klogf("browser: image failed: %s", im.url);
                 tab.layout_w = -1;   // image box changed -> re-layout
             }
         }
@@ -1769,57 +2192,75 @@ static void clear_imgs(TabState& tab) {
     }
 }
 
+static bool on_http_chunk(void* ctx, const uint8_t* data, uint32_t len) {
+    LoadJob* j = (LoadJob*)ctx;
+    if (j->cancelled) { j->aborted = 1; return false; }
+    PageParser* pp = (PageParser*)j->parser;
+    if (!pp) { j->aborted = 1; return false; }
+    pp->feed((const char*)data, (int)len, false);
+    if (pp->dom.overflow) { j->aborted = 1; return false; }   // DOM capped
+    return true;
+}
+
 static void load_worker(void* arg) {
     LoadJob* j = (LoadJob*)arg;
-    uint8_t* body = 0;
-    uint32_t body_len = 0;
-    bool ok = platform_http_get(j->url, &body, &body_len);
-    if (ok && body && body_len > 0 && !j->cancelled) {
-        j->truncated = body_len > MAX_PAGE - 1;
-        uint32_t cap = body_len + 1;
-        if (cap > MAX_PAGE) { cap = MAX_PAGE; j->truncated = true; }
-        char* p = (char*)kalloc(cap);
-        // arena may be tight (bare: 64 MB shared with every other tab and
-        // the DOM/layout caches): halve the page until an allocation fits,
-        // never fail the whole load just because one big page was too big.
-        if (!p) {
-            j->truncated = true;
-            uint32_t try_cap = cap / 2;
-            while (try_cap >= 65536 && !p) {
-                p = (char*)kalloc(try_cap);
-                if (p) cap = try_cap;
-                else try_cap /= 2;
-            }
-        }
-        if (p) {
-            memcpy(p, body, cap - 1);
-            p[cap - 1] = 0;
-            j->data = p;
-            j->len = cap - 1;
-            j->ok = true;
-        }
-    }
-    if (body) kfree(body);
-    // parse the HTML here too, so a 34 MB page never freezes the UI thread:
-    // the worker builds the DOM, the main thread only takes ownership.
-    if (j->ok && j->data && j->len > 0) {
-        j->phase = 1;   // parsing (host: worker thread; bare: same inline path)
+    // streamed download: received bytes feed the parser chunk by chunk; the
+    // raw page is never buffered in full, only an unclosed tag tail is held
+    // back until the next chunk completes it. Parsing happens on the worker
+    // thread so a huge page never freezes the UI thread.
+    PageParser pp(j->script, &j->script_len, j->css, &j->css_n, CSS_MAX,
+                  j->script_srcs, &j->script_src_n, 8);
+    pp.title_out = j->title;
+    pp.title_cap = (int)sizeof(j->title);
+    j->parser = &pp;
+    bool ok = platform_http_stream(j->url, j, on_http_chunk);
+    j->parser = 0;
+    if (!j->cancelled && (ok || j->aborted)) {
+        pp.feed(0, 0, true);   // final flush of any held-back tail
+        j->phase = 1;
         DomArena* ar = new DomArena();
         if (ar) {
-            PageParser pp(j->data, j->len, j->script, &j->script_len,
-                          j->css, &j->css_n, CSS_MAX);
-            pp.parse();
             ar->nodes = pp.dom.nodes;
             j->dom = ar;
         }
-        extract_title(j->data, j->len, j->title, sizeof(j->title));
-        // execute the accumulated <script> body through the mini JS engine;
-        // print/alert/document.write land in js_out (merged into the page)
-        if (j->script_len > 0) {
+        j->ok = true;
+        klogf("browser: worker parsed %d nodes, srcs=%d script=%d",
+              (int)pp.dom.nodes.size(), j->script_src_n, j->script_len);
+        // execute scripts through the mini JS engine in document order:
+        // external <script src> bundles first, then inline <script> bodies.
+        // print/alert output lands in js_out (logged, never on screen); the
+        // DOM shim writes its serialized tree into js_html for re-render.
+        if (j->script_len > 0 || j->script_src_n > 0) {
             j->script[j->script_len] = 0;
-            nefu::mini_js_run(j->script, j->js_out, (int)sizeof(j->js_out));
+            j->js_html_sz = 256 * 1024;
+            j->js_html = (char*)balloc((size_t)j->js_html_sz);
+            char jsacc[4096]; int jan = 0;
+            for (int si = 0; si < j->script_src_n && si < 8; si++) {
+                char u[512];
+                resolve_url(j->url, j->script_srcs[si], u, sizeof(u));
+                uint8_t* body = 0; uint32_t blen = 0;
+                if (platform_http_get(u, &body, &blen) && body && blen > 0) {
+                    char* js = (char*)body;
+                    js[blen] = 0;
+                    nefu::mini_js_set_env(j->url, j->title, 0, 0);
+                    nefu::mini_js_run(js, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
+                                      j->js_html, j->js_html_sz);
+                    jan += (int)strlen(jsacc + jan);
+                    if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
+                    kfree(body);
+                }
+            }
+            nefu::mini_js_set_env(j->url, j->title, 0, 0);
+            nefu::mini_js_run(j->script, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
+                              j->js_html, j->js_html_sz);
+            jan += (int)strlen(jsacc + jan);
+            if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
+            jsacc[jan] = 0;
+            if (jan > 0) { memcpy(j->js_out, jsacc, (size_t)jan); j->js_out[jan] = 0; }
+            else j->js_out[0] = 0;
         }
     }
+    if (pp.sstream) { bfree(pp.sstream); pp.sstream = 0; }
     j->done = 1;
 }
 
@@ -1860,6 +2301,31 @@ struct NfuGl {
     void (*glGetProgramInfoLog)(GLuint, GLsizei, GLsizei*, char*);
     void (*glGenVertexArrays)(GLsizei, GLuint*);
     void (*glBindVertexArray)(GLuint);
+    // ---- WebGL2 bridge additions ----
+    GLint (*glGetUniformLocation)(GLuint, const char*);
+    GLint (*glGetAttribLocation)(GLuint, const char*);
+    void (*glUniform1f)(GLint, GLfloat);
+    void (*glUniform2f)(GLint, GLfloat, GLfloat);
+    void (*glUniform3f)(GLint, GLfloat, GLfloat, GLfloat);
+    void (*glUniform4f)(GLint, GLfloat, GLfloat, GLfloat, GLfloat);
+    void (*glUniform1i)(GLint, GLint);
+    void (*glUniform2i)(GLint, GLint, GLint);
+    void (*glUniform3i)(GLint, GLint, GLint, GLint);
+    void (*glUniform4i)(GLint, GLint, GLint, GLint, GLint);
+    void (*glUniformMatrix2fv)(GLint, GLsizei, GLboolean, const GLfloat*);
+    void (*glUniformMatrix3fv)(GLint, GLsizei, GLboolean, const GLfloat*);
+    void (*glUniformMatrix4fv)(GLint, GLsizei, GLboolean, const GLfloat*);
+    void (*glEnable)(GLenum);
+    void (*glDisable)(GLenum);
+    void (*glBlendFunc)(GLenum, GLenum);
+    void (*glDepthFunc)(GLenum);
+    void (*glCullFace)(GLenum);
+    void (*glDrawElements)(GLenum, GLsizei, GLenum, const void*);
+    void (*glGenTextures)(GLsizei, GLuint*);
+    void (*glBindTexture)(GLenum, GLuint);
+    void (*glTexParameteri)(GLenum, GLenum, GLint);
+    void (*glTexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
+    void (*glActiveTexture)(GLenum);
     HGLRC (*wglCreateContext)(HDC);
     BOOL (*wglMakeCurrent)(HDC, HGLRC);
     BOOL (*wglDeleteContext)(HGLRC);
@@ -1916,6 +2382,30 @@ static void gl_load_ext() {
     GLF(glGetProgramInfoLog, void (*)(GLuint, GLsizei, GLsizei*, char*));
     GLF(glGenVertexArrays, void (*)(GLsizei, GLuint*));
     GLF(glBindVertexArray, void (*)(GLuint));
+    GLF(glGetUniformLocation, GLint (*)(GLuint, const char*));
+    GLF(glGetAttribLocation, GLint (*)(GLuint, const char*));
+    GLF(glUniform1f, void (*)(GLint, GLfloat));
+    GLF(glUniform2f, void (*)(GLint, GLfloat, GLfloat));
+    GLF(glUniform3f, void (*)(GLint, GLfloat, GLfloat, GLfloat));
+    GLF(glUniform4f, void (*)(GLint, GLfloat, GLfloat, GLfloat, GLfloat));
+    GLF(glUniform1i, void (*)(GLint, GLint));
+    GLF(glUniform2i, void (*)(GLint, GLint, GLint));
+    GLF(glUniform3i, void (*)(GLint, GLint, GLint, GLint));
+    GLF(glUniform4i, void (*)(GLint, GLint, GLint, GLint, GLint));
+    GLF(glUniformMatrix2fv, void (*)(GLint, GLsizei, GLboolean, const GLfloat*));
+    GLF(glUniformMatrix3fv, void (*)(GLint, GLsizei, GLboolean, const GLfloat*));
+    GLF(glUniformMatrix4fv, void (*)(GLint, GLsizei, GLboolean, const GLfloat*));
+    GLF(glEnable, void (*)(GLenum));
+    GLF(glDisable, void (*)(GLenum));
+    GLF(glBlendFunc, void (*)(GLenum, GLenum));
+    GLF(glDepthFunc, void (*)(GLenum));
+    GLF(glCullFace, void (*)(GLenum));
+    GLF(glDrawElements, void (*)(GLenum, GLsizei, GLenum, const void*));
+    GLF(glGenTextures, void (*)(GLsizei, GLuint*));
+    GLF(glBindTexture, void (*)(GLenum, GLuint));
+    GLF(glTexParameteri, void (*)(GLenum, GLenum, GLint));
+    GLF(glTexImage2D, void (*)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*));
+    GLF(glActiveTexture, void (*)(GLenum));
     #undef GLF
     g_gl.ready = 1;
 }
@@ -1923,6 +2413,8 @@ static void gl_load_ext() {
 struct GlShader { unsigned used, sid, id; int type; };   // sid = JS-side id, id = GL object id
 struct GlProg { unsigned used, sid, id; };
 struct GlBuf { unsigned used, sid, id; int target; };
+struct GlVao { unsigned used, sid, id; };
+struct GlTex { unsigned used, sid, id, target; };
 
 struct GlCanvas {
     bool used;
@@ -1930,12 +2422,25 @@ struct GlCanvas {
     int w, h;
     HWND hwnd; HDC hdc; HGLRC rc;
     uint8_t* fb; int fbw, fbh;   // last rendered frame (BGRA, bottom-up)
+    uint8_t* tex_px; int tex_len;   // pending direct texture upload (worker -> UI)
     float cr, cg, cb, ca;
     GlShader sh[16]; GlProg pr[8]; GlBuf bu[16];
+    GlVao va[8]; GlTex tx[16];
+    // the JS bridge hands out proxy ids for locations (the protocol is
+    // one-way), so remember what each proxy maps to on the GL side
+    int u_loc[256]; unsigned u_set[256];   // proxy uniform id -> real location
+    int a_loc[256]; unsigned a_set[256];   // proxy attrib id -> real location
     unsigned cur_prog;
     GLuint vao;
 };
 static GlCanvas s_glcv[4];
+
+// Pending direct texture uploads: the JS worker thread copies the pixel bytes
+// here (the WGL context does not exist yet while the script runs), and the UI
+// thread consumes them when the matching texim command applies. All GL calls
+// stay on the UI thread.
+struct TexPending { char cid[32]; uint8_t* px; int len; };
+static TexPending s_texp[4];
 
 static int hexv(char c) {
     if (c >= '0' && c <= '9') return c - '0';
@@ -2008,10 +2513,10 @@ static GlCanvas* gl_find_or_create(const char* cid, const DomNode* nodes, int nn
 
 static void gl_render_readback(GlCanvas& c) {
     if (!c.fb || c.fbw != c.w || c.fbh != c.h) {
-        if (c.fb) kfree(c.fb);
+        if (c.fb) bfree(c.fb);
         c.fb = 0;
         c.fbw = c.fbh = 0;
-        uint8_t* nb = (uint8_t*)kalloc((size_t)c.w * (size_t)c.h * 4);
+        uint8_t* nb = (uint8_t*)balloc((size_t)c.w * (size_t)c.h * 4);
         if (!nb) return;
         c.fb = nb; c.fbw = c.w; c.fbh = c.h;
     }
@@ -2032,12 +2537,18 @@ static void gl_cmd(TabState& tab, const char* cmd, const char* cid, const char* 
     if (!c) {
         if (ci_eq(cmd, "ctx")) c = gl_find_or_create(cid, tab.dom.data(), tab.dom.size());
         if (!c) {
-            clip_str(tab.js_msg, sizeof(tab.js_msg), "GL: canvas create failed");
+            klogf("browser: GL: canvas create failed (%s)", cid);
             return;
         }
         char dbg[96];
         ksprintf(dbg, sizeof(dbg), "GL: ctx %s %dx%d rc=%p", cid, c->w, c->h, (void*)c->rc);
-        clip_str(tab.js_msg, sizeof(tab.js_msg), dbg);
+        klogf("browser: %s", dbg);
+    } else if (ci_eq(cmd, "ctx")) {
+        for (int i = 0; i < tab.dom.size(); i++)
+            if (tab.dom[i].tag == Tag::Canvas && ci_eq(tab.dom[i].id, cid)) {
+                if (c->w != tab.dom[i].cw || c->h != tab.dom[i].ch) { c->w = tab.dom[i].cw; c->h = tab.dom[i].ch; }
+                break;
+            }
     }
     g_gl.wglMakeCurrent(c->hdc, c->rc);
     if (!g_gl.ready) gl_load_ext();   // needs a current context for wglGetProcAddress
@@ -2166,8 +2677,11 @@ static void gl_cmd(TabState& tab, const char* cmd, const char* cid, const char* 
     }
     if (ci_eq(cmd, "attptr")) {   // loc,size,stride,offset
         int v[4]; parse_ints(val, v, 4);
-        g_gl.glVertexAttribPointer((GLuint)v[0], v[1], GL_FLOAT, GL_FALSE, v[2], (const void*)(size_t)v[3]);
-        g_gl.glEnableVertexAttribArray((GLuint)v[0]);
+        // loc is a getAttribLocation proxy id; resolve it to the real index
+        int rl = (v[0] >= 0 && v[0] < 256 && c->a_set[v[0]]) ? c->a_loc[v[0]] : v[0];
+        if (rl < 0) return;
+        g_gl.glVertexAttribPointer((GLuint)rl, v[1], GL_FLOAT, GL_FALSE, v[2], (const void*)(size_t)v[3]);
+        g_gl.glEnableVertexAttribArray((GLuint)rl);
         return;
     }
     if (ci_eq(cmd, "draw")) {   // mode,count
@@ -2177,7 +2691,144 @@ static void gl_cmd(TabState& tab, const char* cmd, const char* cid, const char* 
         gl_render_readback(*c);
         return;
     }
+    // ===================== WebGL2 bridge =====================
+    // location proxies: JS gets an opaque id, we map it to the real GL
+    // location (the command stream is one-way, so this table is the return path)
+    if (ci_eq(cmd, "uloc")) {   // pid,uid,name
+        int v[2]; if (parse_ints(val, v, 2) < 2) return;
+        const char* nm = val;
+        for (int i = 0; i < 2; i++) { while (*nm && *nm != ',') nm++; if (*nm) nm++; }
+        unsigned gid = 0;
+        for (int i = 0; i < 8; i++) if (c->pr[i].used && c->pr[i].sid == (unsigned)v[0]) gid = c->pr[i].id;
+        int rl = (gid && g_gl.glGetUniformLocation) ? g_gl.glGetUniformLocation(gid, nm) : -1;
+        if (v[1] >= 0 && v[1] < 256) { c->u_loc[v[1]] = rl; c->u_set[v[1]] = 1; }
+        return;
+    }
+    if (ci_eq(cmd, "aloc")) {   // pid,aid,name
+        int v[2]; if (parse_ints(val, v, 2) < 2) return;
+        const char* nm = val;
+        for (int i = 0; i < 2; i++) { while (*nm && *nm != ',') nm++; if (*nm) nm++; }
+        unsigned gid = 0;
+        for (int i = 0; i < 8; i++) if (c->pr[i].used && c->pr[i].sid == (unsigned)v[0]) gid = c->pr[i].id;
+        int rl = (gid && g_gl.glGetAttribLocation) ? g_gl.glGetAttribLocation(gid, nm) : -1;
+        if (v[1] >= 0 && v[1] < 256) { c->a_loc[v[1]] = rl; c->a_set[v[1]] = 1; }
+        return;
+    }
+    if (ci_eq(cmd, "uM2") || ci_eq(cmd, "uM3") || ci_eq(cmd, "uM4")) {   // loc,vals...
+        int loc = atoi(val);
+        const char* p = val;
+        while (*p && *p != ',') p++; if (*p) p++;   // step over loc
+        float f[16];
+        parse_floats(p, f, 16);
+        int rl = (loc >= 0 && loc < 256 && c->u_set[loc]) ? c->u_loc[loc] : loc;
+        if (rl < 0) return;
+        int side = cmd[2] - '0';
+        if (side == 2 && g_gl.glUniformMatrix2fv) g_gl.glUniformMatrix2fv(rl, 1, GL_FALSE, f);
+        else if (side == 3 && g_gl.glUniformMatrix3fv) g_gl.glUniformMatrix3fv(rl, 1, GL_FALSE, f);
+        else if (side == 4 && g_gl.glUniformMatrix4fv) g_gl.glUniformMatrix4fv(rl, 1, GL_FALSE, f);
+        return;
+    }
+    if (cmd[0] == 'u' && cmd[1] >= '1' && cmd[1] <= '4' && (cmd[2] == 'f' || cmd[2] == 'i')) {
+        // uniformNf / uniformNi: loc,v0,...,vN-1
+        int loc = atoi(val);
+        const char* p = val; while (*p && *p != ',') p++; if (*p) p++;
+        float f[4];
+        parse_floats(p, f, 4);
+        int rl = (loc >= 0 && loc < 256 && c->u_set[loc]) ? c->u_loc[loc] : loc;
+        if (rl < 0) return;
+        int n = cmd[1] - '0';
+        if (cmd[2] == 'f') {
+            if (n == 1 && g_gl.glUniform1f) g_gl.glUniform1f(rl, f[0]);
+            else if (n == 2 && g_gl.glUniform2f) g_gl.glUniform2f(rl, f[0], f[1]);
+            else if (n == 3 && g_gl.glUniform3f) g_gl.glUniform3f(rl, f[0], f[1], f[2]);
+            else if (n == 4 && g_gl.glUniform4f) g_gl.glUniform4f(rl, f[0], f[1], f[2], f[3]);
+        } else {
+            if (n == 1 && g_gl.glUniform1i) g_gl.glUniform1i(rl, (GLint)f[0]);
+            else if (n == 2 && g_gl.glUniform2i) g_gl.glUniform2i(rl, (GLint)f[0], (GLint)f[1]);
+            else if (n == 3 && g_gl.glUniform3i) g_gl.glUniform3i(rl, (GLint)f[0], (GLint)f[1], (GLint)f[2]);
+            else if (n == 4 && g_gl.glUniform4i) g_gl.glUniform4i(rl, (GLint)f[0], (GLint)f[1], (GLint)f[2], (GLint)f[3]);
+        }
+        return;
+    }
+    if (ci_eq(cmd, "en")) { if (g_gl.glEnable) g_gl.glEnable((GLenum)atoi(val)); return; }
+    if (ci_eq(cmd, "dis")) { if (g_gl.glDisable) g_gl.glDisable((GLenum)atoi(val)); return; }
+    if (ci_eq(cmd, "blend")) { int v[2]; parse_ints(val, v, 2); if (g_gl.glBlendFunc) g_gl.glBlendFunc((GLenum)v[0], (GLenum)v[1]); return; }
+    if (ci_eq(cmd, "dfunc")) { if (g_gl.glDepthFunc) g_gl.glDepthFunc((GLenum)atoi(val)); return; }
+    if (ci_eq(cmd, "cull")) { if (g_gl.glCullFace) g_gl.glCullFace((GLenum)atoi(val)); return; }
+    if (ci_eq(cmd, "deli")) {   // mode,count,type,offset
+        int v[4]; parse_ints(val, v, 4);
+        g_gl.glViewport(0, 0, c->w, c->h);
+        if (g_gl.glDrawElements) g_gl.glDrawElements((GLenum)v[0], v[1], (GLenum)v[2], (const void*)(size_t)v[3]);
+        gl_render_readback(*c);
+        return;
+    }
+    if (ci_eq(cmd, "vao")) {   // sid
+        unsigned sid = (unsigned)atoi(val);
+        for (int i = 0; i < 8; i++) if (c->va[i].used && c->va[i].sid == sid) return;
+        GLuint gid = 0;
+        if (g_gl.glGenVertexArrays) g_gl.glGenVertexArrays(1, &gid);
+        for (int i = 0; i < 8; i++)
+            if (!c->va[i].used) { c->va[i].used = 1; c->va[i].sid = sid; c->va[i].id = gid; return; }
+        return;
+    }
+    if (ci_eq(cmd, "bva")) {   // sid (0 = default VAO)
+        unsigned sid = (unsigned)atoi(val);
+        if (sid == 0) { if (g_gl.glBindVertexArray) g_gl.glBindVertexArray(0); c->vao = 0; return; }
+        for (int i = 0; i < 8; i++)
+            if (c->va[i].used && c->va[i].sid == sid) {
+                if (g_gl.glBindVertexArray) g_gl.glBindVertexArray(c->va[i].id);
+                c->vao = c->va[i].id;
+                return;
+            }
+        return;
+    }
+    if (ci_eq(cmd, "tx")) {   // sid
+        unsigned sid = (unsigned)atoi(val);
+        for (int i = 0; i < 16; i++) if (c->tx[i].used && c->tx[i].sid == sid) return;
+        GLuint gid = 0;
+        if (g_gl.glGenTextures) g_gl.glGenTextures(1, &gid);
+        for (int i = 0; i < 16; i++)
+            if (!c->tx[i].used) { c->tx[i].used = 1; c->tx[i].sid = sid; c->tx[i].id = gid; return; }
+        return;
+    }
+    if (ci_eq(cmd, "btx")) {   // target,sid
+        int v[2]; parse_ints(val, v, 2);
+        if (v[1] == 0) { if (g_gl.glBindTexture) g_gl.glBindTexture((GLenum)v[0], 0); return; }
+        for (int i = 0; i < 16; i++)
+            if (c->tx[i].used && c->tx[i].sid == (unsigned)v[1]) {
+                c->tx[i].target = (unsigned)v[0];
+                if (g_gl.glBindTexture) g_gl.glBindTexture((GLenum)v[0], c->tx[i].id);
+                return;
+            }
+        return;
+    }
+    if (ci_eq(cmd, "texp")) {   // target,pname,param (acts on the bound texture)
+        int v[3]; parse_ints(val, v, 3);
+        if (g_gl.glTexParameteri) g_gl.glTexParameteri((GLenum)v[0], (GLenum)v[1], v[2]);
+        return;
+    }
+    if (ci_eq(cmd, "texim")) {   // target,level,internal,w,h,border,format,type
+        int v[8];
+        if (parse_ints(val, v, 8) < 8 || !g_gl.glTexImage2D) return;
+        const uint8_t* px = 0;
+        for (int i = 0; i < 4; i++)
+            if (s_texp[i].px && ci_eq(s_texp[i].cid, cid)) { px = s_texp[i].px; break; }
+        if (px) {
+            g_gl.glTexImage2D((GLenum)v[0], v[1], v[2], v[3], v[4], v[5], (GLenum)v[6], (GLenum)v[7], px);
+            for (int i = 0; i < 4; i++)
+                if (s_texp[i].px && ci_eq(s_texp[i].cid, cid)) {
+                    bfree(s_texp[i].px);
+                    s_texp[i].px = 0; s_texp[i].len = 0; s_texp[i].cid[0] = 0;
+                    break;
+                }
+        } else {
+            g_gl.glTexImage2D((GLenum)v[0], v[1], v[2], v[3], v[4], v[5], (GLenum)v[6], (GLenum)v[7], 0);
+        }
+        return;
+    }
+    if (ci_eq(cmd, "actex")) { if (g_gl.glActiveTexture) g_gl.glActiveTexture((GLenum)atoi(val)); return; }
 }
+
 #else
 static void gl_cmd(TabState& tab, const char* cmd, const char* cid, const char* val) {
     (void)tab; (void)cmd; (void)cid; (void)val;
@@ -2254,16 +2905,17 @@ static void apply_js_commands(TabState& tab, const char* js) {
 
 static void commit_page(TabState& tab, LoadJob* j) {
     clear_imgs(tab);   // previous page's images are gone
+    if (tab.js_html) { bfree(tab.js_html); tab.js_html = 0; }   // old JS state
     if (j->data && j->len > 0) {
         // zero-copy: the worker buffer becomes the page buffer (j->data is
         // NULLed here so poll_jobs does not free it again)
         if (tab.page) kfree(tab.page);
-        tab.page = j->data;
+        tab.page = 0;   // raw page bytes are freed by the worker after parsing
         tab.page_cap = (int)j->len + 1;
         tab.page_len = (int)j->len;
         j->data = 0;
     }
-    bool ok_page = tab.page && tab.page_len > 0;
+    bool ok_page = j->dom != 0;   // parsed DOM is the success marker now
 
     // history: remember the page we are leaving (only on successful navigation)
     if (j->push_hist) {
@@ -2284,14 +2936,14 @@ static void commit_page(TabState& tab, LoadJob* j) {
         // in paint (tab.dom = shallow copy of the node list, same as before)
         tab.dom.erase_all();
         if (j->dom) {
+            if (j->dom->overflow) klogf("browser: fatal: DOM overflow, page truncated (%s)", j->url);
             tab.dom = j->dom->nodes;
             clip_str(tab.title, sizeof(tab.title), j->title);
             tab.css_n = j->css_n;
             for (int k = 0; k < j->css_n && k < CSS_MAX; k++) tab.css[k] = j->css[k];
             if (j->js_out[0]) {
-                
-                // \x01 DOM commands mutate the committed DOM; plain text from
-                // print/alert/document.write becomes a trailing text node.
+                // \x01 DOM commands mutate the committed DOM; plain console
+                // text from print/alert goes to the log, never on screen.
                 apply_js_commands(tab, j->js_out);
                 char vis[JS_OUT_MAX];
                 int vn = 0;
@@ -2304,20 +2956,22 @@ static void commit_page(TabState& tab, LoadJob* j) {
                     vis[vn++] = *c++;
                 }
                 vis[vn] = 0;
-                if (vis[0]) {
-                    DomNode n;
-                    n.tag = Tag::Text;
-                    for (int i = 0; i < (int)strlen(vis) && n.text.len() < 4000; i++)
-                        n.text += vis[i];
-                    tab.dom[0].kids.push(tab.dom.size());
-                    tab.dom.push(n);
-                    clip_str(tab.js_msg, sizeof(tab.js_msg), vis);
-                } else {
-                    tab.js_msg[0] = 0;
-                }
-            } else {
-                tab.js_msg[0] = 0;
+                if (vis[0]) klogf("browser: js: %s", vis);
             }
+            if (j->js_html && j->js_html[0]) {
+                // the DOM shim serialized a JS-built tree: re-parse it and
+                // replace the committed DOM (styles stay from the <style>)
+                CSSRule css2[CSS_MAX]; int css2_n = 0;
+                PageParser pp2(0, 0, css2, &css2_n, CSS_MAX);
+                pp2.feed(j->js_html, (int)strlen(j->js_html), true);
+                if (!pp2.dom.overflow) {
+                    tab.dom = pp2.dom.nodes;
+                    klogf("browser: js dom re-render (%d nodes)", tab.dom.size());
+                } else {
+                    klogf("browser: js dom re-render overflow, kept original DOM");
+                }
+            }
+            tab.js_msg[0] = 0;
         }
         if (!tab.title[0]) url_host(j->url, tab.title, sizeof(tab.title));
     } else {
@@ -2327,6 +2981,7 @@ static void commit_page(TabState& tab, LoadJob* j) {
         tab.page_len = 0;
         tab.err[0] = 0;
         ksprintf(tab.err, sizeof(tab.err), "Cannot reach %s", j->url);
+        klogf("browser: load failed: %s", j->url);
         clip_str(tab.title, sizeof(tab.title), "Error");
     }
     clip_str(tab.input, sizeof(tab.input), tab.url);
@@ -2344,15 +2999,20 @@ static void poll_jobs(BrowserState* st) {
         LoadJob* j = tab.job;
         if (!j || !j->done) continue;
         tab.job = 0;
-        if (tab.used && !j->cancelled && j->ok && j->data) {
-            commit_page(tab, j);
+        // j->data is freed by the worker as soon as parsing is done, so the
+        // success marker is the parsed DOM, not the raw page buffer
+        if (tab.used && !j->cancelled && j->ok && j->dom) {
+            commit_page(tab, j);   // consumes j->js_html (DOM shim re-render)
+            if (j->js_html) { bfree(j->js_html); j->js_html = 0; }
         } else if (tab.used && !j->cancelled) {
+            if (j->js_html) { bfree(j->js_html); j->js_html = 0; }
             // load failed
             tab.loaded = true;
             tab.is_home = false;
             tab.page_len = 0;
             tab.err[0] = 0;
             ksprintf(tab.err, sizeof(tab.err), "Cannot reach %s", j->url);
+            klogf("browser: load failed: %s", j->url);
             clip_str(tab.title, sizeof(tab.title), "Error");
             clip_str(tab.url, sizeof(tab.url), j->url);
             tab.layout_w = -1;
@@ -2536,19 +3196,58 @@ static void paint_address(Surface& s, const TabState& tab, bool focus, int cw) {
 }
 
 static void paint_page(Surface& s, const PageLayout& lay, int scroll,
-                       int vx, int vy, int vw, int vh, const Img* imgs = 0) {
+                       int vx, int vy, int vw, int vh, Img* imgs = 0,
+                       int* last_used = 0, int gen = 0, const char* base_url = 0) {
+    // pass 0: page-level (body/html) background images at the very bottom
+    for (int i = 0; i < lay.runs.size(); i++) {
+        const Run& r = lay.runs[i];
+        if (r.kind != 4 || !r.full_page) continue;
+        int sy = r.y - scroll;
+        if (sy + r.h < 0 || sy > vh) continue;
+        if (r.img_id >= 0 && imgs && imgs[r.img_id].done && imgs[r.img_id].rgba) {
+            if (last_used) last_used[r.img_id] = gen;
+            int bh = r.h;
+            int bot = r.y + r.h;
+            int vbot = scroll + vh;
+            if (vbot > bot) bot = vbot;
+            bh = bot - r.y;
+            if (bh < r.h) bh = r.h;
+            draw_img_cover(s, vx + r.x, vy + sy, r.w, bh, imgs[r.img_id]);
+        }
+    }
     // pass 1: block backgrounds (kind 3) underneath everything else
     for (int i = 0; i < lay.runs.size(); i++) {
         const Run& r = lay.runs[i];
         if (r.kind != 3) continue;
         int sy = r.y - scroll;
-        if (sy + r.h < 0 || sy > vh) continue;
+        if (sy + r.h < 0 || sy > vh) { if (sy > vh) break; continue; }
         gfx::fillrect(s, vx + r.x, vy + sy, r.w, r.h, r.color);
+        if (r.border > 0 && r.bcol) {
+            int bw = r.border; if (bw > 8) bw = 8;
+            gfx::fillrect(s, vx + r.x, vy + sy, r.w, bw, r.bcol);                     // top
+            gfx::fillrect(s, vx + r.x, vy + sy + r.h - bw, r.w, bw, r.bcol);          // bottom
+            gfx::fillrect(s, vx + r.x, vy + sy, bw, r.h, r.bcol);                     // left
+            gfx::fillrect(s, vx + r.x + r.w - bw, vy + sy, bw, r.h, r.bcol);          // right
+        }
+    }
+    // pass 1.5: element background images (kind 4), above colors, below content
+    for (int i = 0; i < lay.runs.size(); i++) {
+        const Run& r = lay.runs[i];
+        if (r.kind != 4 || r.full_page) continue;
+        int sy = r.y - scroll;
+        if (sy + r.h < 0 || sy > vh) { if (sy > vh) break; continue; }
+        if (r.img_id >= 0 && imgs && imgs[r.img_id].done && imgs[r.img_id].rgba) {
+            if (last_used) last_used[r.img_id] = gen;
+            draw_img_cover(s, vx + r.x, vy + sy, r.w, r.h, imgs[r.img_id]);
+        } else if (r.img_id >= 0 && imgs && imgs[r.img_id].done && base_url &&
+                   imgs[r.img_id].url[0]) {
+            img_lookup_or_start(imgs, base_url, imgs[r.img_id].url);   // refetch
+        }
     }
     for (int i = 0; i < lay.runs.size(); i++) {
         const Run& r = lay.runs[i];
         int sy = r.y - scroll;
-        if (sy + r.h < 0 || sy > vh) continue;   // vertical culling
+        if (sy + r.h < 0 || sy > vh) { if (sy > vh) break; continue; }   // vertical culling
 
         if (r.kind == 2) {   // horizontal rule
             int x0 = vx + r.x, x1 = vx + r.x + r.w;
@@ -2559,9 +3258,13 @@ static void paint_page(Surface& s, const PageLayout& lay, int scroll,
         }
         if (r.kind == 1) {   // image
             if (r.img_id >= 0 && imgs && imgs[r.img_id].done && imgs[r.img_id].rgba) {
+                if (last_used) last_used[r.img_id] = gen;
                 draw_img(s, vx + r.x, vy + sy, imgs[r.img_id]);
                 gfx::rect(s, vx + r.x, vy + sy, r.w, r.h, C_HRLINE);
             } else {
+                if (r.img_id >= 0 && imgs && imgs[r.img_id].done && base_url &&
+                    imgs[r.img_id].url[0])
+                    img_lookup_or_start(imgs, base_url, imgs[r.img_id].url);
                 gfx::fillrect(s, vx + r.x, vy + sy, r.w, r.h, C_IMG);
                 gfx::rect(s, vx + r.x, vy + sy, r.w, r.h, C_HRLINE);
                 int maxc = (r.w - 4) / 8;
@@ -2609,7 +3312,7 @@ static void paint_page(Surface& s, const PageLayout& lay, int scroll,
         }
         // text run (UTF-8 aware via gfx::text; glyphs are clipped by gfx)
         if (r.text.len() > 0) {
-            gfx::text(s, vx + r.x, vy + sy, r.text.c_str(), r.color, C_PAGE_BG);
+            gfx::text(s, vx + r.x, vy + sy, r.text.c_str(), r.color, C_PAGE_BG | 0x80000000);
             if (r.link) {
                 int x0 = vx + r.x, x1 = vx + r.x + r.w - 1;
                 if (x0 < vx) x0 = vx;
@@ -2647,8 +3350,6 @@ static void paint_status(Surface& s, const TabState& tab, int cw, int ch) {
                      (int)(tab.job->len / 1024));
         else
             ksprintf(left, sizeof(left), "Loading %s ...", u[0] ? u : "...");
-    } else if (tab.err[0]) {
-        clip_str(left, sizeof(left), tab.err);
     } else if (tab.is_home || !tab.loaded) {
         ksprintf(left, sizeof(left), "Ready");
     } else if (tab.url[0]) {
@@ -2668,8 +3369,6 @@ static void paint_status(Surface& s, const TabState& tab, int cw, int ch) {
     if (tab.loaded && tab.page_len > 0 && !tab.is_home) {
         int kb = (tab.page_len + 1023) / 1024;
         ksprintf(right, sizeof(right), "%d KB | %d ms", kb, (int)tab.load_ms);
-    } else if (tab.err[0]) {
-        ksprintf(right, sizeof(right), "Error");
     } else {
         ksprintf(right, sizeof(right), "nefuOS v3.0");
     }
@@ -2689,6 +3388,41 @@ static void on_paint(Window* w) {
     poll_jobs(st);   // commit finished loads (also starts queued ones)
 
     TabState& tab = st->tabs[st->active];
+
+    // ---- JS click event round-trip: dispatch to the DOM shim, re-parse the
+    // serialized tree if the listeners mutated it, and re-layout ----
+    if (tab.has_pending_nfu) {
+        tab.has_pending_nfu = false;
+        if (!tab.js_html) {
+            tab.js_html_sz = 256 * 1024;
+            tab.js_html = (char*)balloc((size_t)tab.js_html_sz);
+        }
+        char ev[96], out[JS_OUT_MAX];
+        out[0] = 0;
+        ksprintf(ev, sizeof(ev), "__nfuDispatch(%d,0,0);", tab.pending_nfu);
+        nefu::mini_js_set_env(tab.url, tab.title, 0, 0);
+        mini_js_run(ev, out, (int)sizeof(out), tab.js_html, tab.js_html_sz);
+        if (out[0]) {
+            apply_js_commands(tab, out);
+            char vis[JS_OUT_MAX]; int vn = 0;
+            for (const char* c = out; *c && vn < JS_OUT_MAX - 1; ) {
+                if (*c == '\x01') { while (*c && *c != '\n') c++; if (*c) c++; continue; }
+                vis[vn++] = *c++;
+            }
+            vis[vn] = 0;
+            if (vis[0]) klogf("browser: js: %s", vis);
+        }
+        if (tab.js_html && tab.js_html[0]) {
+            CSSRule css2[CSS_MAX]; int css2_n = 0;
+            PageParser pp2(0, 0, css2, &css2_n, CSS_MAX);
+            pp2.feed(tab.js_html, (int)strlen(tab.js_html), true);
+            if (!pp2.dom.overflow) {
+                tab.dom = pp2.dom.nodes;
+                klogf("browser: js dom re-render (%d nodes) via click", tab.dom.size());
+            }
+        }
+        tab.layout_w = -1;
+    }
     int cw = w->content_w;
     int ch = w->content_h;
 
@@ -2725,27 +3459,12 @@ static void on_paint(Window* w) {
         tab.layout.runs.erase_all();
         if (!tab.loaded || tab.is_home) {
             build_home(tab.layout, vw);
-        } else if (tab.err[0] && !tab.page) {
-            build_error(tab.layout, vw, tab.url, tab.err);
-        } else if (tab.page && tab.page_len > 0) {
+        } else if (tab.dom.size() > 0) {
             layout_page(tab.dom, vw, tab.layout, tab.imgs, tab.url,
                         tab.css_n > 0 ? tab.css : 0, tab.css_n);
             if (tab.truncated) {
-                Run tr;
-                tr.x = 8;
-                tr.y = tab.layout.height + 4;
-                tr.w = 200;
-                tr.h = 16;
-                tr.color = C_GRAY;
-                tr.kind = 0;
-                tr.link = false;
-                tr.img_id = -1;
-                char m[64];
-                ksprintf(m, sizeof(m), "[page truncated at %d MB]",
-                         (tab.page_cap + 524288) / 1048576);
-                tr.text = m;
-                tab.layout.runs.push(tr);
-                tab.layout.height += 24;
+                klogf("browser: warning: page truncated at %d MB (%s)",
+                      (tab.page_cap + 524288) / 1048576, tab.url);
             }
         }
         tab.layout_w = vw;
@@ -2754,7 +3473,33 @@ static void on_paint(Window* w) {
     tab.max_scroll = maxi(0, tab.layout.height - vh);
     if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll;
 
-    paint_page(*s, tab.layout, tab.scroll, vx, vy, vw, vh, tab.imgs);
+    // visibility tracking + offscreen image reclamation: decoded images that
+    // have not been on screen for several frames release their pixels (cache
+    // keeps the URL/size, so scrolling back simply refetches one at a time)
+    tab.img_gen++;
+    paint_page(*s, tab.layout, tab.scroll, vx, vy, vw, vh, tab.imgs,
+               tab.img_last_used, tab.img_gen, tab.url);
+    int done_cnt = 0;
+    for (int k = 0; k < IMG_MAX; k++)
+        if (tab.imgs[k].done && tab.imgs[k].rgba) done_cnt++;
+    if (done_cnt > 4) {
+        for (int k = 0; k < IMG_MAX; k++) {
+            Img& im = tab.imgs[k];
+            // reclaim any decoded image that was not painted this frame (>=1
+            // means off-screen since the last paint); scrolling back triggers
+            // an automatic refetch one at a time. One per frame keeps redraws
+            // smooth. Static pages: the first paint marks visible images and
+            // reclaims the off-screen ones immediately.
+            if (im.done && im.rgba && tab.img_gen - tab.img_last_used[k] >= 1) {
+                kfree(im.rgba);
+                im.rgba = 0;
+                im.done = false;
+                im.is565 = false;
+                klogf("browser: reclaimed offscreen image %s", im.url);
+                break;   // one per frame keeps re-draws smooth
+            }
+        }
+    }
     paint_scrollbar(*s, cw - SB_W, vy, vh, tab.scroll, tab.layout.height);
 
     // ---- status ----
@@ -2916,7 +3661,8 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
         if (!script || !script[0]) return;
         char out[JS_OUT_MAX];
         out[0] = 0;
-        mini_js_run(script, out, (int)sizeof(out));
+        nefu::mini_js_set_env(tab.url, tab.title, 0, 0);
+        mini_js_run(script, out, (int)sizeof(out), 0, 0);
         if (out[0]) {
             apply_js_commands(tab, out);
             char vis[JS_OUT_MAX];
@@ -2926,7 +3672,7 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
                 vis[vn++] = *c++;
             }
             vis[vn] = 0;
-            if (vis[0]) clip_str(tab.js_msg, sizeof(tab.js_msg), vis);
+            if (vis[0]) klogf("browser: js: %s", vis);
         }
         tab.layout_w = -1;   // re-layout on next paint
     };
@@ -2940,6 +3686,13 @@ static void on_mouse(Window* w, int mx, int my, uint8_t buttons) {
             if (r.node >= 0 && r.node < tab.dom.size()) {
                 const char* oc = tab.dom[r.node].onclick;
                 if (oc[0]) { exec_onclick(oc); return; }
+                if (tab.dom[r.node].nfu_idx >= 0) {
+                    // JS-built element: dispatch its click listeners via the
+                    // DOM shim, which re-serializes -> re-render next frame
+                    tab.pending_nfu = tab.dom[r.node].nfu_idx;
+                    tab.has_pending_nfu = true;
+                    return;
+                }
             }
             if (!r.link) continue;
             // ignore pseudo-protocols and in-page anchors (no anchor scrolling
@@ -2979,6 +3732,57 @@ static void on_close(Window* w) {
 }
 
 } // namespace
+
+// Called directly by the JS engine while a script is running, so the WGL
+// context exists before any direct bridge calls (texture upload) happen.
+// Idempotent: the later "ctx" command in the command stream re-uses it.
+#ifndef NEFU_BARE
+void gl_ctx_create(const char* cid, int w, int h) {
+    if (!cid || !cid[0]) return;
+    gl_load_wgl();
+    GlCanvas* c = gl_find_or_create(cid, 0, 0);
+    if (!c) return;
+    if (w > 0 && h > 0 && (c->w != w || c->h != h)) { c->w = w; c->h = h; }
+    g_gl.wglMakeCurrent(c->hdc, c->rc);
+    if (!g_gl.ready) gl_load_ext();
+}
+
+// Direct texture upload (bypasses the text protocol): the JS engine already
+// holds the pixel bytes in memory (Uint8Array / ArrayBuffer from an image or a
+// procedural texture), so it hands them straight to the GL context instead of
+// base64-encoding them into the command stream. WebGL games (bloxd.io etc.)
+// upload every texture through this path. Defined at nefu scope so the JS
+// bridge (minijs.cpp) can link to it across translation units.
+void gl_tex_upload(const char* cid, int target, int level, int internal,
+                   int w, int h, int format, int type,
+                   const uint8_t* px, int len) {
+    (void)target; (void)level; (void)internal; (void)w; (void)h;
+    (void)format; (void)type;
+    if (!px || len <= 0) return;
+    int slot = -1;
+    for (int i = 0; i < 4; i++) {
+        if (s_texp[i].px && s_texp[i].cid[0] && ci_eq(s_texp[i].cid, cid)) { slot = i; break; }
+        if (slot < 0 && !s_texp[i].px) slot = i;
+    }
+    if (slot < 0) return;
+    if (s_texp[slot].px) bfree(s_texp[slot].px);
+    s_texp[slot].px = (uint8_t*)balloc(len);
+    if (!s_texp[slot].px) { s_texp[slot].len = 0; return; }
+    memcpy(s_texp[slot].px, px, len);
+    s_texp[slot].len = len;
+    clip_str(s_texp[slot].cid, sizeof(s_texp[slot].cid), cid ? cid : "");
+}
+#else
+void gl_ctx_create(const char* cid, int w, int h) {
+    (void)cid; (void)w; (void)h;
+}
+void gl_tex_upload(const char* cid, int target, int level, int internal,
+                   int w, int h, int format, int type,
+                   const uint8_t* px, int len) {
+    (void)cid; (void)target; (void)level; (void)internal;
+    (void)w; (void)h; (void)format; (void)type; (void)px; (void)len;
+}
+#endif
 
 // ===================== entry points =====================
 

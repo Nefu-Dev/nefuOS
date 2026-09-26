@@ -41,7 +41,7 @@ static void sysinfo_paint(Window* w) {
     y += lh;
     gfx::text(s, 20, y, "Total RAM: ~64 MB", 0x333333, 0xFFFFFF);
     y += lh;
-    gfx::text(s, 20, y, "Heap: 64 MB (0x400000)", 0x333333, 0xFFFFFF);
+    gfx::text(s, 20, y, "Heap: 64 MB (0x920000)", 0x333333, 0xFFFFFF);
     y += lh * 2;
 
     // Storage

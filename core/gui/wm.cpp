@@ -271,6 +271,27 @@ void WM::raise(Window* w) {
     focus_ = w;
 }
 
+void WM::cycle_focus(bool reverse) {
+    int n = wins_.size();
+    if (n == 0) return;
+    int cur = -1;
+    for (int i = 0; i < n; i++) if (wins_[i] == focus_) { cur = i; break; }
+    int start = cur < 0 ? (reverse ? n - 1 : 0) : cur;
+    for (int step = 1; step <= n; step++) {
+        int idx = reverse ? ((start - step) % n + n) % n : (start + step) % n;
+        Window* w = wins_[idx];
+        if (w && !w->closed && w->visible && !w->minimized) {
+            raise(w);
+            return;
+        }
+    }
+    // fallback: raise the first usable window
+    for (int i = 0; i < n; i++) {
+        Window* w = wins_[i];
+        if (w && !w->closed && w->visible && !w->minimized) { raise(w); return; }
+    }
+}
+
 void WM::tick() {
     // run the heartbeat of every visible window (animation / game update)
     for (int i = 0; i < wins_.size(); i++) {

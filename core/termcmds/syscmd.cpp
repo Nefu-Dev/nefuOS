@@ -2,6 +2,7 @@
 //  syscmd.cpp —— 系统命令实现
 // =============================================================================
 #include "syscmd.h"
+#include "memcfg.h"
 
 namespace nefu {
 namespace termcmds {
@@ -125,9 +126,9 @@ static int cmd_uptime(int argc, const char** argv, TermOutput* out) {
 
 static int cmd_free(int argc, const char** argv, TermOutput* out) {
     (void)argc; (void)argv;
-    // 模拟 512MB 物理内存
-    const uint32_t total = 512u * 1024u;
-    uint32_t used  = 213u * 1024u;
+    // 逻辑系统内存上限 4GB (内核512MB + 浏览器2GB + 余量1.5GB)
+    const uint32_t total = 4096u * 1024u;
+    uint32_t used  = (uint32_t)((KERNEL_MEM_BUDGET_MB + 64u) * 1024u);
     uint32_t free  = total - used;
     out->pln("              total        used        free");
     out->pfln("Mem:      %8u   %8u   %8u", total, used, free);

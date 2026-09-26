@@ -4,6 +4,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include "memcfg.h"
 
 namespace nefu {
 
@@ -21,9 +22,12 @@ bool  platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_
 void  platform_ttf_free(uint8_t* p);
 
 // ===================== memory =====================
-void* kalloc(size_t sz);
+void* kalloc(size_t sz);          // kernel arena (kernel + NVFS + network)
 void  kfree(void* p);
 void* krealloc(void* p, size_t sz);
+void* balloc(size_t sz);          // browser arena (up to BROWSER_MEM_BUDGET_MB)
+void  bfree(void* p);
+void* brealloc(void* p, size_t sz);
 
 // ===================== screen =====================
 // Software pixel buffer, 32bpp, little-endian BGRA (uint32 = 0x00RRGGBB)
@@ -150,6 +154,16 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size);
 
 // ===================== threading =====================
 void* platform_thread_create(void (*func)(void*), void* arg);
+// like platform_thread_create but with an explicit stack size (bytes); use for
+// short-lived worker threads (download/decode) that need only a small stack
+void* platform_thread_create_stk(void (*func)(void*), void* arg, uint32_t stack_bytes);
+
+// chunked HTTP GET: cb is called once per received block; return false from cb
+// to abort the download early. Returns true when the response was fully read
+// and delivered through cb. Lets the caller stream bytes straight into a parser
+// instead of buffering the whole page.
+bool platform_http_stream(const char* url, void* ctx,
+                          bool (*cb)(void* ctx, const uint8_t* data, uint32_t len));
 void  platform_thread_sleep(uint32_t ms);
 
 // ===================== audio (host) =====================

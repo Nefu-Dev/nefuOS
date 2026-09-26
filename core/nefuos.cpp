@@ -11,6 +11,7 @@
 #include "sys/power.h"
 #include "net/net.h"
 #include "sys/sha256.h"
+#include "ime/pinyin.h"
 
 namespace nefu {
 
@@ -19,6 +20,8 @@ static bool s_booted = false;
 static uint32_t s_boot_start = 0;
 static bool s_net_selftest_done = false;
 static int s_mx = -8, s_my = -8;
+// modifier key state: bit0=Shift bit1=Ctrl bit2=Alt (fed into KeyEvent.mods)
+static uint8_t s_mods = 0;
 // ---- lock screen (UEFI password gate) state ----
 static bool s_locked = true;        // desktop starts behind the lock screen
 static char s_lock_pwd[65] = "";
@@ -196,6 +199,7 @@ void nefuos_init() {
     // the whole path into a single name (e.g. "_usr_downloads_page_...")
     g_vfs->cleanup_stray_nodes();
     settings_load();
+    ime::init();
     apps_preinstall_defaults();   // ship store apps pre-installed
     store_load();
     g_wm = new WM();
@@ -273,6 +277,11 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
 
 void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     if (!s_inited || !s_booted) return;
+    // Track modifier keys (both down and up); they are consumed here and never
+    // become normal key events. This is what powers Shift+/Ctrl+ shortcuts.
+    if (keycode == KEY_SHIFT) { if (down) s_mods |= 0x01; else s_mods &= ~0x01; return; }
+    if (keycode == KEY_CTRL)  { if (down) s_mods |= 0x02; else s_mods &= ~0x02; return; }
+    if (keycode == KEY_ALT)   { if (down) s_mods |= 0x04; else s_mods &= ~0x04; return; }
     if (!down) return;
     s_last_activity = platform_tick_ms();
     if (s_setup) {
@@ -308,17 +317,42 @@ void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
         }
         return;
     }
-    if (desktop_handle_key(keycode, ascii)) return;
+    // ---- built-in Pinyin IME (Chinese input): intercept keys while enabled ----
+    {
+        char ime_out[16];
+        if (ime::handle_key(keycode, ascii, s_mods, ime_out, sizeof(ime_out))) {
+            if (ime_out[0]) {
+                // Commit: deliver as a UTF-8 key event (LVGL textarea first,
+                // then the focused classic window such as the editor/terminal).
+                if (!desktop_handle_key(KEY_NONE, 0, s_mods, ime_out)) {
+                    KeyEvent e;
+                    e.keycode = KEY_NONE;
+                    e.ascii = 0;
+                    e.down = true;
+                    e.mods = s_mods;
+                    for (int i = 0; i < 8; i++) e.utf8[i] = ime_out[i] ? ime_out[i] : 0;
+                    g_wm->handle_key(&e);
+                }
+            }
+            return;
+        }
+    }
+    if (desktop_handle_key(keycode, ascii, s_mods, utf8)) return;
     KeyEvent e;
     e.keycode = keycode;
     e.ascii = ascii;
     e.down = true;
+    e.mods = s_mods;
     for (int i = 0; i < 8; i++) e.utf8[i] = (utf8 && utf8[i]) ? utf8[i] : 0;
     g_wm->handle_key(&e);
 }
 
 void nefuos_handle_scroll(int delta) {
     if (!s_inited || !s_booted) return;
+    if (s_locked) return;   // lock screen consumes nothing
+    // LVGL objects under the cursor (store list, start menu) scroll first;
+    // classic WM windows keep their own scroll_y handling.
+    if (desktop_handle_scroll(delta)) return;
     g_wm->handle_scroll(delta);
 }
 
@@ -392,6 +426,7 @@ void nefuos_frame() {
         desktop_paint(fb);
         g_wm->paint_all(fb);
         g_wm->cleanup();
+        ime::paint(fb);
     }
     // software cursor only on bare metal (no OS cursor there). On the Win32
     // host the real system cursor is used, so painting one here would leave

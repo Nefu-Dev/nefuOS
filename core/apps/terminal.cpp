@@ -1157,7 +1157,7 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, "  document.write, len, int arithmetic and string concat");
         } else {
             char out[512];
-            int rc = mini_js_run(argv[1], out, sizeof(out));
+            int rc = mini_js_run(argv[1], out, sizeof(out), 0, 0);
             if (rc) term_print(t, "js: error (syntax or undefined variable)");
             else if (out[0]) term_print(t, out);
         }
@@ -1577,7 +1577,7 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "dmesg") == 0) {
         term_print(t, "[    0.000000] nefuOS kernel v3.0");
         term_print(t, "[    0.000000] Multiboot2 bootloader detected");
-        term_print(t, "[    0.001000] Memory: 64MB available");
+        term_print(t, "[    0.001000] Memory: 4096MB available");
         term_print(t, "[    0.002000] Framebuffer: 800x600x32");
         term_print(t, "[    0.003000] PS/2 keyboard/mouse initialized");
         term_print(t, "[    0.004000] VFS mounted");
@@ -1760,7 +1760,7 @@ static void term_paint(Window* w) {
     if (t->cursor > 0) {
         String head = t->input.substr(0, t->cursor);
         gfx::text(s, px, py, head.c_str(), TERM_FG, TERM_BG);
-        px += t->cursor * 8;
+        px += gfx::text_width(head.c_str());
     }
     if (t->cursor < t->input.len()) {
         gfx::text(s, px, py, t->input.c_str() + t->cursor, TERM_FG, TERM_BG);
@@ -1773,6 +1773,55 @@ static void term_paint(Window* w) {
 static void term_key(Window* w, const KeyEvent* e) {
     TermState* t = (TermState*)w->userdata;
     if (!e->down) return;
+    const bool ctrl  = (e->mods & 0x02) != 0;
+    const bool shift = (e->mods & 0x01) != 0;
+    const char c = e->ascii;
+
+    // ---- UTF-8 (IME) committed text: insert at the caret ----
+    if (e->utf8[0]) {
+        int n = (int)strlen(e->utf8);
+        String a = t->input.substr(0, t->cursor);
+        String b = t->input.substr(t->cursor, t->input.len() - t->cursor);
+        a += String(e->utf8, n);
+        a += b;
+        t->input = a;
+        t->cursor += n;
+        t->view_scroll = 0;
+        return;
+    }
+    // ---- Ctrl shortcuts ----
+    if (ctrl) {
+        if (c == 'l' || c == 'L') {          // Ctrl+L: clear screen
+            t->lines.clear();
+            return;
+        }
+        if (c == 'c' || c == 'C') {          // Ctrl+C: cancel the current line
+            t->input.clear();
+            t->cursor = 0;
+            term_add(t, "^C");
+            return;
+        }
+        if (c == 'u' || c == 'U') {          // Ctrl+U: clear the line
+            t->input.clear();
+            t->cursor = 0;
+            return;
+        }
+        if (c == 'v' || c == 'V') {          // Ctrl+V: paste clipboard
+            const char* cb = clipboard_get(0);
+            if (cb && *cb) {
+                int n = (int)strlen(cb);
+                String a = t->input.substr(0, t->cursor);
+                String b = t->input.substr(t->cursor, t->input.len() - t->cursor);
+                a += String(cb, n);
+                a += b;
+                t->input = a;
+                t->cursor += n;
+                t->view_scroll = 0;
+            }
+            return;
+        }
+        return;
+    }
     if (e->ascii >= 32 && e->ascii < 127) {
         String a = t->input.substr(0, t->cursor);
         String b = t->input.substr(t->cursor, t->input.len() - t->cursor);
@@ -1782,14 +1831,21 @@ static void term_key(Window* w, const KeyEvent* e) {
         t->cursor++;
         t->view_scroll = 0;
     } else if (e->keycode == KEY_BACKSPACE && t->cursor > 0) {
-        String a = t->input.substr(0, t->cursor - 1);
+        // delete one character, skipping UTF-8 continuation bytes
+        int nl = t->cursor - 1;
+        while (nl > 0 && ((unsigned char)t->input[nl] & 0xC0) == 0x80) nl--;
+        String a = t->input.substr(0, nl);
         String b = t->input.substr(t->cursor, t->input.len() - t->cursor);
         a += b;
         t->input = a;
+        t->cursor = nl;
+    } else if (e->keycode == KEY_LEFT && t->cursor > 0) {
         t->cursor--;
-    } else if (e->keycode == KEY_LEFT && t->cursor > 0) t->cursor--;
-    else if (e->keycode == KEY_RIGHT && t->cursor < t->input.len()) t->cursor++;
-    else if (e->keycode == KEY_HOME) t->cursor = 0;
+        while (t->cursor > 0 && ((unsigned char)t->input[t->cursor] & 0xC0) == 0x80) t->cursor--;
+    } else if (e->keycode == KEY_RIGHT && t->cursor < t->input.len()) {
+        t->cursor++;
+        while (t->cursor < t->input.len() && ((unsigned char)t->input[t->cursor] & 0xC0) == 0x80) t->cursor++;
+    } else if (e->keycode == KEY_HOME) t->cursor = 0;
     else if (e->keycode == KEY_END) t->cursor = t->input.len();
     else if (e->keycode == KEY_ENTER) {
         String prompt = prompt_str();
@@ -1803,6 +1859,7 @@ static void term_key(Window* w, const KeyEvent* e) {
         t->input.clear();
         t->cursor = 0;
     }
+    (void)shift;
 }
 
 static void term_scroll(Window* w, int delta) {

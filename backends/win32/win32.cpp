@@ -144,6 +144,11 @@ bool platform_ttf_text(const char* utf8, int px, int& out_w, int& out_h, uint8_t
     return true;
 }
 
+uint64_t browser_mem_used_bytes = 0;
+void* balloc(size_t sz) { void* q = malloc(sz ? sz : 1); if (q) browser_mem_used_bytes += sz ? sz : 8; return q; }
+void bfree(void* p) { free(p); }
+void* brealloc(void* p, size_t sz) { return realloc(p, sz); }
+
 void* kalloc(size_t sz) {
     uint32_t* h = (uint32_t*)malloc(sz + 8);
     if (!h) return 0;
@@ -175,6 +180,12 @@ void* krealloc(void* p, size_t sz) {
 void* platform_thread_create(void (*func)(void*), void* arg) {
     DWORD tid;
     HANDLE h = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)func, arg, 0, &tid);
+    return (void*)h;
+}
+
+void* platform_thread_create_stk(void (*func)(void*), void* arg, uint32_t stack_bytes) {
+    DWORD tid;
+    HANDLE h = CreateThread(0, stack_bytes, (LPTHREAD_START_ROUTINE)func, arg, 0, &tid);
     return (void*)h;
 }
 
@@ -414,16 +425,36 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {    
     for (int attempt = 0; attempt < 2; attempt++) {
         int openMode = (attempt == 0) ? INTERNET_OPEN_TYPE_DIRECT : INTERNET_OPEN_TYPE_PRECONFIG;
         HINTERNET h = InternetOpenA("nefuOS/0.2", openMode, 0, 0, 0);
-        if (!h) continue;
+        if (!h) {
+            DWORD e = GetLastError();
+            char eb[160];
+            wsprintfA(eb, "browser: wininet open err=%u url=%s", e, url);
+            platform_dbg(eb);
+            continue;
+        }
         HINTERNET u = InternetOpenUrlA(h, url, 0, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
-        if (!u) { InternetCloseHandle(h); continue; }
+        if (!u) {
+            DWORD e = GetLastError();
+            char eb[160];
+            wsprintfA(eb, "browser: wininet openurl err=%u url=%s", e, url);
+            platform_dbg(eb);
+            InternetCloseHandle(h);
+            continue;
+        }
         uint32_t cap = 65536, len = 0;
         uint8_t* buf = (uint8_t*)kalloc(cap);
         if (!buf) { InternetCloseHandle(u); InternetCloseHandle(h); return false; }
         char tmp[4096];
         DWORD rd = 0;
         for (;;) {
-            if (!InternetReadFile(u, tmp, sizeof(tmp), &rd) || rd == 0) break;
+            if (!InternetReadFile(u, tmp, sizeof(tmp), &rd)) {
+                DWORD e = GetLastError();
+                char eb[160];
+                wsprintfA(eb, "browser: readfile err=%u len=%u url=%s", e, len, url);
+                platform_dbg(eb);
+                break;
+            }
+            if (rd == 0) break;
             if (len + rd > cap) {
                 cap *= 2;
                 uint8_t* nb = (uint8_t*)kalloc(cap);
@@ -437,11 +468,42 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {    
         }
         InternetCloseHandle(u);
         InternetCloseHandle(h);
-        if (!buf || len == 0) { if (buf) kfree(buf); return false; }
+        if (!buf || len == 0) {
+            DWORD e = GetLastError();
+            char eb[160];
+            wsprintfA(eb, "browser: http_get empty len=%u err=%u url=%s", len, e, url);
+            platform_dbg(eb);
+            if (buf) kfree(buf);
+            return false;
+        }
         *out = buf;
         *out_size = len;
         return true;
         }
+    return false;
+}
+
+bool platform_http_stream(const char* url, void* ctx,
+                          bool (*cb)(void*, const uint8_t*, uint32_t)) {
+    if (!url || !cb) return false;
+    for (int attempt = 0; attempt < 2; attempt++) {
+        int openMode = (attempt == 0) ? INTERNET_OPEN_TYPE_DIRECT : INTERNET_OPEN_TYPE_PRECONFIG;
+        HINTERNET h = InternetOpenA("nefuOS/0.2", openMode, 0, 0, 0);
+        if (!h) continue;
+        HINTERNET u = InternetOpenUrlA(h, url, 0, 0, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
+        if (!u) { InternetCloseHandle(h); continue; }
+        bool ok = true;
+        char tmp[16384];
+        DWORD rd = 0;
+        for (;;) {
+            if (!InternetReadFile(u, tmp, sizeof(tmp), &rd)) { ok = false; break; }
+            if (rd == 0) break;
+            if (!cb(ctx, (const uint8_t*)tmp, rd)) { ok = false; break; }
+        }
+        InternetCloseHandle(u);
+        InternetCloseHandle(h);
+        return ok;
+    }
     return false;
 }
 
@@ -694,10 +756,12 @@ bool platform_hw_info(HwInfo* out) {
 // ---------------- entry ----------------
 static int s_auto_app = -1;
 static int s_click_x = -1, s_click_y = -1;
+static int s_click2_x = -1, s_click2_y = -1;   // second test click (after key injection)
 static const char* s_key_str = 0;
 static const char* s_url_str = 0;
 static const char* s_shot_path = 0;
 static const char* s_media_path = 0;   // --media: autoplay a real media file (video player)
+static bool s_savefs = false;          // --savefs: persist the VFS snapshot before exit
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
 static void save_bmp(const char* path) {
@@ -816,6 +880,11 @@ int main(int argc, char** argv) {
             s_click_x = atoi(argv[i + 1]);
             s_click_y = atoi(argv[i + 2]);
             }
+        if (strcmp(argv[i], "--click2") == 0 && i + 2 < argc) {
+            s_click2_x = atoi(argv[i + 1]);
+            s_click2_y = atoi(argv[i + 2]);
+            }
+        if (strcmp(argv[i], "--savefs") == 0) s_savefs = true;
         if (strcmp(argv[i], "--key") == 0 && i + 1 < argc) s_key_str = argv[i + 1];
         if (strcmp(argv[i], "--url") == 0 && i + 1 < argc) s_url_str = argv[i + 1];
         if (strcmp(argv[i], "--media") == 0 && i + 1 < argc) s_media_path = argv[i + 1];
@@ -926,11 +995,26 @@ int main(int argc, char** argv) {
                 printf("keys injected: %s\n", s_key_str);
                 s_key_str = 0;
             }
+            if (s_click2_x >= 0 && platform_tick_ms() - t0 > 3000) {
+                // optional second click (e.g. click "Save" after typing)
+                int cx = s_click2_x, cy = s_click2_y;
+                nefuos_handle_mouse(cx, cy, 0x01);
+                for (int f = 0; f < 4; f++) { nefuos_tick(); nefuos_frame(); Sleep(16); }
+                nefuos_handle_mouse(cx, cy, 0);
+                s_click2_x = -1;
+                printf("clicked2 %d,%d\n", cx, cy);
+            }
             // mirror the WM_TIMER handler: tick (window animations, media
             // frame grabs) then frame (paint)
             nefuos_tick();
             nefuos_frame(); Sleep(16);
             }
+        if (s_savefs) {
+            // Serialize the in-memory VFS into the NVFS image and persist it,
+            // so test runs can verify files created/edited inside the OS.
+            nefuos_shutdown();
+            printf("fs saved\n");
+        }
         save_bmp(s_shot_path);
         return 0;
         }

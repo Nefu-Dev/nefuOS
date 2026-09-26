@@ -11,6 +11,7 @@ struct KeyEvent {
     char ascii;
     bool down;
     char utf8[8];   // multi-byte UTF-8 for IME input (CJK etc.), empty for raw keys
+    uint8_t mods;   // bit0=Shift bit1=Ctrl bit2=Alt (for Shift+/Ctrl+ shortcuts)
 };
 
 struct Window {
@@ -59,6 +60,7 @@ public:
     void raise(Window* w);
     void toggle_maximize(Window* w);
     void toggle_fullscreen(Window* w);   // F11 fullscreen/restore (hides the title bar, fills the whole screen)
+    void cycle_focus(bool reverse);      // Ctrl+Tab / Ctrl+Shift+Tab: focus the next/previous open window
     Window* focus() { return focus_; }
     List<Window*>& windows() { return wins_; }
     Window* hit(int x, int y);

@@ -11,6 +11,11 @@ namespace nefu {
 
 // Run a small JS-like script. Output of print/alert/document.write is appended
 // to out (up to out_sz-1 bytes). Returns 0 on success, non-zero on error.
-int mini_js_run(const char* script, char* out, int out_sz);
+int mini_js_run(const char* script, char* out, int out_sz,
+                   char* html, int html_sz);
+
+// Set the browser environment visible to scripts: current URL, document title
+// and viewport size (drives window.location / window.innerWidth / navigator).
+void mini_js_set_env(const char* url, const char* title, int w, int h);
 
 } // namespace nefu

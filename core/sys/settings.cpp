@@ -88,9 +88,9 @@ void settings_load() {
         }
     }
     if (g_settings.accent < 0 || g_settings.accent > 3) g_settings.accent = 0;
-    if (g_settings.wallpaper < 0 || g_settings.wallpaper > 3) g_settings.wallpaper = 0;
-    if (g_settings.wallpaper_lock < 0 || g_settings.wallpaper_lock > 3) g_settings.wallpaper_lock = 0;
-    if (g_settings.wallpaper_boot < 0 || g_settings.wallpaper_boot > 3) g_settings.wallpaper_boot = 0;
+    if (g_settings.wallpaper < 0 || g_settings.wallpaper > 5) g_settings.wallpaper = 0;
+    if (g_settings.wallpaper_lock < 0 || g_settings.wallpaper_lock > 5) g_settings.wallpaper_lock = 0;
+    if (g_settings.wallpaper_boot < 0 || g_settings.wallpaper_boot > 5) g_settings.wallpaper_boot = 0;
     kfree(buf);
 }
 

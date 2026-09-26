@@ -2355,6 +2355,10 @@ static void email_paint(Window* w) {
     Surface& s = w->back;
     int W = w->content_w, H = w->content_h;
     mail_paint_sidebar(st, s, H);
+    // clear the whole content area (right of the sidebar) before drawing, so
+    // leftover pixels from the previous view / frame cannot overlap new text
+    gfx::fillrect(s, SW, 0, W - SW, TOOL_H, 0xECF0F1);
+    gfx::fillrect(s, SW, TOOL_H, W - SW, H - TOOL_H - STATUS_H, 0xFFFFFF);
     switch (st->view) {
         case EV_LIST:     mail_paint_list(st, s, W, H); break;
         case EV_READ:     mail_paint_read(st, s, W, H); break;

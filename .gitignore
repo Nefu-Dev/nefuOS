@@ -52,6 +52,32 @@ tools/grub*/
 # Verification screenshots (not source)
 shots/
 crash.txt
+crash_pre*.txt
+crash_test_backup.txt
 
 _p_*.py
 a/
+
+# Build/log scratch at repo root (never upload)
+/build_out*.txt
+/bare_link_*.txt
+/bare_undef_all.txt
+
+# One-off patch / test scratch scripts and outputs (never upload)
+tools/_patch_*.py
+tools/patch_*.ps1
+tools/fix_*.ps1
+tools/fix_*.py
+tools/err*.txt
+tools/*_out.txt
+tools/*_err.txt
+tools/gdb_*.txt
+tools/bisect_*
+tools/hello.*
+tools/click_win*.py
+tools/dbg_*.py
+tools/mail_verify*.ps1
+tools/mail_*.txt
+tools/evt_one.py
+tools/clean_dbg.py
+tools/imgtest.html

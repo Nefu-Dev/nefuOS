@@ -71,13 +71,15 @@ void line(Surface& s, int x0, int y0, int x1, int y1, uint32_t c) {
 void char8x16(Surface& s, int x, int y, char ch, uint32_t fg, uint32_t bg) {
     if (x + 8 < 0 || y + 16 < 0 || x >= s.width || y >= s.height) return;
     int idx = ((unsigned char)ch >= 32 && (unsigned char)ch <= 127) ? ch - 32 : 0;
+    bool nobg = (bg & 0x80000000) != 0;   // bit31 = transparent background
     for (int row = 0; row < 16; row++) {
         unsigned char b = nefu::font8x16[idx][row];
         if (y + row < 0 || y + row >= s.height) continue;
         for (int col = 0; col < 8; col++) {
             int xx = x + col;
             if (xx < 0 || xx >= s.width) continue;
-            s.setpx(xx, y + row, (b & (0x80 >> col)) ? fg : bg);
+            if (b & (0x80 >> col)) s.setpx(xx, y + row, fg);
+            else if (!nobg) s.setpx(xx, y + row, bg);
         }
     }
 }
@@ -161,10 +163,12 @@ void char16x16(Surface& s, int x, int y, uint32_t uc, uint32_t fg, uint32_t bg) 
     for (int row = 0; row < 16; row++) {
         unsigned short b = (unsigned short)((d[row * 2] << 8) | d[row * 2 + 1]);
         if (y + row < 0 || y + row >= s.height) continue;
+        bool nobg = (bg & 0x80000000) != 0;   // bit31 = transparent background
         for (int col = 0; col < 16; col++) {
             int xx = x + col;
             if (xx < 0 || xx >= s.width) continue;
-            s.setpx(xx, y + row, (b & (0x8000 >> col)) ? fg : bg);
+            if (b & (0x8000 >> col)) s.setpx(xx, y + row, fg);
+            else if (!nobg) s.setpx(xx, y + row, bg);
         }
     }
 }
