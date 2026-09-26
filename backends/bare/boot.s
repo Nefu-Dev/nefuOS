@@ -56,6 +56,8 @@ real_sel:    .word 0x0018     # code16 selector (GDT index 3 -> 0x18)
 final_flag:  .byte 0          # 1 => last chunk (unused; stub decides via cd_rem)
 cd_rem:      .word 0          # remaining 2048B CD sectors (cross-window)
 cd_loaded_s: .word 0          # CD sectors loaded into the current window (<=256)
+.org 0x15
+retry_cnt:   .byte 0          # int13 retry counter (cd_retry; reboot fallback)
 
 # ---- EDD DAP for the payload loop (in the safe zone; rewritten per call) ----
 .org 0x16
@@ -187,9 +189,17 @@ cd_resume:
     movw $0xE9, %dx
     movb $'R', %al
     outb %al, %dx
-    sti
+    # NOTE: NO sti here.  The trampoline already ran cli and IF is still 0;
+    # enabling interrupts at this point lets the PIT IRQ0 fire while DS/ES/SS
+    # still hold the stub's PM selector values (0x10 -> real-mode base 0x100),
+    # and SeaBIOS's IRQ0 handler then derails on the corrupted segment bases
+    # (observed: #UD storm, EIP=0x3).  Keeping IF=0 through the window reloads
+    # makes the ping-pong deterministic; the int13 handler masks interrupts
+    # anyway and the kernel enables its own IDT/IF later.
+    nop
     xorw %ax, %ax
     movw %ax, %ds
+    movw %ax, %es        # the stub left ES (and FS/GS) as PM flat; reset here too
     movw %ax, %ss
     movw $0x7C00, %sp
     movw $0x2000, cdap1_seg + 0x7C00
@@ -197,9 +207,33 @@ cd_resume:
     movw $0, cd_loaded_s + 0x7C00
     jmp cd_loop
 cd_retry:
+    # a window's int13 failed.  SeaBIOS's AH=42 handler can leave the segment
+    # registers / DAP in a stale state (observed: DS/ES = 0x10 with real-mode
+    # base 0x100, DAP seg reverted to the previous window's 0xA000, and the CPU
+    # chasing the IVT after a derailed return).  Re-establish the FULL real-mode
+    # environment + a clean DAP on every retry, and hand up to 12 retries before
+    # warm-rebooting via int 0x19 (self-healing on a wedged CD stack).
+    incb retry_cnt + 0x7C00
+    cmpb $12, retry_cnt + 0x7C00
+    ja  reboot_now
+    movw $0xE9, %dx
+    movb $'k', %al       # probe k: a window int13 retry (count in retry_cnt)
+    outb %al, %dx
+    xorw %ax, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %ss
+    movw $0x7C00, %sp
+    movw $0x2000, cdap1_seg + 0x7C00
+    movw $0, cdap1_off + 0x7C00
+    movw $0, cd_loaded_s + 0x7C00
     xorw %ax, %ax
     int $0x13
     jmp cd_loop
+reboot_now:
+    int $0x19            # warm reboot (SeaBIOS boot); if it returns, halt
+    cli
+    hlt
 
 # ---- EDD DAP for the payload loop (rewritten per call; clear of clobber).
 # menu.s uses the separate menu_dap below, so these initializers survive.

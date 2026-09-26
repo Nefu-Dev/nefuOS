@@ -9,7 +9,7 @@
 # page table layout:
 #   0x9000  PML4    0xA000  PDPT
 #   0xB000  PD0     0xD000  PD1     0xF000  PD2     0x11000 PD3
-# GDT64 at 0x8F00; stack at 0x1F000; heap starts at 0x400000
+# GDT64 at 0x8F00; stack at 0x900000; heap (arena) starts at 0x920000
 .section .text
 .code32
 
@@ -285,11 +285,30 @@ common_init:
     movw %ax, %ss
     movw %ax, %fs
     movw %ax, %gs
-    movq $0x1F000, %rsp
+    movq $0x900000, %rsp
     # debugcon probe: 'L' = long mode entered
     movw $0xE9, %dx
     movb $'L', %al
     outb %al, %dx
+    # ---- enable SSE + x87: the QuickJS engine and bare_libc libm need them.
+    # CR0.EM/TS must be clear and MP set; CR4.OSFXSR|OSXMMEXCPT expose SSE1/2.
+    # (The kernel image must stay below 0x620000 (staging base) -- enforced by
+    #  the build's memmap check.  Stub staging runs at 0x620000+ while the
+    #  kernel is being inflated, then the kernel runs with its stack at
+    #  0x900000 and the kalloc arena growing up from 0x920000.)
+    # In long mode mov to/from CR0/CR4 only accepts 64-bit operands.
+    movq %cr0, %rax
+    andq $~0xC, %rax           # clear EM(2) | TS(3)
+    orq $0x2, %rax             # set MP(1)
+    movq %rax, %cr0
+    movq %cr4, %rax
+    orq $0x600, %rax           # OSFXSR(9) | OSXMMEXCPT(10)
+    movq %rax, %cr4
+    fninit
+    subq $16, %rsp
+    movl $0x1F80, (%rsp)       # MXCSR: RN, no FTZ/DAZ, no exception masks changed
+    ldmxcsr (%rsp)
+    addq $16, %rsp
     # ---- clear .bss (kernel.bin carries no zero padding) ----
     # Read bss_start/bss_size from kernel_boot_params (in-kernel, shared by
     # both boot paths), patched at build time from the PE section table.  The
