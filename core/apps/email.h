@@ -133,6 +133,14 @@ struct EmailState {
     // account editor
     int  acc_field;
     char acc_buf[9][128];       // 0..7 network fields, 8 = signature
+    // local account registration (username + password + human check)
+    bool  reg_active;
+    int   reg_field;            // 0=username 1=password 2=confirm 3=captcha answer
+    char  reg_user[48];
+    char  reg_pwd1[48];
+    char  reg_pwd2[48];
+    char  reg_cap[16];
+    int   reg_cap_a, reg_cap_b; // human check: a + b = ?
     // read view
     bool view_source;           // show raw header/source instead of body
     // status
@@ -158,6 +166,10 @@ struct EmailState {
         search[0] = 0;
         search_focus = false;
         acc_field = 0;
+        reg_active = false;
+        reg_field = 0;
+        reg_user[0] = reg_pwd1[0] = reg_pwd2[0] = reg_cap[0] = 0;
+        reg_cap_a = reg_cap_b = 0;
         status[0] = 0;
         net_up = false;
         dirty = false;
@@ -742,70 +754,94 @@ static int mail_line(const char*& p, const char* end, char* out, int max) {
     return n;
 }
 
+// parse one mailbox file into a folder (append-only; caller resets counts).
+// With dedup=true, messages already present (same Message-ID or subject+from)
+// are skipped - used by the local-mail pickup.
+static void mail_parse_into(EmailState* st, const char* path, int folder,
+                            int* added, bool dedup) {
+    FSNode* fn = g_vfs ? g_vfs->resolve(path) : 0;
+    if (!fn || fn->is_dir || fn->size == 0) return;
+    const char* p = (const char*)fn->data;
+    const char* end = p + fn->size;
+    EmailFolder& fo = st->folders[folder];
+    char line[512];
+    while (p < end && fo.msg_count < MAX_MSGS) {
+        if (mail_line(p, end, line, sizeof(line)) <= 0) break;
+        if (strcmp(line, "M") != 0) continue;
+        EmailMessage m;
+        memset(&m, 0, sizeof(m));
+        m.read = false;
+        m.starred = false;
+        int bodylen = 0;
+        while (p < end) {
+            if (mail_line(p, end, line, sizeof(line)) <= 0) break;
+            if (strcmp(line, "E") == 0) break;
+            if (strncmp(line, "F=", 2) == 0) strncpy(m.from, line + 2, sizeof(m.from) - 1);
+            else if (strncmp(line, "T=", 2) == 0) strncpy(m.to, line + 2, sizeof(m.to) - 1);
+            else if (strncmp(line, "C=", 2) == 0) strncpy(m.cc, line + 2, sizeof(m.cc) - 1);
+            else if (strncmp(line, "S=", 2) == 0) strncpy(m.subject, line + 2, sizeof(m.subject) - 1);
+            else if (strncmp(line, "D=", 2) == 0) strncpy(m.date, line + 2, sizeof(m.date) - 1);
+            else if (strcmp(line, "R=1") == 0) m.read = true;
+            else if (strcmp(line, "K=1") == 0) m.starred = true;
+            else if (strncmp(line, "I=", 2) == 0 && line[2] != '-') strncpy(m.msgid, line + 2, sizeof(m.msgid) - 1);
+            else if (strcmp(line, "H=1") == 0) m.has_html = true;
+            else if (strncmp(line, "G=", 2) == 0) m.att_cnt = atoi(line + 2);
+            else if (strncmp(line, "A=", 2) == 0 && m.att_cnt > 0) {
+                int slot = m.att_cnt - 1;
+                if (slot >= 0 && slot < MAX_ATT) {
+                    char* t1 = strchr(line + 2, '\t');
+                    char* t2 = t1 ? strchr(t1 + 1, '\t') : 0;
+                    char* t3 = t2 ? strchr(t2 + 1, '\t') : 0;
+                    if (t1) { *t1 = 0; strncpy(m.att[slot].name, line + 2, sizeof(m.att[slot].name) - 1); }
+                    if (t2) { *t2 = 0; strncpy(m.att[slot].path, t1 + 1, sizeof(m.att[slot].path) - 1); }
+                    if (t3) { *t3 = 0; strncpy(m.att[slot].type, t2 + 1, sizeof(m.att[slot].type) - 1); m.att[slot].size = atoi(t3 + 1); }
+                }
+            }
+            else if (strncmp(line, "B=", 2) == 0) { bodylen = atoi(line + 2); break; }
+        }
+        if (bodylen > 0) {
+            if (bodylen > (int)sizeof(m.body) - 1) bodylen = (int)sizeof(m.body) - 1;
+            int got = 0;
+            while (p < end && got < bodylen) m.body[got++] = *p++;
+            // skip the "\nE" trailer
+            while (p < end && *p != '\n') p++;
+            if (p < end) p++;
+            m.body[got] = 0;
+        }
+        if (dedup) {
+            bool dup = false;
+            for (int i = 0; i < fo.msg_count; i++) {
+                if (m.msgid[0] && fo.messages[i].msgid[0]) {
+                    if (strcmp(fo.messages[i].msgid, m.msgid) == 0) { dup = true; break; }
+                } else if (strcmp(fo.messages[i].subject, m.subject) == 0 &&
+                           strcmp(fo.messages[i].from, m.from) == 0) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (dup) continue;
+        }
+        fo.messages[fo.msg_count++] = m;
+        // strncpy does not NUL-terminate when the source fills the buffer
+        fo.messages[fo.msg_count - 1].from[sizeof(EmailMessage::from) - 1] = 0;
+        fo.messages[fo.msg_count - 1].to[sizeof(EmailMessage::to) - 1] = 0;
+        fo.messages[fo.msg_count - 1].cc[sizeof(EmailMessage::cc) - 1] = 0;
+        fo.messages[fo.msg_count - 1].subject[sizeof(EmailMessage::subject) - 1] = 0;
+        fo.messages[fo.msg_count - 1].date[sizeof(EmailMessage::date) - 1] = 0;
+        if (!m.read) fo.unread_count++;
+        if (added) (*added)++;
+    }
+}
+
 static void mail_load(EmailState* st) {
     if (!g_vfs) return;
     for (int f = 0; f < EF_COUNT; f++) {
         if (f == EF_STARRED) continue;
         FSNode* fn = g_vfs->resolve(mail_path(f));
         if (!fn || fn->is_dir || fn->size == 0) continue;
-        const char* p = (const char*)fn->data;
-        const char* end = p + fn->size;
-        EmailFolder& fo = st->folders[f];
-        fo.msg_count = 0;
-        fo.unread_count = 0;
-        char line[512];
-        while (p < end && fo.msg_count < MAX_MSGS) {
-            if (mail_line(p, end, line, sizeof(line)) <= 0) break;
-            if (strcmp(line, "M") != 0) continue;
-            EmailMessage m;
-            memset(&m, 0, sizeof(m));
-            m.read = false;
-            m.starred = false;
-            int bodylen = 0;
-            while (p < end) {
-                if (mail_line(p, end, line, sizeof(line)) <= 0) break;
-                if (strcmp(line, "E") == 0) break;
-                if (strncmp(line, "F=", 2) == 0) strncpy(m.from, line + 2, sizeof(m.from) - 1);
-                else if (strncmp(line, "T=", 2) == 0) strncpy(m.to, line + 2, sizeof(m.to) - 1);
-                else if (strncmp(line, "C=", 2) == 0) strncpy(m.cc, line + 2, sizeof(m.cc) - 1);
-                else if (strncmp(line, "S=", 2) == 0) strncpy(m.subject, line + 2, sizeof(m.subject) - 1);
-                else if (strncmp(line, "D=", 2) == 0) strncpy(m.date, line + 2, sizeof(m.date) - 1);
-                else if (strcmp(line, "R=1") == 0) m.read = true;
-                else if (strcmp(line, "K=1") == 0) m.starred = true;
-                else if (strncmp(line, "I=", 2) == 0 && line[2] != '-') strncpy(m.msgid, line + 2, sizeof(m.msgid) - 1);
-                else if (strcmp(line, "H=1") == 0) m.has_html = true;
-                else if (strncmp(line, "G=", 2) == 0) m.att_cnt = atoi(line + 2);
-                else if (strncmp(line, "A=", 2) == 0 && m.att_cnt > 0) {
-                    int slot = m.att_cnt - 1;
-                    if (slot >= 0 && slot < MAX_ATT) {
-                        char* t1 = strchr(line + 2, '\t');
-                        char* t2 = t1 ? strchr(t1 + 1, '\t') : 0;
-                        char* t3 = t2 ? strchr(t2 + 1, '\t') : 0;
-                        if (t1) { *t1 = 0; strncpy(m.att[slot].name, line + 2, sizeof(m.att[slot].name) - 1); }
-                        if (t2) { *t2 = 0; strncpy(m.att[slot].path, t1 + 1, sizeof(m.att[slot].path) - 1); }
-                        if (t3) { *t3 = 0; strncpy(m.att[slot].type, t2 + 1, sizeof(m.att[slot].type) - 1); m.att[slot].size = atoi(t3 + 1); }
-                    }
-                }
-                else if (strncmp(line, "B=", 2) == 0) { bodylen = atoi(line + 2); break; }
-            }
-            if (bodylen > 0) {
-                if (bodylen > (int)sizeof(m.body) - 1) bodylen = (int)sizeof(m.body) - 1;
-                int got = 0;
-                while (p < end && got < bodylen) m.body[got++] = *p++;
-                // skip the "\nE" trailer
-                while (p < end && *p != '\n') p++;
-                if (p < end) p++;
-                m.body[got] = 0;
-            }
-            fo.messages[fo.msg_count++] = m;
-            // strncpy does not NUL-terminate when the source fills the buffer
-            fo.messages[fo.msg_count - 1].from[sizeof(EmailMessage::from) - 1] = 0;
-            fo.messages[fo.msg_count - 1].to[sizeof(EmailMessage::to) - 1] = 0;
-            fo.messages[fo.msg_count - 1].cc[sizeof(EmailMessage::cc) - 1] = 0;
-            fo.messages[fo.msg_count - 1].subject[sizeof(EmailMessage::subject) - 1] = 0;
-            fo.messages[fo.msg_count - 1].date[sizeof(EmailMessage::date) - 1] = 0;
-            if (!m.read) fo.unread_count++;
-        }
+        st->folders[f].msg_count = 0;
+        st->folders[f].unread_count = 0;
+        mail_parse_into(st, mail_path(f), f, 0, false);
     }
     // account
     FSNode* af = g_vfs->resolve("/home/user/Mail/account.conf");
@@ -1878,6 +1914,90 @@ static bool mail_smtp_send(EmailState* st, char* err, int errsz) {
 
 #endif // host build
 
+// ============================== local mailbox (no SMTP needed) ==============================
+
+static bool mail_addr_is_local(const char* addr) {
+    const char* at = addr ? strrchr(addr, '@') : 0;
+    return at && strcmp(at + 1, "nefuos.dev") == 0;
+}
+
+static bool mail_has_local_rcpt(EmailState* st) {
+    const char* groups[3] = { st->comp_to, st->comp_cc, st->comp_bcc };
+    for (int g = 0; g < 3; g++) {
+        const char* gs = groups[g];
+        while (gs && *gs) {
+            while (*gs == ' ' || *gs == ',') gs++;
+            if (!*gs) break;
+            const char* e = gs;
+            while (*e && *e != ',') e++;
+            char one[160];
+            int n = (int)(e - gs);
+            if (n > 159) n = 159;
+            memcpy(one, gs, (size_t)n);
+            one[n] = 0;
+            char only[96];
+            mail_addr_only(one, only, sizeof(only));
+            if (mail_addr_is_local(only)) return true;
+            gs = *e ? e + 1 : e;
+        }
+    }
+    return false;
+}
+
+static void mail_make_msgid(char* out, int sz) {
+    uint32_t t = platform_tick_ms();
+    uint32_t r = t * 1664525u + 1013904223u;
+    r = (r ^ (r >> 16)) * 0x45D9F3Bu;
+    ksprintf(out, (size_t)sz, "<%08x.%08x@nefuos.dev>", t, r);
+}
+
+// local delivery: append the composed message to /home/user/Mail/local.mail
+// so a later Refresh delivers it into the Inbox. Only local-domain
+// recipients (@nefuos.dev) are routed this way.
+static void mail_local_deliver(EmailState* st) {
+    if (!g_vfs || !mail_has_local_rcpt(st)) return;
+    g_vfs->mkdir("/home/user/Mail");
+    String out;
+    out += "M\n";
+    out += "F="; out += st->acct.email[0] ? st->acct.email : "user@nefuos.dev"; out += "\n";
+    out += "T="; out += st->comp_to; out += "\n";
+    out += "C="; out += st->comp_cc; out += "\n";
+    out += "S="; out += st->comp_subject; out += "\n";
+    char d[40];
+    mail_now(d, sizeof(d));
+    out += "D="; out += d; out += "\n";
+    char mid[96];
+    mail_make_msgid(mid, sizeof(mid));
+    out += "I="; out += mid; out += "\n";
+    char nb[16];
+    ksprintf(nb, sizeof(nb), "%d", (int)strlen(st->comp_body));
+    out += "B="; out += nb; out += "\n";
+    out += st->comp_body; out += "\nE\n";
+    const char* lp = "/home/user/Mail/local.mail";
+    FSNode* fn = g_vfs->resolve(lp);
+    String all;
+    if (fn && !fn->is_dir && fn->size > 0) {
+        String old((const char*)fn->data, (int)fn->size);
+        all += old;
+    }
+    all += out;
+    if (!fn) fn = g_vfs->create_file(lp);
+    if (fn) g_vfs->write_file(fn, (const uint8_t*)all.c_str(), (uint32_t)all.len());
+}
+
+// pickup: move locally delivered mail into the Inbox (dedup) and clear the queue
+static int mail_local_pickup(EmailState* st) {
+    if (!g_vfs) return 0;
+    const char* lp = "/home/user/Mail/local.mail";
+    FSNode* fn = g_vfs->resolve(lp);
+    if (!fn || fn->is_dir || fn->size == 0) return 0;
+    int added = 0;
+    mail_parse_into(st, lp, EF_INBOX, &added, true);
+    if (added > 0) mail_rebuild_star(st);
+    g_vfs->write_file(fn, (const uint8_t*)"", 0);
+    return added;
+}
+
 // ============================== send / refresh entry points ==============================
 
 static void mail_net_status(EmailState* st) {
@@ -1891,20 +2011,15 @@ static void mail_net_status(EmailState* st) {
 
 static void mail_send_current(EmailState* st) {
     if (!st->comp_to[0]) { strcpy(st->status, "Add a recipient first"); return; }
+    char smtp_err[96];
+    smtp_err[0] = 0;
+    bool smtp_ok = false;
 #if defined(_WIN32) && !defined(NEFU_BARE)
-    char err[96];
-    err[0] = 0;
-    if (st->acct.configured) {
-        if (!mail_smtp_send(st, err, sizeof(err))) {
-            strncpy(st->status, err, sizeof(st->status) - 1);
-            return;
-        }
-        strcpy(st->status, "Sent via SMTP");
-    } else {
-        strcpy(st->status, "No SMTP account - saved to Sent locally");
+    // live SMTP only when an external server is actually configured;
+    // local accounts (username@nefuos.dev) deliver via the local mailbox.
+    if (st->acct.configured && st->acct.smtp_host[0]) {
+        if (mail_smtp_send(st, smtp_err, sizeof(smtp_err))) smtp_ok = true;
     }
-#else
-    strcpy(st->status, "Bare build: live SMTP unavailable - saved to Sent");
 #endif
     EmailFolder& sn = st->folders[EF_SENT];
     if (sn.msg_count < MAX_MSGS) {
@@ -1937,6 +2052,18 @@ static void mail_send_current(EmailState* st) {
     }
     if (st->comp_draft_slot >= 0 && st->comp_draft_slot < st->folders[EF_DRAFTS].msg_count)
         mail_remove_msg(st, EF_DRAFTS, st->comp_draft_slot);
+    // dependable local delivery: the message always lands in Sent, and
+    // local-domain recipients get it via local.mail on the next Refresh.
+    mail_local_deliver(st);
+    if (smtp_ok) {
+        strcpy(st->status, "Sent via SMTP");
+    } else if (smtp_err[0]) {
+        char sb[192];
+        ksprintf(sb, sizeof(sb), "%s - saved to Sent (local)", smtp_err);
+        strcpy(st->status, sb);
+    } else {
+        strcpy(st->status, "Delivered to local mail (no SMTP server needed)");
+    }
     compose_start(st, true);
     st->view = EV_LIST;
     st->cur_folder = EF_SENT;
@@ -1949,21 +2076,37 @@ static void mail_send_current(EmailState* st) {
 }
 
 static void mail_refresh(EmailState* st) {
+    char msg[160];
+    msg[0] = 0;
+    int total = 0;
 #if defined(_WIN32) && !defined(NEFU_BARE)
     if (st->acct.configured && st->acct.pop_host[0]) {
         char err[96];
         int n = mail_pop3_fetch(st, err, sizeof(err));
         if (n >= 0) {
-            char buf[64];
-            ksprintf(buf, sizeof(buf), "POP3: %d new message(s)", n);
-            strcpy(st->status, buf);
-            mail_rebuild_star(st);
-            mail_save(st);
-        } else strncpy(st->status, err, sizeof(st->status) - 1);
-    } else strcpy(st->status, "No POP3 account - configure one in Account");
-#else
-    strcpy(st->status, "POP3 live receive is host-build only");
+            total += n;
+            ksprintf(msg, sizeof(msg), "POP3: %d new", n);
+        } else strncpy(msg, err, sizeof(msg) - 1);
+    }
 #endif
+    // locally delivered mail needs no network: pick it up on every Refresh
+    int ln = mail_local_pickup(st);
+    if (ln > 0) {
+        total += ln;
+        if (msg[0]) {
+            char b[192];
+            ksprintf(b, sizeof(b), "%s, %d local", msg, ln);
+            strcpy(msg, b);
+        } else {
+            ksprintf(msg, sizeof(msg), "Local: %d new message(s)", ln);
+        }
+    }
+    if (!msg[0]) strcpy(msg, "No new mail");
+    strcpy(st->status, msg);
+    if (total > 0) {
+        mail_rebuild_star(st);
+        mail_save(st);
+    }
 }
 
 // ============================== painting ==============================
@@ -2313,6 +2456,63 @@ static void mail_paint_compose(EmailState* st, Surface& s, int W, int H) {
     if (st->picker_open) mail_paint_picker(st, s, W, H);
 }
 
+// ============================== local account registration ==============================
+
+static void mail_captcha_new(EmailState* st) {
+    uint32_t r = platform_tick_ms() * 2654435761u + 1013904223u;
+    st->reg_cap_a = (int)((r >> 8) % 10);
+    r = r * 1664525u + 1013904223u;
+    st->reg_cap_b = (int)((r >> 8) % 10);
+    st->reg_cap[0] = 0;
+}
+
+static char* mail_reg_buf(EmailState* st) {
+    if (st->reg_field == 0) return st->reg_user;
+    if (st->reg_field == 1) return st->reg_pwd1;
+    if (st->reg_field == 2) return st->reg_pwd2;
+    return st->reg_cap;
+}
+
+static int mail_reg_buf_cap(EmailState* st) {
+    return st->reg_field == 3 ? (int)sizeof(st->reg_cap) : (int)sizeof(st->reg_user);
+}
+
+static void mail_register_try(EmailState* st) {
+    // trim the username
+    int un = (int)strlen(st->reg_user);
+    while (un > 0 && (st->reg_user[un - 1] == ' ' || st->reg_user[un - 1] == '\t')) st->reg_user[--un] = 0;
+    bool bad_user = un == 0 || strchr(st->reg_user, '@') != 0 || strchr(st->reg_user, ' ') != 0;
+    bool bad_pwd = (int)strlen(st->reg_pwd1) < 4;
+    bool bad_confirm = strcmp(st->reg_pwd1, st->reg_pwd2) != 0;
+    bool bad_cap = atoi(st->reg_cap) != st->reg_cap_a + st->reg_cap_b;
+    if (bad_user) strcpy(st->status, "Username must be non-empty and contain no @ or spaces");
+    else if (bad_pwd) strcpy(st->status, "Password needs at least 4 characters");
+    else if (bad_confirm) strcpy(st->status, "Passwords do not match");
+    else if (bad_cap) strcpy(st->status, "Human check failed - try again");
+    if (bad_user || bad_pwd || bad_confirm || bad_cap) {
+        mail_captcha_new(st);
+        return;
+    }
+    EmailAccount& a = st->acct;
+    bool had_external = a.email[0] && !mail_addr_is_local(a.email);
+    strncpy(a.display, st->reg_user, sizeof(a.display) - 1);
+    ksprintf(a.email, sizeof(a.email), "%s@nefuos.dev", st->reg_user);
+    strncpy(a.username, st->reg_user, sizeof(a.username) - 1);
+    strncpy(a.password, st->reg_pwd1, sizeof(a.password) - 1);
+    a.configured = true;
+    // a local mailbox needs no external server
+    a.smtp_host[0] = 0;
+    a.pop_host[0] = 0;
+    st->reg_active = false;
+    mail_save(st);
+    st->view = EV_LIST;
+    st->cur_folder = EF_INBOX;
+    mail_build_view(st);
+    strcpy(st->status, had_external
+           ? "Registered - replaced the previous external account"
+           : "Registered - local mailbox ready (no SMTP needed)");
+}
+
 static const char* ACC_LABELS[9] = {
     "Display name", "Email address", "SMTP server", "SMTP port",
     "POP3 server", "POP3 port", "Username", "Password", "Signature"
@@ -2324,8 +2524,35 @@ static void mail_paint_account(EmailState* st, Surface& s, int W) {
     mail_btn(s, x, 5, 62, 22, "Save", 0x27AE60); x += 68;
     mail_btn(s, x, 5, 62, 22, "Back", 0x95A5A6); x += 68;
     mail_btn(s, x, 5, 108, 22, "Test Conn", 0x8E44AD);
+    x += 114;
+    mail_btn(s, x, 5, 66, 22, "Register", 0x8E44AD);
     gfx::text(s, W - gfx::text_width("Account") - 10, 9, "Account", 0x2C3E50, 0xECF0F1);
     int y = 44;
+    if (st->reg_active) {
+        // the registration panel replaces the network-field editor
+        gfx::fillrect(s, SW + 6, 38, W - SW - 12, 22, 0x8E44AD);
+        gfx::text(s, SW + 12, 41, "Register a local mailbox account", 0xFFFFFF, 0x8E44AD);
+        int ry = 68;
+        char capq[64];
+        ksprintf(capq, sizeof(capq), "Human check: %d+%d = ?", st->reg_cap_a, st->reg_cap_b);
+        const char* rl[4] = { "Username", "Password", "Confirm", capq };
+        for (int i = 0; i < 4; i++) {
+            gfx::text(s, SW + 12, ry + 5, rl[i], 0x34495E, 0xFFFFFF);
+            char* buf = i == 0 ? st->reg_user : i == 1 ? st->reg_pwd1 : i == 2 ? st->reg_pwd2 : st->reg_cap;
+            bool mask = i == 1 || i == 2;
+            mail_draw_input(s, SW + 150, ry, W - SW - 150 - 12, 24,
+                            mask && st->reg_field != i ? "********" : buf,
+                            mask && st->reg_field != i ? 0 : (int)strlen(buf),
+                            st->reg_field == i, mask);
+            ry += 30;
+        }
+        ry += 2;
+        mail_btn(s, SW + 6, ry, 88, 22, "Create", 0x27AE60);
+        mail_btn(s, SW + 100, ry, 66, 22, "Cancel", 0x95A5A6);
+        gfx::text(s, SW + 12, ry + 28, "Creates username@nefuos.dev - a local mailbox that needs", 0x7F8C8D, 0xFFFFFF);
+        gfx::text(s, SW + 12, ry + 44, "no SMTP server. Sent mail is delivered to local recipients.", 0x7F8C8D, 0xFFFFFF);
+        return;
+    }
     for (int i = 0; i < 9; i++) {
         gfx::text(s, SW + 12, y + 5, ACC_LABELS[i], 0x34495E, 0xFFFFFF);
         bool mask = (i == 7);
@@ -2579,6 +2806,17 @@ static void email_mouse(Window* w, int mx, int my, uint8_t buttons) {
         }
         case EV_ACCOUNT: {
             int x = SW + 6;
+            if (st->reg_active) {
+                int by = 190;
+                if (mail_in(mx, my, SW + 6, by, 88, 22)) { mail_register_try(st); break; }
+                if (mail_in(mx, my, SW + 100, by, 66, 22)) { st->reg_active = false; break; }
+                int ry = 68;
+                for (int i = 0; i < 4; i++) {
+                    if (my >= ry && my < ry + 24 && mx >= SW + 150) { st->reg_field = i; break; }
+                    ry += 30;
+                }
+                break;
+            }
             if (mail_in(mx, my, x, 5, 62, 22)) {
                 // commit account
                 strncpy(st->acct.display, st->acc_buf[0], sizeof(st->acct.display) - 1);
@@ -2613,6 +2851,16 @@ static void email_mouse(Window* w, int mx, int my, uint8_t buttons) {
 #else
                 strcpy(st->status, "Live test is host-build only");
 #endif
+                break;
+            }
+            x += 114;
+            if (mail_in(mx, my, x, 5, 66, 22)) {
+                // start the local-account registration form
+                st->reg_active = true;
+                st->reg_field = 0;
+                st->reg_user[0] = st->reg_pwd1[0] = st->reg_pwd2[0] = st->reg_cap[0] = 0;
+                mail_captcha_new(st);
+                strcpy(st->status, "Create a username + password; solve the human check");
                 break;
             }
             int y = 44;
@@ -2659,6 +2907,36 @@ static void mail_buf_del(char* buf, int& cursor) {
     if (cursor >= len) return;
     int stp = mail_step(buf + cursor);
     memmove(buf + cursor, buf + cursor + stp, (size_t)(len - cursor - stp + 1));
+}
+
+// Shift+<key> -> symbol, US layout (also covers bare-kernel and simulated
+// input where the host did not already apply the shift).
+static char mail_shift_symbol(char c) {
+    switch (c) {
+        case '1': return '!'; case '2': return '@'; case '3': return '#';
+        case '4': return '$'; case '5': return '%'; case '6': return '^';
+        case '7': return '&'; case '8': return '*'; case '9': return '(';
+        case '0': return ')'; case '-': return '_'; case '=': return '+';
+        case '[': return '{'; case ']': return '}'; case ';': return ':';
+        case '\'': return '"'; case '`': return '~'; case '\\': return '|';
+        case ',': return '<'; case '.': return '>'; case '/': return '?';
+        default: return 0;
+    }
+}
+
+// insert one char honoring Shift: symbols, uppercase letters, or passthrough
+static void mail_insert_shifted(char* buf, int cap, int& cur, char c) {
+    char sc = mail_shift_symbol(c);
+    if (sc) {
+        char s2[2] = { sc, 0 };
+        mail_buf_insert(buf, cap, cur, s2);
+    } else if (c >= 'a' && c <= 'z') {
+        char s2[2] = { (char)(c - 32), 0 };
+        mail_buf_insert(buf, cap, cur, s2);
+    } else {
+        char s2[2] = { c, 0 };
+        mail_buf_insert(buf, cap, cur, s2);
+    }
 }
 
 // buffer currently being edited in the compose view
@@ -2751,12 +3029,38 @@ static void email_key(Window* w, const KeyEvent* e) {
             else if (e->keycode == KEY_RIGHT) { int len = (int)strlen(buf); if (cur < len) cur += mail_step(buf + cur); }
             else if (e->utf8[0]) mail_buf_insert(buf, (int)(st->comp_field == 4 ? sizeof(st->comp_body) : 256), cur, e->utf8);
             else if (e->ascii >= 32 && e->ascii < 127) {
-                char s2[2] = { e->ascii, 0 };
-                mail_buf_insert(buf, (int)(st->comp_field == 4 ? sizeof(st->comp_body) : 256), cur, s2);
+                if (e->mods & 1) {
+                    // Shift+2 -> '@' etc. (handles simulated / bare input too)
+                    mail_insert_shifted(buf, (int)(st->comp_field == 4 ? sizeof(st->comp_body) : 256), cur, e->ascii);
+                } else {
+                    char s2[2] = { e->ascii, 0 };
+                    mail_buf_insert(buf, (int)(st->comp_field == 4 ? sizeof(st->comp_body) : 256), cur, s2);
+                }
             }
             break;
         }
         case EV_ACCOUNT: {
+            if (st->reg_active) {
+                if (e->keycode == KEY_ESC) st->reg_active = false;
+                else if (e->keycode == KEY_TAB || e->keycode == KEY_ENTER) st->reg_field = (st->reg_field + 1) % 4;
+                else if (e->keycode == KEY_BACKSPACE) {
+                    char* rb = mail_reg_buf(st);
+                    int cur = (int)strlen(rb);
+                    mail_buf_backspace(rb, cur);
+                }
+                else if (e->utf8[0]) {
+                    char* rb = mail_reg_buf(st);
+                    int cur = (int)strlen(rb);
+                    mail_buf_insert(rb, mail_reg_buf_cap(st), cur, e->utf8);
+                }
+                else if (e->ascii >= 32 && e->ascii < 127) {
+                    char* rb = mail_reg_buf(st);
+                    int cur = (int)strlen(rb);
+                    if (e->mods & 1) mail_insert_shifted(rb, mail_reg_buf_cap(st), cur, e->ascii);
+                    else if (cur < mail_reg_buf_cap(st) - 1) { rb[cur] = e->ascii; rb[cur + 1] = 0; }
+                }
+                break;
+            }
             if (e->keycode == KEY_ESC) st->view = EV_LIST;
             else if (e->keycode == KEY_TAB || e->keycode == KEY_ENTER) st->acc_field = (st->acc_field + 1) % 9;
             else if (e->keycode == KEY_BACKSPACE) {
@@ -2769,9 +3073,12 @@ static void email_key(Window* w, const KeyEvent* e) {
             }
             else if (e->ascii >= 32 && e->ascii < 127) {
                 if ((st->acc_field == 3 || st->acc_field == 5) && (e->ascii < '0' || e->ascii > '9')) break;
-                char s2[2] = { e->ascii, 0 };
                 int cur = (int)strlen(st->acc_buf[st->acc_field]);
-                mail_buf_insert(st->acc_buf[st->acc_field], 95, cur, s2);
+                if (e->mods & 1) mail_insert_shifted(st->acc_buf[st->acc_field], 95, cur, e->ascii);
+                else {
+                    char s2[2] = { e->ascii, 0 };
+                    mail_buf_insert(st->acc_buf[st->acc_field], 95, cur, s2);
+                }
             }
             break;
         }
