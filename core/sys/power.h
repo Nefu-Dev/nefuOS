@@ -2,6 +2,7 @@
 #pragma once
 #include "../platform.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/gfx.h"   // Surface (bsod_paint)
 
 namespace nefu {
 
@@ -38,9 +39,20 @@ void autostart_run();
 // Verify password input against stored SHA256 hash
 bool verify_password(const char* input);
 
-// Detailed BSOD-style panic screen (LVGL fullscreen). Shows the error code,
-// fault address, register dump and recovery options (reboot / recovery).
-// The optional message is capped at 40 characters to keep the layout clean.
-void blue_screen(uint32_t code, const char* msg);
+// ---- BSOD-style panic screen (fullscreen framebuffer overlay) ----
+// Shown automatically on a real kernel/app fault (host: SEH crash handler).
+// It fills the whole nefuOS screen, swallows all keys and CANNOT be
+// dismissed; self-recovery runs automatically on entry and only "Reboot"
+// restarts the system. `regs` optionally carries the real register dump
+// from the faulting context (0 = synthetic values).
+struct CrashRegs {
+    uint64_t rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp, rip;
+    uint64_t eflags;
+};
+extern bool g_crash_active;          // true while the blue screen is showing
+void blue_screen(uint32_t code, const char* msg, const CrashRegs* regs = 0);
+void bsod_paint(Surface& fb);        // fullscreen overlay renderer (called from nefuos_frame)
+void bsod_handle_mouse(int x, int y, uint8_t buttons);   // Reboot / Recovery hit-test
+void system_recovery();              // rebuild standard dirs + core files (idempotent)
 
 }

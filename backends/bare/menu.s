@@ -47,6 +47,12 @@ main16:
     movw %ax, %ds           # address this stage's data at 0x10000
     call tramp_install      # PM->RM trampoline at 0x8000 (before any cd_pm)
     call detect_hd          # ax = 1 multi-boot, 0 single
+    # SeaBIOS's int13 (AH=15/AH=42, hard-disk probe above) reuses the
+    # 0x8000 BIOS work area and clobbers the PM->RM trampoline we just
+    # installed (observed: 0x8000 all-zero when an -hda drive is present,
+    # the stub then far-jumps into garbage).  Reinstall it; the installer
+    # only reads boot.s slots 0x7C0A/0x7C0E, which are stable here.
+    call tramp_install
     testw %ax, %ax
     jz  boot_nefuos         # single boot -> straight to nefuOS, no page
     movw $0x0003, %ax       # 80x25 text mode (picker page only; keep the

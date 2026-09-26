@@ -1,0 +1,137 @@
+argv: app=17 shot=- click=-1,-1
+nefuOS host backend (win32) starting...
+[BOOT] nefuOS boot preparation started...
+[BOOT] Step 0: Starting F2 BIOS key detection thread...
+[BOOT] F2 detection thread started - monitoring for F2 key...
+[BOOT] Step 1: Checking kernel integrity...
+[BOOT] Kernel integrity OK.
+[BOOT] Step 2: Initializing system components...
+[BOOT]   - Graphics subsystem
+[BOOT]   - Input subsystem
+[BOOT]   - File system
+[BOOT]   - Network stack
+[BOOT]   - Audio mixer
+[BOOT] Step 3: Checking BIOS boot keys...
+[BOOT] No special boot keys detected.
+[BOOT] Step 4: Auto-starting desktop widgets...
+[BOOT] Step 5: Running system validation...
+[BOOT]   - Memory check: OK
+[BOOT]   - Display check: OK
+[BOOT]   - Input check: OK
+[BOOT]   - Storage check: OK
+[BOOT] Step 6: Finalizing boot...
+[BOOT] Boot preparation complete! Entering desktop...
+nefuOS init
+no NVFS image found: fresh filesystem + default tree
+disk: 2 block device(s)
+  C: 0 MB fixed
+  D: 0 MB fixed
+nefuOS ready on win32
+[BOOT] F2 not detected, continuing normal boot.
+browser: js: ensure rtbrowser: js: ensure ctxbrowser: js: ensure ctxbrowser: js: ensure env donebrowser: js: pre-eval 279 bytes env=http://127.0.0.1:8123/envtest.htmlbrowser: js: pre-eval 279 bytes env=http://127.0.0.1:8123/envtest.htmlbrowser: js: post-evalbrowser: js: post-evalbrowser: js: ua=nefuOS/0.2 (host)
+platform=Win32
+lang=zh-CN
+w=1024 h=768
+url=http://127.0.0.1:8123/envtest.html
+title=env test
+loc=http://127.0.0.1:8123/envtest.html
+nh m=640,496 b=0 locked=0
+dh m=640,496 b=0
+nh m=634,464 b=0 locked=0
+dh m=634,464 b=0
+nh m=625,434 b=0 locked=0
+dh m=625,434 b=0
+nh m=617,406 b=0 locked=0
+dh m=617,406 b=0
+nh m=613,385 b=0 locked=0
+dh m=613,385 b=0
+lvgl in=613,385 st=0
+nh m=607,368 b=0 locked=0
+dh m=607,368 b=0
+nh m=602,354 b=0 locked=0
+dh m=602,354 b=0
+nh m=597,342 b=0 locked=0
+dh m=597,342 b=0
+nh m=593,332 b=0 locked=0
+dh m=593,332 b=0
+nh m=590,322 b=0 locked=0
+dh m=590,322 b=0
+nh m=587,312 b=0 locked=0
+dh m=587,312 b=0
+nh m=583,303 b=0 locked=0
+dh m=583,303 b=0
+lvgl in=583,303 st=0
+nh m=580,295 b=0 locked=0
+dh m=580,295 b=0
+nh m=576,288 b=0 locked=0
+dh m=576,288 b=0
+nh m=573,281 b=0 locked=0
+dh m=573,281 b=0
+nh m=570,276 b=0 locked=0
+dh m=570,276 b=0
+nh m=568,272 b=0 locked=0
+dh m=568,272 b=0
+nh m=566,268 b=0 locked=0
+dh m=566,268 b=0
+nh m=563,262 b=0 locked=0
+dh m=563,262 b=0
+nh m=559,253 b=0 locked=0
+dh m=559,253 b=0
+lvgl in=559,253 st=0
+lvgl in=516,202 st=0
+lvgl in=495,181 st=0
+lvgl in=495,181 st=0
+lvgl in=493,181 st=0
+lvgl in=492,181 st=0
+lvgl in=492,181 st=0
+lvgl in=492,181 st=0
+lvgl in=492,181 st=0
+lvgl in=492,181 st=0
+lvgl in=492,181 st=0
+lvgl in=492,181 st=0
+lvgl in=500,186 st=0
+lvgl in=544,224 st=0
+lvgl in=555,234 st=0
+lvgl in=605,270 st=0
+lvgl in=655,323 st=0
+lvgl in=700,396 st=0
+lvgl in=712,424 st=0
+lvgl in=722,439 st=0
+lvgl in=738,464 st=0
+lvgl in=751,494 st=0
+lvgl in=773,523 st=0
+lvgl in=781,528 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0
+lvgl in=799,524 st=0

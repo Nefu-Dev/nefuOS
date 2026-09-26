@@ -16,6 +16,7 @@
 #endif
 
 LV_FONT_DECLARE(lv_font_montserrat_16);
+LV_FONT_DECLARE(lv_font_montserrat_12);
 
 namespace nefu {
 
@@ -1034,8 +1035,10 @@ static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
     ic.label[sizeof(ic.label) - 1] = 0;
     lv_obj_t* lab = lv_label_create(card);
     lv_label_set_text(lab, ic.label);
+    lv_label_set_long_mode(lab, LV_LABEL_LONG_CLIP);
+    lv_obj_set_width(lab, ICON_W);   // clip at card width: left part stays readable
     lv_obj_set_style_text_color(lab, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(lab, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(lab, &lv_font_montserrat_12, 0);
     lv_obj_align(lab, LV_ALIGN_BOTTOM_MID, 0, -4);
     s_icon_labels[i] = lab;
     lv_obj_add_event_cb(card, on_icon_click, LV_EVENT_CLICKED, (void*)(intptr_t)i);
@@ -1267,6 +1270,10 @@ static void desktop_lvgl_init(Surface& fb) {
     build_rmenu(scr);
     lv_timer_create(on_clock_tick, 1000, NULL);
     s_initialized = true;
+    s_dirty = true;
+}
+
+void desktop_mark_dirty() {
     s_dirty = true;
 }
 
@@ -1527,8 +1534,10 @@ bool desktop_handle_key(int keycode, char ascii, uint8_t mods, const char* utf8)
         if (ctrl && keycode == KEY_TAB) { g_wm->cycle_focus(shift); return true; }         // Ctrl+Tab / Ctrl+Shift+Tab: cycle windows
         return false;   // other Ctrl/Alt combos go to the focused app (Ctrl+S, ...)
     }
-    lvgl_key_push(keycode, ascii);
-    // ESC closes an open context menu first
+    // ESC closes an open context menu first; then the system F1-F7 app
+    // shortcuts.  These MUST run before the focused-widget dispatch below:
+    // the dispatch returns early for any non-textarea focus, which would
+    // otherwise swallow every function key (F2 -> terminal etc. never worked).
     if ((s_rmenu_open || s_rmenu_desk_open) && keycode == KEY_ESC) {
         rmenu_hide_all();
         return true;
@@ -1545,6 +1554,15 @@ bool desktop_handle_key(int keycode, char ascii, uint8_t mods, const char* utf8)
     if (keycode == KEY_F5) { app_launch(APP_SETTINGS); return true; }
     if (keycode == KEY_F6) { app_launch(APP_BROWSER); return true; }
     if (keycode == KEY_F7) { app_launch(APP_VIDEOPLAYER); return true; }
+    {
+        // Feed keys into LVGL only when a textarea is focused (typing / Enter
+        // to submit). Button activation by keyboard on an empty desktop is not
+        // intended: Enter/space on a focused button could crash in the browser
+        // scene, so non-textarea focus falls through to the classic WM.
+        lv_obj_t* fo = s_kb_group ? lv_group_get_focused(s_kb_group) : 0;
+        if (fo && lv_obj_check_type(fo, &lv_textarea_class)) lvgl_key_push(keycode, ascii);
+        else return false;
+    }
     return false;
 }
 

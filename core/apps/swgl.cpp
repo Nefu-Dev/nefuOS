@@ -14,7 +14,7 @@
 #include "swgl.h"
 #ifdef SWGL_TEST_DEBUG
 #include <cstdio>
-#define SWDBG(...) do { FILE* dbg = fopen("D:/mycppos1/nefuOS/tools/swdbg.txt", "a"); if (dbg) { fprintf(dbg, __VA_ARGS__); fclose(dbg); } } while (0)
+#define SWDBG(...) do { (void)0; } while (0)
 #else
 #define SWDBG(...) do {} while (0)
 #endif

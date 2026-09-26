@@ -52,6 +52,7 @@
 #include "../gui/wm.h"
 #include "../klib/klib.h"
 #include "../platform.h"
+#include "php2html.h"   // nfuphp::php_convert — PHP template mini-transpiler
 #include <cstring>
 #include <cstdio>
 
@@ -412,6 +413,88 @@ struct DomArena {
         nodes[p].kids.push(nodes.size() - 1);
     }
 };
+
+// serialize the parsed DOM back to HTML; used to seed the JS DOM shim so
+// scripts can find real page elements (getElementById) and the shim tree
+// matches the rendered page. Script/Style nodes are skipped (CSS/JS already
+// captured by the browser pipeline; their bodies would confuse the seed).
+static const char* tag_name_of(Tag t) {
+    switch (t) {
+        case Tag::H1: return "h1"; case Tag::H2: return "h2"; case Tag::H3: return "h3";
+        case Tag::H4: return "h4"; case Tag::H5: return "h5"; case Tag::H6: return "h6";
+        case Tag::P: return "p"; case Tag::Div: return "div"; case Tag::Span: return "span";
+        case Tag::A: return "a"; case Tag::Img: return "img"; case Tag::Ul: return "ul";
+        case Tag::Ol: return "ol"; case Tag::Li: return "li"; case Tag::Br: return "br";
+        case Tag::Hr: return "hr"; case Tag::B: return "b"; case Tag::Strong: return "strong";
+        case Tag::I: return "i"; case Tag::Em: return "em"; case Tag::Pre: return "pre";
+        case Tag::Blockquote: return "blockquote"; case Tag::Table: return "table";
+        case Tag::Tr: return "tr"; case Tag::Td: return "td"; case Tag::Th: return "th";
+        case Tag::Form: return "form"; case Tag::Button: return "button";
+        case Tag::Canvas: return "canvas";
+        default: return "";
+    }
+}
+static bool tag_is_void(Tag t) {
+    return t == Tag::Br || t == Tag::Hr || t == Tag::Img;
+}
+static void dom_html_rec(const DomArena& dom, int idx, char* out, int& n, int cap) {
+    if (n >= cap - 16) return;
+    const DomNode& nd = dom.nodes[idx];
+    if (nd.tag == Tag::Text) {
+        for (int i = 0; i < nd.text.len() && n < cap - 1; i++) out[n++] = nd.text[i];
+        return;
+    }
+    if (nd.tag == Tag::Root) {
+        for (int k = 0; k < nd.kids.size(); k++) dom_html_rec(dom, nd.kids[k], out, n, cap);
+        return;
+    }
+    if (nd.tag == Tag::Script || nd.tag == Tag::Style) return;
+    const char* nm = tag_name_of(nd.tag);
+    if (!nm[0]) return;
+    bool vd = tag_is_void(nd.tag);
+    out[n++] = '<';
+    for (const char* c = nm; *c && n < cap - 2; c++) out[n++] = *c;
+    if (nd.id[0]) {
+        const char* a = " id=\"";
+        for (const char* c = a; *c && n < cap - 2; c++) out[n++] = *c;
+        for (const char* c = nd.id; *c && n < cap - 2; c++) out[n++] = *c;
+        out[n++] = '"';
+    }
+    if (nd.cls[0]) {
+        const char* a = " class=\"";
+        for (const char* c = a; *c && n < cap - 2; c++) out[n++] = *c;
+        for (const char* c = nd.cls; *c && n < cap - 2; c++) out[n++] = *c;
+        out[n++] = '"';
+    }
+    if (nd.href.len() > 0) {
+        const char* a = " href=\"";
+        for (const char* c = a; *c && n < cap - 2; c++) out[n++] = *c;
+        for (int i = 0; i < nd.href.len() && n < cap - 2; i++) out[n++] = nd.href[i];
+        out[n++] = '"';
+    }
+    if (nd.src.len() > 0) {
+        const char* a = " src=\"";
+        for (const char* c = a; *c && n < cap - 2; c++) out[n++] = *c;
+        for (int i = 0; i < nd.src.len() && n < cap - 2; i++) out[n++] = nd.src[i];
+        out[n++] = '"';
+    }
+    if (vd) { out[n++] = '/'; }
+    out[n++] = '>';
+    if (!vd) {
+        for (int k = 0; k < nd.kids.size(); k++) dom_html_rec(dom, nd.kids[k], out, n, cap);
+        if (n < cap - 2) { out[n++] = '<'; out[n++] = '/'; }
+        for (const char* c = nm; *c && n < cap - 2; c++) out[n++] = *c;
+        if (n < cap - 1) out[n++] = '>';
+    }
+}
+static int dom_to_html(const DomArena& dom, char* out, int cap) {
+    int n = 0;
+    dom_html_rec(dom, 0, out, n, cap);
+    if (n >= cap) n = cap - 1;
+    out[n] = 0;
+    return n;
+}
+
 
 // decode HTML entities into a NUL-terminated buffer, returns decoded length
 static int decode_entities(const char* in, int inlen, char* out, int cap) {
@@ -1578,12 +1661,18 @@ static void build_error(PageLayout& out, int width, const char* url, const char*
 }
 
 // ===================== navigation & loading =====================
+struct TabState;   // fwd for LoadJob (defined below)
+
 // A LoadJob is owned by the main thread (tab.job). The worker thread only
 // fills it and sets done=1; the main thread commits, frees, and deletes it.
 // On bare metal platform_thread_create() runs the worker inline, so the job
 // is already done when start_job() returns — same code path, no #ifdef.
 struct LoadJob {
     volatile int done;   // 0 running, 1 finished
+    volatile int committed;  // 1 = main thread has committed this page
+    volatile int worker_done; // 1 = worker thread has fully exited
+    TabState* tab;
+    bool js_err;       // JS execution failed (mini engine limits / SPA bundle)
     volatile int phase;  // 0 downloading, 1 parsing
     bool ok;
     bool cancelled;
@@ -1603,6 +1692,9 @@ struct LoadJob {
     char* js_html;       // DOM shim re-sync buffer (worker alloc, main frees)
     int js_html_sz;
     char js_out[4096];   // mini_js_run console output (accumulated)
+    bool php_mode;       // page is PHP: body buffered, converted after download
+    char* php_buf;       // buffered PHP source (browser arena)
+    int php_len, php_cap;
     CSSRule css[CSS_MAX];      // parsed <style> sheet
     int css_n;
     void* parser;        // worker-local PageParser (streaming only)
@@ -1648,6 +1740,13 @@ struct TabState {
     char queued[256];    // next URL once the current job finishes
     bool has_queued;
     uint32_t load_ms;
+    // resident JS worker queue (host): quickjs state stays on the load thread
+    volatile int js_ev_pending, js_ev_done, js_ev_close;
+    char js_ev_script[512];
+    char js_ev_out[4096];
+    char* js_ev_html;
+    int js_ev_html_sz;
+    LoadJob* job_keep;   // finished load job whose worker is still resident
     Img imgs[IMG_MAX];   // per-tab image cache
     CSSRule css[CSS_MAX]; // style sheet (fixed array, copied from the job)
     int css_n;
@@ -1656,6 +1755,7 @@ struct TabState {
     int js_html_sz;
     int pending_nfu;      // JS element under a click (data-nfu index), -1 none
     bool has_pending_nfu;
+    bool js_err;
     int img_gen;          // paint generation counter (visible-image tracking)
     int img_last_used[IMG_MAX];
 
@@ -1664,7 +1764,9 @@ struct TabState {
           used(false), loaded(false), is_home(false), truncated(false),
           scroll(0), max_scroll(0), layout_w(-1), job(0), has_queued(false),
           load_ms(0), css_n(0), img_gen(0), js_html(0), js_html_sz(0),
-          pending_nfu(-1), has_pending_nfu(false) {
+          pending_nfu(-1), has_pending_nfu(false), js_err(false), js_ev_pending(0),
+          js_ev_done(0), js_ev_close(0), js_ev_html(0), js_ev_html_sz(0),
+          job_keep(0) {
         for (int i = 0; i < IMG_MAX; i++) img_last_used[i] = 0;
         input[0] = url[0] = title[0] = err[0] = queued[0] = 0;
         js_msg[0] = 0;
@@ -1677,16 +1779,19 @@ struct TabState {
         dom.erase_all();
         back.erase_all();
         fwd.erase_all();
-        if (job) {
-            job->cancelled = true;
-            // bounded wait for the worker so we can free it (host thread);
-            // on bare the load is synchronous, so it is already done.
-            for (int i = 0; i < 60 && !job->done; i++) platform_thread_sleep(5);
-            if (job->done) {
-                if (job->data) kfree(job->data);
-                if (job->dom) delete job->dom;
-                delete job;
-            }
+        LoadJob* jk = job_keep ? job_keep : job;
+        if (jk) {
+            jk->cancelled = true;
+#ifndef NEFU_BARE
+            if (jk->tab) jk->tab->js_ev_close = 1;   // let the resident worker exit
+            for (int i = 0; i < 400 && !jk->worker_done; i++) platform_thread_sleep(5);
+#else
+            for (int i = 0; i < 60 && !jk->done; i++) platform_thread_sleep(5);
+#endif
+            if (jk->data) kfree(jk->data);
+            if (jk->php_buf) bfree(jk->php_buf);
+            if (jk->dom) delete jk->dom;
+            delete jk;
         }
         clear_imgs(*this);
     }
@@ -1809,6 +1914,21 @@ static void extract_title(const char* page, int len, char* out, int cap) {
 }
 
 static void start_job(TabState& tab, const char* url, bool push_hist) {
+    if (tab.job_keep) {
+        // retire the previous page's resident JS worker (host): it must die
+        // before a new worker creates a fresh quickjs runtime on ITS thread.
+#ifndef NEFU_BARE
+        tab.job_keep->tab->js_ev_close = 1;
+        for (int i = 0; i < 400 && !tab.job_keep->worker_done; i++) platform_thread_sleep(5);
+#endif
+        if (tab.job_keep->data) kfree(tab.job_keep->data);
+        if (tab.job_keep->php_buf) bfree(tab.job_keep->php_buf);
+        if (tab.job_keep->dom) delete tab.job_keep->dom;
+        delete tab.job_keep;
+        tab.job_keep = 0;
+        // NOTE: quickjs runtime is freed by the resident worker itself on its
+        // own thread (mini_js_reset before worker_done), never cross-thread.
+    }
     if (tab.job) {
         // a load is already in flight → queue (the latest URL wins)
         tab.job->cancelled = true;
@@ -1818,6 +1938,14 @@ static void start_job(TabState& tab, const char* url, bool push_hist) {
     }
     LoadJob* j = new LoadJob();
     j->done = 0;
+    j->committed = 0;
+    j->worker_done = 0;
+    j->tab = &tab;
+    j->js_err = false;
+    j->php_mode = false;
+    j->php_buf = 0;
+    j->php_len = 0;
+    j->php_cap = 0;
     j->ok = false;
     j->cancelled = false;
     j->truncated = false;
@@ -2195,6 +2323,30 @@ static void clear_imgs(TabState& tab) {
 static bool on_http_chunk(void* ctx, const uint8_t* data, uint32_t len) {
     LoadJob* j = (LoadJob*)ctx;
     if (j->cancelled) { j->aborted = 1; return false; }
+    if (!j->php_mode && j->php_len == 0) {
+        // PHP detection: URL carries a .php path, or the very first bytes open
+        // a PHP tag. HTML pages keep the normal streaming path untouched.
+        if (strstr(j->url, ".php") ||
+            (len >= 4 && memcmp(data, "<?ph", 4) == 0) ||
+            (len >= 3 && (memcmp(data, "<?=", 3) == 0 || memcmp(data, "<? ", 3) == 0)))
+            j->php_mode = true;
+    }
+    if (j->php_mode) {
+        // buffer the whole body; the transpiler needs the complete document
+        // (PHP blocks cross chunk boundaries)
+        if (j->php_len + (int)len + 1 > j->php_cap) {
+            int ncap = j->php_cap ? j->php_cap * 2 : 65536;
+            while (ncap < j->php_len + (int)len + 1) ncap *= 2;
+            char* nb = (char*)brealloc(j->php_buf, (size_t)ncap);
+            if (!nb) { j->aborted = 1; return false; }
+            j->php_buf = nb;
+            j->php_cap = ncap;
+        }
+        memcpy(j->php_buf + j->php_len, data, (size_t)len);
+        j->php_len += (int)len;
+        j->php_buf[j->php_len] = 0;
+        return true;
+    }
     PageParser* pp = (PageParser*)j->parser;
     if (!pp) { j->aborted = 1; return false; }
     pp->feed((const char*)data, (int)len, false);
@@ -2216,7 +2368,20 @@ static void load_worker(void* arg) {
     bool ok = platform_http_stream(j->url, j, on_http_chunk);
     j->parser = 0;
     if (!j->cancelled && (ok || j->aborted)) {
-        pp.feed(0, 0, true);   // final flush of any held-back tail
+        if (j->php_mode && j->php_buf) {
+            // PHP template: run the mini transpiler, then parse the emitted
+            // HTML (scripts inside it still run through the mini JS engine).
+            const int conv_cap = 8 * 1024 * 1024;
+            char* conv = (char*)balloc((size_t)conv_cap);
+            if (conv) {
+                int clen = nfuphp::php_convert(j->php_buf, conv, conv_cap);
+                klogf("browser: php converted %d -> %d bytes", j->php_len, clen);
+                pp.feed(conv, clen, true);
+                bfree(conv);
+            }
+        } else {
+            pp.feed(0, 0, true);   // final flush of any held-back tail
+        }
         j->phase = 1;
         DomArena* ar = new DomArena();
         if (ar) {
@@ -2232,6 +2397,10 @@ static void load_worker(void* arg) {
         // DOM shim writes its serialized tree into js_html for re-render.
         if (j->script_len > 0 || j->script_src_n > 0) {
             j->script[j->script_len] = 0;
+            // seed the DOM shim with the parsed tree (real getElementById)
+            char seedbuf[65536];
+            int seedlen = dom_to_html(pp.dom, seedbuf, (int)sizeof(seedbuf));
+            klogf("browser: dom seed %d bytes: %.80s", seedlen, seedbuf);
             j->js_html_sz = 256 * 1024;
             j->js_html = (char*)balloc((size_t)j->js_html_sz);
             char jsacc[4096]; int jan = 0;
@@ -2242,17 +2411,19 @@ static void load_worker(void* arg) {
                 if (platform_http_get(u, &body, &blen) && body && blen > 0) {
                     char* js = (char*)body;
                     js[blen] = 0;
+                    nefu::mini_js_set_dom(seedbuf);
                     nefu::mini_js_set_env(j->url, j->title, 0, 0);
-                    nefu::mini_js_run(js, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
-                                      j->js_html, j->js_html_sz);
+                    j->js_err |= (nefu::mini_js_run(js, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
+                                      j->js_html, j->js_html_sz) != 0);
                     jan += (int)strlen(jsacc + jan);
                     if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
                     kfree(body);
                 }
             }
+            nefu::mini_js_set_dom(seedbuf);
             nefu::mini_js_set_env(j->url, j->title, 0, 0);
-            nefu::mini_js_run(j->script, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
-                              j->js_html, j->js_html_sz);
+            j->js_err |= (nefu::mini_js_run(j->script, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
+                              j->js_html, j->js_html_sz) != 0);
             jan += (int)strlen(jsacc + jan);
             if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
             jsacc[jan] = 0;
@@ -2262,6 +2433,24 @@ static void load_worker(void* arg) {
     }
     if (pp.sstream) { bfree(pp.sstream); pp.sstream = 0; }
     j->done = 1;
+#ifndef NEFU_BARE
+    // resident JS worker: keep quickjs on THIS thread so event dispatch
+    // (click listeners in the DOM shim) safely reuses the page's globals.
+    while (!j->tab->js_ev_close) {
+        if (j->tab->js_ev_pending) {
+            j->tab->js_ev_pending = 0;
+            char* h = j->tab->js_ev_html;
+            int hsz = j->tab->js_ev_html_sz;
+            if (h && hsz > 0) h[0] = 0;
+            nefu::mini_js_run(j->tab->js_ev_script, j->tab->js_ev_out,
+                              (int)sizeof(j->tab->js_ev_out), h, hsz);
+            j->tab->js_ev_done = 1;
+        }
+        platform_thread_sleep(2);
+    }
+    nefu::mini_js_reset();   // quickjs must be freed on the thread that owns it
+    j->worker_done = 1;
+#endif
 }
 
 // Apply one \x01-prefixed DOM command from the JS output stream to the DOM.
@@ -2941,6 +3130,7 @@ static void commit_page(TabState& tab, LoadJob* j) {
             clip_str(tab.title, sizeof(tab.title), j->title);
             tab.css_n = j->css_n;
             for (int k = 0; k < j->css_n && k < CSS_MAX; k++) tab.css[k] = j->css[k];
+            tab.js_err = j->js_err;
             if (j->js_out[0]) {
                 // \x01 DOM commands mutate the committed DOM; plain console
                 // text from print/alert goes to the log, never on screen.
@@ -2997,8 +3187,9 @@ static void poll_jobs(BrowserState* st) {
     for (int t = 0; t < MAX_TABS; t++) {
         TabState& tab = st->tabs[t];
         LoadJob* j = tab.job;
-        if (!j || !j->done) continue;
+        if (!j || !j->done || j->committed) continue;
         tab.job = 0;
+        j->committed = 1;
         // j->data is freed by the worker as soon as parsing is done, so the
         // success marker is the parsed DOM, not the raw page buffer
         if (tab.used && !j->cancelled && j->ok && j->dom) {
@@ -3019,8 +3210,13 @@ static void poll_jobs(BrowserState* st) {
             tab.scroll = 0;
         }
         if (j->data) kfree(j->data);
+        if (j->php_buf) bfree(j->php_buf);
         if (j->dom) delete j->dom;
+#ifndef NEFU_BARE
+        tab.job_keep = j;   // worker stays resident for event dispatch
+#else
         delete j;
+#endif
         if (tab.used && tab.has_queued) {
             tab.has_queued = false;
             char u[256];
@@ -3401,7 +3597,21 @@ static void on_paint(Window* w) {
         out[0] = 0;
         ksprintf(ev, sizeof(ev), "__nfuDispatch(%d,0,0);", tab.pending_nfu);
         nefu::mini_js_set_env(tab.url, tab.title, 0, 0);
+#ifndef NEFU_BARE
+        if (tab.job_keep && !tab.job_keep->worker_done) {
+            clip_str(tab.js_ev_script, sizeof(tab.js_ev_script), ev);
+            tab.js_ev_html = tab.js_html;
+            tab.js_ev_html_sz = tab.js_html_sz;
+            tab.js_ev_out[0] = 0;
+            tab.js_ev_done = 0;
+            tab.js_ev_pending = 1;
+            for (int i = 0; i < 400 && !tab.js_ev_done; i++) platform_thread_sleep(5);
+            memcpy(out, tab.js_ev_out, (int)sizeof(out) - 1);
+            out[sizeof(out) - 1] = 0;
+        }
+#else
         mini_js_run(ev, out, (int)sizeof(out), tab.js_html, tab.js_html_sz);
+#endif
         if (out[0]) {
             apply_js_commands(tab, out);
             char vis[JS_OUT_MAX]; int vn = 0;
@@ -3477,8 +3687,56 @@ static void on_paint(Window* w) {
     // have not been on screen for several frames release their pixels (cache
     // keeps the URL/size, so scrolling back simply refetches one at a time)
     tab.img_gen++;
-    paint_page(*s, tab.layout, tab.scroll, vx, vy, vw, vh, tab.imgs,
-               tab.img_last_used, tab.img_gen, tab.url);
+    if (tab.js_err && tab.loaded && !tab.is_home) {
+        bool has_text = false;
+        for (int i = 0; i < tab.layout.runs.size() && !has_text; i++) {
+            const Run& r = tab.layout.runs[i];
+            if (r.kind == 0 && r.text.len() > 0) has_text = true;
+        }
+        if (!has_text) {
+            // SPA / heavy-JS site that the mini engine cannot run: show a
+            // friendly panel with the site name instead of a blank viewport.
+            int pw = 440, ph = 96;
+            int px = vx + (vw - pw) / 2, py = vy + vh / 2 - ph / 2;
+            gfx::fillrect(*s, px, py, pw, ph, 0xFF111827);
+            gfx::rect(*s, px, py, pw, ph, C_HRLINE);
+            const char* l1 = "This site needs a full JavaScript engine";
+            char l2[64];
+            url_host(tab.url, l2, sizeof(l2));
+            char l3[64];
+            if (tab.title[0]) {
+                int k = 0;
+                for (; k < (int)sizeof(l3) - 1 && tab.title[k]; k++)
+                    l3[k] = ((unsigned char)tab.title[k] < 128) ? tab.title[k] : '?';
+                l3[k] = 0;
+            } else l3[0] = 0;
+            int ty = py + 26;
+            int x0 = px + pw / 2 - (int)strlen(l1) * 4;
+            if (x0 < px + 6) x0 = px + 6;
+            for (int c = 0; l1[c]; c++)
+                gfx::char8x16(*s, x0 + c * 8, ty, l1[c], 0xFFFFFFFF, 0xFF111827);
+            int l2n = (int)strlen(l2);
+            if (l2n > 50) l2n = 50;
+            x0 = px + pw / 2 - l2n * 4;
+            if (x0 < px + 6) x0 = px + 6;
+            for (int c = 0; c < l2n; c++)
+                gfx::char8x16(*s, x0 + c * 8, ty + 20, l2[c], 0xFF60A5FA, 0xFF111827);
+            if (l3[0]) {
+                int l3n = (int)strlen(l3);
+                if (l3n > 50) l3n = 50;
+                x0 = px + pw / 2 - l3n * 4;
+                if (x0 < px + 6) x0 = px + 6;
+                for (int c = 0; c < l3n; c++)
+                    gfx::char8x16(*s, x0 + c * 8, ty + 40, l3[c], C_GRAY, 0xFF111827);
+            }
+        } else {
+            paint_page(*s, tab.layout, tab.scroll, vx, vy, vw, vh, tab.imgs,
+                       tab.img_last_used, tab.img_gen, tab.url);
+        }
+    } else {
+        paint_page(*s, tab.layout, tab.scroll, vx, vy, vw, vh, tab.imgs,
+                   tab.img_last_used, tab.img_gen, tab.url);
+    }
     int done_cnt = 0;
     for (int k = 0; k < IMG_MAX; k++)
         if (tab.imgs[k].done && tab.imgs[k].rgba) done_cnt++;
@@ -3560,6 +3818,7 @@ static void on_key(Window* w, const KeyEvent* e) {
 
     // ---- page shortcuts ----
     int vh = w->content_h - STAT_H - BAR_H - 2;
+
     if (e->keycode == KEY_UP) { tab.scroll -= 24; if (tab.scroll < 0) tab.scroll = 0; return; }
     if (e->keycode == KEY_DOWN) { tab.scroll += 24; if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll; return; }
     if (e->keycode == KEY_PGUP) { tab.scroll -= vh; if (tab.scroll < 0) tab.scroll = 0; return; }

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><title>WGL2</title>
+<style>body { background-color: #202020; color: #ddd; }</style>
+</head>
+<body>
+<h1 style="background-color:#000080">WGL2 TRIANGLE</h1>
+<canvas id="glc" width="320" height="240"></canvas>
+<script>
+  var c = document.getElementById('glc');
+  var gl = c.getContext('webgl2');
+  gl.clearColor(0.1, 0.1, 0.6, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  var vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, "attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }");
+  gl.compileShader(vs);
+  var fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, "precision mediump float; void main() { gl_FragColor = vec4(1.0, 0.2, 0.2, 1.0); }");
+  gl.compileShader(fs);
+  var prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-0.8,-0.8, 0.8,-0.8, 0.0,0.8]), gl.STATIC_DRAW);
+  var loc = gl.getAttribLocation(prog, "p");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  print("wgl2 drawn");
+</script>
+</body></html>

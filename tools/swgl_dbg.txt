@@ -1,0 +1,15 @@
+start
+ctx done
+resize done
+calling glsh
+glsh done
+glcsh done
+calling glsh 2
+glsh 2 done
+glcsh 2 done
+linking
+linked
+before draw
+draw done
+frame fetched
+frame 64x64 px(1,1)=255,0,0

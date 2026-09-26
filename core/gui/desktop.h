@@ -16,6 +16,10 @@ bool desktop_handle_scroll(int delta);
 void desktop_paint_boot(Surface& fb);
 void desktop_paint_lock(Surface& fb);   // lock screen (UEFI password gate)
 void desktop_paint_setup(Surface& fb);  // first-boot setup wizard
+// Force the LVGL desktop to fully repaint on its next frame (used when a
+// pure-framebuffer overlay such as the lock screen is dismissed, so its
+// pixels are not left behind because LVGL only redraws dirty regions).
+void desktop_mark_dirty();
 
 // first-boot setup wizard state (owned by nefuos.cpp)
 bool nefuos_setup_active();

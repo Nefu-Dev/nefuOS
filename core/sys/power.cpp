@@ -1,6 +1,7 @@
 #include "power.h"
 #include "settings.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/gfx.h"
 #include "../klib/klib.h"
 #include "../apps/apps.h"
 #include "sha256.h"
@@ -161,97 +162,129 @@ void power_init() {
     s_pwd_input = nullptr;
 }
 
-// ---- Detailed BSOD-style panic screen (LVGL) -------------------------------
-// Shows a crash code, a register dump, the fault address and two recovery
-// actions. This is the "detailed blue screen" required by the spec: after any
-// kernel/app fault the user gets readable diagnostics plus a one-click path
-// back to the recovery command line, never a silent hang.
-static LvglWin* s_bsod_win = nullptr;
+// ---- BSOD-style panic screen (fullscreen framebuffer overlay) --------------
+// Painted last in nefuos_frame() INSTEAD of the desktop + windows, so it
+// fills the ENTIRE nefuOS screen and no window can ever overlap it. It
+// swallows all keyboard input and has no close button, so it cannot be
+// dismissed: on entry it automatically runs system self-recovery and only
+// "Reboot" restarts the OS ("Recovery" re-runs the repair).
 
-static void bsod_reboot_cb(lv_event_t* e) { (void)e; os_reboot(); }
-static void bsod_recover_cb(lv_event_t* e) {
-    (void)e;
-    // Drop back to the desktop; recovery is also available as the
-    // "recovery" terminal command (rebuilds /usr, /tmp, standard dirs).
-    if (s_bsod_win) {
-        lv_obj_del(s_bsod_win->win);
-        s_bsod_win = nullptr;
+bool g_crash_active = false;
+
+struct BsodState {
+    uint32_t code;
+    char msg[48];
+    CrashRegs regs;
+    bool have_regs;
+};
+static BsodState s_bsod;
+
+// Rebuild standard dirs + core files (same routine as the `recovery` command).
+void system_recovery() {
+    if (!g_vfs) return;
+    g_vfs->ensure_standard_dirs();
+    if (!g_vfs->resolve("/etc/passwd")) {
+        g_vfs->mkdir("/etc");
+        FSNode* f = g_vfs->create_file("/etc/passwd");
+        if (f) {
+            const char* c = "root:x:0:0:root:/root:/bin/sh\nnefu:x:1000:1000:nefu:/home/user:/bin/sh\n";
+            g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
+        }
     }
+    if (!g_vfs->resolve("/var/lib/nefuos/db/system.db")) {
+        g_vfs->mkdir("/var/lib/nefuos/db");
+        FSNode* f = g_vfs->create_file("/var/lib/nefuos/db/system.db");
+        if (f) {
+            const char* c = "name=nefuOS\nversion=0.2.0\narch=x86_64\n";
+            g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
+        }
+    }
+    if (!g_vfs->resolve("/tmp")) g_vfs->mkdir("/tmp");
 }
 
-void blue_screen(uint32_t code, const char* msg) {
-    if (s_bsod_win) return;   // already showing
-    s_bsod_win = lvgl_win_create("nefuOS", 0, 0, 800, 600);
-    if (!s_bsod_win) return;
-    // Classic dark blue background
-    lv_obj_set_style_bg_color(s_bsod_win->content, lv_color_hex(0x000080), 0);
+void blue_screen(uint32_t code, const char* msg, const CrashRegs* regs) {
+    if (g_crash_active) return;   // already showing
+    g_crash_active = true;
+    s_bsod.code = code;
+    s_bsod.msg[0] = 0;
+    if (msg) { strncpy(s_bsod.msg, msg, 47); s_bsod.msg[47] = 0; }
+    s_bsod.have_regs = (regs != 0);
+    if (regs) s_bsod.regs = *regs;
+    // Automatic self-recovery: rebuild the system files immediately so the
+    // OS comes back to a usable state (idempotent, cannot fail hard).
+    system_recovery();
+}
 
-    lv_obj_t* title = lv_label_create(s_bsod_win->content);
-    lv_label_set_text(title, "nefuOS has encountered a problem");
-    lv_obj_set_style_text_color(title, lv_color_white(), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 20, 16);
-
-    char line[160];
-    ksprintf(line, sizeof(line), "STOP: 0x%08lX", (unsigned long)code);
-    lv_obj_t* stop = lv_label_create(s_bsod_win->content);
-    lv_label_set_text(stop, line);
-    lv_obj_set_style_text_color(stop, lv_color_white(), 0);
-    lv_obj_align(stop, LV_ALIGN_TOP_LEFT, 20, 60);
-
-    if (msg && msg[0]) {
-        char cap[48];
-        strncpy(cap, msg, 47);
-        cap[47] = 0;
-        lv_obj_t* m = lv_label_create(s_bsod_win->content);
-        lv_label_set_text(m, cap);
-        lv_obj_set_style_text_color(m, lv_color_white(), 0);
-        lv_obj_align(m, LV_ALIGN_TOP_LEFT, 20, 92);
+// Paint the fullscreen blue screen (pure framebuffer drawing, no LVGL: safe
+// to call from the crash-handler keep-alive loop as well as the frame loop).
+void bsod_paint(Surface& fb) {
+    const uint32_t NAVY = 0x000080;
+    const uint32_t WHITE = 0xFFFFFF;
+    const uint32_t LT = 0xC0C0C0;
+    const uint32_t GREEN = 0x90EE90;
+    fb.fill(NAVY);
+    int x = 40, y = 16;
+    gfx::text_ttf(fb, x, y, "nefuOS", WHITE, NAVY, 20); y += 34;
+    gfx::text_ttf(fb, x, y, "nefuOS has encountered a problem", WHITE, NAVY, 16); y += 32;
+    char line[128];
+    ksprintf(line, sizeof(line), "STOP: 0x%08lX", (unsigned long)s_bsod.code);
+    gfx::text_ttf(fb, x, y, line, WHITE, NAVY, 14); y += 26;
+    if (s_bsod.msg[0]) {
+        gfx::text_ttf(fb, x, y, s_bsod.msg, WHITE, NAVY, 14); y += 26;
     }
-
-    // Register / fault dump (synthetic for host, real EIP on bare metal when
-    // the fault handler stores it into the bootinfo block).
-    const char* dump[] = {
-        "Technical information:",
-        "  fault address : 0x%08lX",
-        "  eax=00000000 ebx=00000000 ecx=00000000 edx=00000000",
-        "  esi=00000000 edi=00000000 ebp=00000000 esp=0001F000",
-        "  cr2=00000000  eflags=00000246  cs=0008  ss=0010",
-        0
-    };
-    int dy = 130;
-    for (int i = 0; dump[i]; i++) {
-        char txt[120];
-        if (dump[i][0] == ' ') ksprintf(txt, sizeof(txt), dump[i], (unsigned long)code);
-        else strncpy(txt, dump[i], sizeof(txt) - 1), txt[sizeof(txt)-1] = 0;
-        lv_obj_t* l = lv_label_create(s_bsod_win->content);
-        lv_label_set_text(l, txt);
-        lv_obj_set_style_text_color(l, lv_color_white(), 0);
-        lv_obj_align(l, LV_ALIGN_TOP_LEFT, 20, dy);
-        dy += 22;
+    gfx::text_ttf(fb, x, y, "Technical information:", WHITE, NAVY, 13); y += 24;
+    if (s_bsod.have_regs) {
+        ksprintf(line, sizeof(line), "  fault address: 0x%08lX",
+                 (unsigned long)(s_bsod.regs.rip & 0xFFFFFFFFu));
+        gfx::text_ttf(fb, x, y, line, WHITE, NAVY, 13); y += 24;
+        ksprintf(line, sizeof(line), "  eax=%08lX ebx=%08lX ecx=%08lX edx=%08lX",
+                 (unsigned long)(s_bsod.regs.rax & 0xFFFFFFFFu),
+                 (unsigned long)(s_bsod.regs.rbx & 0xFFFFFFFFu),
+                 (unsigned long)(s_bsod.regs.rcx & 0xFFFFFFFFu),
+                 (unsigned long)(s_bsod.regs.rdx & 0xFFFFFFFFu));
+        gfx::text_ttf(fb, x, y, line, WHITE, NAVY, 13); y += 24;
+        ksprintf(line, sizeof(line), "  esi=%08lX edi=%08lX ebp=%08lX esp=%08lX",
+                 (unsigned long)(s_bsod.regs.rsi & 0xFFFFFFFFu),
+                 (unsigned long)(s_bsod.regs.rdi & 0xFFFFFFFFu),
+                 (unsigned long)(s_bsod.regs.rbp & 0xFFFFFFFFu),
+                 (unsigned long)(s_bsod.regs.rsp & 0xFFFFFFFFu));
+        gfx::text_ttf(fb, x, y, line, WHITE, NAVY, 13); y += 24;
+        ksprintf(line, sizeof(line), "  eflags=%08lX  cs=0008  ss=0010",
+                 (unsigned long)(s_bsod.regs.eflags & 0xFFFFFFFFu));
+        gfx::text_ttf(fb, x, y, line, WHITE, NAVY, 13); y += 24;
+    } else {
+        ksprintf(line, sizeof(line), "  fault address: 0x%08lX", (unsigned long)s_bsod.code);
+        gfx::text_ttf(fb, x, y, line, WHITE, NAVY, 13); y += 24;
+        gfx::text_ttf(fb, x, y, "  eax=00000000 ebx=00000000 ecx=00000000 edx=00000000",
+                      WHITE, NAVY, 13); y += 24;
+        gfx::text_ttf(fb, x, y, "  esi=00000000 edi=00000000 ebp=00000000 esp=0001F000",
+                      WHITE, NAVY, 13); y += 24;
+        gfx::text_ttf(fb, x, y, "  eflags=00000246  cs=0008  ss=0010",
+                      WHITE, NAVY, 13); y += 24;
     }
+    y += 8;
+    gfx::text_ttf(fb, x, y, "Automatic recovery: DONE - system files rebuilt", GREEN, NAVY, 13); y += 26;
+    gfx::text_ttf(fb, x, y, "This screen cannot be dismissed. Click 'Reboot' to restart nefuOS.",
+                  LT, NAVY, 13);
+    // Buttons (bottom area)
+    gfx::fillrect(fb, 40, 545, 150, 38, 0x004080);
+    gfx::rect(fb, 40, 545, 150, 38, WHITE);
+    gfx::text_ttf(fb, 78, 557, "Reboot", WHITE, 0x004080, 14);
+    gfx::fillrect(fb, 210, 545, 190, 38, 0x004080);
+    gfx::rect(fb, 210, 545, 190, 38, WHITE);
+    gfx::text_ttf(fb, 248, 557, "Recovery", WHITE, 0x004080, 14);
+}
 
-    lv_obj_t* tip = lv_label_create(s_bsod_win->content);
-    lv_label_set_text(tip, "Try: restart the app, or reboot the system. If this repeats,\n"
-                          "run 'recovery' in the terminal to rebuild system files.");
-    lv_obj_set_style_text_color(tip, lv_color_white(), 0);
-    lv_obj_align(tip, LV_ALIGN_TOP_LEFT, 20, dy + 10);
-
-    lv_obj_t* rb = lv_button_create(s_bsod_win->content);
-    lv_obj_set_size(rb, 150, 40);
-    lv_obj_align(rb, LV_ALIGN_BOTTOM_LEFT, 40, -40);
-    lv_obj_add_event_cb(rb, bsod_reboot_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_t* rb_l = lv_label_create(rb);
-    lv_label_set_text(rb_l, "Reboot");
-    lv_obj_center(rb_l);
-
-    lv_obj_t* cv = lv_button_create(s_bsod_win->content);
-    lv_obj_set_size(cv, 190, 40);
-    lv_obj_align(cv, LV_ALIGN_BOTTOM_LEFT, 210, -40);
-    lv_obj_add_event_cb(cv, bsod_recover_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_t* cv_l = lv_label_create(cv);
-    lv_label_set_text(cv_l, "Recovery");
-    lv_obj_center(cv_l);
+// Blue-screen mouse hit-test (Reboot / Recovery). All other clicks and every
+// key are swallowed, so the screen can never be dismissed.
+void bsod_handle_mouse(int x, int y, uint8_t buttons) {
+    static uint8_t s_prev = 0;
+    bool pressed = (buttons & 1) != 0;
+    bool was = (s_prev & 1) != 0;
+    s_prev = buttons;
+    if (!pressed || was) return;   // act on press edge only
+    if (x >= 40 && x <= 190 && y >= 545 && y <= 583) { os_reboot(); return; }
+    if (x >= 210 && x <= 400 && y >= 545 && y <= 583) { system_recovery(); return; }
 }
 
 }

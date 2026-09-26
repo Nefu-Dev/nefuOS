@@ -8,6 +8,7 @@
 #include "../net/net.h"
 #include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (hash only, no plaintext)
 #include "../sys/sha256.h"
+#include "../sys/power.h"        // blue_screen()
 #include <cstdlib>
 
 namespace nefu {
@@ -1011,28 +1012,9 @@ static void term_run(TermState* t, const char* cmd) {
         else term_print(t, "db: usage: list | get <key> | set <key> <value> | rm <key>");
     }
     else if (strcmp(a0, "recovery") == 0) {
-        // Rebuild standard system directories + default files (self-recovery).
-        g_vfs->ensure_standard_dirs();
-        // Re-seed core config files if missing
-        if (!g_vfs->resolve("/etc/passwd")) {
-            g_vfs->mkdir("/etc");
-            FSNode* f = g_vfs->create_file("/etc/passwd");
-            if (f) {
-                const char* c = "root:x:0:0:root:/root:/bin/sh\nnefu:x:1000:1000:nefu:/home/user:/bin/sh\n";
-                g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
-            }
-        }
-        if (!g_vfs->resolve("/var/lib/nefuos/db/system.db")) {
-            g_vfs->mkdir("/var/lib/nefuos/db");
-            FSNode* f = g_vfs->create_file("/var/lib/nefuos/db/system.db");
-            if (f) {
-                const char* c = "name=nefuOS\nversion=0.2.0\narch=x86_64\n";
-                g_vfs->write_file(f, (const uint8_t*)c, (uint32_t)strlen(c));
-            }
-        }
-        if (!g_vfs->resolve("/tmp")) {
-            g_vfs->mkdir("/tmp");
-        }
+        // Rebuild standard system directories + core files (self-recovery).
+        // Same routine the blue screen runs automatically on a real crash.
+        system_recovery();
         term_print(t, "recovery: standard dirs + core files restored");
     }
     else if (strcmp(a0, "honeypot") == 0) {
@@ -1116,7 +1098,22 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "ln") == 0) {
         if (argc < 3) term_print(t, "usage: ln <target> <link>");
         else term_print(t, "ln: symlink created (simulated)");
-    }else if (strcmp(a0, "shutdown") == 0 || strcmp(a0, "reboot") == 0 || strcmp(a0, "poweroff") == 0) {
+    }
+    else if (strcmp(a0, "bsod") == 0 || strcmp(a0, "panic") == 0) {
+        // Spec: detailed blue screen instructions. Simulated crash demo:
+        // triggers the BSOD-style panic screen directly (no real fault).
+        term_print(t, "triggering nefuOS blue screen (BSOD)...");
+        blue_screen(0xC0000005, "kernel panic: simulated crash");
+    }
+    else if (strcmp(a0, "crash") == 0) {
+        // REAL crash test: dereference a null pointer. The SEH crash handler
+        // catches it and automatically pops the blue screen with the true
+        // register dump (verification path for crash -> bsod -> recovery).
+        term_print(t, "crashing nefuOS (real access violation)...");
+        volatile unsigned long long* p = 0;
+        *p = 0xDEADBEEFULL;
+    }
+    else if (strcmp(a0, "shutdown") == 0 || strcmp(a0, "reboot") == 0 || strcmp(a0, "poweroff") == 0) {
         // Check for -b flag (reboot to BIOS)
         bool reboot_to_bios = false;
         for (int i = 1; i < argc; i++) {

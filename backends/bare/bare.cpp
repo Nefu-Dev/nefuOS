@@ -568,11 +568,11 @@ void platform_mem_stats(uint32_t* used, uint32_t* total) {
 
 const char* platform_name() { return "bare (x86_64)"; }
 
-bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
-    (void)out; (void)out_size;
-    return false;   // ,
-}
-void platform_fs_save(const uint8_t* data, uint32_t size) { (void)data; (void)size; }
+// NVFS image persistence on the first non-removable ATA drive (QEMU -hda).
+// Implemented with the ATA PIO driver below. Disk layout: LBA 0 reserved,
+// LBA 1 = uint32 LE image size, LBA 2.. = image data.
+bool platform_fs_load(uint8_t** out, uint32_t* out_size);
+void platform_fs_save(const uint8_t* data, uint32_t size);
 
 // ===================== =====================
 static bool sb_audio_init(void);   // defined below (SB16 driver)
@@ -819,6 +819,173 @@ int platform_disk_scan(DiskInfo* list, int max) {
         }
     }
     return n;
+}
+
+// ===================== NVFS persistence (ATA PIO) =====================
+// PIO 28-bit LBA sector I/O used to persist the NVFS image so settings,
+// the firstboot marker and user files survive reboots (task: real save).
+#define FS_HEADER_LBA 1u
+#define FS_DATA_LBA   2u
+#define FS_MAX_IMAGE  (64u * 1024u * 1024u)
+
+static uint16_t s_fs_base = 0;
+static uint8_t  s_fs_dev  = 0;
+
+static bool ata_wait_drq(uint16_t base, int timeout_loops) {
+    for (int i = 0; i < timeout_loops; i++) {
+        uint8_t st = inb_p(base + 7);
+        if (st & 1) return false;          // error bit
+        if (st & 8) return true;           // DRQ
+    }
+    return false;
+}
+
+static bool ata_pio_read(uint16_t base, uint8_t devsel, uint32_t lba,
+                         uint8_t* buf, uint32_t sectors) {
+    while (sectors) {
+        uint32_t cnt = sectors > 255 ? 255 : sectors;
+        outb_p(base + 6, (uint8_t)(devsel | ((lba >> 24) & 0x0F)));
+        outb_p(base + 2, (uint8_t)cnt);
+        outb_p(base + 3, (uint8_t)(lba & 0xFF));
+        outb_p(base + 4, (uint8_t)((lba >> 8) & 0xFF));
+        outb_p(base + 5, (uint8_t)((lba >> 16) & 0xFF));
+        outb_p(base + 7, 0x20);            // READ SECTORS (28-bit)
+        for (uint32_t s = 0; s < cnt; s++) {
+            if (!ata_wait_not_busy(base, 400000)) return false;
+            if (!ata_wait_drq(base, 400000)) return false;
+            uint16_t* w = (uint16_t*)(buf + (size_t)s * 512u);
+            for (int j = 0; j < 256; j++) w[j] = inw_p(base);
+        }
+        if (!ata_wait_not_busy(base, 400000)) return false;
+        buf += (size_t)cnt * 512u;
+        lba += cnt;
+        sectors -= cnt;
+    }
+    return true;
+}
+
+static bool ata_pio_write(uint16_t base, uint8_t devsel, uint32_t lba,
+                          const uint8_t* buf, uint32_t sectors) {
+    while (sectors) {
+        uint32_t cnt = sectors > 255 ? 255 : sectors;
+        outb_p(base + 6, (uint8_t)(devsel | ((lba >> 24) & 0x0F)));
+        outb_p(base + 2, (uint8_t)cnt);
+        outb_p(base + 3, (uint8_t)(lba & 0xFF));
+        outb_p(base + 4, (uint8_t)((lba >> 8) & 0xFF));
+        outb_p(base + 5, (uint8_t)((lba >> 16) & 0xFF));
+        outb_p(base + 7, 0x30);            // WRITE SECTORS (28-bit)
+        for (uint32_t s = 0; s < cnt; s++) {
+            if (!ata_wait_not_busy(base, 400000)) return false;
+            if (!ata_wait_drq(base, 400000)) return false;
+            const uint16_t* w = (const uint16_t*)(buf + (size_t)s * 512u);
+            for (int j = 0; j < 256; j++) outw_p(base, w[j]);
+        }
+        if (!ata_wait_not_busy(base, 400000)) return false;
+        buf += (size_t)cnt * 512u;
+        lba += cnt;
+        sectors -= cnt;
+    }
+    return true;
+}
+
+static bool fs_find_disk(uint16_t* base_out, uint8_t* dev_out) {
+    static const uint16_t bases[2] = { 0x1F0, 0x170 };
+    for (unsigned c = 0; c < 2; c++) {
+        for (int sel = 0; sel < 2; sel++) {
+            char model[48];
+            uint64_t sectors = 0;
+            bool rem = false;
+            if (ata_identify(bases[c], (uint8_t)(sel ? 0xB0 : 0xA0),
+                             model, sizeof(model), &sectors, &rem)) {
+                if (rem || sectors < 1024) continue;   // skip CD-ROM / tiny disks
+                *base_out = bases[c];
+                *dev_out = (uint8_t)(sel ? 0xB0 : 0xA0);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
+    if (!out || !out_size) return false;
+    *out = 0;
+    *out_size = 0;
+    uint16_t base;
+    uint8_t dev;
+    if (!fs_find_disk(&base, &dev)) return false;
+    uint8_t hdr[512];
+    memset(hdr, 0, sizeof(hdr));
+    if (!ata_pio_read(base, dev, FS_HEADER_LBA, hdr, 1)) return false;
+    uint32_t size = (uint32_t)hdr[0] | ((uint32_t)hdr[1] << 8) |
+                    ((uint32_t)hdr[2] << 16) | ((uint32_t)hdr[3] << 24);
+    if (size == 0 || size > FS_MAX_IMAGE) return false;
+    uint32_t sectors = (size + 511u) / 512u;
+    uint8_t* img = (uint8_t*)kalloc(size);
+    if (!img) return false;
+    uint8_t* p = img;
+    uint32_t done = 0;
+    uint32_t left = sectors;
+    while (left) {
+        uint32_t n = left > 64 ? 64 : left;
+        uint8_t* tmp = (uint8_t*)kalloc(n * 512u);
+        if (!tmp) { kfree(img); return false; }
+        if (!ata_pio_read(base, dev, FS_DATA_LBA + (sectors - left), tmp, n)) {
+            kfree(tmp); kfree(img); return false;
+        }
+        uint32_t take = (n * 512u > size - done) ? (size - done) : n * 512u;
+        memcpy(p, tmp, take);
+        p += take;
+        done += take;
+        kfree(tmp);
+        left -= n;
+    }
+    s_fs_base = base;
+    s_fs_dev = dev;
+    *out = img;
+    *out_size = size;
+    klogf("nvfs: loaded %u bytes from ATA disk\n", (unsigned)size);
+    return true;
+}
+
+void platform_fs_save(const uint8_t* data, uint32_t size) {
+    if (!data || size == 0 || size > FS_MAX_IMAGE) return;
+    uint16_t base;
+    uint8_t dev;
+    if (s_fs_base) {
+        base = s_fs_base;
+        dev = s_fs_dev;
+    } else if (!fs_find_disk(&base, &dev)) {
+        return;
+    }
+    uint8_t hdr[512];
+    memset(hdr, 0, sizeof(hdr));
+    hdr[0] = (uint8_t)(size & 0xFF);
+    hdr[1] = (uint8_t)((size >> 8) & 0xFF);
+    hdr[2] = (uint8_t)((size >> 16) & 0xFF);
+    hdr[3] = (uint8_t)((size >> 24) & 0xFF);
+    if (!ata_pio_write(base, dev, FS_HEADER_LBA, hdr, 1)) return;
+    uint32_t sectors = (size + 511u) / 512u;
+    const uint8_t* p = data;
+    uint32_t left = sectors;
+    uint32_t done = 0;
+    while (left) {
+        uint32_t n = left > 64 ? 64 : left;
+        uint8_t* tmp = (uint8_t*)kalloc(n * 512u);
+        if (!tmp) return;
+        memset(tmp, 0, n * 512u);
+        uint32_t take = (n * 512u > size - done) ? (size - done) : n * 512u;
+        memcpy(tmp, p, take);
+        if (!ata_pio_write(base, dev, FS_DATA_LBA + (sectors - left), tmp, n)) {
+            kfree(tmp);
+            return;
+        }
+        p += take;
+        done += take;
+        kfree(tmp);
+        left -= n;
+    }
+    klogf("nvfs: saved %u bytes to ATA disk\n", (unsigned)size);
 }
 
 

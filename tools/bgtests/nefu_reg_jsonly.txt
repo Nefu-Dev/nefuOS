@@ -1,0 +1,97 @@
+argv: app=17 shot=- click=-1,-1
+nefuOS host backend (win32) starting...
+[BOOT] nefuOS boot preparation started...
+[BOOT] Step 0: Starting F2 BIOS key detection thread...
+[BOOT] F2 detection thread started - monitoring for F2 key...
+[BOOT] Step 1: Checking kernel integrity...
+[BOOT] Kernel integrity OK.
+[BOOT] Step 2: Initializing system components...
+[BOOT]   - Graphics subsystem
+[BOOT]   - Input subsystem
+[BOOT]   - File system
+[BOOT]   - Network stack
+[BOOT]   - Audio mixer
+[BOOT] Step 3: Checking BIOS boot keys...
+[BOOT] No special boot keys detected.
+[BOOT] Step 4: Auto-starting desktop widgets...
+[BOOT] Step 5: Running system validation...
+[BOOT]   - Memory check: OK
+[BOOT]   - Display check: OK
+[BOOT]   - Input check: OK
+[BOOT]   - Storage check: OK
+[BOOT] Step 6: Finalizing boot...
+[BOOT] Boot preparation complete! Entering desktop...
+nefuOS init
+no NVFS image found: fresh filesystem + default tree
+disk: 2 block device(s)
+  C: 0 MB fixed
+  D: 0 MB fixed
+nefuOS ready on win32
+[BOOT] F2 not detected, continuing normal boot.
+nh m=303,538 b=0 locked=0
+dh m=303,538 b=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+browser: js: ua=nefuOS/0.2 (host)
+platform=Win32
+w=1024 h=768
+url=http://127.0.0.1:8123/jsonly.html
+title=js only test
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0
+lvgl in=303,538 st=0

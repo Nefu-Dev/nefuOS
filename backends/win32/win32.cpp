@@ -18,6 +18,7 @@
 #include "../../core/gui/gfx.h"   // full Surface definition
 #include "../../core/apps/apps.h"  // app_launch for --app
 #include "../../core/apps/bios.h"  // classic BIOS setup utility (F2 boot key)
+#include "../../core/sys/power.h"  // blue_screen()
 
 using namespace nefu;
 
@@ -665,6 +666,10 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 // ---------------- () ----------------
 #include <windows.h>
+// Declared early so the crash handler can save a verification shot of the
+// blue screen in headless runs (the real declarations live further down).
+static const char* s_shot_path = 0;
+static void save_bmp(const char* path);
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
     FILE* f = fopen("crash.txt", "a");
     if (f) {
@@ -684,7 +689,33 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
                 (unsigned long long)c->Rip);
         fclose(f);
         }
-    return EXCEPTION_EXECUTE_HANDLER;
+    // Real crash -> automatic nefuOS blue screen with the TRUE register dump.
+    // The filter never returns, so Windows does not terminate the process:
+    // this keep-alive loop renders the blue screen forever (it can only be
+    // left via the on-screen "Reboot" / closing the OS window).
+    CrashRegs r;
+    CONTEXT* c = ep->ContextRecord;
+    r.rax = c->Rax; r.rbx = c->Rbx; r.rcx = c->Rcx; r.rdx = c->Rdx;
+    r.rsi = c->Rsi; r.rdi = c->Rdi; r.rbp = c->Rbp; r.rsp = c->Rsp; r.rip = c->Rip;
+    r.eflags = c->EFlags;
+    blue_screen((uint32_t)ep->ExceptionRecord->ExceptionCode,
+                "kernel panic: unhandled exception", &r);
+    // Keep-alive render loop: paints the blue screen forever. The OS-level
+    // fullscreen cannot be dismissed (keys swallowed, no close button); only
+    // the on-screen "Reboot" / closing the OS window leaves it. In headless
+    // --shot runs, save the blue screen bitmap after ~1.5s and exit.
+    int nf = 0;
+    for (;;) {
+        nefuos_tick();
+        nefuos_frame();
+        if (s_shot_path && ++nf == 90) {
+            save_bmp(s_shot_path);
+            printf("[SHOT] blue screen saved after real crash\n");
+            ExitProcess(0);
+        }
+        Sleep(16);
+    }
+    return EXCEPTION_EXECUTE_HANDLER;   // unreachable
 }
 
 // ---------------- reboot / suspend / uefi / hw info ----------------
@@ -759,9 +790,9 @@ static int s_click_x = -1, s_click_y = -1;
 static int s_click2_x = -1, s_click2_y = -1;   // second test click (after key injection)
 static const char* s_key_str = 0;
 static const char* s_url_str = 0;
-static const char* s_shot_path = 0;
 static const char* s_media_path = 0;   // --media: autoplay a real media file (video player)
 static bool s_savefs = false;          // --savefs: persist the VFS snapshot before exit
+static bool s_bsod_trigger = false;    // --bsod: show the BSOD-style panic screen
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
 static void save_bmp(const char* path) {
@@ -889,6 +920,7 @@ int main(int argc, char** argv) {
         if (strcmp(argv[i], "--url") == 0 && i + 1 < argc) s_url_str = argv[i + 1];
         if (strcmp(argv[i], "--media") == 0 && i + 1 < argc) s_media_path = argv[i + 1];
         if (strcmp(argv[i], "--bios") == 0) s_enter_bios = true;  // enter BIOS directly (for testing, same as pressing F2 at boot)
+        if (strcmp(argv[i], "--bsod") == 0) s_bsod_trigger = true; // show the detailed blue screen (verification)
         }
     SetUnhandledExceptionFilter(crash_handler);
     printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
@@ -950,12 +982,17 @@ int main(int argc, char** argv) {
         nefuos_unlock();
         nefu::apps::bios_launch();
         }
-    if (s_auto_app >= 0) {
+    if (s_auto_app >= 0 || s_bsod_trigger) {
         // test mode: skip first-boot wizard and lock screen (frame loop
         // would otherwise have re-locked after the boot splash)
         nefuos_mark_firstboot_done();
         nefuos_unlock();
-        if (s_auto_app == 17 && s_url_str) browser_launch_url(s_url_str);
+        if (s_bsod_trigger) {
+            // --bsod: render the detailed BSOD-style panic screen directly
+            // (no terminal on top), for a clean verification screenshot.
+            printf("[SHOT] triggering nefuOS blue screen (BSOD)...\n");
+            blue_screen(0xC0000005, "kernel panic: simulated crash");
+        } else if (s_auto_app == 17 && s_url_str) browser_launch_url(s_url_str);
         else {
             if (s_auto_app == APP_VIDEOPLAYER && s_media_path)
                 video_player_autoplay(s_media_path);   // --media test hook
@@ -985,13 +1022,38 @@ int main(int argc, char** argv) {
                     if (c == '\r' || c == '\n') kc = KEY_ENTER;
                     else if (c == 8) kc = KEY_BACKSPACE;
                     else if (c == 27) kc = KEY_ESC;
+                    else if (c == '<') {
+                        // special-key tag like <PgDn> for scroll tests
+                        const char* q = p + 1;
+                        const char* e2 = strchr(q, '>');
+                        if (e2 && e2 - q < 10) {
+                            char tag[12]; int tl = (int)(e2 - q);
+                            memcpy(tag, q, (size_t)tl); tag[tl] = 0;
+                            int kc2 = 0;
+                            if (!strcmp(tag, "PgDn")) kc2 = KEY_PGDN;
+                            else if (!strcmp(tag, "PgUp")) kc2 = KEY_PGUP;
+                            else if (!strcmp(tag, "Down")) kc2 = KEY_DOWN;
+                            else if (!strcmp(tag, "Up")) kc2 = KEY_UP;
+                            else if (!strcmp(tag, "Home")) kc2 = KEY_HOME;
+                            else if (!strcmp(tag, "End")) kc2 = KEY_END;
+                            if (kc2) {
+                                nefuos_handle_key(kc2, 0, true);
+                                nefuos_handle_key(kc2, 0, false);
+                                p = e2;
+                                Sleep(24);
+                                continue;
+                            }
+                        }
+                    }
 
                     nefuos_handle_key(kc, c, true);
                     nefuos_handle_key(kc, c, false);
                     Sleep(24);
                 }
-                nefuos_handle_key(KEY_ENTER, '\r', true);
-                nefuos_handle_key(KEY_ENTER, '\r', false);
+                if (strchr(s_key_str, '<') == 0) {
+                    nefuos_handle_key(KEY_ENTER, '\r', true);
+                    nefuos_handle_key(KEY_ENTER, '\r', false);
+                }
                 printf("keys injected: %s\n", s_key_str);
                 s_key_str = 0;
             }

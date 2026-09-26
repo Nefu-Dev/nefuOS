@@ -148,6 +148,11 @@ static void lock_verify() {
     if (ok) {
         s_locked = false;
         s_lock_fail_ms = 0;
+        // The lock screen paints directly into the framebuffer, bypassing
+        // LVGL. Without this, LVGL would only redraw its dirty regions on the
+        // next desktop frame and the lock-screen pixels (panel, clock) would
+        // stay on screen after unlocking.
+        desktop_mark_dirty();
     } else {
         s_lock_fail_ms = platform_tick_ms();
     }
@@ -267,6 +272,8 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
     s_my = y;
     if (!s_inited || !s_booted) return;
     s_last_activity = platform_tick_ms();
+    // Blue screen: only its Reboot / Recovery buttons are clickable.
+    if (g_crash_active) { bsod_handle_mouse(x, y, buttons); return; }
     static int s_nhdbg = 0;
     if (s_nhdbg < 20) { s_nhdbg++; klogf("nh m=%d,%d b=%u locked=%d\n", x, y, (unsigned)buttons, (int)s_locked); }
     if (s_locked) return;   // lock screen consumes nothing from the desktop
@@ -277,6 +284,8 @@ void nefuos_handle_mouse(int x, int y, uint8_t buttons) {
 
 void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     if (!s_inited || !s_booted) return;
+    // Blue screen swallows every key: it cannot be dismissed by keyboard.
+    if (g_crash_active) return;
     // Track modifier keys (both down and up); they are consumed here and never
     // become normal key events. This is what powers Shift+/Ctrl+ shortcuts.
     if (keycode == KEY_SHIFT) { if (down) s_mods |= 0x01; else s_mods &= ~0x01; return; }
@@ -400,6 +409,14 @@ void nefuos_tick() {
 void nefuos_frame() {
     if (!s_inited) return;
     Surface fb = screen_surface();
+    // Blue screen: paint it INSTEAD of the desktop + windows so it fills the
+    // whole screen and nothing can overlap it.
+    if (g_crash_active) {
+        bsod_paint(fb);
+        if (s_mx >= 0 && s_my >= 0 && platform_name()[0] == 'b') draw_cursor(fb, s_mx, s_my);
+        platform_present();
+        return;
+    }
     uint32_t now = platform_tick_ms();
     if (!s_booted) {
         desktop_paint_boot(fb);

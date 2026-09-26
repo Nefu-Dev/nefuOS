@@ -1,0 +1,130 @@
+argv: app=17 shot=- click=-1,-1
+nefuOS host backend (win32) starting...
+[BOOT] nefuOS boot preparation started...
+[BOOT] Step 0: Starting F2 BIOS key detection thread...
+[BOOT] F2 detection thread started - monitoring for F2 key...
+[BOOT] Step 1: Checking kernel integrity...
+[BOOT] Kernel integrity OK.
+[BOOT] Step 2: Initializing system components...
+[BOOT]   - Graphics subsystem
+[BOOT]   - Input subsystem
+[BOOT]   - File system
+[BOOT]   - Network stack
+[BOOT]   - Audio mixer
+[BOOT] Step 3: Checking BIOS boot keys...
+[BOOT] No special boot keys detected.
+[BOOT] Step 4: Auto-starting desktop widgets...
+[BOOT] Step 5: Running system validation...
+[BOOT]   - Memory check: OK
+[BOOT]   - Display check: OK
+[BOOT]   - Input check: OK
+[BOOT]   - Storage check: OK
+[BOOT] Step 6: Finalizing boot...
+[BOOT] Boot preparation complete! Entering desktop...
+nefuOS init
+no NVFS image found: fresh filesystem + default tree
+disk: 2 block device(s)
+  C: 0 MB fixed
+  D: 0 MB fixed
+nefuOS ready on win32
+[BOOT] F2 not detected, continuing normal boot.
+nh m=726,424 b=0 locked=0
+dh m=726,424 b=0
+nh m=725,432 b=0 locked=0
+dh m=725,432 b=0
+nh m=723,439 b=0 locked=0
+dh m=723,439 b=0
+nh m=723,443 b=0 locked=0
+dh m=723,443 b=0
+lvgl in=723,443 st=0
+nh m=722,445 b=0 locked=0
+dh m=722,445 b=0
+nh m=722,447 b=0 locked=0
+dh m=722,447 b=0
+nh m=722,448 b=0 locked=0
+dh m=722,448 b=0
+nh m=722,448 b=0 locked=0
+dh m=722,448 b=0
+nh m=721,449 b=0 locked=0
+dh m=721,449 b=0
+lvgl in=721,449 st=0
+nh m=720,449 b=0 locked=0
+dh m=720,449 b=0
+lvgl in=720,449 st=0
+nh m=719,449 b=0 locked=0
+dh m=719,449 b=0
+nh m=719,448 b=0 locked=0
+dh m=719,448 b=0
+nh m=719,448 b=0 locked=0
+dh m=719,448 b=0
+lvgl in=719,448 st=0
+nh m=718,448 b=0 locked=0
+dh m=718,448 b=0
+nh m=717,447 b=0 locked=0
+dh m=717,447 b=0
+nh m=717,446 b=0 locked=0
+dh m=717,446 b=0
+lvgl in=717,446 st=0
+nh m=716,445 b=0 locked=0
+dh m=716,445 b=0
+nh m=716,444 b=0 locked=0
+dh m=716,444 b=0
+nh m=716,444 b=0 locked=0
+dh m=716,444 b=0
+nh m=715,444 b=0 locked=0
+dh m=715,444 b=0
+lvgl in=715,440 st=0
+lvgl in=715,436 st=0
+lvgl in=714,434 st=0
+lvgl in=713,432 st=0
+lvgl in=663,408 st=0
+lvgl in=649,395 st=0
+lvgl in=649,392 st=0
+lvgl in=686,350 st=0
+lvgl in=753,321 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=791,311 st=0
+lvgl in=684,512 st=0
+lvgl in=736,531 st=0
+lvgl in=754,536 st=0
+lvgl in=755,537 st=0
+lvgl in=789,556 st=0
+lvgl in=794,560 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0
+lvgl in=796,562 st=0

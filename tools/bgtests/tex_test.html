@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html><head><title>TEX2</title>
+<style>body { background-color: #202020; color: #ddd; }</style>
+</head>
+<body>
+<h1 style="background-color:#000080">TEX2 TEXTURED TRIANGLE</h1>
+<canvas id="glc" width="320" height="240"></canvas>
+<script>
+  var c = document.getElementById('glc');
+  var gl = c.getContext('webgl2');
+  gl.clearColor(0.1, 0.1, 0.6, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  var vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, "attribute vec2 p; attribute vec2 uv; varying vec2 v_uv; void main() { v_uv = uv; gl_Position = vec4(p, 0.0, 1.0); }");
+  gl.compileShader(vs);
+  var fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, "precision mediump float; varying vec2 v_uv; uniform sampler2D u_tex; void main() { gl_FragColor = texture2D(u_tex, v_uv); }");
+  gl.compileShader(fs);
+  var prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  // 2x2 texture: TL=red TR=green BL=blue BR=white
+  var px = new Uint8Array([
+    255,0,0,255,  0,255,0,255,
+    0,0,255,255,  255,255,255,255
+  ]);
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.uniform1i(gl.getUniformLocation(prog, "u_tex"), 0);
+  // vertices: pos + uv (uv origin bottom-left)
+  var vb = new Float32Array([
+    -0.8,-0.8, 0,0,    0.8,-0.8, 1,0,    0,0.8, 0.5,0.5
+  ]);
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, vb, gl.STATIC_DRAW);
+  var loc = gl.getAttribLocation(prog, "p");
+  var locuv = gl.getAttribLocation(prog, "uv");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 16, 0);
+  gl.enableVertexAttribArray(locuv);
+  gl.vertexAttribPointer(locuv, 2, gl.FLOAT, false, 16, 8);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  print("textured triangle drawn");
+</script>
+</body></html>

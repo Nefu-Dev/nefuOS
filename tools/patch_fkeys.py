@@ -1,0 +1,83 @@
+p = r'D:\mycppos1\nefuOS\core\gui\desktop.cpp'
+with open(p, 'rb') as f:
+    data = f.read()
+
+old = (
+    b'        if (ctrl && !alt && keycode == KEY_ESC) { start_menu_toggle(); return true; }      // Ctrl+Esc: start menu\n'
+    b'        if (ctrl && keycode == KEY_TAB) { g_wm->cycle_focus(shift); return true; }         // Ctrl+Tab / Ctrl+Shift+Tab: cycle windows\n'
+    b'        return false;   // other Ctrl/Alt combos go to the focused app (Ctrl+S, ...)\n'
+    b'    }\n'
+    b'    {\n'
+    b'        // Feed keys into LVGL only when a textarea is focused (typing / Enter\n'
+    b'        // to submit). Button activation by keyboard on an empty desktop is not\n'
+    b'        // intended: Enter/space on a focused button could crash in the browser\n'
+    b'        // scene, so non-textarea focus falls through to the classic WM.\n'
+    b'        lv_obj_t* fo = s_kb_group ? lv_group_get_focused(s_kb_group) : 0;\n'
+    b'        if (fo && lv_obj_check_type(fo, &lv_textarea_class)) lvgl_key_push(keycode, ascii);\n'
+    b'        else return false;\n'
+    b'    }\n'
+    b'    // ESC closes an open context menu first\n'
+    b'    if ((s_rmenu_open || s_rmenu_desk_open) && keycode == KEY_ESC) {\n'
+    b'        rmenu_hide_all();\n'
+    b'        return true;\n'
+    b'    }\n'
+    b'    if (s_start_open && keycode == KEY_ESC) {\n'
+    b'        if (s_start_menu) lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);\n'
+    b'        s_start_open = false;\n'
+    b'        return true;\n'
+    b'    }\n'
+    b'    if (keycode == KEY_F1) { start_menu_toggle(); return true; }\n'
+    b'    if (keycode == KEY_F2) { app_launch(APP_TERMINAL); return true; }\n'
+    b'    if (keycode == KEY_F3) { app_launch(APP_FILEMGR); return true; }\n'
+    b'    if (keycode == KEY_F4) { app_launch(APP_MUSIC); return true; }\n'
+    b'    if (keycode == KEY_F5) { app_launch(APP_SETTINGS); return true; }\n'
+    b'    if (keycode == KEY_F6) { app_launch(APP_BROWSER); return true; }\n'
+    b'    if (keycode == KEY_F7) { app_launch(APP_VIDEOPLAYER); return true; }\n'
+    b'    return false;\n'
+    b'}'
+)
+new = (
+    b'        if (ctrl && !alt && keycode == KEY_ESC) { start_menu_toggle(); return true; }      // Ctrl+Esc: start menu\n'
+    b'        if (ctrl && keycode == KEY_TAB) { g_wm->cycle_focus(shift); return true; }         // Ctrl+Tab / Ctrl+Shift+Tab: cycle windows\n'
+    b'        return false;   // other Ctrl/Alt combos go to the focused app (Ctrl+S, ...)\n'
+    b'    }\n'
+    b'    // ESC closes an open context menu first; then the system F1-F7 app\n'
+    b'    // shortcuts.  These MUST run before the focused-widget dispatch below:\n'
+    b'    // the dispatch returns early for any non-textarea focus, which would\n'
+    b'    // otherwise swallow every function key (F2 -> terminal etc. never worked).\n'
+    b'    if ((s_rmenu_open || s_rmenu_desk_open) && keycode == KEY_ESC) {\n'
+    b'        rmenu_hide_all();\n'
+    b'        return true;\n'
+    b'    }\n'
+    b'    if (s_start_open && keycode == KEY_ESC) {\n'
+    b'        if (s_start_menu) lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);\n'
+    b'        s_start_open = false;\n'
+    b'        return true;\n'
+    b'    }\n'
+    b'    if (keycode == KEY_F1) { start_menu_toggle(); return true; }\n'
+    b'    if (keycode == KEY_F2) { app_launch(APP_TERMINAL); return true; }\n'
+    b'    if (keycode == KEY_F3) { app_launch(APP_FILEMGR); return true; }\n'
+    b'    if (keycode == KEY_F4) { app_launch(APP_MUSIC); return true; }\n'
+    b'    if (keycode == KEY_F5) { app_launch(APP_SETTINGS); return true; }\n'
+    b'    if (keycode == KEY_F6) { app_launch(APP_BROWSER); return true; }\n'
+    b'    if (keycode == KEY_F7) { app_launch(APP_VIDEOPLAYER); return true; }\n'
+    b'    {\n'
+    b'        // Feed keys into LVGL only when a textarea is focused (typing / Enter\n'
+    b'        // to submit). Button activation by keyboard on an empty desktop is not\n'
+    b'        // intended: Enter/space on a focused button could crash in the browser\n'
+    b'        // scene, so non-textarea focus falls through to the classic WM.\n'
+    b'        lv_obj_t* fo = s_kb_group ? lv_group_get_focused(s_kb_group) : 0;\n'
+    b'        if (fo && lv_obj_check_type(fo, &lv_textarea_class)) lvgl_key_push(keycode, ascii);\n'
+    b'        else return false;\n'
+    b'    }\n'
+    b'    return false;\n'
+    b'}'
+)
+n = data.count(old)
+print('occurrences:', n)
+if n != 1:
+    raise SystemExit(1)
+data = data.replace(old, new)
+with open(p, 'wb') as f:
+    f.write(data)
+print('patched OK')

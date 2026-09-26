@@ -17,5 +17,10 @@ int mini_js_run(const char* script, char* out, int out_sz,
 // Set the browser environment visible to scripts: current URL, document title
 // and viewport size (drives window.location / window.innerWidth / navigator).
 void mini_js_set_env(const char* url, const char* title, int w, int h);
+void mini_js_set_dom(const char* html);   // seed the DOM shim with the parsed tree
+
+// Drop the JS runtime entirely (fresh globals for a new page). Safe to call
+// from the main thread between page loads; the next mini_js_run rebuilds it.
+void mini_js_reset(void);
 
 } // namespace nefu

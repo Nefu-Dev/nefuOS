@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><title>TXND</title>
+<style>body { background-color: #202020; color: #ddd; }</style>
+</head>
+<body>
+<h1 style="background-color:#000080">TXND</h1>
+<canvas id="glc" width="320" height="240"></canvas>
+<script>
+  var c = document.getElementById('glc');
+  var gl = c.getContext('webgl2');
+  gl.clearColor(0.1, 0.1, 0.6, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  var px = new Uint8Array([255,0,0,255, 0,255,0,255, 0,0,255,255, 255,255,255,255]);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  print("txnd done");
+</script>
+</body></html>

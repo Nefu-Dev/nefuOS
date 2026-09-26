@@ -543,12 +543,16 @@ void gl_tex_upload(const char* cid, int target, int level, int internal,
 // and namespace-scope lookup respects declaration order.
 static const char* s_env_url = 0;
 static const char* s_env_title = 0;
+static const char* s_env_dom = 0;
 static int s_env_w = 0, s_env_h = 0;
 
 void mini_js_set_env(const char* url, const char* title, int w, int h) {
     s_env_url = url;
     s_env_title = title;
     s_env_w = w; s_env_h = h;
+}
+void mini_js_set_dom(const char* html) {
+    s_env_dom = html;   // read by ensure_js when the QuickJS runtime is born
 }
 
 namespace {
@@ -1232,6 +1236,8 @@ static void ensure_js() {
     // keep the doc JSValue alive: freeing it here would drop the reference
     // below the one held by the global object and break document.write
     JS_FreeValue(s_ctx, g);
+    if (s_env_dom && s_env_dom[0])
+        JS_SetPropertyStr(s_ctx, g, "__nfuSeed", JS_NewString(s_ctx, s_env_dom));
     // React/Vue-capable DOM shim: replaces document with a full node model
     JSValue shr = JS_Eval(s_ctx, JSDOM_SHIM_SRC, (size_t)strlen(JSDOM_SHIM_SRC),
                           "<dom-shim>", JS_EVAL_TYPE_GLOBAL);
@@ -1246,10 +1252,19 @@ static void ensure_js() {
 
 } // namespace
 
+static volatile int s_js_lock = 0;   // serializes quickjs across threads
+static inline void js_lock(void) {
+    while (__sync_lock_test_and_set(&s_js_lock, 1)) {}
+}
+static inline void js_unlock(void) {
+    __sync_lock_release(&s_js_lock);
+}
+
 int mini_js_run(const char* script, char* out, int out_sz,
                     char* html, int html_sz) {
     if (!script || !out || out_sz <= 1) return 1;
     out[0] = 0;
+    js_lock();
     ensure_js();
     if (!s_ctx) return 1;
     RunCtx rc;
@@ -1291,7 +1306,15 @@ int mini_js_run(const char* script, char* out, int out_sz,
     }
     JS_FreeValue(s_ctx, r);
     out[rc.oi] = 0;
+    js_unlock();
     return err;
+}
+
+void mini_js_reset(void) {
+    js_lock();
+    if (s_ctx) { JS_FreeContext(s_ctx); s_ctx = 0; }
+    if (s_rt) { JS_FreeRuntime(s_rt); s_rt = 0; }
+    js_unlock();
 }
 
 } // namespace nefu
