@@ -110,6 +110,37 @@ These are the original, hand-written parts that make nefuOS different from a "co
 - HTML parser recognizes `<img>`, `<br>`, `<p>`, `<h1>` tags
 - Real Bing search, page scroll, history navigation
 
+### 15. Real .deb Runtime (ar → gzip → tar → Linux ELF)
+- Kernel-side `.deb` parser: `ar` archive → `gzip` → `data.tar.*` → `tar` entries → files into the VFS
+- Installs the embedded Linux static ELF64 from `control.tar.gz` (`.deb` from `dpkg-deb --build` works unmodified)
+- Full Linux ELF64 loader: 40+ syscalls, `mmap`/`brk`/`write`/`read`/`open`/`close`/`stat`/`fcntl`/`select`/`ioctl`/`socket`-family
+- `#UD`-trap syscall dispatch keeps the guest ring-3 code isolated; exit trampoline returns control to the kernel
+- Verified headless: `"Hello from Linux ELF in nefuOS!"` printed by a real gcc-built static ELF inside the guest
+- Usage: `deb run <file.deb>`, or `electron <file.deb>` for the windowed renderer path
+
+### 16. Embedded X11 Protocol Server (core/x11)
+- 24bpp 1024x768 framebuffer; windows / GC / pixmaps as fixed tables; 4096-slot event queue
+- Guest socket plumbing: `socket` / `connect` / `sendto` / `recvfrom` syscalls from Linux ELF guests map onto the embedded server
+- Core requests: CreateWindow, CreateGC, MapWindow, Expose, PolyFillRectangle, PolyLine, ImageText8, PutImage
+- Host-side input injection: `xs_inject_key` / `xs_inject_pointer` feed the event queue
+- Boot-time self-test drives a real hand-built X11 wire-protocol client ELF end to end:
+  `req_count=7 draw_ops=46 windows=2 connected=1 pixel rect=ffffff bg=0 → SELFTEST PASS`
+
+### 17. Electron-Style Renderer Environment (core/apps/electron.cpp)
+- Main/renderer split: the nefuOS window is the Electron "main"; a guest Linux static ELF is the "renderer"
+- Renderer connects to the embedded X server through the kernel socket mapping and paints into `xs_fb`
+- `el_paint` letterboxes the 1024x768 X framebuffer into the window surface and draws a caption
+- Input forwarding: window keys/mouse are injected straight into the X event queue
+- `electron <path.deb|elf>` from the terminal; verified in QEMU: `electron wins=1 px=ecebe6 → ELECTRON PASS`
+
+### 18. NPKG Online Package Registry (slowAES challenge solved)
+- Live registry `http://npkg.site.je/package.json` downloads and lists **every** package
+- Solves the per-request JavaScript challenge: parse `slowAES.decrypt(c,2,a,b)`, AES-128-CBC decrypt (key=a, iv=b, no padding) into the `__test` cookie, re-request with `?i=1`
+- WinINet `Cookie:` header is ignored, so the host backend applies the cookie via `InternetSetCookieA` (session cookie, path=/)
+- Registry parser merges the server's concatenated JSON documents (`{"app":{...}}` x N)
+- GUI: store app shows "npkg Online" with install action; verified: `registry bytes=432 packages=2` (nefud, cubehu), `install 'nefud' -> OK`
+- Terminal: `npkg update / install / remove / start / list / upgrade`
+
 ---
 ## Features
 
