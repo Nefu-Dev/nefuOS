@@ -878,7 +878,22 @@ bool VFS::load(const uint8_t* data, uint32_t size) {
     root_.name = "/";
     root_.is_dir = true;
     root_.expanded = true;
-    return deser_node(p, end, &root_);
+    if (!deser_node(p, end, &root_)) return false;
+    // The serialized tree includes the root node itself, so deser_node adds
+    // a "/" wrapper under root_. Hoist the wrapper's children onto root_ so
+    // absolute paths resolve directly (legacy snapshots only).
+    if (root_.children.size() == 1 && root_.children[0]->is_dir &&
+        root_.children[0]->name == "/") {
+        FSNode* wrap = root_.children[0];
+        List<FSNode*> kids = wrap->children;
+        for (int i = 0; i < kids.size(); i++) {
+            kids[i]->parent = &root_;
+            root_.children.push(kids[i]);
+        }
+        root_.children.remove(0);
+        delete wrap;
+    }
+    return true;
 }
 
 } // namespace nefu

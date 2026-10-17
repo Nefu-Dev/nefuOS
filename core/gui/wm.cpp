@@ -61,8 +61,32 @@ static void wm_lv_close_cb(lv_event_t* e) {
     if (w && g_wm) g_wm->close_window(w);
 }
 
-WM::WM() : focus_(0), drag_(0), last_buttons_(0) {
+WM::WM() : focus_(0), drag_(0), scroll_drag_(0), scroll_drag_off_(0), last_buttons_(0) {
     drag_win_ = 0;
+}
+
+// Geometry of a window's vertical scrollbar: the track spans the content area
+// on the right edge; the thumb size/position derive from content_scroll_h and
+// scroll_y. Shared by paint_all and the mouse handler so the draggable thumb
+// always matches the drawn one. Returns false when the window has no scrollbar
+// (content fits or no declared height).
+static bool wm_sb_geom(Window* w, int& sb_x, int& sb_y, int& sb_h,
+                       int& thumb_h, int& thumb_y) {
+    sb_x = w->content_x + w->content_w - 8;
+    sb_y = w->content_y;
+    sb_h = w->content_h;
+    thumb_h = 0;
+    thumb_y = sb_y;
+    if (!w || w->content_scroll_h <= w->content_h) return false;
+    thumb_h = (w->content_h * w->content_h) / w->content_scroll_h;
+    if (thumb_h < 20) thumb_h = 20;
+    if (thumb_h > sb_h) thumb_h = sb_h;
+    int track = sb_h - thumb_h;
+    if (track < 1) track = 1;
+    int max_s = w->content_scroll_h - w->content_h;
+    if (max_s < 1) max_s = 1;
+    thumb_y = sb_y + (w->scroll_y * track) / max_s;
+    return true;
 }
 
 // Real LVGL title-bar height (the lv_win header); falls back to 18 for the
@@ -109,6 +133,7 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fu
     win->dragging = false;
     win->scroll_y = 0;
     win->content_scroll_h = 0;
+    win->app_scroll = false;
     win->title = title ? title : "";
     win->content_w = w;
     win->content_h = fullscreen ? h : h - 18;
@@ -183,6 +208,11 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fu
             lv_obj_set_style_bg_color(lvw->content, lv_color_hex(0xEDF0F6), 0);
             lv_obj_set_style_bg_opa(lvw->content, LV_OPA_COVER, 0);
             lv_obj_set_style_pad_all(lvw->content, 0, 0);
+            // Real scrolling for pure-LVGL windows (settings, store, ...):
+            // make the content scrollable so overflowing widgets scroll natively
+            // (wheel via WM::handle_scroll, draggable LVGL scrollbar).
+            lv_obj_add_flag(lvw->content, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_scrollbar_mode(lvw->content, LV_SCROLLBAR_MODE_AUTO);
             // The LVGL header is taller than the legacy 18px assumption;
             // size the canvas to the REAL content area so app content
             // (e.g. wiki bottom buttons) is not clipped and stays clickable.
@@ -215,6 +245,7 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fu
 
 void WM::destroy_window(Window* w) {
     if (!w) return;
+    if (scroll_drag_ == w) scroll_drag_ = 0;   // drop a stale thumb-drag owner
     if (w->lvw && w->lvw->win) {
         lv_obj_delete(w->lvw->win);
         w->lvw->win = 0;
@@ -237,6 +268,18 @@ void WM::close_window(Window* w) {
     if (w->lvw && w->lvw->win) lv_obj_add_flag(w->lvw->win, LV_OBJ_FLAG_HIDDEN);
     if (focus_ == w) focus_ = 0;
     if (drag_ == w) drag_ = 0;
+}
+
+void WM::minimize_all() {
+    for (int i = 0; i < wins_.size(); i++) {
+        Window* w = wins_[i];
+        if (!w || w->closed || !w->visible) continue;
+        if (!w->minimized) {
+            w->minimized = true;
+            if (w->lvw && w->lvw->win) lv_obj_add_flag(w->lvw->win, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    focus_ = 0;
 }
 
 void WM::cleanup() {
@@ -326,8 +369,11 @@ void WM::paint_all(Surface& fb) {
         }
         if (w->on_paint) w->on_paint(w);
         if (w->back.addr && w->content_w > 0 && w->content_h > 0) {
-            // Apply scroll offset: blit from scroll_y position in back buffer
-            int sy = w->scroll_y;
+            // Apply scroll offset: blit from scroll_y position in back buffer.
+            // app_scroll windows paint their own scrolled viewport into back
+            // (the back height equals the visible height), so the blit stays at
+            // offset 0 while scroll_y only drives the scrollbar thumb.
+            int sy = w->app_scroll ? 0 : w->scroll_y;
             if (sy < 0) sy = 0;
             if (sy > w->back.height - w->content_h) sy = w->back.height - w->content_h;
             if (sy < 0) sy = 0;
@@ -418,6 +464,29 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
         if (dw->on_drop) dw->on_drop(dw);
     }
 
+    // Scrollbar thumb drag owns the pointer while held: the WM drives
+    // w->scroll_y from the mouse Y and notifies the app (which mirrors it
+    // into its own scroll model for app_scroll windows).
+    if (scroll_drag_) {
+        Window* sw = scroll_drag_;
+        if (released) { scroll_drag_ = 0; return; }
+        if (sw && !sw->closed && sw->visible && !sw->minimized &&
+            sw->content_scroll_h > sw->content_h) {
+            int sb_x, sb_y, sb_h, thumb_h, thumb_y;
+            if (wm_sb_geom(sw, sb_x, sb_y, sb_h, thumb_h, thumb_y)) {
+                int max_s = sw->content_scroll_h - sw->content_h;
+                int track = sb_h - thumb_h;
+                int ny = y - scroll_drag_off_;
+                int ns = (ny - sb_y) * max_s / (track > 0 ? track : 1);
+                if (ns < 0) ns = 0;
+                if (ns > max_s) ns = max_s;
+                sw->scroll_y = ns;
+                if (sw->on_scroll) sw->on_scroll(sw, 0);
+            }
+        }
+        return;
+    }
+
     // dragging
     if (drag_) {
         if (released) {
@@ -479,22 +548,20 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
 
     // Scrollbar click handling
     if (pressed && win->content_scroll_h > win->content_h) {
-        int sb_x = win->content_x + win->content_w - 8;
-        int sb_y = win->content_y;
-        int sb_h = win->content_h;
+        int sb_x, sb_y, sb_h, thumb_h, thumb_y;
+        wm_sb_geom(win, sb_x, sb_y, sb_h, thumb_h, thumb_y);
         
         if (x >= sb_x - 4 && x <= sb_x + 10 && y >= sb_y && y <= sb_y + sb_h) {
-            // Click on scrollbar - jump to position
-            int thumb_h = (win->content_h * win->content_h) / win->content_scroll_h;
-            if (thumb_h < 20) thumb_h = 20;
-            int thumb_y = sb_y + (win->scroll_y * (sb_h - thumb_h)) / (win->content_scroll_h - win->content_h);
-            
-            int click_y = y;
-            if (click_y < thumb_y) {
-                // Click above thumb - scroll up one page
+            if (y >= thumb_y && y < thumb_y + thumb_h) {
+                // Press on the thumb: start dragging it
+                scroll_drag_ = win;
+                scroll_drag_off_ = y - thumb_y;
+                return;
+            }
+            // Click on track - jump one page
+            if (y < thumb_y) {
                 win->scroll_y -= win->content_h;
-            } else if (click_y > thumb_y + thumb_h) {
-                // Click below thumb - scroll down one page
+            } else if (y > thumb_y + thumb_h) {
                 win->scroll_y += win->content_h;
             }
             
@@ -538,13 +605,33 @@ void WM::handle_key(const KeyEvent* e) {
 
 void WM::handle_scroll(int delta) {
     if (!focus_) return;
-    
+
+    // Let the app scroll its own content first (browser/tab offsets, terminal
+    // line scroll, ...). The app mirrors the result into w->scroll_y for the
+    // scrollbar (app_scroll windows). Plain windows fall through to the WM
+    // auto-scroll below.
+    if (focus_->on_scroll) {
+        focus_->on_scroll(focus_, delta);
+        // clamp whatever the app left in scroll_y
+        int max_s = focus_->content_scroll_h - focus_->content_h;
+        if (max_s < 0) max_s = 0;
+        if (focus_->scroll_y < 0) focus_->scroll_y = 0;
+        if (focus_->scroll_y > max_s) focus_->scroll_y = max_s;
+        return;
+    }
+
+    // Pure-LVGL windows scroll their native content for real (LVGL renders
+    // the window itself, so the WM blit offset must stay untouched).
+    if (focus_->lvw && focus_->lvw->content) {
+        lv_obj_scroll_by(focus_->lvw->content, 0, -delta * 20, LV_ANIM_OFF);
+        return;
+    }
+
     // Auto-scroll: apply delta to window scroll offset
     focus_->scroll_y -= delta * 20;
     if (focus_->scroll_y < 0) focus_->scroll_y = 0;
-    
-    // Let the app handle it too (optional)
-    if (focus_->on_scroll) focus_->on_scroll(focus_, delta);
+    int max_s = focus_->content_scroll_h - focus_->content_h;
+    if (max_s > 0 && focus_->scroll_y > max_s) focus_->scroll_y = max_s;
 }
 
 void WM::relayout(Window* w) {

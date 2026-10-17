@@ -1,0 +1,14 @@
+#nefu
+import<std>
+import<sysapi>
+main() {
+  println("Hello from nefuOS npkg!");
+  println("args count: " + args().len);
+  var a = args();
+  var i = 0;
+  while (i < a.len) { println("  arg[" + i + "]=" + a[i]); i = i + 1; }
+  var extra = file_read_all("/pkg/hello/greeting.txt");
+  if (extra.len > 0) println("manifest file: [" + extra + "]");
+  else println("no greeting file");
+  println("install + start OK");
+}

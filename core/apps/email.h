@@ -2593,6 +2593,30 @@ static void email_paint(Window* w) {
         case EV_ACCOUNT:  mail_paint_account(st, s, W); break;
         default: break;
     }
+    // mirror scroll state for the WM scrollbar every frame
+    if (st->view == EV_LIST) {
+        int n = vis_total(st);
+        int total = n * ROW_H + TOOL_H + STATUS_H;
+        w->content_scroll_h = total > w->content_h ? total : 0;
+        w->scroll_y = w->content_scroll_h ? st->list_scroll * ROW_H : 0;
+    } else if (st->view == EV_READ) {
+        int maxv = 0;
+        if (st->cur_msg >= 0 && st->cur_msg < MAX_MSGS) {
+            const EmailMessage& m = st->folders[st->cur_folder].messages[st->cur_msg];
+            if (m.subject[0]) maxv = (int)(strlen(m.body) / 48) + 1;
+        }
+        int total = (maxv + 8) * 16;
+        w->content_scroll_h = total > w->content_h ? total : 0;
+        w->scroll_y = w->content_scroll_h ? st->read_scroll * 16 : 0;
+    } else if (st->view == EV_COMPOSE && st->comp_field == 4) {
+        int maxv = (int)(strlen(st->comp_body) / 48) + 1;
+        int total = (maxv + 8) * 16;
+        w->content_scroll_h = total > w->content_h ? total : 0;
+        w->scroll_y = w->content_scroll_h ? st->comp_body_scroll * 16 : 0;
+    } else {
+        w->content_scroll_h = 0;
+        w->scroll_y = 0;
+    }
     gfx::fillrect(s, SW, H - STATUS_H, W - SW, STATUS_H, 0x34495E);
     gfx::text(s, SW + 8, H - STATUS_H + 2, st->status, 0xECF0F1, 0x34495E);
 }
@@ -3096,16 +3120,40 @@ static void email_scroll(Window* w, int delta) {
         int n = vis_total(st);
         int listh = w->content_h - TOOL_H - 26 - STATUS_H;
         int maxrows = listh / ROW_H;
-        st->list_scroll -= delta;
+        if (delta != 0) st->list_scroll -= delta;
+        else st->list_scroll = w->scroll_y / ROW_H;   // thumb dragged (px -> rows)
         if (st->list_scroll < 0) st->list_scroll = 0;
         if (st->list_scroll > n - maxrows) st->list_scroll = n - maxrows;
         if (st->list_scroll < 0) st->list_scroll = 0;
+        int total = n * ROW_H + TOOL_H + STATUS_H;
+        w->content_scroll_h = total > w->content_h ? total : 0;
+        w->scroll_y = w->content_scroll_h ? st->list_scroll * ROW_H : 0;
     } else if (st->view == EV_READ) {
-        st->read_scroll -= delta;
+        int maxv = 0;
+        if (st->cur_msg >= 0 && st->cur_msg < MAX_MSGS) {
+            const EmailMessage& m = st->folders[st->cur_folder].messages[st->cur_msg];
+            if (m.subject[0]) maxv = (int)(strlen(m.body) / 48) + 1;
+        }
+        if (delta != 0) st->read_scroll -= delta;
+        else st->read_scroll = w->scroll_y / 16;
         if (st->read_scroll < 0) st->read_scroll = 0;
+        if (st->read_scroll > maxv) st->read_scroll = maxv;
+        int total = (maxv + 8) * 16;
+        w->content_scroll_h = total > w->content_h ? total : 0;
+        w->scroll_y = w->content_scroll_h ? st->read_scroll * 16 : 0;
     } else if (st->view == EV_COMPOSE && st->comp_field == 4) {
-        st->comp_body_scroll -= delta;
+        int maxv = (int)(strlen(st->comp_body) / 48) + 1;
+        if (delta != 0) st->comp_body_scroll -= delta;
+        else st->comp_body_scroll = w->scroll_y / 16;
         if (st->comp_body_scroll < 0) st->comp_body_scroll = 0;
+        if (st->comp_body_scroll > maxv) st->comp_body_scroll = maxv;
+        int total = (maxv + 8) * 16;
+        w->content_scroll_h = total > w->content_h ? total : 0;
+        w->scroll_y = w->content_scroll_h ? st->comp_body_scroll * 16 : 0;
+    } else {
+        // account view / non-body compose fields: nothing to scroll
+        w->content_scroll_h = 0;
+        w->scroll_y = 0;
     }
     email_paint(w);
 }
@@ -3128,6 +3176,7 @@ Window* open_email() {
     w->on_key = email_key;
     w->on_scroll = email_scroll;
     w->on_close = email_close;
+    w->app_scroll = true;   // email paints its own scrolled viewport
     w->esc_close = false;
     mail_load(st);
     if (!st->acct.configured && st->folders[EF_INBOX].msg_count == 0) mail_seed(st);

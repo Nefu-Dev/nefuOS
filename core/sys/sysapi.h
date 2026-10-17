@@ -122,6 +122,11 @@ int screen_height();
 // Get color depth
 int screen_bpp();
 
+// Number of pending notifications (0 until a notification center exists)
+int notification_count();
+void notification_mark_all_read();
+void notification_clear();
+
 // ============================================
 // Power API
 // ============================================

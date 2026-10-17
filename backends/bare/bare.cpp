@@ -5,6 +5,7 @@
 #include "../../core/klib/klib.h"
 #include "../../core/platform.h"
 #include "../../core/gui/gfx.h"   // full Surface definition
+#include "../../core/audio/audio_engine.h"   // integer audio engine (PCI sound cards)
 
 namespace nefu {
 
@@ -38,13 +39,13 @@ static void uart_putc(char c) {
 }
 
 // ===================== =====================
-// Arena starts at 0x920000: above the kernel image (linked at 0x100000,
-// ends < 0x620000, enforced at build time) and above the entry/stub stacks
-// (0x900000) and the stub staging region (0x620000..~0x8A0000).
+// Arena starts at 0xA20000: above the kernel image (linked at 0x100000,
+// ends < 0x680000, enforced at build time) and above the entry/stub stacks
+// (0xA00000) and the stub staging region (0x680000..~0x9C0000).
 // Kernel arena: 512 MB budget (kernel + NVFS + network). Browser arena:
 // a separate 2 GB region (BROWSER_ARENA_BASE..+2GB) so the browser can grow
 // up to its own 2 GB budget without starving the kernel.
-#define ARENA_BASE 0x920000u
+#define ARENA_BASE 0xA20000u
 #define ARENA_SIZE (512u * 1024u * 1024u)      // kernel + NVFS + network
 #define BROWSER_ARENA_BASE 0x40000000u
 #define BROWSER_ARENA_SIZE (2048u * 1024u * 1024u)  // browser, 2 GB
@@ -363,9 +364,11 @@ __attribute__((interrupt)) static void irq12_handler(void* frame) {
     pic_eoi(12);
 }
 __attribute__((interrupt)) static void spurious_handler(void* frame) { (void)frame; }
+extern "C" void nefu_ud_syscall_stub(void);   // elfrun.cpp: guest syscall emulation (#UD -> Linux syscall)
 static void idt_init() {
     // spurious, IRQ
     for (int i = 0; i < 256; i++) idt_set(i, (void*)spurious_handler);
+    idt_set(6, (void*)nefu_ud_syscall_stub);  // #UD: 0f 05 syscall -> elf syscall emulator
     idt_set(32, (void*)irq0_handler);
     idt_set(33, (void*)irq1_handler);
     idt_set(44, (void*)irq12_handler);
@@ -620,11 +623,14 @@ extern "C" void nefuos_kernel_main(void* info) {
 
     nefuos_init();
 
-    // audio: probe the SB16 DSP once so headless runs can verify the driver
-    if (sb_audio_init())
+    // audio: the integer engine probes real PCI sound cards (AC'97 / HDA)
+    // first, then the ISA SB16 fallback (headless serial runs can verify)
+    if (nefu::audio::engine_init())
+        platform_dbg("audio: engine ready on PCI sound card\n");
+    else if (sb_audio_init())
         platform_dbg("audio: sb16 detected at 0x220 (DSP 0xAA)\n");
     else
-        platform_dbg("audio: no sb16 sound card (run QEMU with -soundhw sb16)\n");
+        platform_dbg("audio: no sound card (run QEMU with -device AC97 or -device intel-hda)\n");
 
     __asm__ volatile("movw $0xE9, %%dx; movb $'C', %%al; outb %%al, %%dx" ::: "dx", "ax");
 
@@ -685,7 +691,7 @@ bool platform_net_get(NetAdapterInfo* out) {
     out->ip = g_net.ip;
     out->gw = g_net.gw;
     out->mask = g_net.netmask;
-    strncpy(out->name, "Intel PRO/1000 (e1000)", 48);
+    strncpy(out->name, "NIC", 48);
     out->name[47] = 0;
     return true;
 }
@@ -710,6 +716,29 @@ bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     if (out) *out = 0;
     if (out_size) *out_size = 0;
     return false;   // bare uses the in-house TCP stack (IP literals only)
+}
+
+// Generic HTTP request (bare): not implemented - the in-house TCP stack is
+// IP-literal only, so npkg/update report failure instead of hanging.
+bool platform_http_request(const char* method, const char* url,
+                           const char* headers,
+                           const uint8_t* body, uint32_t body_len,
+                           int* out_status, uint8_t** out_body, uint32_t* out_body_len) {
+    (void)method; (void)url; (void)headers; (void)body; (void)body_len;
+    if (out_status) *out_status = 0;
+    if (out_body) *out_body = 0;
+    if (out_body_len) *out_body_len = 0;
+    return false;
+}
+
+// Streaming HTTP request (bare): not implemented (see platform_http_request).
+bool platform_http_stream_request(const char* method, const char* url,
+                                  const char* headers, void* ctx,
+                                  bool (*cb)(void* ctx, const uint8_t* data, uint32_t len),
+                                  int* out_status) {
+    (void)method; (void)url; (void)headers; (void)ctx; (void)cb;
+    if (out_status) *out_status = 0;
+    return false;
 }
 
 // ===================== disk / ATA probe =====================
@@ -948,6 +977,14 @@ bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
     return true;
 }
 
+// The bare backend has no LLM model file/disk; the chatbot falls back to its
+// built-in rule table (see core/apps/chatbot.cpp).
+bool platform_llm_load(uint8_t** out, uint32_t* out_size) {
+    if (out) *out = 0;
+    if (out_size) *out_size = 0;
+    return false;
+}
+
 void platform_fs_save(const uint8_t* data, uint32_t size) {
     if (!data || size == 0 || size > FS_MAX_IMAGE) return;
     uint16_t base;
@@ -1150,10 +1187,15 @@ static bool wav_to_pcm16_stereo(const WavInfo& w, uint32_t& out_frames, uint32_t
     return true;
 }
 
-bool platform_audio_available() { return sb_audio_init(); }
+bool platform_audio_available() {
+    if (nefu::audio::engine_available()) return true;
+    return sb_audio_init();
+}
 
 bool platform_play_wav_mem(const uint8_t* data, uint32_t size) {
     if (!data || size < 44) return false;
+    // prefer the real PCI sound card (AC'97 / HD Audio) via the integer engine
+    if (nefu::audio::engine_play_wav_mem(data, size)) return true;
     if (!sb_audio_init()) return false;
     WavInfo w;
     if (!wav_parse(data, size, w)) return false;
@@ -1183,22 +1225,27 @@ void platform_stop_sound() {
     outb_p(DMA2_MASK, 0x05);           // mask DMA ch1 to halt transfer
 }
 
-// ===================== media (bare: no host decoder) =====================
-// The bare kernel has no Media Foundation; apps (video player, music player)
-// fall back to their demo content when these report false / -1.
-bool platform_media_available() { return false; }
+// ===================== media (bare: real WAV playback via the audio engine) =====================
+// The bare kernel has no Media Foundation; the integer audio engine plays WAV
+// files straight through the real PCI sound card (AC'97 / HD Audio).  VFS
+// paths are resolved inside the engine.
+bool platform_media_available() { return nefu::audio::engine_available(); }
 bool platform_media_open(const char* host_path, bool audio_only) {
-    (void)host_path; (void)audio_only;
-    return false;
+    (void)audio_only;
+    if (!host_path || !host_path[0]) return false;
+    return nefu::audio::media_open_path(host_path);
 }
-void platform_media_close() {}
-bool platform_media_play() { return false; }
-bool platform_media_pause() { return false; }
-void platform_media_stop() {}
-bool platform_media_seek_sec(int sec) { (void)sec; return false; }
-int  platform_media_position_sec() { return 0; }
-int  platform_media_duration_sec() { return -1; }
-void platform_media_set_volume(int percent) { (void)percent; }
+void platform_media_close() { nefu::audio::media_close(); }
+bool platform_media_play() { return nefu::audio::media_play(); }
+bool platform_media_pause() { nefu::audio::media_pause(); return true; }
+void platform_media_stop() { nefu::audio::media_stop(); }
+bool platform_media_seek_sec(int sec) {
+    if (sec < 0) sec = 0;
+    return nefu::audio::media_seek_sec(sec);
+}
+int  platform_media_position_sec() { return nefu::audio::media_position_sec(); }
+int  platform_media_duration_sec() { return nefu::audio::media_duration_sec(); }
+void platform_media_set_volume(int percent) { nefu::audio::media_set_volume(percent); }
 bool platform_media_has_video() { return false; }
 bool platform_media_frame_info(int* w, int* h) { (void)w; (void)h; return false; }
 bool platform_media_grab_frame(uint8_t* out_rgba) { (void)out_rgba; return false; }

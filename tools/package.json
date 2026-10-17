@@ -1,0 +1,10 @@
+{
+    "app":{
+        "nefud":{
+            "Introduction":"a text for nefuOS NPKG",
+            "version":"1.0.0",
+            "server_in":"/htdocs/nefud",
+            "deps": ["sysapi.h","std/*/**"]
+        }
+    }
+}

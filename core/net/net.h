@@ -7,6 +7,7 @@ namespace nefu {
 struct NetIf {
     bool up;
     uint8_t mac[6];
+    char name[48];      // NIC model name ("e1000"/"rtl8139"/"virtio-net")
     uint32_t ip;        // host order
     uint32_t gw;        // host order
     uint32_t netmask;   // host order

@@ -77,6 +77,12 @@ const char* platform_name();
 bool platform_fs_load(uint8_t** out, uint32_t* out_size);
 void platform_fs_save(const uint8_t* data, uint32_t size);
 
+// ===================== LLM model blob =====================
+// Load the neural-model blob (TinyStories int8). Host may read a model file;
+// bare has no model disk and returns false, so the app falls back to its
+// rule table.
+bool platform_llm_load(uint8_t** out, uint32_t* out_size);
+
 // ===================== power off / exit =====================
 void platform_poweroff();
 void platform_reboot();    // really reboot
@@ -164,6 +170,22 @@ void* platform_thread_create_stk(void (*func)(void*), void* arg, uint32_t stack_
 // instead of buffering the whole page.
 bool platform_http_stream(const char* url, void* ctx,
                           bool (*cb)(void* ctx, const uint8_t* data, uint32_t len));
+
+// Generic HTTP request with method + extra headers + optional body (host:
+// WinINet). On success *out_body is a kalloc'd buffer (caller kfree) and
+// *out_status holds the HTTP status code. Returns false on transport failure.
+bool platform_http_request(const char* method, const char* url,
+                           const char* headers,
+                           const uint8_t* body, uint32_t body_len,
+                           int* out_status, uint8_t** out_body, uint32_t* out_body_len);
+
+// Streaming variant: cb is called once per received block (return false to
+// abort). *out_status receives the HTTP status code.
+bool platform_http_stream_request(const char* method, const char* url,
+                                  const char* headers, void* ctx,
+                                  bool (*cb)(void* ctx, const uint8_t* data, uint32_t len),
+                                  int* out_status);
+
 void  platform_thread_sleep(uint32_t ms);
 
 // ===================== audio (host) =====================
@@ -230,6 +252,21 @@ enum {
     KEY_F1 = 20, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
     KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12,
     KEY_SHIFT = 30, KEY_CTRL = 31, KEY_ALT = 32, KEY_CAPS = 33,
+    KEY_FAST = 34,   // Win / Super (modifier; powers bare quick-update)
 };
 
 } // namespace nefu
+
+// C linkage HTTP request for the MicroPython nefu_http module. Buffers are
+// malloc'd (caller free()s them).
+#ifdef __cplusplus
+extern "C" {
+#endif
+int nefu_http_request(const char* method, const char* url,
+                      const char* body, const char* content_type,
+                      const char* extra_headers,
+                      int* out_status, char** out_headers, uint32_t* out_headers_len,
+                      char** out_body, uint32_t* out_body_len);
+#ifdef __cplusplus
+}
+#endif

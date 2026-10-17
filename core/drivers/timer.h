@@ -18,18 +18,18 @@ void shutdown_timer() {
 }
 
 // timer status
-bool () {
+bool timer_status() {
     return true;
 }
 
 // timer read operation
-int (uint32_t addr, void* buf, uint32_t len) {
+int timer_read(uint32_t addr, void* buf, uint32_t len) {
     // Read from timer
     return (int)len;
 }
 
 // timer write operation
-int (uint32_t addr, const void* buf, uint32_t len) {
+int timer_write(uint32_t addr, const void* buf, uint32_t len) {
     // Write to timer
     return (int)len;
 }

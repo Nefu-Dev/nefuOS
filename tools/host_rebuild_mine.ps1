@@ -1,0 +1,195 @@
+# nefuOS host incremental rebuild - PRIVATE copy (MainAgent) that uses its own
+# object cache, log files and output name so it never collides with the user's
+# own parallel builds (which share $env:TEMP\nefu_build\host and gcc_err.txt).
+$ErrorActionPreference = "Continue"
+$root = "D:\mycppos1\nefuOS"
+$g = "D:\CLion\bin\mingw\bin\g++.exe"
+Set-Location $root
+
+$coreSrc = @(
+  "core\nefuos.cpp", "core\klib\memory.cpp", "core\klib\string.cpp", "core\klib\printf.cpp", "core\klib\aes128.cpp",
+  "core\vfs\vfs.cpp", "core\vfs\nvfs.cpp", "core\gui\gfx.cpp", "core\gui\wm.cpp", "core\gui\widgets.cpp", "core\gui\desktop.cpp",
+  "core\apps\apps.cpp", "core\apps\terminal.cpp", "core\apps\filemgr.cpp", "core\apps\calc.cpp",
+  "core\apps\textview.cpp", "core\apps\sysinfo.cpp", "core\apps\settings.cpp", "core\apps\store.cpp",
+  "core\apps\snake.cpp", "core\apps\paint.cpp", "core\apps\clock.cpp", "core\apps\notepad.cpp",
+  "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\videoplayer.cpp", "core\apps\monitor.cpp",
+  "core\apps\browser.cpp", "core\apps\netcfg.cpp",
+  "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\net\net.cpp",
+  "core\net\http2.cpp",
+  "core\net\tls13_fixed.cpp",
+  "core\gui\ttfont.cpp", "core\apps\fontview.cpp", "core\apps\lvgl_demo.cpp",
+  "core\gui\lvgl_win.cpp",
+  "core\apps\lvgl_desktop.cpp",
+  "core\sys\settings.cpp", "core\sys\sha256.cpp", "core\sys\power.cpp", "core\sys\sysapi.cpp",
+  "core\apps\wiki.cpp",
+  "core\audio.cpp",
+  "core\audio\audio_engine.cpp", "core\drivers\audio_driver.cpp",
+  "core\apps\editor.cpp", "core\apps\minijs.cpp", "core\apps\calendar.cpp",
+  "core\apps\diskusage.cpp", "core\apps\passgen.cpp", "core\apps\sticky.cpp",
+  "core\apps\screenshot.cpp", "core\apps\colorpicker.cpp", "core\apps\search.cpp",
+  "core\apps\recyclebin.cpp", "core\apps\weather.cpp", "core\apps\help.cpp",
+  "core\apps\dictionary.cpp", "core\apps\taskmgr.cpp", "core\apps\inputmethod.cpp",
+  "core\ime\pinyin.cpp",
+  "core\apps\clipboard.cpp", "core\apps\notifcenter.cpp", "core\apps\shortcuts.cpp",
+  "core\apps\wallpaper.cpp", "core\apps\theme.cpp", "core\apps\processlist.cpp",
+  "core\apps\about_full.cpp", "core\apps\sysinfo_ext.cpp", "core\apps\credits.cpp",
+  "core\apps\releasenotes.cpp", "core\apps\installer.cpp", "core\apps\bios.cpp",
+  "core\apps\chatbot.cpp",
+    "core\lib\json.cpp", "core\lib\regex.cpp", "core\lib\softmath.cpp", "core\lib\hash.cpp", "core\lib\llm.cpp",
+  "core\lib\deflate.cpp", "core\lib\zip.cpp", "core\lib\bigint.cpp", "core\lib\prime.cpp",
+  "core\elf\elfrun.cpp",
+  "core\elf\elfrun_selfcheck.cpp",
+  "core\net\dns.cpp",
+  "core\apps\term_ext.cpp", "core\apps\ncode.cpp", "core\apps\npkg.cpp", "core\apps\update.cpp", "core\apps\tetris.cpp", "core\apps\game2048.cpp", "core\apps\sudoku.cpp",
+  "core\apps\memorymatch.cpp", "core\apps\hexedit.cpp", "core\apps\jsonview.cpp", "core\apps\findfiles.cpp",
+  "core\apps\pomodoro.cpp", "core\apps\stopwatch.cpp", "core\apps\wordcount.cpp",
+  "core\algo\sort.cpp", "core\algo\search.cpp", "core\algo\graph.cpp", "core\algo\ds.cpp",
+  "core\algo\numeric.cpp", "core\apps\algoviz.cpp",
+  "core\gfxlib\raster.cpp", "core\gfxlib\geo.cpp", "core\gfxlib\transform.cpp",
+  "core\gfxlib\noise.cpp", "core\gfxlib\color.cpp", "core\apps\gfxlab.cpp",
+  "core\simulate\ca.cpp", "core\simulate\particle.cpp", "core\simulate\physics.cpp",
+  "core\simulate\fluid.cpp", "core\simulate\lsystem.cpp", "core\simulate\flocking.cpp",
+  "core\apps\simlab.cpp",
+  "core\mathext\complex.cpp", "core\mathext\matrix.cpp", "core\mathext\poly.cpp",
+  "core\mathext\statistics.cpp", "core\mathext\numtheory.cpp", "core\mathext\geometry.cpp",
+  "core\apps\mathtool.cpp", "core\apps\fxgraph.cpp", "core\apps\fxsci.cpp",
+  "core\apps\fpsci.cpp", "core\apps\bigint.cpp", "core\apps\datecalc.cpp",
+  "core\apps\scratch.cpp", "core\apps\minijvm.cpp", "core\apps\minijvm_core.cpp",
+  "core\apps\minijvm_builtin.cpp",
+  "core\uiwidgets\widget.cpp", "core\uiwidgets\controls.cpp", "core\uiwidgets\tableview.cpp",
+  "core\uiwidgets\chart.cpp", "core\uiwidgets\dialog.cpp", "core\uiwidgets\menu.cpp",
+  "core\uiwidgets\painter.cpp", "core\apps\widgetgallery.cpp",
+  "core\database\wal.cpp", "core\database\btree.cpp", "core\database\kvstore.cpp",
+  "core\database\sqlparse.cpp", "core\database\sqlexec.cpp", "core\database\cursor.cpp",
+  "core\apps\dbmanager.cpp",
+  "core\apps\games2_util.cpp", "core\apps\breakout.cpp", "core\apps\pong.cpp",
+  "core\apps\flappy.cpp", "core\apps\spaceinv.cpp", "core\apps\pacman.cpp",
+  "core\apps\tictactoe.cpp", "core\apps\connect4.cpp", "core\apps\minesweeper2.cpp",
+  "core\apps\life.cpp",
+  "core\ml\matrix.cpp", "core\ml\dataset.cpp", "core\ml\linear.cpp", "core\ml\knn.cpp",
+  "core\ml\decisiontree.cpp", "core\ml\randomforest.cpp", "core\ml\kmeans.cpp",
+  "core\ml\pca.cpp", "core\ml\neuralnet.cpp", "core\ml\bayes.cpp",
+  "core\apps\mllab.cpp",
+  "core\termcmds\termcmds_all.cpp", "core\termcmds\filecmd.cpp", "core\termcmds\textcmd.cpp",
+  "core\termcmds\syscmd.cpp", "core\termcmds\netcmd.cpp", "core\termcmds\devcmd.cpp",
+  "core\termcmds\funcmd.cpp", "core\termcmds\extracmd.cpp",
+  "core\textlib\levenshtein.cpp", "core\textlib\lcs.cpp", "core\textlib\kmp.cpp",
+  "core\textlib\aho.cpp", "core\textlib\token.cpp", "core\textlib\ngram.cpp",
+  "core\textlib\regexlite.cpp", "core\textlib\diff.cpp",
+  "core\textproc\editdist.cpp", "core\textproc\search.cpp", "core\textproc\trie.cpp",
+  "core\textproc\stats.cpp", "core\textproc\phonetic.cpp", "core\textproc\tokenize.cpp",
+  "core\apps\texttool.cpp",
+    "core\datlib\vec.cpp", "core\datlib\ringbuf.cpp", "core\datlib\bitset.cpp",
+    "core\datlib\hashtab.cpp", "core\datlib\rbtree.cpp", "core\datlib\treap.cpp",
+    "core\datlib\btree.cpp", "core\datlib\segtree.cpp", "core\datlib\fenwick.cpp",
+    "core\datlib\bloom.cpp", "core\datlib\lru.cpp", "core\datlib\sortedlist.cpp",
+    "core\datlib\ipq.cpp", "core\datlib\objpool.cpp", "core\datlib\radix.cpp",
+    "core\datlib\timerwheel.cpp",
+    "core\cryptlib\sha256.cpp", "core\cryptlib\sha1.cpp", "core\cryptlib\md5.cpp",
+    "core\cryptlib\crc.cpp", "core\cryptlib\b64.cpp", "core\cryptlib\hmac.cpp",
+    "core\cryptlib\pbkdf2.cpp", "core\cryptlib\aes.cpp", "core\cryptlib\rc4.cpp",
+    "core\cryptlib\xor.cpp",
+    "core\complib\bitio.cpp", "core\complib\rle.cpp", "core\complib\huffman.cpp",
+    "core\complib\lz77.cpp", "core\complib\lzw.cpp", "core\complib\arithmetic.cpp",
+    "core\complib\bwt.cpp",
+    "core\mathlib\bigint.cpp", "core\mathlib\rational.cpp", "core\mathlib\complex.cpp",
+    "core\mathlib\matrix.cpp", "core\mathlib\fft.cpp", "core\mathlib\polynomial.cpp",
+    "core\mathlib\stat.cpp", "core\mathlib\regression.cpp", "core\mathlib\prime.cpp",
+    "core\mathlib\random.cpp", "core\mathlib\vector2.cpp", "core\mathlib\gcd.cpp",
+    "core\simlib\life.cpp", "core\simlib\queue.cpp", "core\simlib\world.cpp",
+    "core\simlib\boids.cpp", "core\simlib\epidemic.cpp", "core\simlib\traffic.cpp",
+    "core\simlib\perlin.cpp", "core\simlib\langton.cpp",
+    "core\gfxmath\vec3.cpp", "core\gfxmath\mat4.cpp", "core\gfxmath\quat.cpp",
+    "core\gfxmath\ray.cpp", "core\gfxmath\aabb.cpp", "core\gfxmath\camera.cpp",
+    "core\gfxmath\mesh.cpp", "core\gfxmath\proj.cpp",
+    "core\audlib\wave.cpp", "core\audlib\synth.cpp", "core\audlib\env.cpp",
+    "core\audlib\filter.cpp", "core\audlib\seq.cpp", "core\audlib\mixer.cpp",
+    "core\audlib\modulate.cpp",
+    "core\dblib\csv.cpp", "core\dblib\ini.cpp", "core\dblib\jsonstore.cpp",
+    "core\dblib\bptree.cpp", "core\dblib\page.cpp", "core\dblib\table.cpp",
+    "core\crypto\cipher.cpp", "core\crypto\hashx.cpp", "core\crypto\mac.cpp",
+    "core\crypto\kdf.cpp", "core\crypto\rng.cpp", "core\crypto\codec.cpp",
+    "core\crypto\classic.cpp", "core\crypto\pubkey.cpp",
+    "core\compress\rle.cpp", "core\compress\huffman.cpp", "core\compress\lz.cpp",
+    "core\compress\bwt.cpp", "core\compress\arith.cpp", "core\compress\dict.cpp",
+    "core\compress\other.cpp", "core\compress\compress_all.cpp",
+    "core\serialize\textfmt.cpp", "core\serialize\binary.cpp",
+    "core\serialize\imagec.cpp", "core\serialize\audiof.cpp",
+    "core\audsp\osc.cpp", "core\audsp\env.cpp", "core\audsp\filter.cpp",
+    "core\audsp\effect.cpp", "core\audsp\synth.cpp", "core\audsp\analysis.cpp",
+    "core\audsp\midi.cpp",
+    "core\gfx3d\math3d.cpp", "core\gfx3d\mesh.cpp", "core\gfx3d\raster.cpp",
+    "core\gfx3d\light.cpp", "core\gfx3d\scene.cpp", "core\gfx3d\ppm.cpp",
+    "core\gfx3d\renderer.cpp", "core\gfx3d\bezier.cpp", "core\gfx3d\shadows.cpp",
+    "core\gfx3d\tonemap.cpp", "core\gfx3d\texture.cpp", "core\gfx3d\camera.cpp",
+    "core\apps\cryptolab.cpp", "core\apps\compresstool.cpp", "core\apps\serialab.cpp",
+    "core\apps\audiolab.cpp", "core\apps\gfx3dview.cpp",
+  "core\netproto\arp.cpp", "core\netproto\dhcp.cpp", "core\netproto\dns.cpp", "core\netproto\ethernet.cpp",
+  "core\netproto\firewall.cpp", "core\netproto\http.cpp", "core\netproto\icmp.cpp", "core\netproto\ip.cpp",
+  "core\netproto\mqtt.cpp", "core\netproto\netif.cpp", "core\netproto\netproto_all.cpp", "core\netproto\netproto_common.cpp",
+  "core\netproto\netstack.cpp", "core\netproto\ntp.cpp", "core\netproto\pkt_dissect.cpp", "core\netproto\pktlog.cpp",
+  "core\netproto\socket.cpp", "core\netproto\tcp.cpp", "core\netproto\udp.cpp", "core\netproto\websocket.cpp",
+  "core\sysutil\config.cpp", "core\sysutil\eventlog.cpp", "core\sysutil\permissions.cpp", "core\sysutil\process.cpp",
+  "core\sysutil\scheduler.cpp", "core\sysutil\services.cpp", "core\sysutil\sysinfo.cpp", "core\minilang\ast.cpp",
+  "core\minilang\builtin.cpp", "core\minilang\compiler.cpp", "core\minilang\env.cpp", "core\minilang\eval.cpp",
+  "core\minilang\parser.cpp", "core\minilang\stdlib.cpp", "core\minilang\token.cpp", "core\minilang\value.cpp",
+  "core\minilang\vm.cpp", "core\filesystem\cache.cpp", "core\filesystem\disk.cpp", "core\filesystem\ext2.cpp",
+  "core\filesystem\fat16.cpp", "core\filesystem\journal.cpp", "core\filesystem\minixfs.cpp", "core\filesystem\vfs_layer.cpp",
+  "core\raytrace\bvh.cpp", "core\raytrace\camera.cpp", "core\raytrace\lights.cpp", "core\raytrace\materials.cpp",
+  "core\raytrace\pathtracer.cpp", "core\raytrace\primitives.cpp", "core\raytrace\rtaccel.cpp", "core\raytrace\rtaccum.cpp",
+  "core\raytrace\rtbake.cpp", "core\raytrace\rtbrdf.cpp", "core\raytrace\rtcampath.cpp", "core\raytrace\rtenv.cpp",
+  "core\raytrace\rtfilter.cpp", "core\raytrace\rtinstance.cpp", "core\raytrace\rtintegrator.cpp", "core\raytrace\rtlightprobe.cpp",
+  "core\raytrace\rtlighttree.cpp", "core\raytrace\rtmath.cpp", "core\raytrace\rtmesh.cpp", "core\raytrace\rtmesh2.cpp",
+  "core\raytrace\rtmis.cpp", "core\raytrace\rtnoise.cpp", "core\raytrace\rtonemap.cpp", "core\raytrace\rtpost.cpp",
+  "core\raytrace\rtraypool.cpp", "core\raytrace\rtrender.cpp", "core\raytrace\rtsampler.cpp", "core\raytrace\rtserialize.cpp",
+  "core\raytrace\rtshader.cpp", "core\raytrace\rtsky.cpp", "core\raytrace\rtstats.cpp", "core\raytrace\rtutil.cpp",
+  "core\raytrace\rtworld.cpp", "core\raytrace\scene.cpp", "core\raytrace\texture.cpp", "core\compiler\assembler.cpp",
+  "core\compiler\ast.cpp", "core\compiler\codegen.cpp", "core\compiler\ir.cpp", "core\compiler\lexer.cpp",
+  "core\compiler\linker.cpp", "core\compiler\parser.cpp", "core\compiler\preprocessor.cpp", "core\gameengine\audio_engine.cpp",
+  "core\gameengine\ge_math.cpp", "core\gameengine\input.cpp", "core\gameengine\particle_engine.cpp", "core\gameengine\physics2d.cpp",
+  "core\gameengine\scene.cpp", "core\gameengine\sprite.cpp", "core\gameengine\tilemap.cpp", "core\gameengine\ui.cpp",
+  "core\deeplearn\activations.cpp", "core\deeplearn\attention.cpp", "core\deeplearn\autograd.cpp", "core\deeplearn\data.cpp",
+  "core\deeplearn\layers.cpp", "core\deeplearn\losses.cpp", "core\deeplearn\metrics.cpp", "core\deeplearn\models.cpp",
+  "core\deeplearn\optimizers.cpp", "core\deeplearn\rnn.cpp", "core\deeplearn\tensor.cpp", "core\deeplearn\trainer.cpp",
+  "core\deeplearn\weights.cpp", "core\apps\netlab.cpp", "core\apps\sysmon.cpp", "core\apps\repl.cpp", "core\apps\fsview.cpp",
+  "core\apps\rayview.cpp", "core\apps\compilerlab.cpp", "core\apps\gedemo.cpp", "core\apps\deepviz.cpp",
+  "third_party\stb_image_wrap.cpp",
+  "backends\win32\win32.cpp", "backends\win32\media_win32.cpp"
+)
+
+$lvConfPath = (Resolve-Path "third_party\lvgl_conf\lv_conf.h").Path -replace '\\', '/'
+$flags = "-std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party -I third_party\lvgl_conf -I third_party\lvgl_src\lvgl-9.2.0 -D`"LV_CONF_PATH=$lvConfPath`" -DNEFU_LVGL_DEMO"
+
+$hostOut = "$env:TEMP\nefu_build_mine\host"
+New-Item -ItemType Directory -Force $hostOut | Out-Null
+$objs = @()
+$failed = @()
+foreach ($s in $coreSrc) {
+  $o = "$hostOut\" + ($s -replace '[\\/]', '_' -replace '\.cpp$', '.o')
+  $objs += $o
+  if (Test-Path $o) {
+    $srcT = (Get-Item $s).LastWriteTime; $objT = (Get-Item $o).LastWriteTime
+    if ($objT -ge $srcT) { continue }
+    Remove-Item $o -Force
+  }
+  & $g $flags.Split(' ') -c $s -o $o 2> "$env:TEMP\gcc_err_mine.txt"
+  if ($LASTEXITCODE -ne 0) { $failed += $s; Write-Output "FAIL: $s" }
+}
+if ($failed.Count -gt 0) { Write-Output "compile failures: $($failed.Count)"; exit 1 }
+Write-Output "compiled $($objs.Count) host objects"
+
+# prebuilt bare objects are shared read-only with the user's cache
+$bareOut = "$env:TEMP\nefu_build\bare"
+$extra = @()
+$extra += Get-ChildItem "$bareOut\lvgl_h_*.o" -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+$extra += Get-ChildItem "$bareOut\host_*.o" -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "host_mp_*" } | ForEach-Object { $_.FullName }
+$extra += Get-ChildItem "$bareOut\mp_*.o" -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+Write-Output "bare objects: $($extra.Count)"
+$all = $objs + $extra
+$rsp = "$env:TEMP\nefu_objs_mine.rsp"
+[IO.File]::WriteAllText($rsp, (($all | ForEach-Object { '"' + $_ + '"' }) -join "`r`n"), (New-Object Text.UTF8Encoding $false))
+$exe = "$env:TEMP\nefu_fix_test\nefuOS_mine.exe"
+New-Item -ItemType Directory -Force "$env:TEMP\nefu_fix_test" | Out-Null
+& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation "-Wl,--stack,67108864" -o $exe "@$rsp" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 2> "$env:TEMP\gcc_link_err_mine.txt"
+if ($LASTEXITCODE -ne 0) { Write-Output "LINK FAILED"; exit 1 }
+Write-Output "host exe OK: $((Get-Item $exe).Length) bytes -> $exe"

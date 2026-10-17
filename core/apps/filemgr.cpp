@@ -161,7 +161,7 @@ static void fm_open(FSNode* c) {
             strcmp(ext, "mpeg") == 0 || strcmp(ext, "m4v") == 0 || strcmp(ext, "webm") == 0 ||
             strcmp(ext, "3gp") == 0 || strcmp(ext, "flv") == 0 || strcmp(ext, "ts") == 0 ||
             strcmp(ext, "ogv") == 0) app_show_video(c);
-    else if (strcmp(ext, "nefud") == 0 || strcmp(ext, "bin") == 0) app_show_nefud(c);
+    else if (strcmp(ext, "nefud") == 0 || strcmp(ext, "bin") == 0 || strcmp(ext, "deb") == 0) app_show_nefud(c);
     else if (is_code_ext(ext)) app_show_editor(c);
     else app_show_textview(c);
 }
@@ -250,6 +250,13 @@ static void fm_paint(Window* w) {
     int W = s.width, H = s.height;
     int left_w = W * 2 / 5;
     s.fill(FM_BG);
+    // mirror scroll state for the WM scrollbar every frame
+    int rcount = st->sel_dir ? (int)st->sel_dir->children.size() : 0;
+    int total = rcount * 16 + 64;
+    w->content_scroll_h = total > w->content_h ? total : 0;
+    w->scroll_y = w->content_scroll_h ? st->list_scroll * 16 : 0;
+    if (w->content_scroll_h && w->scroll_y > w->content_scroll_h - w->content_h)
+        w->scroll_y = w->content_scroll_h - w->content_h;
 
     gfx::fillrect(s, 0, 0, W, TOOL_H, FM_HEAD);
     gfx::hline(s, 0, W - 1, TOOL_H, color::BORDER);
@@ -629,11 +636,27 @@ static void fm_drag_drop(Window* w) {
 
 static void fm_scroll(Window* w, int delta) {
     FMState* st = (FMState*)w->userdata;
-    int step = delta > 0 ? -2 : 2;
-    st->tree_scroll += step;
-    st->list_scroll += step;
-    if (st->tree_scroll < 0) st->tree_scroll = 0;
-    if (st->list_scroll < 0) st->list_scroll = 0;
+    if (delta != 0) {
+        int step = delta > 0 ? -2 : 2;
+        st->tree_scroll += step;
+        st->list_scroll += step;
+        if (st->tree_scroll < 0) st->tree_scroll = 0;
+        if (st->list_scroll < 0) st->list_scroll = 0;
+    } else {
+        // scrollbar thumb dragged: the WM moved w->scroll_y (pixels); map it
+        // back to list rows (16px each) and keep the tree pane in sync.
+        st->list_scroll = w->scroll_y / 16;
+        if (st->list_scroll < 0) st->list_scroll = 0;
+        st->tree_scroll = st->list_scroll;
+    }
+    // Mirror the list offset into the WM scrollbar: rows * line height (16)
+    // plus the toolbar/header block.
+    int rows = st->sel_dir ? (int)st->sel_dir->children.size() : 0;
+    int total = rows * 16 + 64;
+    w->content_scroll_h = total > w->content_h ? total : 0;
+    w->scroll_y = w->content_scroll_h ? st->list_scroll * 16 : 0;
+    if (w->content_scroll_h && w->scroll_y > w->content_scroll_h - w->content_h)
+        w->scroll_y = w->content_scroll_h - w->content_h;
 }
 
 static void fm_key(Window* w, const KeyEvent* e) {
@@ -783,6 +806,7 @@ void fm_launch() {
     w->on_close = fm_close;
     w->on_drag = fm_drag_update;
     w->on_drop = fm_drag_drop;
+    w->app_scroll = true;   // filemgr paints its own scrolled viewport
 }
 
 } // namespace nefu

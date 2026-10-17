@@ -1,0 +1,2 @@
+export const id=144;export const ids=[144];export const modules={29170:(uu,Cu,Ju)=>{Ju.r(Cu),Ju.d(Cu,{clearQuadPixelShaderWGSL:()=>Uu});var mC=Ju(1356);const hu="clearQuadPixelShader",nu="uniform color: vec4f;@fragment\nfn main(input: FragmentInputs)->FragmentOutputs {fragmentOutputs.color=uniforms.color;}\n";mC.e.ShadersStoreWGSL[hu]||(mC.e.ShadersStoreWGSL[hu]=nu);const Uu={name:hu,shader:nu}}};
+//# sourceMappingURL=y8i0fs.144.8206c136.chunk.js.map

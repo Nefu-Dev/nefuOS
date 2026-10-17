@@ -1,0 +1,1124 @@
+﻿
+
+Root    : D:\mycppos1\nefuOS
+Gxx     : D:\CLion\bin\mingw\bin\g++.exe
+As      : D:\CLion\bin\mingw\bin\as.exe
+Ld      : D:\CLion\bin\mingw\bin\ld.exe
+Objcopy : D:\CLion\bin\mingw\bin\objcopy.exe
+
+core sources: 437
+powershell : out-file : The process cannot access the file 'C:\Users\huawei\AppData\Local\Temp\nefu_link.log' because i
+t is being us
+所在位置 行:1 字符: 36
++ ... s1\nefuOS"; powershell -NoProfile -ExecutionPolicy Bypass -File "tool ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (out-file : The ... it is being us:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ed by another process.
+At D:\mycppos1\nefuOS\tools\build_iso.ps1:215 char:1
++ & $g "@$hostLinkRsp" 2> $linkErr
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OpenError: (:) [Out-File], IOException
+    + FullyQualifiedErrorId : FileOpenFailure,Microsoft.PowerShell.Commands.OutFileCommand
+ 
+host exe OK: 8297258 bytes
+core\algo\search.cpp: In function 'int nefu::algo::search_self_test()':
+core\algo\search.cpp:214:17: warning: unused variable 'p4' [-Wunused-variable]
+  214 |     const char* p4 = "the";
+      |                 ^~
+core\algo\search.cpp:215:17: warning: unused variable 'p5' [-Wunused-variable]
+  215 |     const char* p5 = "o";
+      |                 ^~
+core\algo\sort.cpp: In function 'void nefu::algo::{anonymous}::check_sort(const char*, void (*)(int*, int, nefu::algo::
+CompareFn), int*, int, nefu::algo::CompareFn)':
+core\algo\sort.cpp:350:29: warning: unused parameter 'name' [-Wunused-parameter]
+  350 | void check_sort(const char* name, void (*fn)(int*, int, CompareFn), int* a, int n, CompareFn cmp) {
+      |                 ~~~~~~~~~~~~^~~~
+core\algo\sort.cpp: In function 'void nefu::algo::{anonymous}::check_noncmp(const char*, void (*)(int*, int, int, int),
+ int*, int, int, int)':
+core\algo\sort.cpp:367:31: warning: unused parameter 'name' [-Wunused-parameter]
+  367 | void check_noncmp(const char* name, void (*fn)(int*, int, int, int), int* a, int n, int lo, int hi) {
+      |                   ~~~~~~~~~~~~^~~~
+core\algo\sort.cpp: In function 'void nefu::algo::{anonymous}::check_noncmp5(const char*, void (*)(int*, int, int, int,
+ int), int*, int, int, int, int)':
+core\algo\sort.cpp:375:32: warning: unused parameter 'name' [-Wunused-parameter]
+  375 | void check_noncmp5(const char* name, void (*fn)(int*, int, int, int, int), int* a, int n, int lo, int hi, int n
+b) {
+      |                    ~~~~~~~~~~~~^~~~
+In file included from core\apps\apps.cpp:3:
+core\apps\email.h:669:13: warning: 'void nefu::apps::mail_qp_decode(const char*, char*, int)' defined but not used [-Wu
+nused-function]
+  669 | static void mail_qp_decode(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~
+core\apps\email.h:590:13: warning: 'void nefu::apps::mail_encode_header(const char*, char*, int)' defined but not used 
+[-Wunused-function]
+  590 | static void mail_encode_header(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~~~~
+core\apps\email.h:555:13: warning: 'void nefu::apps::mail_disp_name(const char*, char*, int)' defined but not used [-Wu
+nused-function]
+  555 | static void mail_disp_name(const char* addr, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~
+core\apps\email.h:509:13: warning: 'void nefu::apps::mail_parse_rfc822_date(const char*, char*, int)' defined but not u
+sed [-Wunused-function]
+  509 | static void mail_parse_rfc822_date(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~
+core\apps\email.h:462:13: warning: 'void nefu::apps::mail_strip_html(const char*, char*, int)' defined but not used [-W
+unused-function]
+  462 | static void mail_strip_html(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~
+core\apps\email.h:436:13: warning: 'void nefu::apps::mail_decode_header(const char*, char*, int)' defined but not used 
+[-Wunused-function]
+  436 | static void mail_decode_header(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~~~~
+core\apps\audiolab.cpp: In member function 'void nefu::{anonymous}::LabState::write_wav()':
+core\apps\audiolab.cpp:96:13: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+   96 |             if (v > 1.0) v = 1.0; if (v < -1.0) v = -1.0;
+      |             ^~
+core\apps\audiolab.cpp:96:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by
+ the 'if'
+   96 |             if (v > 1.0) v = 1.0; if (v < -1.0) v = -1.0;
+      |                                   ^~
+core\apps\bigint.cpp: In function 'void nefu::{anonymous}::run(BiState*)':
+core\apps\bigint.cpp:305:9: warning: unused variable 'digits1' [-Wunused-variable]
+  305 |     int digits1 = 0;
+      |         ^~~~~~~
+In function 'int nefu::{anonymous}::big_digits(const Big*)',
+    inlined from 'void nefu::{anonymous}::run(BiState*)' at core\apps\bigint.cpp:373:35:
+core\apps\bigint.cpp:229:12: warning: 'R.nefu::{anonymous}::Big::n' may be used uninitialized [-Wmaybe-uninitialized]
+  229 |     if (a->n == 0) return 1;
+      |         ~~~^
+core\apps\bigint.cpp: In function 'void nefu::{anonymous}::run(BiState*)':
+core\apps\bigint.cpp:297:15: note: 'R' declared here
+  297 |     Big A, B, R, R2;
+      |               ^
+In file included from core\apps\browser.cpp:64:
+core\apps\php2html.h: In function 'char* nfuphp::pv_arr_encode(PVm*, const char*, const char*)':
+core\apps\php2html.h:1014:33: warning: unused parameter 'V' [-Wunused-parameter]
+ 1014 | static char* pv_arr_encode(PVm* V, const char* k, const char* v) {
+      |                            ~~~~~^
+core\apps\php2html.h: In function 'nfuphp::PVal nfuphp::vm_call_builtin(PVm*, const char*, PVal*, int, PScratch*)':
+core\apps\php2html.h:1530:21: warning: unused variable 'q' [-Wunused-variable]
+ 1530 |         const char* q = src;
+      |                     ^
+core\apps\php2html.h:1626:13: warning: unused variable 'wn' [-Wunused-variable]
+ 1626 |         int wn = 0;
+      |             ^~
+core\apps\browser.cpp: In constructor 'nefu::{anonymous}::DomNode::DomNode()':
+core\apps\browser.cpp:401:10: warning: 'nefu::{anonymous}::DomNode::has_inl' will be initialized after [-Wreorder]
+  401 |     bool has_inl;
+      |          ^~~~~~~
+core\apps\browser.cpp:399:9: warning:   'int nefu::{anonymous}::DomNode::cw' [-Wreorder]
+  399 |     int cw, ch;        // canvas element size (width/height attrs, default 300x150)
+      |         ^~
+core\apps\browser.cpp:409:5: warning:   when initialized here [-Wreorder]
+  409 |     DomNode() : has_inl(false), cw(300), ch(150), nfu_idx(-1),
+      |     ^~~~~~~
+core\apps\browser.cpp: In copy constructor 'nefu::{anonymous}::DomNode::DomNode(const nefu::{anonymous}::DomNode&)':
+core\apps\browser.cpp:401:10: warning: 'nefu::{anonymous}::DomNode::has_inl' will be initialized after [-Wreorder]
+  401 |     bool has_inl;
+      |          ^~~~~~~
+core\apps\browser.cpp:399:9: warning:   'int nefu::{anonymous}::DomNode::cw' [-Wreorder]
+  399 |     int cw, ch;        // canvas element size (width/height attrs, default 300x150)
+      |         ^~
+core\apps\browser.cpp:416:5: warning:   when initialized here [-Wreorder]
+  416 |     DomNode(const DomNode& o) : has_inl(false), cw(300), ch(150), nfu_idx(-1),
+      |     ^~~~~~~
+core\apps\browser.cpp: In member function 'void nefu::{anonymous}::PageParser::parse_until(int)':
+core\apps\browser.cpp:1165:52: warning: unused variable 'srl' [-Wunused-variable]
+ 1165 |                 char srcur[256]; int srn2 = 0; int srl = 0;
+      |                                                    ^~~
+core\apps\browser.cpp: In constructor 'nefu::{anonymous}::Flow::Flow(nefu::{anonymous}::PageLayout*, int, nefu::{anonym
+ous}::Img*, const char*, const nefu::{anonymous}::CSSRule*, int)':
+core\apps\browser.cpp:1489:9: warning: 'nefu::{anonymous}::Flow::css_n' will be initialized after [-Wreorder]
+ 1489 |     int css_n;
+      |         ^~~~~
+core\apps\browser.cpp:1481:9: warning:   'int nefu::{anonymous}::Flow::node_now' [-Wreorder]
+ 1481 |     int node_now;       // DomNode index currently emitted (click mapping)
+      |         ^~~~~~~~
+core\apps\browser.cpp:1492:5: warning:   when initialized here [-Wreorder]
+ 1492 |     Flow(PageLayout* o, int width, Img* im = 0, const char* base = 0,
+      |     ^~~~
+core\apps\browser.cpp: In function 'void nefu::{anonymous}::layout_node_inner(const nefu::List<DomNode>&, int, Flow&, i
+nt, const Eff&)':
+core\apps\browser.cpp:1683:33: warning: the address of 'nefu::{anonymous}::DomNode::value' will never be NULL [-Waddres
+s]
+ 1683 |             const char* raw = n.value ? n.value : "";
+      |                               ~~^~~~~
+core\apps\browser.cpp:408:10: note: 'nefu::{anonymous}::DomNode::value' declared here
+  408 |     char value[128];   // current input value (UTF-8)
+      |          ^~~~~
+core\apps\browser.cpp:1782:17: warning: unused variable 'ex' [-Wunused-variable]
+ 1782 |             int ex = f.x, ey = f.y;
+      |                 ^~
+core\apps\browser.cpp:1827:17: warning: unused variable 'ex' [-Wunused-variable]
+ 1827 |             int ex = f.x, ey = f.y;
+      |                 ^~
+core\apps\browser.cpp: In constructor 'nefu::{anonymous}::TabState::TabState()':
+core\apps\browser.cpp:2115:9: warning: 'nefu::{anonymous}::TabState::img_gen' will be initialized after [-Wreorder]
+ 2115 |     int img_gen;          // paint generation counter (visible-image tracking)
+      |         ^~~~~~~
+core\apps\browser.cpp:2110:11: warning:   'char* nefu::{anonymous}::TabState::js_html' [-Wreorder]
+ 2110 |     char* js_html;        // DOM shim re-sync buffer (event re-render)
+      |           ^~~~~~~
+core\apps\browser.cpp:2123:5: warning:   when initialized here [-Wreorder]
+ 2123 |     TabState()
+      |     ^~~~~~~~
+core\apps\browser.cpp:2114:10: warning: 'nefu::{anonymous}::TabState::js_err' will be initialized after [-Wreorder]
+ 2114 |     bool js_err;
+      |          ^~~~~~
+core\apps\browser.cpp:2100:18: warning:   'volatile int nefu::{anonymous}::TabState::js_ev_pending' [-Wreorder]
+ 2100 |     volatile int js_ev_pending, js_ev_done, js_ev_close;
+      |                  ^~~~~~~~~~~~~
+core\apps\browser.cpp:2123:5: warning:   when initialized here [-Wreorder]
+ 2123 |     TabState()
+      |     ^~~~~~~~
+core\apps\browser.cpp: In function 'void nefu::{anonymous}::img_worker(void*)':
+core\apps\browser.cpp:2344:45: warning: the address of 'nefu::{anonymous}::ImgJob::url' will never be NULL [-Waddress]
+ 2344 |     klogf("browser: load_worker url=%s", j->url ? j->url : "(null)");
+      |                                          ~~~^~~
+core\apps\browser.cpp:2061:10: note: 'nefu::{anonymous}::ImgJob::url' declared here
+ 2061 |     char url[256];
+      |          ^~~
+core\apps\browser.cpp:2346:12: warning: the address of 'nefu::{anonymous}::ImgJob::url' will never be NULL [-Waddress]
+ 2346 |     if (j->url && strstr(j->url, "bloxd.io")) {
+      |         ~~~^~~
+core\apps\browser.cpp:2061:10: note: 'nefu::{anonymous}::ImgJob::url' declared here
+ 2061 |     char url[256];
+      |          ^~~
+core\apps\browser.cpp:2352:19: warning: the address of 'nefu::{anonymous}::ImgJob::url' will never be NULL [-Waddress]
+ 2352 |     if (!ok && j->url && strstr(j->url, "chat.deepseek.com")) {
+      |                ~~~^~~
+core\apps\browser.cpp:2061:10: note: 'nefu::{anonymous}::ImgJob::url' declared here
+ 2061 |     char url[256];
+      |          ^~~
+core\apps\browser.cpp: In static member function 'static void nefu::{anonymous}::nefu_render_html_to_bmp(const char*, c
+onst char*, int, int)::W::rec(nefu::Surface&, const nefu::List<nefu::{anonymous}::DomNode>&, int, int&, int)':
+core\apps\browser.cpp:4401:29: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 4401 |                             if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                             ^~
+core\apps\browser.cpp:4401:48: note: ...this statement, but the latter is misleadingly indented as if it were guarded b
+y the 'if'
+ 4401 |                             if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                                                ^~~
+core\apps\browser.cpp: In static member function 'static void nefu::{anonymous}::nefu_text_dump(nefu::Surface&, const n
+efu::List<DomNode>&, int, int, int)::W::rec(nefu::Surface&, const nefu::List<nefu::{anonymous}::DomNode>&, int, int&, i
+nt, int, int, int&)':
+core\apps\browser.cpp:4485:25: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 4485 |                         if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                         ^~
+core\apps\browser.cpp:4485:44: note: ...this statement, but the latter is misleadingly indented as if it were guarded b
+y the 'if'
+ 4485 |                         if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                                            ^~~
+core\apps\browser.cpp: In lambda function:
+core\apps\browser.cpp:4988:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 4988 |                 if (b <= 0) return 0; b--;
+      |                 ^~
+core\apps\browser.cpp:4988:39: note: ...this statement, but the latter is misleadingly indented as if it were guarded b
+y the 'if'
+ 4988 |                 if (b <= 0) return 0; b--;
+      |                                       ^
+core\apps\browser.cpp: At global scope:
+core\apps\browser.cpp:2261:13: warning: 'void nefu::{anonymous}::extract_title(const char*, int, char*, int)' defined b
+ut not used [-Wunused-function]
+ 2261 | static void extract_title(const char* page, int len, char* out, int cap) {
+      |             ^~~~~~~~~~~~~
+core\apps\browser_engine.cpp: In member function 'void nefu::browser_eng::CSSStyleSheet::parse(const char*, int)':
+core\apps\browser_engine.cpp:261:39: warning: comparison of integer expressions of different signedness: 'int' and 'siz
+e_t' {aka 'long long unsigned int'} [-Wsign-compare]
+  261 |                     for (int k = 0; k < strlen(val); k++) {
+      |                                     ~~^~~~~~~~~~~~~
+core\apps\clock.cpp: In function 'void nefu::clock_wm_paint(Window*)':
+core\apps\clock.cpp:24:20: warning: unused variable 'h' [-Wunused-variable]
+   24 |     int w = st->w, h = st->h;
+      |                    ^
+In file included from core\apps\compilerlab.cpp:16:
+core\apps\../compiler/compiler_all.h: In function 'int nefu::compiler::compiler_stats(const char*, nefu::String&)':
+core\apps\../compiler/compiler_all.h:65:21: warning: unused variable 'nvars' [-Wunused-variable]
+   65 |     int nfuncs = 0, nvars = 0;
+      |                     ^~~~~
+core\apps\compresstool.cpp: In member function 'void nefu::{anonymous}::CompressTool::paint(nefu::Surface&)':
+core\apps\compresstool.cpp:81:13: warning: unused variable 'W' [-Wunused-variable]
+   81 |         int W = s.width;
+      |             ^
+core\apps\cryptolab.cpp: In member function 'void nefu::{anonymous}::CryptoLab::do_decrypt()':
+core\apps\cryptolab.cpp:183:13: warning: this 'for' clause does not guard... [-Wmisleading-indentation]
+  183 |             for (int i = 0; i < n; i++) result[i] = (char)out[i]; result[n] = 0;
+      |             ^~~
+core\apps\cryptolab.cpp:183:67: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'for'
+  183 |             for (int i = 0; i < n; i++) result[i] = (char)out[i]; result[n] = 0;
+      |                                                                   ^~~~~~
+core\apps\cryptolab.cpp:189:13: warning: this 'for' clause does not guard... [-Wmisleading-indentation]
+  189 |             for (int i = 0; i < n; i++) result[i] = (char)out[i]; result[n] = 0;
+      |             ^~~
+core\apps\cryptolab.cpp:189:67: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'for'
+  189 |             for (int i = 0; i < n; i++) result[i] = (char)out[i]; result[n] = 0;
+      |                                                                   ^~~~~~
+core\apps\datecalc.cpp: In function 'void nefu::{anonymous}::dc_mouse(nefu::Window*, int, int, uint8_t)':
+core\apps\datecalc.cpp:245:9: warning: unused variable 'cw' [-Wunused-variable]
+  245 |     int cw = w->content_w;
+      |         ^~
+core\apps\deepviz.cpp: In member function 'void nefu::{anonymous}::DeepViz::paint(nefu::Surface&)':
+core\apps\deepviz.cpp:226:13: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  226 |             if (b<0) b=0; if (b>7) b=7; bins[b]++;
+      |             ^~
+core\apps\deepviz.cpp:226:27: note: ...this statement, but the latter is misleadingly indented as if it were guarded by
+ the 'if'
+  226 |             if (b<0) b=0; if (b>7) b=7; bins[b]++;
+      |                           ^~
+core\apps\fontview.cpp: In function 'void nefu::fontview_mouse(Window*, int, int, uint8_t)':
+core\apps\fontview.cpp:65:43: warning: unused parameter 'mx' [-Wunused-parameter]
+   65 | static void fontview_mouse(Window* w, int mx, int my, uint8_t buttons) {
+      |                                       ~~~~^~
+core\apps\fsview.cpp: In member function 'void nefu::{anonymous}::FsView::paint(nefu::Surface&)':
+core\apps\fsview.cpp:134:14: warning: unused variable 'ln' [-Wunused-variable]
+  134 |         char ln[48];
+      |              ^~
+core\apps\fxgraph.cpp: In function 'nefu::fx::fix nefu::{anonymous}::ceil_mult(nefu::fx::fix, nefu::fx::fix)':
+core\apps\fxgraph.cpp:110:9: warning: unused variable 'r' [-Wunused-variable]
+  110 |     fix r = q;  // fix has 16 frac bits; round toward +inf
+      |         ^
+In file included from core\apps\../gameengine/gameengine_all.h:7,
+                 from core\apps\gedemo.cpp:16:
+core\apps\../gameengine/ge_math.h: In static member function 'static nefu::gameengine::Color nefu::gameengine::Color::l
+erp(const nefu::gameengine::Color&, const nefu::gameengine::Color&, nefu::gameengine::fix)':
+core\apps\../gameengine/ge_math.h:360:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  360 |         if (tt < 0) tt = 0; if (tt > 256) tt = 256;
+      |         ^~
+core\apps\../gameengine/ge_math.h:360:29: note: ...this statement, but the latter is misleadingly indented as if it wer
+e guarded by the 'if'
+  360 |         if (tt < 0) tt = 0; if (tt > 256) tt = 256;
+      |                             ^~
+In file included from core\apps\../gameengine/gameengine_all.h:8:
+core\apps\../gameengine/sprite.h: In function 'void nefu::gameengine::blit_sprite(nefu::Surface&, nefu::Surface&, const
+ SpriteFrame&, int, int, int, fix, fix, uint32_t, BlendMode)':
+core\apps\../gameengine/sprite.h:185:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  185 |                 if (rr > 255) rr = 255; if (gg > 255) gg = 255; if (bb > 255) bb = 255;
+      |                 ^~
+core\apps\../gameengine/sprite.h:185:41: note: ...this statement, but the latter is misleadingly indented as if it were
+ guarded by the 'if'
+  185 |                 if (rr > 255) rr = 255; if (gg > 255) gg = 255; if (bb > 255) bb = 255;
+      |                                         ^~
+core\apps\../gameengine/sprite.h: In member function 'void nefu::gameengine::SpriteAnimator::play(int, int)':
+core\apps\../gameengine/sprite.h:312:36: warning: unused parameter 'count' [-Wunused-parameter]
+  312 |     void play(int start_frame, int count) {
+      |                                ~~~~^~~~~
+In file included from core\apps\../gameengine/gameengine_all.h:9:
+core\apps\../gameengine/tilemap.h: In function 'void nefu::gameengine::draw_tilemap(nefu::Surface&, const Tilemap&, con
+st Camera&)':
+core\apps\../gameengine/tilemap.h:202:9: warning: unused variable 'tx0' [-Wunused-variable]
+  202 |     int tx0 = cam.world_to_screen_x(0) < 0 ?
+      |         ^~~
+In file included from core\apps\../gameengine/gameengine_all.h:10:
+core\apps\../gameengine/physics2d.h: In member function 'void nefu::gameengine::BroadPhase::insert(nefu::gameengine::Ri
+gidBody*)':
+core\apps\../gameengine/physics2d.h:217:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  217 |         if (cx < 0) cx = 0; if (cx >= GE_GRID_W) cx = GE_GRID_W - 1;
+      |         ^~
+core\apps\../gameengine/physics2d.h:217:29: note: ...this statement, but the latter is misleadingly indented as if it w
+ere guarded by the 'if'
+  217 |         if (cx < 0) cx = 0; if (cx >= GE_GRID_W) cx = GE_GRID_W - 1;
+      |                             ^~
+core\apps\../gameengine/physics2d.h:218:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  218 |         if (cy < 0) cy = 0; if (cy >= GE_GRID_H) cy = GE_GRID_H - 1;
+      |         ^~
+core\apps\../gameengine/physics2d.h:218:29: note: ...this statement, but the latter is misleadingly indented as if it w
+ere guarded by the 'if'
+  218 |         if (cy < 0) cy = 0; if (cy >= GE_GRID_H) cy = GE_GRID_H - 1;
+      |                             ^~
+In file included from core\apps\../gameengine/gameengine_all.h:12:
+core\apps\../gameengine/input.h: In member function 'void nefu::gameengine::VirtualStick::move(int, int)':
+core\apps\../gameengine/input.h:280:13: warning: unused variable 'len' [-Wunused-variable]
+  280 |         int len = 0;
+      |             ^~~
+In file included from core\apps\../gameengine/gameengine_all.h:13:
+core\apps\../gameengine/audio_engine.h: In member function 'int nefu::gameengine::MusicSequencer::update(int, const int
+*, int)':
+core\apps\../gameengine/audio_engine.h:167:20: warning: comparison of integer expressions of different signedness: 'int
+' and 'uint32_t' {aka 'unsigned int'} [-Wsign-compare]
+  167 |         if (now_ms < next_note_at) return -1;
+      |             ~~~~~~~^~~~~~~~~~~~~~
+In file included from core\apps\../gameengine/gameengine_all.h:15:
+core\apps\../gameengine/ui.h: In member function 'bool nefu::gameengine::FadeTransition::update(int)':
+core\apps\../gameengine/ui.h:308:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  308 |         if (alpha < 0) alpha = 0; if (alpha > 255) alpha = 255;
+      |         ^~
+core\apps\../gameengine/ui.h:308:35: note: ...this statement, but the latter is misleadingly indented as if it were gua
+rded by the 'if'
+  308 |         if (alpha < 0) alpha = 0; if (alpha > 255) alpha = 255;
+      |                                   ^~
+In file included from core/gfx3d/gfx3d_all.h:9,
+                 from core\apps\gfx3dview.cpp:16:
+core/gfx3d/math3d.h: In member function 'void nefu::gfx3d::AABB::expand(const nefu::gfx3d::Vec3&)':
+core/gfx3d/math3d.h:257:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  257 |         if (p.x < mn.x) mn.x = p.x;  if (p.x > mx.x) mx.x = p.x;
+      |         ^~
+core/gfx3d/math3d.h:257:38: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'if'
+  257 |         if (p.x < mn.x) mn.x = p.x;  if (p.x > mx.x) mx.x = p.x;
+      |                                      ^~
+core/gfx3d/math3d.h:258:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  258 |         if (p.y < mn.y) mn.y = p.y;  if (p.y > mx.y) mx.y = p.y;
+      |         ^~
+core/gfx3d/math3d.h:258:38: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'if'
+  258 |         if (p.y < mn.y) mn.y = p.y;  if (p.y > mx.y) mx.y = p.y;
+      |                                      ^~
+core/gfx3d/math3d.h:259:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  259 |         if (p.z < mn.z) mn.z = p.z;  if (p.z > mx.z) mx.z = p.z;
+      |         ^~
+core/gfx3d/math3d.h:259:38: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'if'
+  259 |         if (p.z < mn.z) mn.z = p.z;  if (p.z > mx.z) mx.z = p.z;
+      |                                      ^~
+core\apps\gfxlab.cpp:285:6: warning: 'void nefu::{anonymous}::GfxLab::render()' defined but not used [-Wunused-function
+]
+  285 | void GfxLab::render() {
+      |      ^~~~~~
+core\apps\lvgl_desktop.cpp: In function 'void nefu::lv_build_taskbar(lv_obj_t*, int, int)':
+core\apps\lvgl_desktop.cpp:180:56: warning: unused parameter 'h' [-Wunused-parameter]
+  180 | static void lv_build_taskbar(lv_obj_t* scr, int w, int h) {
+      |                                                    ~~~~^
+In file included from core\apps\minijs.cpp:7:
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\s'
+  960 | "})(this);\n";
+      | ^~~~~~~~~~~~~
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\s'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\s'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\s'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\s'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\d'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\)'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\s'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\d'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\)'
+core\apps\jsdom_shim.h:960:1: warning: unknown escape sequence: '\d'
+In file included from core\apps\minijs.cpp:8:
+core\apps\wasm_min.h: In member function 'uint64_t nefu_wasm::VM::call(const nefu_wasm::Func&, const uint64_t*)':
+core\apps\wasm_min.h:501:30: warning: unused variable 'tidx' [-Wunused-variable]
+  501 |                     uint32_t tidx = rdleb(ok), tbl = rdleb(ok);
+      |                              ^~~~
+core\apps\minijs.cpp: In function 'int nefu::{anonymous}::js_interrupt_cb(JSRuntime*, void*)':
+core\apps\minijs.cpp:612:39: warning: unused parameter 'rt' [-Wunused-parameter]
+  612 | static int js_interrupt_cb(JSRuntime* rt, void* opaque) {
+      |                            ~~~~~~~~~~~^~
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_out(JSContext*, JSValue, int, JSValue*, int)':
+core\apps\minijs.cpp:646:51: warning: unused parameter 'thisv' [-Wunused-parameter]
+  646 | static JSValue nfu_out(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_domcmd(JSContext*, JSValue, int, JSValue*, int)':
+core\apps\minijs.cpp:658:54: warning: unused parameter 'thisv' [-Wunused-parameter]
+  658 | static JSValue nfu_domcmd(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_len(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:674:51: warning: unused parameter 'thisv' [-Wunused-parameter]
+  674 | static JSValue nfu_len(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'void nefu::{anonymous}::canvas_finalizer(JSRuntime*, JSValue)':
+core\apps\minijs.cpp:692:41: warning: unused parameter 'rt' [-Wunused-parameter]
+  692 | static void canvas_finalizer(JSRuntime* rt, JSValue val) {
+      |                              ~~~~~~~~~~~^~
+core\apps\minijs.cpp: In function 'void nefu::{anonymous}::gl_finalizer(JSRuntime*, JSValue)':
+core\apps\minijs.cpp:696:37: warning: unused parameter 'rt' [-Wunused-parameter]
+  696 | static void gl_finalizer(JSRuntime* rt, JSValue val) {
+      |                          ~~~~~~~~~~~^~
+core\apps\minijs.cpp: In function 'char* nefu::{anonymous}::gl_cid_of(JSContext*, JSValue)':
+core\apps\minijs.cpp:726:35: warning: unused parameter 'c' [-Wunused-parameter]
+  726 | static char* gl_cid_of(JSContext* c, JSValueConst thisv) {
+      |                        ~~~~~~~~~~~^
+core\apps\minijs.cpp: In function 'char* nefu::{anonymous}::canvas_cid_of(JSContext*, JSValue)':
+core\apps\minijs.cpp:730:39: warning: unused parameter 'c' [-Wunused-parameter]
+  730 | static char* canvas_cid_of(JSContext* c, JSValueConst thisv) {
+      |                            ~~~~~~~~~~~^
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_createProgram(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:945:72: warning: unused parameter 'argc' [-Wunused-parameter]
+  945 | static JSValue nfu_createProgram(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                    ~~~~^~~~
+core\apps\minijs.cpp:946:48: warning: unused parameter 'argv' [-Wunused-parameter]
+  946 |                                  JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_createBuffer(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:958:71: warning: unused parameter 'argc' [-Wunused-parameter]
+  958 | static JSValue nfu_createBuffer(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                   ~~~~^~~~
+core\apps\minijs.cpp:959:47: warning: unused parameter 'argv' [-Wunused-parameter]
+  959 |                                 JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_createVertexArray(JSContext*, JSValue, int, JSValue*)
+':
+core\apps\minijs.cpp:1071:76: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1071 | static JSValue nfu_createVertexArray(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                        ~~~~^~~~
+core\apps\minijs.cpp:1072:52: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1072 |                                      JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_createTexture(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1084:72: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1084 | static JSValue nfu_createTexture(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                    ~~~~^~~~
+core\apps\minijs.cpp:1085:48: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1085 |                                  JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_ret_true(JSContext*, JSValue, int, JSValue*, int)':
+core\apps\minijs.cpp:1099:56: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1099 | static JSValue nfu_ret_true(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp:1099:67: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1099 | static JSValue nfu_ret_true(JSContext* c, JSValueConst thisv, int argc,
+      |                                                               ~~~~^~~~
+core\apps\minijs.cpp:1100:43: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1100 |                             JSValueConst* argv, int magic) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_getContext(JSContext*, JSValue, int, JSValue*, int)':
+core\apps\minijs.cpp:1109:69: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1109 | static JSValue nfu_getContext(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                 ~~~~^~~~
+core\apps\minijs.cpp:1110:45: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1110 |                               JSValueConst* argv, int magic) {
+core\apps\minijs.cpp:1110:55: warning: unused parameter 'magic' [-Wunused-parameter]
+ 1110 |                               JSValueConst* argv, int magic) {
+      |                                                   ~~~~^~~~~
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_getElementById(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1120:62: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1120 | static JSValue nfu_getElementById(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_input_value(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1149:59: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1149 | static JSValue nfu_input_value(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_nativeSync(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1167:58: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1167 | static JSValue nfu_nativeSync(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_cookie_get(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1478:58: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1478 | static JSValue nfu_cookie_get(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp:1478:69: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1478 | static JSValue nfu_cookie_get(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                 ~~~~^~~~
+core\apps\minijs.cpp:1479:45: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1479 |                               JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_cookie_set(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1503:58: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1503 | static JSValue nfu_cookie_set(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_storage_get(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1632:59: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1632 | static JSValue nfu_storage_get(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_storage_set(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1645:59: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1645 | static JSValue nfu_storage_set(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_storage_remove(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1668:62: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1668 | static JSValue nfu_storage_remove(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_storage_clear(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1688:45: warning: unused parameter 'c' [-Wunused-parameter]
+ 1688 | static JSValue nfu_storage_clear(JSContext* c, JSValueConst thisv, int argc,
+      |                                  ~~~~~~~~~~~^
+core\apps\minijs.cpp:1688:61: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1688 | static JSValue nfu_storage_clear(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp:1688:72: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1688 | static JSValue nfu_storage_clear(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                    ~~~~^~~~
+core\apps\minijs.cpp:1689:48: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1689 |                                  JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_storage_all(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1704:59: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1704 | static JSValue nfu_storage_all(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp:1704:70: warning: unused parameter 'argc' [-Wunused-parameter]
+ 1704 | static JSValue nfu_storage_all(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                  ~~~~^~~~
+core\apps\minijs.cpp:1705:46: warning: unused parameter 'argv' [-Wunused-parameter]
+ 1705 |                                JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_http(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1736:52: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1736 | static JSValue nfu_http(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_img(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:1828:51: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 1828 | static JSValue nfu_img(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSModuleDef* nefu::{anonymous}::nefu_module_loader(JSContext*, const char*, void*)':
+core\apps\minijs.cpp:1908:87: warning: unused parameter 'opaque' [-Wunused-parameter]
+ 1908 | static JSModuleDef* nefu_module_loader(JSContext* ctx, const char* module_name, void* opaque) {
+      |                                                                                 ~~~~~~^~~~~~
+core\apps\minijs.cpp: In function 'char* nefu::{anonymous}::nefu_module_normalize(JSContext*, const char*, const char*,
+ void*)':
+core\apps\minijs.cpp:2064:60: warning: unused parameter 'opaque' [-Wunused-parameter]
+ 2064 |                                    const char* name, void* opaque) {
+      |                                                      ~~~~~~^~~~~~
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_now(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2079:51: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2079 | static JSValue nfu_now(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp:2079:62: warning: unused parameter 'argc' [-Wunused-parameter]
+ 2079 | static JSValue nfu_now(JSContext* c, JSValueConst thisv, int argc,
+      |                                                          ~~~~^~~~
+core\apps\minijs.cpp:2080:38: warning: unused parameter 'argv' [-Wunused-parameter]
+ 2080 |                        JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_log(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2084:51: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2084 | static JSValue nfu_log(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_pump_note(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2106:41: warning: unused parameter 'c' [-Wunused-parameter]
+ 2106 | static JSValue nfu_pump_note(JSContext* c, JSValueConst thisv, int argc,
+      |                              ~~~~~~~~~~~^
+core\apps\minijs.cpp:2106:57: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2106 | static JSValue nfu_pump_note(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp:2106:68: warning: unused parameter 'argc' [-Wunused-parameter]
+ 2106 | static JSValue nfu_pump_note(JSContext* c, JSValueConst thisv, int argc,
+      |                                                                ~~~~^~~~
+core\apps\minijs.cpp:2107:44: warning: unused parameter 'argv' [-Wunused-parameter]
+ 2107 |                              JSValueConst* argv) {
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_wasm_run(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2145:56: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2145 | static JSValue nfu_wasm_run(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_wasm_exports(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2186:60: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2186 | static JSValue nfu_wasm_exports(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_wasm_fetch(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2266:58: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2266 | static JSValue nfu_wasm_fetch(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_wasm_run_fetch(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2286:62: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2286 | static JSValue nfu_wasm_run_fetch(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_ws_open(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2318:55: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2318 | static JSValue nfu_ws_open(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_ws_send(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2337:55: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2337 | static JSValue nfu_ws_send(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_ws_poll(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2347:55: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2347 | static JSValue nfu_ws_poll(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_ws_close(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2356:56: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2356 | static JSValue nfu_ws_close(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: In function 'JSValue nefu::{anonymous}::nfu_getGL(JSContext*, JSValue, int, JSValue*)':
+core\apps\minijs.cpp:2425:53: warning: unused parameter 'thisv' [-Wunused-parameter]
+ 2425 | static JSValue nfu_getGL(JSContext* c, JSValueConst thisv, int argc,
+core\apps\minijs.cpp: At global scope:
+core\apps\minijs.cpp:1071:16: warning: 'JSValue nefu::{anonymous}::nfu_createVertexArray(JSContext*, JSValue, int, JSVa
+lue*)' defined but not used [-Wunused-function]
+ 1071 | static JSValue nfu_createVertexArray(JSContext* c, JSValueConst thisv, int argc,
+      |                ^~~~~~~~~~~~~~~~~~~~~
+core\apps\minijs.cpp:1056:16: warning: 'JSValue nefu::{anonymous}::nfu_uniformMatrix(JSContext*, JSValue, int, JSValue*
+, int)' defined but not used [-Wunused-function]
+ 1056 | static JSValue nfu_uniformMatrix(JSContext* c, JSValueConst thisv, int argc,
+      |                ^~~~~~~~~~~~~~~~~
+core\apps\wasm_min.h:793:12: warning: 'int nefu_wasm::run_module(Module&, const char*, const uint64_t*, uint64_t&)' def
+ined but not used [-Wunused-function]
+  793 | static int run_module(Module& m, const char* fname, const uint64_t* args, uint64_t& out) {
+      |            ^~~~~~~~~~
+core\apps\ncode.cpp:181:13: warning: 'void nefu::ctx_pln(NCtx*)' defined but not used [-Wunused-function]
+  181 | static void ctx_pln(NCtx* ctx)                  { if (ctx->out) ctx->out->p("\n"); }
+      |             ^~~~~~~
+core\apps\ncode.cpp:58:13: warning: 'nefu::NVal nefu::nv_fn(const char*)' defined but not used [-Wunused-function]
+   58 | static NVal nv_fn(const char* n)     { NVal v; v.tag = N_FN; v.fn = n; return v; }
+      |             ^~~~~
+core\apps\nefud.cpp: In function 'void nefu::nefud_data_install(const char*, const uint8_t*, uint32_t, uint8_t, const c
+har*, void*)':
+core\apps\nefud.cpp:348:58: warning: unused parameter 'link' [-Wunused-parameter]
+  348 |                                uint8_t type, const char* link, void* ud) {
+      |                                              ~~~~~~~~~~~~^~~~
+core\apps\netcfg.cpp:44:21: warning: 'nefu::{anonymous}::s_nc_st' defined but not used [-Wunused-variable]
+   44 | static NetCfgState* s_nc_st = 0;
+      |                     ^~~~~~~
+In file included from core\apps\../raytrace/raytrace_all.h:13,
+                 from core\apps\rayview.cpp:14:
+core\apps\../raytrace/rtmath.h: In member function 'void nefu::raytrace::RTAABB::expand(const nefu::raytrace::RTVec3&)'
+:
+core\apps\../raytrace/rtmath.h:156:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  156 |         if (p.x < mn.x) mn.x = p.x; if (p.x > mx.x) mx.x = p.x;
+      |         ^~
+core\apps\../raytrace/rtmath.h:156:37: note: ...this statement, but the latter is misleadingly indented as if it were g
+uarded by the 'if'
+  156 |         if (p.x < mn.x) mn.x = p.x; if (p.x > mx.x) mx.x = p.x;
+      |                                     ^~
+core\apps\../raytrace/rtmath.h:157:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  157 |         if (p.y < mn.y) mn.y = p.y; if (p.y > mx.y) mx.y = p.y;
+      |         ^~
+core\apps\../raytrace/rtmath.h:157:37: note: ...this statement, but the latter is misleadingly indented as if it were g
+uarded by the 'if'
+  157 |         if (p.y < mn.y) mn.y = p.y; if (p.y > mx.y) mx.y = p.y;
+      |                                     ^~
+core\apps\../raytrace/rtmath.h:158:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  158 |         if (p.z < mn.z) mn.z = p.z; if (p.z > mx.z) mx.z = p.z;
+      |         ^~
+core\apps\../raytrace/rtmath.h:158:37: note: ...this statement, but the latter is misleadingly indented as if it were g
+uarded by the 'if'
+  158 |         if (p.z < mn.z) mn.z = p.z; if (p.z > mx.z) mx.z = p.z;
+      |                                     ^~
+core\apps\rayview.cpp: In member function 'void nefu::raytrace::{anonymous}::RayView::tick()':
+core\apps\rayview.cpp:59:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+   59 |                 if (R < 0) R = 0; if (R > 255) R = 255;
+      |                 ^~
+core\apps\rayview.cpp:59:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by 
+the 'if'
+   59 |                 if (R < 0) R = 0; if (R > 255) R = 255;
+      |                                   ^~
+core\apps\rayview.cpp:60:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+   60 |                 if (G < 0) G = 0; if (G > 255) G = 255;
+      |                 ^~
+core\apps\rayview.cpp:60:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by 
+the 'if'
+   60 |                 if (G < 0) G = 0; if (G > 255) G = 255;
+      |                                   ^~
+core\apps\rayview.cpp:61:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+   61 |                 if (B < 0) B = 0; if (B > 255) B = 255;
+      |                 ^~
+core\apps\rayview.cpp:61:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by 
+the 'if'
+   61 |                 if (B < 0) B = 0; if (B > 255) B = 255;
+      |                                   ^~
+core\apps\repl.cpp: In member function 'void nefu::minilang_repl::ReplState::paint(nefu::Surface&)':
+core\apps\repl.cpp:125:13: warning: unused variable 'W' [-Wunused-variable]
+  125 |         int W = s.width;
+      |             ^
+core\apps\sticky.cpp: In function 'void nefu::sticky_paint(Window*)':
+core\apps\sticky.cpp:32:9: warning: unused variable 'current_col' [-Wunused-variable]
+   32 |     int current_col = 0;
+      |         ^~~~~~~~~~~
+core\apps\store.cpp:153:13: warning: 'void nefu::store_lv_card(lv_event_t*)' defined but not used [-Wunused-function]
+  153 | static void store_lv_card(lv_event_t* e) {
+      |             ^~~~~~~~~~~~~
+core\apps\swgl.cpp: In function 'void nefu::{anonymous}::sw_parse_err(SwParser&, const char*)':
+core\apps\swgl.cpp:488:25: warning: variable 'ctx' set but not used [-Wunused-but-set-variable]
+  488 |     if (ps.lx.p) { char ctx[64]; int m = 0; const char* q = ps.lx.p; while (*q && *q != 10 && m < 63) { ctx[m++
+] = *q; q++; } ctx[m] = 0; SWDBG("  parse_err at: %s\n", ctx); }
+      |                         ^~~
+core\apps\swgl.cpp: In function 'void nefu::{anonymous}::sw_blend_pixel(SwCanvas&, int, int, uint8_t*, const float*)':
+core\apps\swgl.cpp:2155:46: warning: unused parameter 'x' [-Wunused-parameter]
+ 2155 | static void sw_blend_pixel(SwCanvas& cv, int x, int y, uint8_t* px, const float* c) {
+      |                                          ~~~~^
+core\apps\swgl.cpp:2155:53: warning: unused parameter 'y' [-Wunused-parameter]
+ 2155 | static void sw_blend_pixel(SwCanvas& cv, int x, int y, uint8_t* px, const float* c) {
+      |                                                 ~~~~^
+core\apps\swgl.cpp: In function 'void nefu::{anonymous}::sw_raster_line(SwDrawCtx&, const SwVtx&, const SwVtx&)':
+core\apps\swgl.cpp:2307:15: warning: unused variable 'cv' [-Wunused-variable]
+ 2307 |     SwCanvas& cv = dc.cv;
+      |               ^~
+core\apps\swgl.cpp: In function 'void nefu::{anonymous}::sw_emit_prim(SwDrawCtx&, int, SwVtx*, int, int, int, int, int)
+':
+core\apps\swgl.cpp:2339:83: warning: unused parameter 'a' [-Wunused-parameter]
+ 2339 | static void sw_emit_prim(SwDrawCtx& dc, int mode, SwVtx* vs, int n, int base, int a, int b, int c) {
+      |                                                                               ~~~~^
+core\apps\swgl.cpp:2339:90: warning: unused parameter 'b' [-Wunused-parameter]
+ 2339 | static void sw_emit_prim(SwDrawCtx& dc, int mode, SwVtx* vs, int n, int base, int a, int b, int c) {
+      |                                                                                      ~~~~^
+core\apps\swgl.cpp:2339:97: warning: unused parameter 'c' [-Wunused-parameter]
+ 2339 | static void sw_emit_prim(SwDrawCtx& dc, int mode, SwVtx* vs, int n, int base, int a, int b, int c) {
+      |                                                                                             ~~~~^
+core\apps\swgl.cpp: In function 'void nefu::swgl_cmd(const char*, const char*, const char*)':
+core\apps\swgl.cpp:2521:13: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 2521 |             if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
+      |             ^~
+core\apps\swgl.cpp:2521:33: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'if'
+ 2521 |             if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
+      |                                 ^~
+core\apps\swgl.cpp:2522:13: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 2522 |             if (x1 > cv->w) x1 = cv->w; if (y1 > cv->h) y1 = cv->h;
+      |             ^~
+core\apps\swgl.cpp:2522:41: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'if'
+ 2522 |             if (x1 > cv->w) x1 = cv->w; if (y1 > cv->h) y1 = cv->h;
+      |                                         ^~
+core\apps\swgl.cpp:2545:9: warning: this 'while' clause does not guard... [-Wmisleading-indentation]
+ 2545 |         while (*p && *p != ',') p++; if (*p) p++;
+      |         ^~~~~
+core\apps\swgl.cpp:2545:38: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'while'
+ 2545 |         while (*p && *p != ',') p++; if (*p) p++;
+      |                                      ^~
+core\apps\swgl.cpp:2547:9: warning: this 'while' clause does not guard... [-Wmisleading-indentation]
+ 2547 |         while (*p && *p != ',') p++; if (*p) p++;
+      |         ^~~~~
+core\apps\swgl.cpp:2547:38: note: ...this statement, but the latter is misleadingly indented as if it were guarded by t
+he 'while'
+ 2547 |         while (*p && *p != ',') p++; if (*p) p++;
+      |                                      ^~
+core\apps\swgl.cpp:2640:13: warning: unused variable 'target' [-Wunused-variable]
+ 2640 |         int target = sw_atoi(a[1]);
+      |             ^~~~~~
+core\apps\swgl.cpp: At global scope:
+core\apps\swgl.cpp:493:13: warning: 'bool nefu::{anonymous}::sw_tok_is(SwLexer&, const char*)' defined but not used [-W
+unused-function]
+  493 | static bool sw_tok_is(SwLexer& lx, const char* s) {
+      |             ^~~~~~~~~
+core\apps\sysinfo.cpp: In function 'void nefu::{anonymous}::sysinfo_paint(nefu::Window*)':
+core\apps\sysinfo.cpp:19:19: warning: unused variable 'st' [-Wunused-variable]
+   19 |     SysInfoState* st = (SysInfoState*)w->userdata;
+      |                   ^~
+In file included from core\apps\../gfx3d/gfx3d_all.h:9,
+                 from core\apps\term_ext.cpp:42:
+core\apps\../gfx3d/math3d.h: In member function 'void nefu::gfx3d::AABB::expand(const nefu::gfx3d::Vec3&)':
+core\apps\../gfx3d/math3d.h:257:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  257 |         if (p.x < mn.x) mn.x = p.x;  if (p.x > mx.x) mx.x = p.x;
+      |         ^~
+core\apps\../gfx3d/math3d.h:257:38: note: ...this statement, but the latter is misleadingly indented as if it were guar
+ded by the 'if'
+  257 |         if (p.x < mn.x) mn.x = p.x;  if (p.x > mx.x) mx.x = p.x;
+      |                                      ^~
+core\apps\../gfx3d/math3d.h:258:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  258 |         if (p.y < mn.y) mn.y = p.y;  if (p.y > mx.y) mx.y = p.y;
+      |         ^~
+core\apps\../gfx3d/math3d.h:258:38: note: ...this statement, but the latter is misleadingly indented as if it were guar
+ded by the 'if'
+  258 |         if (p.y < mn.y) mn.y = p.y;  if (p.y > mx.y) mx.y = p.y;
+      |                                      ^~
+core\apps\../gfx3d/math3d.h:259:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  259 |         if (p.z < mn.z) mn.z = p.z;  if (p.z > mx.z) mx.z = p.z;
+      |         ^~
+core\apps\../gfx3d/math3d.h:259:38: note: ...this statement, but the latter is misleadingly indented as if it were guar
+ded by the 'if'
+  259 |         if (p.z < mn.z) mn.z = p.z;  if (p.z > mx.z) mx.z = p.z;
+      |                                      ^~
+In file included from core\apps\../raytrace/raytrace_all.h:13,
+                 from core\apps\term_ext.cpp:53:
+core\apps\../raytrace/rtmath.h: In member function 'void nefu::raytrace::RTAABB::expand(const nefu::raytrace::RTVec3&)'
+:
+core\apps\../raytrace/rtmath.h:156:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  156 |         if (p.x < mn.x) mn.x = p.x; if (p.x > mx.x) mx.x = p.x;
+      |         ^~
+core\apps\../raytrace/rtmath.h:156:37: note: ...this statement, but the latter is misleadingly indented as if it were g
+uarded by the 'if'
+  156 |         if (p.x < mn.x) mn.x = p.x; if (p.x > mx.x) mx.x = p.x;
+      |                                     ^~
+core\apps\../raytrace/rtmath.h:157:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  157 |         if (p.y < mn.y) mn.y = p.y; if (p.y > mx.y) mx.y = p.y;
+      |         ^~
+core\apps\../raytrace/rtmath.h:157:37: note: ...this statement, but the latter is misleadingly indented as if it were g
+uarded by the 'if'
+  157 |         if (p.y < mn.y) mn.y = p.y; if (p.y > mx.y) mx.y = p.y;
+      |                                     ^~
+core\apps\../raytrace/rtmath.h:158:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  158 |         if (p.z < mn.z) mn.z = p.z; if (p.z > mx.z) mx.z = p.z;
+      |         ^~
+core\apps\../raytrace/rtmath.h:158:37: note: ...this statement, but the latter is misleadingly indented as if it were g
+uarded by the 'if'
+  158 |         if (p.z < mn.z) mn.z = p.z; if (p.z > mx.z) mx.z = p.z;
+      |                                     ^~
+In file included from core\apps\term_ext.cpp:54:
+core\apps\../compiler/compiler_all.h: In function 'int nefu::compiler::compiler_stats(const char*, nefu::String&)':
+core\apps\../compiler/compiler_all.h:65:21: warning: unused variable 'nvars' [-Wunused-variable]
+   65 |     int nfuncs = 0, nvars = 0;
+      |                     ^~~~~
+In file included from core\apps\../gameengine/gameengine_all.h:7,
+                 from core\apps\term_ext.cpp:55:
+core\apps\../gameengine/ge_math.h: In static member function 'static nefu::gameengine::Color nefu::gameengine::Color::l
+erp(const nefu::gameengine::Color&, const nefu::gameengine::Color&, nefu::gameengine::fix)':
+core\apps\../gameengine/ge_math.h:360:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  360 |         if (tt < 0) tt = 0; if (tt > 256) tt = 256;
+      |         ^~
+core\apps\../gameengine/ge_math.h:360:29: note: ...this statement, but the latter is misleadingly indented as if it wer
+e guarded by the 'if'
+  360 |         if (tt < 0) tt = 0; if (tt > 256) tt = 256;
+      |                             ^~
+In file included from core\apps\../gameengine/gameengine_all.h:8:
+core\apps\../gameengine/sprite.h: In function 'void nefu::gameengine::blit_sprite(nefu::Surface&, nefu::Surface&, const
+ SpriteFrame&, int, int, int, fix, fix, uint32_t, BlendMode)':
+core\apps\../gameengine/sprite.h:185:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  185 |                 if (rr > 255) rr = 255; if (gg > 255) gg = 255; if (bb > 255) bb = 255;
+      |                 ^~
+core\apps\../gameengine/sprite.h:185:41: note: ...this statement, but the latter is misleadingly indented as if it were
+ guarded by the 'if'
+  185 |                 if (rr > 255) rr = 255; if (gg > 255) gg = 255; if (bb > 255) bb = 255;
+      |                                         ^~
+core\apps\../gameengine/sprite.h: In member function 'void nefu::gameengine::SpriteAnimator::play(int, int)':
+core\apps\../gameengine/sprite.h:312:36: warning: unused parameter 'count' [-Wunused-parameter]
+  312 |     void play(int start_frame, int count) {
+      |                                ~~~~^~~~~
+In file included from core\apps\../gameengine/gameengine_all.h:9:
+core\apps\../gameengine/tilemap.h: In function 'void nefu::gameengine::draw_tilemap(nefu::Surface&, const Tilemap&, con
+st Camera&)':
+core\apps\../gameengine/tilemap.h:202:9: warning: unused variable 'tx0' [-Wunused-variable]
+  202 |     int tx0 = cam.world_to_screen_x(0) < 0 ?
+      |         ^~~
+In file included from core\apps\../gameengine/gameengine_all.h:10:
+core\apps\../gameengine/physics2d.h: In member function 'void nefu::gameengine::BroadPhase::insert(nefu::gameengine::Ri
+gidBody*)':
+core\apps\../gameengine/physics2d.h:217:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  217 |         if (cx < 0) cx = 0; if (cx >= GE_GRID_W) cx = GE_GRID_W - 1;
+      |         ^~
+core\apps\../gameengine/physics2d.h:217:29: note: ...this statement, but the latter is misleadingly indented as if it w
+ere guarded by the 'if'
+  217 |         if (cx < 0) cx = 0; if (cx >= GE_GRID_W) cx = GE_GRID_W - 1;
+      |                             ^~
+core\apps\../gameengine/physics2d.h:218:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  218 |         if (cy < 0) cy = 0; if (cy >= GE_GRID_H) cy = GE_GRID_H - 1;
+      |         ^~
+core\apps\../gameengine/physics2d.h:218:29: note: ...this statement, but the latter is misleadingly indented as if it w
+ere guarded by the 'if'
+  218 |         if (cy < 0) cy = 0; if (cy >= GE_GRID_H) cy = GE_GRID_H - 1;
+      |                             ^~
+In file included from core\apps\../gameengine/gameengine_all.h:12:
+core\apps\../gameengine/input.h: In member function 'void nefu::gameengine::VirtualStick::move(int, int)':
+core\apps\../gameengine/input.h:280:13: warning: unused variable 'len' [-Wunused-variable]
+  280 |         int len = 0;
+      |             ^~~
+In file included from core\apps\../gameengine/gameengine_all.h:13:
+core\apps\../gameengine/audio_engine.h: In member function 'int nefu::gameengine::MusicSequencer::update(int, const int
+*, int)':
+core\apps\../gameengine/audio_engine.h:167:20: warning: comparison of integer expressions of different signedness: 'int
+' and 'uint32_t' {aka 'unsigned int'} [-Wsign-compare]
+  167 |         if (now_ms < next_note_at) return -1;
+      |             ~~~~~~~^~~~~~~~~~~~~~
+In file included from core\apps\../gameengine/gameengine_all.h:15:
+core\apps\../gameengine/ui.h: In member function 'bool nefu::gameengine::FadeTransition::update(int)':
+core\apps\../gameengine/ui.h:308:9: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  308 |         if (alpha < 0) alpha = 0; if (alpha > 255) alpha = 255;
+      |         ^~
+core\apps\../gameengine/ui.h:308:35: note: ...this statement, but the latter is misleadingly indented as if it were gua
+rded by the 'if'
+  308 |         if (alpha < 0) alpha = 0; if (alpha > 255) alpha = 255;
+      |                                   ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_paste(TermState*, int, const char**)':
+core\apps\term_ext.cpp:179:75: warning: the address of 'l2' will never be NULL [-Waddress]
+  179 |         if (i < c1 && i < c2) ksprintf(buf, sizeof(buf), "%s\t%s", l1[i], l2 ? l2[i] : "");
+      |                                                                           ^~
+core\apps\term_ext.cpp:169:11: note: 'l2' declared here
+  169 |     char* l2[256]; int c2 = 0;
+      |           ^~
+core\apps\term_ext.cpp:181:49: warning: the address of 'l2' will never be NULL [-Waddress]
+  181 |         else ksprintf(buf, sizeof(buf), "\t%s", l2 ? l2[i] : "");
+      |                                                 ^~
+core\apps\term_ext.cpp:169:11: note: 'l2' declared here
+  169 |     char* l2[256]; int c2 = 0;
+      |           ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_chmod(TermState*, int, const char**)':
+core\apps\term_ext.cpp:733:60: warning: unused parameter 'argv' [-Wunused-parameter]
+  733 | static void cmd_chmod(TermState* t, int argc, const char** argv) {
+      |                                               ~~~~~~~~~~~~~^~~~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_chown(TermState*, int, const char**)':
+core\apps\term_ext.cpp:738:41: warning: unused parameter 'argc' [-Wunused-parameter]
+  738 | static void cmd_chown(TermState* t, int argc, const char** argv) {
+      |                                     ~~~~^~~~
+core\apps\term_ext.cpp:738:60: warning: unused parameter 'argv' [-Wunused-parameter]
+  738 | static void cmd_chown(TermState* t, int argc, const char** argv) {
+      |                                               ~~~~~~~~~~~~~^~~~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_chgrp(TermState*, int, const char**)':
+core\apps\term_ext.cpp:742:41: warning: unused parameter 'argc' [-Wunused-parameter]
+  742 | static void cmd_chgrp(TermState* t, int argc, const char** argv) {
+      |                                     ~~~~^~~~
+core\apps\term_ext.cpp:742:60: warning: unused parameter 'argv' [-Wunused-parameter]
+  742 | static void cmd_chgrp(TermState* t, int argc, const char** argv) {
+      |                                               ~~~~~~~~~~~~~^~~~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_life(TermState*, int, const char**)':
+core\apps\term_ext.cpp:1270:5: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 1270 |     if (steps < 1) steps = 1; if (steps > 500) steps = 500;
+      |     ^~
+core\apps\term_ext.cpp:1270:31: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'if'
+ 1270 |     if (steps < 1) steps = 1; if (steps > 500) steps = 500;
+      |                               ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_particle(TermState*, int, const char**)':
+core\apps\term_ext.cpp:1282:5: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 1282 |     if (n < 1) n = 1; if (n > 5000) n = 5000;
+      |     ^~
+core\apps\term_ext.cpp:1282:23: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'if'
+ 1282 |     if (n < 1) n = 1; if (n > 5000) n = 5000;
+      |                       ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_pendulum(TermState*, int, const char**)':
+core\apps\term_ext.cpp:1299:5: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 1299 |     if (len < 0.1) len = 0.1; if (len > 5) len = 5;
+      |     ^~
+core\apps\term_ext.cpp:1299:31: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'if'
+ 1299 |     if (len < 0.1) len = 0.1; if (len > 5) len = 5;
+      |                               ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_lsystem(TermState*, int, const char**)':
+core\apps\term_ext.cpp:1308:5: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 1308 |     if (it < 1) it = 1; if (it > 6) it = 6;
+      |     ^~
+core\apps\term_ext.cpp:1308:25: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'if'
+ 1308 |     if (it < 1) it = 1; if (it > 6) it = 6;
+      |                         ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_boids(TermState*, int, const char**)':
+core\apps\term_ext.cpp:1318:5: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 1318 |     if (n < 2) n = 2; if (n > 200) n = 200;
+      |     ^~
+core\apps\term_ext.cpp:1318:23: note: ...this statement, but the latter is misleadingly indented as if it were guarded 
+by the 'if'
+ 1318 |     if (n < 2) n = 2; if (n > 200) n = 200;
+      |                       ^~
+core\apps\term_ext.cpp: In function 'void nefu::cmd_pip(TermState*, int, const char**)':
+core\apps\term_ext.cpp:2321:32: warning: comparison of integer expressions of different signedness: 'unsigned int' and 
+'int' [-Wsign-compare]
+ 2321 |         for (unsigned i = 0; i < dir->children.size(); i++) {
+      |                              ~~^~~~~~~~~~~~~~~~~~~~~~
+core\apps\terminal.cpp: In function 'void nefu::term_deb(TermState*, int, const char**)':
+core\apps\terminal.cpp:413:13: warning: unused variable 'n' [-Wunused-variable]
+  413 |         int n = nefud_deb_install(f, buf, (int)sizeof(buf));
+      |             ^
+core\apps\update.cpp: In function 'void nefu::prog_win_paint(Window*)':
+core\apps\update.cpp:640:5: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+  640 |     if (fill < 0) fill = 0; if (fill > bw) fill = bw;
+      |     ^~
+core\apps\update.cpp:640:29: note: ...this statement, but the latter is misleadingly indented as if it were guarded by 
+the 'if'
+  640 |     if (fill < 0) fill = 0; if (fill > bw) fill = bw;
+      |                             ^~
+core\audlib\mixer.cpp: In static member function 'static int nefu::audx::Reverb::self_test()':
+core\audlib\mixer.cpp:225:27: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+  225 |             if (o.data[i] > 32767 || o.data[i] < -32768) fails++;
+core\audlib\mixer.cpp:225:48: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+  225 |             if (o.data[i] > 32767 || o.data[i] < -32768) fails++;
+core\audlib\modulate.cpp: In member function 'nefu::audx::AudioBuf nefu::audx::Modulator::modulate(const nefu::audx::Au
+dioBuf&, double) const':
+core\audlib\modulate.cpp:30:16: warning: unused variable 'vib' [-Wunused-variable]
+   30 |         double vib = 1.0 + vibrato_depth * std::sin(2 * 3.14159265358979 * vibrato_rate * t);
+      |                ^~~
+core\audlib\modulate.cpp:24:12: warning: unused variable 'phase' [-Wunused-variable]
+   24 |     double phase = 0, vib_phase = 0;
+      |            ^~~~~
+core\audlib\modulate.cpp:21:62: warning: unused parameter 'freq' [-Wunused-parameter]
+   21 | AudioBuf Modulator::modulate(const AudioBuf& carrier, double freq) const {
+      |                                                       ~~~~~~~^~~~
+core\audlib\synth.cpp: In static member function 'static int nefu::audx::Synth::self_test()':
+core\audlib\synth.cpp:120:16: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+  120 |         if (mx > 32767) fails++;
+      |             ~~~^~~~~~~
+core\audlib\wave.cpp: In static member function 'static int nefu::audx::WaveIO::self_test()':
+core\audlib\wave.cpp:160:23: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+  160 |         if (a.data[5] > 32767 || a.data[9] < 0) fails++;
+core\audsp\analysis.cpp: In function 'int nefu::audsp::analysis_self_test()':
+core\audsp\analysis.cpp:263:14: warning: variable 'ok' set but not used [-Wunused-but-set-variable]
+  263 |         bool ok = true;
+      |              ^~
+core\audsp\analysis.cpp:282:13: warning: variable 'peak' set but not used [-Wunused-but-set-variable]
+  282 |         int peak = 0;
+      |             ^~~~
+core\audsp\analysis.cpp:324:16: warning: unused variable 's' [-Wunused-variable]
+  324 |         double s = window_sum(w, N);
+      |                ^
+core\audsp\analysis.cpp:345:16: warning: unused variable 'r' [-Wunused-variable]
+  345 |         double r = rms_level(x, 4);
+      |                ^
+core\audsp\analysis.cpp:346:16: warning: unused variable 'p' [-Wunused-variable]
+  346 |         double p = peak_level(x, 4);
+      |                ^
+core\audsp\analysis.cpp:355:16: warning: unused variable 'f0' [-Wunused-variable]
+  355 |         double f0 = estimate_pitch_autocorr(x, N, sr);
+      |                ^~
+core\audsp\effect.cpp: In function 'int nefu::audsp::effect_self_test()':
+core\audsp\effect.cpp:277:10: warning: variable 'heard' set but not used [-Wunused-but-set-variable]
+  277 |     bool heard = false;
+      |          ^~~~~
+core\audsp\effect.cpp:301:12: warning: unused variable 'h' [-Wunused-variable]
+  301 |     double h = dh.process(5.0);
+      |            ^
+core\audsp\effect.cpp:306:12: warning: variable 'out_small' set but not used [-Wunused-but-set-variable]
+  306 |     double out_small = 0.0, out_large = 0.0;
+      |            ^~~~~~~~~
+core\audsp\effect.cpp:306:29: warning: variable 'out_large' set but not used [-Wunused-but-set-variable]
+  306 |     double out_small = 0.0, out_large = 0.0;
+      |                             ^~~~~~~~~
+core\audsp\effect.cpp:323:12: warning: unused variable 'z' [-Wunused-variable]
+  323 |     double z = rm.process(0.5);
+      |            ^
+core\audsp\filter.cpp: In function 'int nefu::audsp::filter_self_test()':
+core\audsp\filter.cpp:362:12: warning: variable 'dc_out' set but not used [-Wunused-but-set-variable]
+  362 |     double dc_out = 0.0;
+      |            ^~~~~~
+core\audsp\filter.cpp:381:12: warning: variable 'hp_dc' set but not used [-Wunused-but-set-variable]
+  381 |     double hp_dc = 0.0;
+      |            ^~~~~
+core\audsp\filter.cpp:387:12: warning: variable 'op_dc' set but not used [-Wunused-but-set-variable]
+  387 |     double op_dc = 0.0;
+      |            ^~~~~
+core\audsp\filter.cpp:402:10: warning: variable 'saw_pulse' set but not used [-Wunused-but-set-variable]
+  402 |     bool saw_pulse = false;
+      |          ^~~~~~~~~
+core\audsp\filter.cpp:411:12: warning: variable 'ap_dc' set but not used [-Wunused-but-set-variable]
+  411 |     double ap_dc = 0.0;
+      |            ^~~~~
+core\audsp\filter.cpp:417:12: warning: variable 'fir_dc' set but not used [-Wunused-but-set-variable]
+  417 |     double fir_dc = 0.0;
+      |            ^~~~~~
+core\audsp\filter.cpp:424:12: warning: variable 'moog_dc' set but not used [-Wunused-but-set-variable]
+  424 |     double moog_dc = 0.0;
+      |            ^~~~~~~
+core\audsp\osc.cpp: In function 'int nefu::audsp::osc_self_test()':
+core\audsp\osc.cpp:261:12: warning: unused variable 's_half' [-Wunused-variable]
+  261 |     double s_half = sine_lookup(0.25);         // quarter period = pi/2
+      |            ^~~~~~
+core\audsp\osc.cpp:262:12: warning: unused variable 's_mid' [-Wunused-variable]
+  262 |     double s_mid  = sine_lookup(0.50);         // half period = pi
+      |            ^~~~~
+core\audsp\osc.cpp:270:12: warning: variable 'v' set but not used [-Wunused-but-set-variable]
+  270 |     double v = 0.0;
+      |            ^
+core\audsp\osc.cpp:310:12: warning: unused variable 'mean' [-Wunused-variable]
+  310 |     double mean = sum / 10000.0;
+      |            ^~~~
+core\audsp\synth.cpp: In member function 'void nefu::audsp::SubtractiveVoice::note_on(int, int)':
+core\audsp\synth.cpp:37:51: warning: unused parameter 'velocity' [-Wunused-parameter]
+   37 | void SubtractiveVoice::note_on(int midi_note, int velocity) {
+      |                                               ~~~~^~~~~~~~
+core\audsp\synth.cpp: In member function 'void nefu::audsp::FmSynthVoice::note_on(int, int)':
+core\audsp\synth.cpp:82:47: warning: unused parameter 'velocity' [-Wunused-parameter]
+   82 | void FmSynthVoice::note_on(int midi_note, int velocity) {
+      |                                           ~~~~^~~~~~~~
+core\audsp\synth.cpp: In function 'int nefu::audsp::synth_self_test()':
+core\audsp\synth.cpp:276:10: warning: variable 'died' set but not used [-Wunused-but-set-variable]
+  276 |     bool died = false;
+      |          ^~~~
+core\audsp\synth.cpp:317:9: warning: unused variable 'active' [-Wunused-variable]
+  317 |     int active = va.active_count();
+      |         ^~~~~~
+core\audsp\synth.cpp:328:12: warning: unused variable 'out' [-Wunused-variable]
+  328 |     double out = mx.process(ins);
+      |            ^~~
+core\compiler\parser.cpp: In member function 'nefu::compiler::Type* nefu::compiler::Parser::parse_declarator(nefu::comp
+iler::Type*, const char*&, int&, nefu::List<const char*>*)':
+core\compiler\parser.cpp:92:29: warning: unused variable 'pn' [-Wunused-variable]
+   92 |                 const char* pn = 0; int pnl = 0;
+      |                             ^~
+core\compiler\parser.cpp:92:41: warning: unused variable 'pnl' [-Wunused-variable]
+   92 |                 const char* pn = 0; int pnl = 0;
+      |                                         ^~~
+core\complib\huffman.cpp: In function 'int nefu::comp::huffman_decode(const unsigned char*, int, unsigned char*, int)':
+core\complib\huffman.cpp:150:42: warning: operation on 'hdr' may be undefined [-Wsequence-point]
+  150 |                         ((uint32_t)in[hdr++] << 8) | (uint32_t)in[hdr++];
+      |                                       ~~~^~
+core\complib\huffman.cpp:150:42: warning: operation on 'hdr' may be undefined [-Wsequence-point]
+core\complib\huffman.cpp:150:42: warning: operation on 'hdr' may be undefined [-Wsequence-point]
+core\complib\lzw.cpp: In function 'int nefu::comp::lzw_decode(const unsigned char*, int, unsigned char*, int)':
+core\complib\lzw.cpp:91:30: warning: operation on 'st' may be undefined [-Wsequence-point]
+   91 |         if (special) stack[st++] = stack[st - 1];  // append the prev string's first char
+      |                            ~~^~
+core\compress\arith.cpp: In function 'int nefu::compress::arith_decode(const uint8_t*, int, uint8_t*, int)':
+core\compress\arith.cpp:78:62: warning: unused parameter 'cap' [-Wunused-parameter]
+   78 | int arith_decode(const uint8_t* in, int n, uint8_t* out, int cap) {
+      |                                                          ~~~~^~~
+core\compress\arith.cpp: At global scope:
+core\compress\arith.cpp:31:6: warning: 'void nefu::compress::{anonymous}::rc_renorm(RCEnc&)' defined but not used [-Wun
+used-function]
+   31 | void rc_renorm(RCEnc& e) {
+      |      ^~~~~~~~~
+core\compress\bwt.cpp: In function 'int nefu::compress::bwt_decode(const uint8_t*, int, uint8_t*, int)':
+core\compress\bwt.cpp:144:60: warning: unused parameter 'cap' [-Wunused-parameter]
+  144 | int bwt_decode(const uint8_t* in, int n, uint8_t* out, int cap) {
+      |                                                        ~~~~^~~
+core\compress\bwt.cpp: In lambda function:
+core\compress\bwt.cpp:170:31: warning: unused parameter 'tag' [-Wunused-parameter]
+  170 |     auto rt = [&](const char* tag, const uint8_t* data, int n) {
+      |                   ~~~~~~~~~~~~^~~
+core\compress\dict.cpp: In function 'int nefu::compress::snappy_decode(const uint8_t*, int, uint8_t*, int)':
+core\compress\dict.cpp:175:31: warning: operation on 'p' may be undefined [-Wsequence-point]
+  175 |             int offset = (in[p++] << 8) | in[p++];
+      |                              ~^~
+core\compress\dict.cpp: In function 'int nefu::compress::dict_self_test()':
+core\compress\dict.cpp:220:7: warning: this 'for' clause does not guard... [-Wmisleading-indentation]
+  220 |       for (int i=0;i<N;i++) d[i]=(uint8_t)t[k++%tl]; rt(d,N); }
+      |       ^~~
+core\compress\dict.cpp:220:54: note: ...this statement, but the latter is misleadingly indented as if it were guarded b
+y the 'for'
+  220 |       for (int i=0;i<N;i++) d[i]=(uint8_t)t[k++%tl]; rt(d,N); }
+      |                                                      ^~
+core\compress\other.cpp:152:10: warning: 'uint32_t nefu::compress::{anonymous}::get_fib(nefu::compress::BitSource&)' de
+fined but not used [-Wunused-function]
+  152 | uint32_t get_fib(BitSource& bs) {
+      |          ^~~~~~~
+core\compress\other.cpp:143:6: warning: 'void nefu::compress::{anonymous}::put_fib(nefu::compress::BitSink&, uint32_t)'
+ defined but not used [-Wunused-function]
+  143 | void put_fib(BitSink& bs, uint32_t x) {
+      |      ^~~~~~~
+core\compress\other.cpp:135:10: warning: 'uint32_t nefu::compress::{anonymous}::get_rice(nefu::compress::BitSource&, in
+t)' defined but not used [-Wunused-function]
+  135 | uint32_t get_rice(BitSource& bs, int k) {
+      |          ^~~~~~~~
+core\compress\other.cpp:128:6: warning: 'void nefu::compress::{anonymous}::put_rice(nefu::compress::BitSink&, uint32_t,
+ int)' defined but not used [-Wunused-function]
+  128 | void put_rice(BitSink& bs, uint32_t x, int k) {
+      |      ^~~~~~~~

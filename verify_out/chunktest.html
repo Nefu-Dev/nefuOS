@@ -1,0 +1,22 @@
+<html><head><title>chunk test</title></head>
+<body><div id="root">chunktest</div>
+<script>
+try {
+  var p = import('./chunk.js');
+  console.log("[CHUNK] import() started, promise=" + (p && typeof p));
+  p.then(function(ns) {
+    console.log("[CHUNK] resolved id=" + ns.id + " ids=" + JSON.stringify(ns.ids) +
+                " hasModules=" + (typeof ns.modules));
+    var mods = ns.modules ? Object.keys(ns.modules) : [];
+    console.log("[CHUNK] module keys: " + JSON.stringify(mods.slice(0,10)));
+    document.getElementById('root').textContent = "resolved:id=" + ns.id + ",mods=" + mods.length;
+  }).catch(function(e) {
+    console.log("[CHUNK] import rejected: " + e);
+    document.getElementById('root').textContent = "rejected:" + e;
+  });
+} catch (e) {
+  console.log("[CHUNK] import threw sync: " + e);
+  document.getElementById('root').textContent = "threw:" + e;
+}
+</script>
+</body></html>

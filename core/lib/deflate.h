@@ -18,6 +18,12 @@ int zlib_decompress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst
 // raw deflate decompress (no zlib header/trailer)
 int raw_decompress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_cap);
 
+// gzip (RFC 1952) decompress. Skips the 10-byte header plus optional
+// FEXTRA/FNAME/FCOMMENT/FHCRC fields, inflates the raw DEFLATE body, then
+// verifies the trailing CRC32 + ISIZE against the output. Returns the
+// decompressed size, or -1 on error / small buffer / bad CRC.
+int gzip_decompress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_cap);
+
 // raw deflate compress (no zlib header/trailer)
 int raw_compress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_cap);
 

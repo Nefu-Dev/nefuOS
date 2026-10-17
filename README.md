@@ -636,6 +636,40 @@ All other code (kernel, GUI shell, VFS, network stack, apps, ISO builder) is
 original to this project. Third-party license texts are kept at
 
 `third_party/licenses/`.
+## .deb environment (real Debian packages)
+
+nefuOS can install and run **real Debian `.deb` packages** on the bare-metal
+kernel: the archive is parsed in the kernel (ar → gzip → tar → install),
+no host conversion is needed for plain gzip `.deb` files.
+
+### Kernel-side pipeline (`core/apps/nefud.cpp`)
+
+* `nefud_deb_probe(file, out, cap)` — walks the `ar` member table
+  (`!<arch>\n`, 60-byte headers, even-padding), recognizes
+  `debian-binary` / `control.tar.*` / `data.tar.*`, and prints the member
+  list plus the `control` `Package:`/`Version:` fields.
+* `nefud_deb_install(file, out, cap)` — decompresses `data.tar.gz`
+  (RFC 1952 via `core/lib/deflate.cpp` `gzip_decompress`, CRC32 + ISIZE
+  verified), walks the ustar tar and writes every file into the VFS
+  (`/usr/...` paths) with `g_vfs->create_file` + `write_file`.
+* `nefud_deb_find_elf(file, path, cap)` — locates the first static x86-64
+  ELF in `data.tar` and returns its installed VFS path.
+* `deb` terminal command: `deb probe <pkg.deb>` / `deb install <pkg.deb>` /
+  `deb run <pkg.deb>` (runs the installed ELF through the same
+  `elf::parse → build_guest → execute` chain as `runelf`).
+* Compressed variants (`bz2`/`xz`/`zst` data.tar): convert on the host with
+  `tools/nefupack.py` into a `.nefud` zip-deb wrapper, then install the
+  `.nefud` as usual.
+
+### Boot-time verification (headless)
+
+`tools/deb_verify.ps1 -Seconds 90` boots the ISO in QEMU with a serial log
+and asserts the `[DEBREQ]` marker chain end to end (probe → install → find
+ELF → run → guest "Hello" output → run done). Pass criteria are the ten
+`[DEBREQ]` markers listed in `tools/deb_verify.ps1` (including
+`installed 2 file(s) from data.tar to VFS` and
+`Hello from Linux ELF in nefuOS!`).
+
 ## License
 
 MIT — free to use, learn from, and modify.

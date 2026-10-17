@@ -1,0 +1,32 @@
+backends\bare\bare.cpp: In function 'void* nefu::b_alloc_from_bump(uint32_t)':
+backends\bare\bare.cpp:78:14: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+   78 |     Blk* b = (Blk*)cur;
+      |              ^~~~~~~~~
+backends\bare\bare.cpp: In function 'void* nefu::alloc_from_bump(uint32_t)':
+backends\bare\bare.cpp:88:14: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+   88 |     Blk* b = (Blk*)cur;
+      |              ^~~~~~~~~
+backends\bare\bare.cpp: In function 'void nefu::nefuos_kernel_main(void*)':
+backends\bare\bare.cpp:595:21: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  595 |     s_screen.addr = (uint8_t*)s_lfb;
+      |                     ^~~~~~~~~~~~~~~
+backends\bare\bare.cpp: At global scope:
+backends\bare\bare.cpp:390:13: warning: 'void nefu::pic_init()' defined but not used [-Wunused-function]
+  390 | static void pic_init() {
+      |             ^~~~~~~~
+backends\bare\bare_libc.cpp: In function 'int fmt_float(char*, int, int, double, char, int, int*)':
+backends\bare\bare_libc.cpp:70:37: warning: unused parameter 'cap' [-Wunused-parameter]
+   70 | static int fmt_float(char* out, int cap, int sign, double av,
+      |                                 ~~~~^~~
+backends\bare\bare_libc.cpp: In function 'void fmt_float_copy(Fmt*, int, double, char, int, int)':
+backends\bare\bare_libc.cpp:146:82: warning: unused parameter 'e10' [-Wunused-parameter]
+  146 | static void fmt_float_copy(Fmt* f, int sign, double av, char conv, int prec, int e10) {
+      |                                                                              ~~~~^~~
+kernel image ends at 0x9040A0 >= 0x900000 (staging base): raise STAGE_BASE/stacks/ARENA_BASE
+ËùÔÚÎ»ÖÃ C:\Users\huawei\AppData\Local\Temp\nefu_build_inc.ps1:457 ×Ö·û: 5
++     throw "kernel image ends at 0x$('{0:X}' -f $kEnd) >= 0x900000 (st ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (kernel image en...acks/ARENA_BASE:String) [], RuntimeException
+    + FullyQualifiedErrorId : kernel image ends at 0x9040A0 >= 0x900000 (staging base): raise STAGE_BASE/stacks/ARENA_ 
+   BASE
+ 

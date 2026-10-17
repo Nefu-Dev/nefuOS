@@ -3,6 +3,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 #include <new>
 
 // ===================== global new/delete(use kalloc/kfree,) =====================
@@ -10,7 +11,7 @@ void* operator new(size_t sz);
 void* operator new[](size_t sz);
 void  operator delete(void* p) noexcept;
 void  operator delete[](void* p) noexcept;
-// placement new/delete 由标准 <new> 提供（上面已 include），此处不再重复定义
+// placement new/delete provided by <new> (already included above); not redefined here
 
 namespace nefu {
 
@@ -132,5 +133,6 @@ private:
 // ===================== format =====================
 int  ksprintf(char* buf, size_t bufsz, const char* fmt, ...);
 void klogf(const char* fmt, ...);   // format then output to debug channel
+int  kvsnprintf(char* buf, size_t bufsz, const char* fmt, va_list ap);
 
 } // namespace nefu

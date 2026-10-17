@@ -93,6 +93,12 @@ int screen_width() { return 800; }
 int screen_height() { return 600; }
 int screen_bpp() { return 32; }
 
+// The host build currently has no notification center; ncode.cpp exposes
+// this to scripts. Return 0 (no pending notifications) until one exists.
+int notification_count() { return 0; }
+void notification_mark_all_read() {}
+void notification_clear() {}
+
 // ============================================
 // Power API
 // ============================================

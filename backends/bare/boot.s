@@ -4,7 +4,7 @@
 # and either boots nefuOS or warm-reboots into Windows -> VBE 1024x768x32 ->
 # store LFB/bootinfo at 0x7000 -> PING-PONG load the compressed payload from
 # CD LBA26 in 512KB windows -> protected mode -> stub copies each window to a
-# 0x620000 staging area -> real mode (via the 0x8000 PM->RM trampoline) ->
+# 0x680000 staging area -> real mode (via the 0x8000 PM->RM trampoline) ->
 # next window -> final window: stub inflates the kernel to 0x100000 ->
 # long mode entry (entry.s).
 # Why ping-pong: the real-mode loader can only reach ~512KB contiguously
@@ -48,7 +48,7 @@ _start:
 # survives: window 2's lgdt still worked).  The legacy pm_entry at 0x04 is
 # retired (unused dead code) and replaced by these slots.
 .org 0x04
-pm_off:      .long 0x20000    # 32-bit stub entry offset (stub updates to 0x620000)
+pm_off:      .long 0x20000    # 32-bit stub entry offset (stub updates to 0x680000)
 pm_sel:      .word 0x0008     # code32 flat selector
 real_resume: .long cd_resume + 0x7C00   # real-mode return target (offset)
 real_sel:    .word 0x0018     # code16 selector (GDT index 3 -> 0x18)
@@ -178,7 +178,7 @@ cd_pm:
     movb $'P', %al
     outb %al, %dx
     # far jump to the stub (pm_off/pm_sel).  In 16-bit mode an indirect
-    # far jmp only takes m16:16, but 0x20000/0x620000 need 32-bit: push the
+    # far jmp only takes m16:16, but 0x20000/0x680000 need 32-bit: push the
     # selector then the 32-bit offset and lret with a data32 prefix.
     pushw pm_sel + 0x7C00
     pushl pm_off + 0x7C00

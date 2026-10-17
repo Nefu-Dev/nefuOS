@@ -166,6 +166,19 @@ static void wiki_paint(Window* w) {
     WikiState* st = (WikiState*)w->userdata;
     Surface& s = w->back;
     s.fill(color::WHITE);
+    // mirror scroll state for the WM scrollbar every frame
+    int maxv = 0;
+    if (st->sel >= 0 && st->sel < st->entries.size()) {
+        const WikiEntry& e = st->entries[st->sel];
+        int segs = 1;
+        for (int i = 0; i < e.body.len(); i++) if (e.body[i] == '~') segs++;
+        maxv = segs;
+    }
+    int total = (maxv + 3) * 16 + 24;
+    w->content_scroll_h = total > w->content_h ? total : 0;
+    w->scroll_y = w->content_scroll_h ? st->body_scroll * 16 : 0;
+    if (w->content_scroll_h && w->scroll_y > w->content_scroll_h - w->content_h)
+        w->scroll_y = w->content_scroll_h - w->content_h;
 
     // top bar
     gfx::text(s, 8, 4, T("维基", "Wiki"), color::BLUE, color::WHITE);
@@ -461,9 +474,31 @@ static void wiki_key(Window* w, const KeyEvent* e) {
 static void wiki_scroll(Window* w, int delta) {
     WikiState* st = (WikiState*)w->userdata;
     if (st->edit_mode) return;
-    int d = (delta > 0) ? 4 : -4;
-    st->body_scroll += d;
-    if (st->body_scroll < 0) st->body_scroll = 0;
+    // total body rows of the selected entry (16px each)
+    int maxv = 0;
+    if (st->sel >= 0 && st->sel < st->entries.size()) {
+        const WikiEntry& e = st->entries[st->sel];
+        int segs = 1;
+        for (int i = 0; i < e.body.len(); i++) if (e.body[i] == '~') segs++;
+        maxv = segs;
+    }
+    if (delta != 0) {
+        int d = (delta > 0) ? 4 : -4;
+        st->body_scroll += d;
+        if (st->body_scroll < 0) st->body_scroll = 0;
+        if (st->body_scroll > maxv) st->body_scroll = maxv;
+    } else {
+        // scrollbar thumb dragged: the WM moved w->scroll_y (pixels)
+        st->body_scroll = w->scroll_y / 16;
+        if (st->body_scroll < 0) st->body_scroll = 0;
+        if (st->body_scroll > maxv) st->body_scroll = maxv;
+    }
+    // Mirror the body offset into the WM scrollbar (pixel space).
+    int total = (maxv + 3) * 16 + 24;   // title + body rows + status line
+    w->content_scroll_h = total > w->content_h ? total : 0;
+    w->scroll_y = w->content_scroll_h ? st->body_scroll * 16 : 0;
+    if (w->content_scroll_h && w->scroll_y > w->content_scroll_h - w->content_h)
+        w->scroll_y = w->content_scroll_h - w->content_h;
 }
 
 static void wiki_close(Window* w) {
@@ -496,6 +531,7 @@ void wiki_launch() {
     w->on_key = wiki_key;
     w->on_scroll = wiki_scroll;
     w->on_close = wiki_close;
+    w->app_scroll = true;   // wiki paints its own scrolled viewport
 }
 
 } // namespace nefu

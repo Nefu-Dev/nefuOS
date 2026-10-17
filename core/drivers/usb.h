@@ -18,18 +18,18 @@ void shutdown_usb() {
 }
 
 // usb status
-bool () {
+bool usb_status() {
     return true;
 }
 
 // usb read operation
-int (uint32_t addr, void* buf, uint32_t len) {
+int usb_read(uint32_t addr, void* buf, uint32_t len) {
     // Read from usb
     return (int)len;
 }
 
 // usb write operation
-int (uint32_t addr, const void* buf, uint32_t len) {
+int usb_write(uint32_t addr, const void* buf, uint32_t len) {
     // Write to usb
     return (int)len;
 }

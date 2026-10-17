@@ -1,0 +1,7 @@
+host build failed
+ËùÔÚÎ»ÖÃ D:\mycppos1\nefuOS\tools\build_iso.ps1:144 ×Ö·û: 28
++ if ($LASTEXITCODE -ne 0) { throw "host build failed" }
++                            ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (host build failed:String) [], RuntimeException
+    + FullyQualifiedErrorId : host build failed
+ 

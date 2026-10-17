@@ -18,18 +18,18 @@ void shutdown_input() {
 }
 
 // input status
-bool () {
+bool input_status() {
     return true;
 }
 
 // input read operation
-int (uint32_t addr, void* buf, uint32_t len) {
+int input_read(uint32_t addr, void* buf, uint32_t len) {
     // Read from input
     return (int)len;
 }
 
 // input write operation
-int (uint32_t addr, const void* buf, uint32_t len) {
+int input_write(uint32_t addr, const void* buf, uint32_t len) {
     // Write to input
     return (int)len;
 }

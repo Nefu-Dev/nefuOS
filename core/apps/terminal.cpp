@@ -1,7 +1,9 @@
 // nefuOS terminal app
 #include "apps.h"
 #include "term_ext.h"
+#include "ncode.h"
 #include "minijs.h"
+#include "minijvm.h"
 #include "nefvm.h"
 #include "../gui/gfx.h"
 #include "../platform.h"
@@ -9,9 +11,11 @@
 #include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (hash only, no plaintext)
 #include "../sys/sha256.h"
 #include "../sys/power.h"        // blue_screen()
+#include "../elf/elfrun.h"    // Linux static-ELF loader + syscall ABI
 #include <cstdlib>
 
 namespace nefu {
+namespace electron { void electron_launch_deb(const char* path); }
 
 // lock-screen API owned by nefuos.cpp
 void nefuos_lock_screen();
@@ -109,6 +113,10 @@ static void term_help(TermState* t) {
     term_print(t, "  tree [path]       - show file tree");
     term_print(t, "  find [path]       - recursive listing");
     term_print(t, "  run <file.nefud>  - launch a .nefud app");
+    term_print(t, "  runelf <file>    - load a Linux static ELF (bare runs it)");
+    term_print(t, "  deb info <f.deb> - show a Linux .deb package summary");
+    term_print(t, "  deb install <f.deb> - unpack data.tar into the VFS");
+    term_print(t, "  deb run <f.deb>  - install + runelf its static ELF");
     term_print(t, "  whoami            - current user (root/guest)");
     term_print(t, "  uname [-a]        - system info");
     term_print(t, "  lsblk / disks     - list block devices");
@@ -305,6 +313,19 @@ static void term_nefud_run(TermState* t, FSNode* f) {
         }
         return;
     }
+    // .ncode nefu script (npkg package language)
+    {
+        bool is_ncode = f->size >= 5 && strncmp((const char*)f->data, "#nefu", 5) == 0;
+        if (!is_ncode && f->name.len() >= 6 && f->name.substr(f->name.len() - 6, 6) == ".ncode") is_ncode = true;
+        if (is_ncode) {
+            struct NCodeSink { static void cb(void* ud, const char* s) { term_ext_print((TermState*)ud, s); } };
+            NCOut sink;
+            sink.print = &NCodeSink::cb;
+            sink.ud = t;
+            ncode_run_file(&sink, f, 0, 0);
+            return;
+        }
+    }
     // .nefud text manifest
     char* buf = (char*)kalloc((size_t)f->size + 1);
     if (!buf) return;
@@ -331,6 +352,80 @@ static void term_nefud_run(TermState* t, FSNode* f) {
     kfree(buf);
 }
 
+static int term_elf_write(const void* buf, int64_t n, void* ud) {
+    TermState* t = (TermState*)ud;
+    char tmp[256];
+    int64_t m = n > (int64_t)(sizeof(tmp) - 1) ? (int64_t)(sizeof(tmp) - 1) : n;
+    memcpy(tmp, buf, (size_t)m); tmp[m] = 0;
+    term_print(t, tmp);
+    return (int)m;
+}
+static void term_runelf(TermState* t, const char* path) {
+    FSNode* f = g_vfs->resolve(path);
+    if (!f || f->is_dir || f->size == 0) { term_print(t, "runelf: no such file"); return; }
+    nefu::elf::Image img;
+    int rc = nefu::elf::parse(f->data, f->size, img);
+    if (rc != 0) { term_print(t, "runelf: not a loadable x86_64 ELF"); return; }
+    nefu::elf::Guest g;
+    rc = nefu::elf::build_guest(img, path, g);
+    if (rc != 0) { term_print(t, "runelf: build_guest failed"); return; }
+    char line[160];
+    ksprintf(line, sizeof(line), "ELF loaded: entry=0x%llx segs=%d image=%d B",
+             (unsigned long long)g.entry, img.nsegs, (int)g.size);
+    term_print(t, line);
+    nefu::elf::SysCtx ctx; memset(&ctx, 0, sizeof(ctx));
+    ctx.write_fn = term_elf_write; ctx.ud = t;
+    ctx.brk_cur = g.brk; ctx.brk_limit = g.brk_limit;
+    ctx.mmap_cur = g.brk; ctx.mmap_limit = g.brk_limit;
+    int e = nefu::elf::execute(g, ctx);
+    if (e == -1)
+        term_print(t, "runelf: host backend cannot execute x86 ELF (bare only)");
+    else { char x[48]; ksprintf(x, sizeof(x), "[exit %d]", e); term_print(t, x); }
+    if (g.mem) kfree(g.mem);
+}
+
+// `deb` command: work with real Linux .deb (ar) packages inside nefuOS.
+//   deb info <file.deb>    - show package metadata + ar members
+//   deb install <file.deb> - unpack data.tar(.gz) into the VFS
+//   deb run <file.deb>     - install, then runelf the first static ELF
+static void term_deb(TermState* t, int argc, const char** argv) {
+    if (argc < 3) { term_print(t, "usage: deb info|install|run <file.deb>"); return; }
+    FSNode* f = g_vfs->resolve(argv[2]);
+    if (!f || f->is_dir || f->size == 0) {
+        String e = "deb: no such file: "; e += argv[2]; term_print(t, e.c_str()); return;
+    }
+    if (strcmp(argv[1], "info") == 0) {
+        char buf[1024];
+        if (nefud_deb_probe(f, buf, (int)sizeof(buf)) != 0)
+            term_print(t, buf);
+        else
+            term_print(t, buf);
+    } else if (strcmp(argv[1], "install") == 0) {
+        char buf[512];
+        int n = nefud_deb_install(f, buf, (int)sizeof(buf));
+        term_print(t, buf);
+        if (n >= 0) {
+            char line[96];
+            ksprintf(line, sizeof(line), "deb: %d file(s) installed to VFS", n);
+            term_print(t, line);
+        }
+    } else if (strcmp(argv[1], "run") == 0) {
+        char buf[512];
+        int n = nefud_deb_install(f, buf, (int)sizeof(buf));
+        term_print(t, buf);
+        char vp[300];
+        if (nefud_deb_find_elf(f, vp, (int)sizeof(vp))) {
+            char line[340];
+            ksprintf(line, sizeof(line), "deb: ELF at %s - running...", vp);
+            term_print(t, line);
+            term_runelf(t, vp);
+        } else {
+            term_print(t, "deb: no static ELF found in data.tar (nothing to run)");
+        }
+    } else {
+        term_print(t, "usage: deb info|install|run <file.deb>");
+    }
+}
 static void term_run(TermState* t, const char* cmd) {
     if (!cmd || !*cmd) return;
     hist_add(cmd);
@@ -385,6 +480,25 @@ static void term_run(TermState* t, const char* cmd) {
     }
     else if (strcmp(a0, "pwd") == 0) term_print(t, node_path(g_vfs->cwd).c_str());
     else if (strcmp(a0, "cat") == 0) { if (argc > 1) term_cat(t, argv[1]); }
+    else if (strcmp(a0, "runelf") == 0) {
+        if (argc < 2) term_print(t, "usage: runelf <path>");
+        else term_runelf(t, argv[1]);
+    }
+    else if (strcmp(a0, "deb") == 0) {
+        term_deb(t, argc, argv);
+    }
+    else if (strcmp(a0, "electron") == 0) {
+        // Electron-style runtime: run a .deb app / ELF as an X11 renderer
+        if (argc < 2) term_print(t, "usage: electron <path.deb|elf|url>");
+        else if (strncmp(argv[1], "http://", 7) == 0 || strncmp(argv[1], "https://", 8) == 0) {
+            // URL mode: the browser engine is the renderer
+            String e = "electron: opening in browser engine: "; e += argv[1];
+            term_print(t, e.c_str());
+            app_launch(APP_BROWSER);
+        } else {
+            nefu::electron::electron_launch_deb(argv[1]);
+        }
+    }
     else if (strcmp(a0, "mkdir") == 0) {
         if (argc < 2) term_print(t, "usage: mkdir [-p] <path>");
         else if (strcmp(argv[1], "-p") == 0) { if (argc > 2) term_mkdir_p(t, argv[2]); else term_print(t, "usage: mkdir -p <path>"); }
@@ -1159,6 +1273,127 @@ static void term_run(TermState* t, const char* cmd) {
             else if (out[0]) term_print(t, out);
         }
     }
+    else if (strcmp(a0, "java") == 0) {
+        // mini JVM: run a javac-compiled .class file from the VFS.
+        // java <file.class> [arg ...]  - the mini JVM covers the "real JDK
+        // surface" subset: int/long/float/double, arrays, static fields,
+        // recursion, exceptions (try/catch/finally), String/StringBuilder,
+        // boxed wrappers, java/util collections + Arrays + Collections,
+        // java/io over the VFS (PrintStream, File, streams), Math full set.
+        struct JavaOut { TermState* t; char acc[512]; int n; };
+        struct JavaSink {
+            static void cb(const char* s, void* ud) {
+                JavaOut* j = (JavaOut*)ud;
+                if (!s) return;
+                for (const char* p = s; *p; p++) {
+                    if (*p == '\n') {
+                        j->acc[j->n] = 0;
+                        term_print(j->t, j->acc);
+                        j->n = 0;
+                    } else if (j->n < 510) {
+                        j->acc[j->n++] = *p;
+                    }
+                }
+            }
+        };
+        // VFS hooks: java/io File & streams talk to the nefuOS file system.
+        static MiniJvmVfs jvfs;
+        static bool jvfs_inited = false;
+        if (!jvfs_inited) {
+            jvfs.ud = 0;
+            jvfs.stat = [](void*, const char* p, MiniJvmFile* o) -> int {
+                FSNode* n = g_vfs->resolve(p);
+                if (!n) return 1;
+                o->is_dir = n->is_dir != 0;
+                o->size = n->size;
+                return 0;
+            };
+            jvfs.read = [](void*, const char* p, uint8_t* b, uint32_t off, uint32_t len) -> int {
+                FSNode* n = g_vfs->resolve(p);
+                if (!n || off > n->size) return -1;
+                uint32_t avail = n->size - off;
+                if (len > avail) len = avail;
+                if (len) memcpy(b, n->data + off, len);
+                return (int)len;
+            };
+            jvfs.write = [](void*, const char* p, const uint8_t* b, uint32_t off, uint32_t len) -> int {
+                FSNode* n = g_vfs->resolve(p);
+                if (!n) return -1;
+                uint32_t need = off + len;
+                if (need > n->size) {
+                    uint32_t ns = need + 64;
+                    uint8_t* nd = (uint8_t*)krealloc(n->data, ns);
+                    if (!nd) return -1;
+                    n->data = nd;
+                    n->size = ns;
+                }
+                memcpy(n->data + off, b, len);
+                return (int)len;
+            };
+            jvfs.create = [](void*, const char* p) -> int {
+                if (g_vfs->resolve(p)) return 0;
+                return g_vfs->create_file(p) ? 0 : -1;
+            };
+            jvfs.mkdir = [](void*, const char* p) -> int {
+                return g_vfs->mkdir(p) ? 0 : -1;
+            };
+            jvfs.remove = [](void*, const char* p) -> int {
+                FSNode* n = g_vfs->resolve(p);
+                return (n && g_vfs->remove_node(n)) ? 0 : -1;
+            };
+            jvfs.list = [](void*, const char* p, char* out, int out_sz) -> int {
+                FSNode* n = g_vfs->resolve(p);
+                if (!n || !n->is_dir) return -1;
+                int k = 0;
+                for (int i = 0; i < n->children.size() && k < out_sz - 1; i++) {
+                    FSNode* c = n->children[i];
+                    for (const char* q = c->name.data(); *q; q++) {
+                        if (k < out_sz - 1) out[k++] = *q;
+                    }
+                    if (k < out_sz - 1) out[k++] = '\n';
+                }
+                if (k < out_sz) out[k] = 0;
+                return 0;
+            };
+            nefu::minijvm_set_vfs(&jvfs);
+            jvfs_inited = true;
+        }
+        if (argc < 2) {
+            term_print(t, "usage: java <file.class> [arg ...]   (mini JVM)");
+            term_print(t, "  int/long/float/double, arrays, recursion, exceptions,");
+            term_print(t, "  String/StringBuilder, wrappers, collections, java/io, Math");
+        } else {
+            FSNode* f = g_vfs->resolve(argv[1]);
+            if (!f || f->is_dir || f->size < 4) {
+                term_print(t, "java: no such class file");
+            } else if (!(f->data[0] == 0xCA && f->data[1] == 0xFE &&
+                         f->data[2] == 0xBA && f->data[3] == 0xBE)) {
+                term_print(t, "java: not a Java class file (CAFEBABE magic missing)");
+            } else {
+                JavaOut jo;
+                jo.t = t; jo.n = 0; jo.acc[0] = 0;
+                const char** jargs = 0;
+                if (argc > 2) {
+                    jargs = (const char**)kalloc(sizeof(const char*) * (size_t)(argc - 2));
+                    if (jargs) {
+                        for (int i = 2; i < argc; i++) jargs[i - 2] = argv[i];
+                    }
+                }
+                term_print(t, "running Java class...");
+                int rc = nefu::minijvm_run_class(f->data, f->size, &JavaSink::cb, &jo,
+                                                 argc > 2 ? argc - 2 : 0, jargs);
+                if (jargs) kfree(jargs);
+                if (jo.n > 0) { jo.acc[jo.n] = 0; term_print(t, jo.acc); }
+                if (rc) {
+                    char msg[64];
+                    ksprintf(msg, sizeof(msg), "java: program exited with error %d", rc);
+                    term_print(t, msg);
+                } else {
+                    term_print(t, "[program exited]");
+                }
+            }
+        }
+    }
     else if (strcmp(a0, "man") == 0) {
         if (argc < 2) term_print(t, "usage: man <command>   (built-in manual)");
         else {
@@ -1177,6 +1412,7 @@ static void term_run(TermState* t, const char* cmd) {
             else if (strcmp(m, "free") == 0) term_print(t, "free  - show memory usage");
             else if (strcmp(m, "ps") == 0) term_print(t, "ps  - list running processes");
             else if (strcmp(m, "js") == 0) term_print(t, "js <code>  - run mini JavaScript");
+            else if (strcmp(m, "java") == 0) term_print(t, "java <file.class> [arg ...]  - run a Java class (mini JVM)");
             else if (strcmp(m, "lock") == 0) term_print(t, "lock  - lock the screen");
             else if (strcmp(m, "shutdown") == 0) term_print(t, "shutdown|reboot|poweroff  - power control");
             else term_print(t, "no manual entry for this command");
@@ -1667,6 +1903,7 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, "  - gfxmath/gfx_all.h (vec3/mat4/quat/ray/plane/aabb/sphere/camera/mesh/proj/render)");
             term_print(t, "  - audlib/aud_all.h (wave/synth/env/filter/seq/mixer/delay/reverb/mod/pitch)");
             term_print(t, "  - dblib/db_all.h (csv/ini/json/bptree/page/table)");
+            term_print(t, "  - stdcxx/stdcxx_all.h (C++ standard library: vector/string/map/set/list/queue/stack/algorithm/limits/utility/memory)");
             term_print(t, "");
             term_print(t, "Example:");
             term_print(t, "  nefucpp myapp.cpp myapp.nefud");
@@ -1691,6 +1928,7 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, "  - including gfxmath/gfx_all.h");
             term_print(t, "  - including audlib/aud_all.h");
             term_print(t, "  - including dblib/db_all.h");
+            term_print(t, "  - including stdcxx/stdcxx_all.h");
             term_print(t, "  - linking nefuOS runtime");
             
             ksprintf(msg, sizeof(msg), "nefucpp: successfully packed -> %s", out);
@@ -1728,6 +1966,13 @@ static void term_run(TermState* t, const char* cmd) {
             } else if (f->size >= 6 && !strncmp((const char*)f->data, "NEFUD1", 6)) {
                 String ok = "exec: "; ok += exec; term_print(t, ok.c_str());
                 term_nefud_run(t, f);
+            } else if (f->name.len() >= 6 && f->name.substr(f->name.len() - 6, 6) == ".ncode") {
+                String ok = "exec: "; ok += exec; term_print(t, ok.c_str());
+                struct NCodeSink2 { static void cb(void* ud, const char* s) { term_ext_print((TermState*)ud, s); } };
+                NCOut sink;
+                sink.print = &NCodeSink2::cb;
+                sink.ud = t;
+                ncode_run_file(&sink, f, 0, 0);
             } else {
                 String e = "exec: not executable: "; e += exec; term_print(t, e.c_str());
             }
@@ -1743,6 +1988,12 @@ static void term_paint(Window* w) {
     TermState* t = (TermState*)w->userdata;
     Surface& s = w->back;
     s.fill(TERM_BG);
+    // mirror scroll state for the WM scrollbar every frame
+    int total = (int)t->lines.size() * 16 + 24;
+    w->content_scroll_h = total > w->content_h ? total : 0;
+    w->scroll_y = w->content_scroll_h ? t->view_scroll * 16 : 0;
+    if (w->content_scroll_h && w->scroll_y > w->content_scroll_h - w->content_h)
+        w->scroll_y = w->content_scroll_h - w->content_h;
     int rows = term_rows(t);
     int start = t->lines.size() - (rows - 1) - t->view_scroll;
     if (start < 0) start = 0;
@@ -1861,11 +2112,25 @@ static void term_key(Window* w, const KeyEvent* e) {
 
 static void term_scroll(Window* w, int delta) {
     TermState* t = (TermState*)w->userdata;
-    int step = delta > 0 ? 2 : -2;
-    int maxv = t->lines.size();
-    t->view_scroll += step;
-    if (t->view_scroll < 0) t->view_scroll = 0;
-    if (t->view_scroll > maxv) t->view_scroll = maxv;
+    if (delta != 0) {
+        int step = delta > 0 ? 2 : -2;
+        int maxv = t->lines.size();
+        t->view_scroll += step;
+        if (t->view_scroll < 0) t->view_scroll = 0;
+        if (t->view_scroll > maxv) t->view_scroll = maxv;
+    } else {
+        // scrollbar thumb dragged: the WM moved w->scroll_y (pixels)
+        t->view_scroll = (int)t->lines.size() ? w->scroll_y / 16 : 0;
+        if (t->view_scroll < 0) t->view_scroll = 0;
+        if (t->view_scroll > (int)t->lines.size()) t->view_scroll = (int)t->lines.size();
+    }
+    // Mirror the row offset into the WM scrollbar (pixel space). The full
+    // content height is rows*line height + the input line at the bottom.
+    int total = (int)t->lines.size() * 16 + 24;
+    w->content_scroll_h = total > w->content_h ? total : 0;
+    w->scroll_y = w->content_scroll_h ? t->view_scroll * 16 : 0;
+    if (w->content_scroll_h && w->scroll_y > w->content_scroll_h - w->content_h)
+        w->scroll_y = w->content_scroll_h - w->content_h;
 }
 
 static void term_close(Window* w) {
@@ -1886,6 +2151,7 @@ void term_launch() {
     w->on_paint = term_paint;
     w->on_key = term_key;
     w->on_scroll = term_scroll;
+    w->app_scroll = true;   // terminal paints its own scrolled viewport
     w->on_close = term_close;
     term_print(t, "nefuOS shell v0.1 - type 'help' for commands.");
 }

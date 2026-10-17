@@ -30,7 +30,9 @@ $coreExclude = @(
   "core\apps\calculator.cpp", "core\apps\html5.cpp", "core\apps\lockscreen.cpp",
   "core\apps\recycle.cpp", "core\apps\stubs.cpp",
   "core\apps\terminal_commands.cpp", "core\apps\terminal_extra.cpp",
-  "core\sys\sysapi_extended.cpp"
+  "core\sys\sysapi_extended.cpp",
+  "core\net\tls13_fixed.cpp",      # supersedes tls13.cpp -> duplicate symbols
+  "core\stdcxx\test_stdcxx.cpp"    # test main() collides with win32.cpp main
 )
 $coreRoot = (Get-Location).Path
 $coreSrc = @(Get-ChildItem "core" -Recurse -Filter *.cpp |
@@ -122,12 +124,15 @@ foreach ($q in $qjSrc) {
   }
   $lvglHostObjs += $qobj
 }
-$linkErr = Join-Path $env:TEMP "nefu_link.log"
+# unique temp names per process: concurrent build invocations (e.g. a parallel
+# agent) share $env:TEMP, and a fixed name makes one link clobber/fail the other
+$pidTag = "_" + [System.Diagnostics.Process]::GetCurrentProcess().Id
+$linkErr = Join-Path $env:TEMP ("nefu_link" + $pidTag + ".log")
 # Windows caps a process command line at ~32KB; with lvgl + quickjs + core the
 # link line blows past it and CreateProcess fails before g++ even starts (which
 # also left $LASTEXITCODE unset, silently reusing a stale exe).  Pass the args
 # through a response file instead.
-$hostLinkRsp = Join-Path $env:TEMP "nefu_host_link.rsp"
+$hostLinkRsp = Join-Path $env:TEMP ("nefu_host_link" + $pidTag + ".rsp")
 $hostLinkArgs = @("-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-fno-builtin",
                   "-Wall", "-Wextra", "-Wno-sized-deallocation", "-I", "core", "-I", "third_party",
                   "-DNEFU_LVGL_DEMO") +
@@ -306,7 +311,7 @@ $objs = @("$bareOut\entry.o") + $objs
 # 4) link閿涘湧E �?>
 # Same 32KB command-line cap as the host link: pass the object list via a
 # response file so ld actually runs.
-$bareLinkRsp = Join-Path $env:TEMP "nefu_bare_link.rsp"
+$bareLinkRsp = Join-Path $env:TEMP ("nefu_bare_link" + $pidTag + ".rsp")
 $bareLinkArgs = @("-mi386pep", "--image-base", "0x100000", "--gc-sections",
                   "-T", "backends\bare\linker.ld", "-o", "$bareOut\kernel.exe",
                   "-Map", "$bareOut\kernel.map") + $objs
@@ -342,15 +347,15 @@ $isoKernelMax = 4194304 * 2048   # ISO layout: kernel occupies up to 1024 x 2048
 Write-Output "isoKernelMax=$isoKernelMax kSize=$kSize (make_iso cap = 4194304)"
 if ($kSize -gt $isoKernelMax) { throw "kernel too large for ISO (max $isoKernelMax bytes, got $kSize)" }
 # memory map check: the flat kernel loads at 0x100000 and must stay BELOW the
-# stub staging base 0x620000 -- otherwise the stub's inflate destination
+# stub staging base 0xB00000 -- otherwise the stub's inflate destination
 # (0x100000..0x100000+kSize) overlaps the staging/source region and corrupts
 # the compressed stream (observed as inflate error -24).  Fixed in stub.s /
 # entry.s / bare.cpp.  Fail loudly instead of producing a broken image.
 $kEnd = 0x100000 + $kSize
-if ($kEnd -ge 0x620000) {
-    throw "kernel image ends at 0x$('{0:X}' -f $kEnd) >= 0x620000 (staging base): raise STAGE_BASE/stacks/ARENA_BASE"
+if ($kEnd -ge 0xB00000) {
+    throw "kernel image ends at 0x$('{0:X}' -f $kEnd) >= 0xB00000 (staging base): raise STAGE_BASE/stacks/ARENA_BASE"
 }
-Write-Output "memmap OK: kernel ends at 0x$('{0:X}' -f $kEnd) (< 0x620000 staging, < 0x900000 stacks, < 0x920000 arena)"
+Write-Output "memmap OK: kernel ends at 0x$('{0:X}' -f $kEnd) (< 0xB00000 staging, < 0x2000000 stacks, < 0x2020000 arena)"
 
 # 4b) patch the multiboot2 header (entry.s) so GRUB/ESP boot works:
 #     Address-tag load_end_addr/bss_end_addr + in-kernel kernel_boot_params

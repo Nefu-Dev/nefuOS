@@ -1,0 +1,22 @@
+{
+  "app": {
+    "nefud": {
+      "Introduction": "a text for nefuOS NPKG",
+      "version": "1.0.0",
+      "server_in": "/htdocs/nefud",
+      "deps": ["sysapi.h", "std/*/**"]
+    },
+    "hello": {
+      "Introduction": "A minimal .ncode package for testing npkg install/start",
+      "version": "0.2.0",
+      "server_in": "/htdocs/hello",
+      "deps": ["std"]
+    },
+    "draw": {
+      "Introduction": "start_r_os() window demo - a nefu runtime desktop",
+      "version": "1.0.0",
+      "server_in": "/htdocs/draw",
+      "deps": ["std"]
+    }
+  }
+}

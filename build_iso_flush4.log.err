@@ -1,0 +1,31 @@
+out-file : 文件“C:\Users\huawei\AppData\Local\Temp\nefu_link.log”正由另一进程使用，因此该进程无法访问此文件。
+所在位置 C:\Users\huawei\AppData\Local\Temp\nefu_build_inc.ps1:214 字符: 1
++ & $g "@$hostLinkRsp" 2> $linkErr
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OpenError: (:) [Out-File], IOException
+    + FullyQualifiedErrorId : FileOpenFailure,Microsoft.PowerShell.Commands.OutFileCommand
+ 
+backends\bare\bare.cpp: In function 'void* nefu::b_alloc_from_bump(uint32_t)':
+backends\bare\bare.cpp:78:14: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+   78 |     Blk* b = (Blk*)cur;
+      |              ^~~~~~~~~
+backends\bare\bare.cpp: In function 'void* nefu::alloc_from_bump(uint32_t)':
+backends\bare\bare.cpp:88:14: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+   88 |     Blk* b = (Blk*)cur;
+      |              ^~~~~~~~~
+backends\bare\bare.cpp: In function 'void nefu::nefuos_kernel_main(void*)':
+backends\bare\bare.cpp:595:21: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  595 |     s_screen.addr = (uint8_t*)s_lfb;
+      |                     ^~~~~~~~~~~~~~~
+backends\bare\bare.cpp: At global scope:
+backends\bare\bare.cpp:390:13: warning: 'void nefu::pic_init()' defined but not used [-Wunused-function]
+  390 | static void pic_init() {
+      |             ^~~~~~~~
+backends\bare\bare_libc.cpp: In function 'int fmt_float(char*, int, int, double, char, int, int*)':
+backends\bare\bare_libc.cpp:70:37: warning: unused parameter 'cap' [-Wunused-parameter]
+   70 | static int fmt_float(char* out, int cap, int sign, double av,
+      |                                 ~~~~^~~
+backends\bare\bare_libc.cpp: In function 'void fmt_float_copy(Fmt*, int, double, char, int, int)':
+backends\bare\bare_libc.cpp:146:82: warning: unused parameter 'e10' [-Wunused-parameter]
+  146 | static void fmt_float_copy(Fmt* f, int sign, double av, char conv, int prec, int e10) {
+      |                                                                              ~~~~^~~

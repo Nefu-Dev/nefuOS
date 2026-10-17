@@ -10,10 +10,54 @@
 #include "sys/settings.h"
 #include "sys/power.h"
 #include "net/net.h"
+#include "audio/audio_engine.h"
 #include "sys/sha256.h"
 #include "ime/pinyin.h"
+#include "apps/update.h"
+#include "lib/llm.h"
+
+#ifdef NEFU_BARE
+extern "C" void nefu_elf_selfcheck(void);   // VFS-backed Linux-ELF run (runelf path)
+extern "C" void nefu_deb_selftest(void);    // VFS-backed .deb install + run selftest
+extern "C" void nefu_x11_selftest(void);    // embedded X11 server + guest X client
+#endif
 
 namespace nefu {
+
+// nefuLLM boot self-test (bare COM1): load the real model disk, build the
+// tokenizer workspace, run one short generation, log the result, then free
+// everything so the chatbot re-loads it lazily on first English message.
+#ifdef NEFU_BARE
+static void llm_boot_selftest(void) {
+    klogf("llm: selftest enter\n");
+    uint8_t* blob = 0; uint32_t blob_sz = 0;
+    if (!platform_llm_load(&blob, &blob_sz)) { klogf("llm: no model disk\n"); return; }
+    size_t ws = llm::llm_workspace_needed(blob, blob_sz);
+    void* wp = kalloc(ws ? ws : 1);
+    if (!wp) { klogf("llm: ws alloc fail (%u B)\n", (unsigned)ws); kfree(blob); return; }
+    llm::Model* m = 0;
+    int rc = llm::llm_load(blob, blob_sz, wp, ws, &m);
+    klogf("llm: blob %u B ws %u B load rc=%d\n", blob_sz, (unsigned)ws, rc);
+    if (rc == 0) {
+        size_t sc = llm::llm_scratch_needed(m);
+        void* sp = kalloc(sc ? sc : 1);
+        if (sp) {
+            char out[160];
+            int n = llm::llm_generate(m, "Once upon a time", out, (int)sizeof(out),
+                                      sp, sc, 24);
+            out[sizeof(out) - 1] = 0;
+            klogf("llm: gen n=%d [%s]\n", n, out);
+            kfree(sp);
+        } else {
+            klogf("llm: scratch alloc fail (%u B)\n", (unsigned)sc);
+        }
+    }
+    kfree(wp);
+    kfree(blob);
+    klogf("llm: boot self-test done\n");
+}
+#endif
+
 
 static bool s_inited = false;
 static bool s_booted = false;
@@ -29,6 +73,8 @@ static int s_lock_len = 0;
 static uint32_t s_lock_fail_ms = 0;
 static uint32_t s_last_activity = 0;
 // ---- first-boot setup wizard state ----
+static uint32_t s_super_press_ms = 0;   // tick when the Win key was pressed (0 = up)
+static bool s_super_alone = false;      // Win pressed & released alone (no combo key)
 static bool s_setup = false;
 static char s_setup_user[33] = "user";
 static char s_setup_pwd1[65] = "";
@@ -210,12 +256,19 @@ void nefuos_init() {
     g_wm = new WM();
     desktop_init();
     if (platform_name()[0] == 'b') __asm__ volatile("sti");   // enable IRQs before blocking net ops
-    // bare-metal NIC (e1000 in QEMU); win32 host has none -> skipped by name
+    // bare-metal NIC (e1000/RTL8139/virtio in QEMU); win32 host has none -> skipped by name
     if (platform_name()[0] == 'b') {
         if (net_init()) {
-            klogf("net: e1000 up, ip=10.0.2.15\n");
+            klogf("net: NIC up, ip=10.0.2.15\n");
         } else {
-            klogf("net: no e1000 found\n");
+            klogf("net: no supported NIC found\n");
+        }
+        // bare-metal audio: probe real PCI sound cards (AC'97 / HD Audio);
+        // the ISA SB16 fallback is probed later by the backend.
+        if (audio::engine_init()) {
+            klogf("audio: %s ready\n", audio::engine_device_name());
+        } else {
+            klogf("audio: no PCI sound card (falling back to SB16 probe)\n");
         }
     }
     s_boot_start = platform_tick_ms();
@@ -230,6 +283,12 @@ void nefuos_init() {
                   (unsigned)(di[i].sectors / 2048),
                   di[i].removable ? "removable" : "fixed");
     }
+#ifdef NEFU_BARE
+    nefu_elf_selfcheck();   // VFS-backed Linux-ELF run (runelf path), headless COM1
+    nefu_deb_selftest();    // VFS-backed .deb install + run (headless COM1)
+    nefu_x11_selftest();    // embedded X11 server + guest X client (headless COM1)
+    llm_boot_selftest();    // nefuLLM: load the real model disk + run one reply (COM1)
+#endif
     s_inited = true;
     if (platform_name()[0] == 'b') __asm__ volatile("sti");   // enable IRQs for tick/input
     klogf("nefuOS ready on %s\n", platform_name());
@@ -289,10 +348,58 @@ void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     // Track modifier keys (both down and up); they are consumed here and never
     // become normal key events. This is what powers Shift+/Ctrl+ shortcuts.
     if (keycode == KEY_SHIFT) { if (down) s_mods |= 0x01; else s_mods &= ~0x01; return; }
-    if (keycode == KEY_CTRL)  { if (down) s_mods |= 0x02; else s_mods &= ~0x02; return; }
+    if (keycode == KEY_FAST) {
+        if (down) {
+            s_mods |= 0x08;
+            s_super_press_ms = platform_tick_ms();
+            s_super_alone = true;
+        } else {
+            s_mods &= ~0x08;
+            // Bare Win press+release within 500 ms (no combo key) -> fast update
+            if (s_super_alone && s_super_press_ms &&
+                (platform_tick_ms() - s_super_press_ms) < 500 && !s_locked) {
+                update_global_shortcut();
+            }
+            s_super_press_ms = 0;
+            s_super_alone = false;
+        }
+        return;
+    }
     if (keycode == KEY_ALT)   { if (down) s_mods |= 0x04; else s_mods &= ~0x04; return; }
     if (!down) return;
     s_last_activity = platform_tick_ms();
+    if (s_super_press_ms) s_super_alone = false;   // any key while Win held = combo, not a bare Win
+    // Super/Win (⊞/⌘) shortcuts — global hotkeys, work anywhere on the desktop
+    if (s_mods & 0x08) {
+        char c = ascii;
+        if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+        switch (c) {
+        case 'd': case 'm':                     // Win+D / Win+M: show desktop
+            g_wm->minimize_all();
+            return;
+        case 'f':                               // Win+F: fast system update (incremental)
+        case 'u':                               // Win+U: same as Ctrl+Shift+U
+            update_global_shortcut();
+            return;
+        case 'e': app_launch(APP_FILEMGR); return;      // Win+E: file manager
+        case 'r': app_launch(APP_TERMINAL); return;     // Win+R: terminal
+        case 'b': app_launch(APP_BROWSER); return;      // Win+B: browser
+        case 'l': nefuos_lock_screen(); return;         // Win+L: lock screen
+        case 'p': app_launch(APP_SETTINGS); return;     // Win+P: settings
+        case 't': app_launch(APP_TASKMGR); return;      // Win+T: task manager
+        case 'c': app_launch(APP_CALC); return;         // Win+C: calculator
+        case 'g': app_launch(APP_GAMECENTER); return;   // Win+G: game center
+        case 's': app_launch(APP_SEARCH); return;       // Win+S: search
+        case 'w': app_launch(APP_WALLPAPER); return;    // Win+W: wallpaper
+        case 'i': app_launch(APP_INPUTMETHOD); return;  // Win+I: input method
+        default: break;
+        }
+    }
+    // Ctrl+Shift+U: quick system update (progress window, non-blocking)
+    if ((s_mods & 0x02) && (s_mods & 0x01) && (ascii == 'u' || ascii == 'U')) {
+        update_global_shortcut();
+        return;
+    }
     if (s_setup) {
         char* dst = (s_setup_field == 0) ? s_setup_user
                   : (s_setup_field == 1) ? s_setup_pwd1 : s_setup_pwd2;
@@ -366,6 +473,10 @@ void nefuos_handle_scroll(int delta) {
 }
 
 void nefuos_tick() {
+    // audio heartbeat: keep the real sound card fed (mix + submit each tick)
+#ifdef NEFU_BARE
+    audio::engine_pump();
+#endif
     // idle auto-lock (configured in Settings -> idle_lock_sec)
     if (s_booted && !s_locked && g_settings.idle_lock_sec > 0 &&
         platform_tick_ms() - s_last_activity > (uint32_t)g_settings.idle_lock_sec * 1000u) {

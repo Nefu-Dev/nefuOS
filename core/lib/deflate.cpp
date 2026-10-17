@@ -283,6 +283,54 @@ int raw_decompress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_
     return (int)out_len;
 }
 
+// ---- gzip (RFC 1952) decompressor ----
+// Table-free CRC-32 (IEEE 802.3), same polynomial as zip/gzip trailers.
+static uint32_t gz_crc32(const uint8_t* d, size_t n) {
+    uint32_t c = 0xFFFFFFFF;
+    for (size_t i = 0; i < n; i++) {
+        c ^= d[i];
+        for (int b = 0; b < 8; b++)
+            c = (c >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(c & 1)));
+    }
+    return ~c;
+}
+
+int gzip_decompress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_cap) {
+    if (!src || src_len < 18) return -1;
+    // fixed header: ID1=0x1f ID2=0x8b CM=8 (deflate)
+    if (src[0] != 0x1f || src[1] != 0x8b || src[2] != 8) return -1;
+    uint8_t flg = src[3];
+    size_t pos = 10;
+    if (flg & 0x04) {                       // FEXTRA: 2-byte XLEN + extra field
+        if (pos + 2 > src_len) return -1;
+        size_t xlen = (size_t)src[pos] | ((size_t)src[pos + 1] << 8);
+        pos += 2 + xlen;
+    }
+    if (flg & 0x08) {                       // FNAME: NUL-terminated string
+        while (pos < src_len && src[pos]) pos++;
+        pos++;
+    }
+    if (flg & 0x10) {                       // FCOMMENT: NUL-terminated string
+        while (pos < src_len && src[pos]) pos++;
+        pos++;
+    }
+    if (flg & 0x02) pos += 2;               // FHCRC: 2 bytes (ignored)
+    if (pos + 8 > src_len) return -1;       // need deflate body + 8-byte trailer
+    size_t comp_len = src_len - pos - 8;
+    size_t out_len = 0;
+    {
+        BitReader br(src + pos, comp_len);
+        if (inflate_block(br, dst, dst_cap, out_len) != 0) return -1;
+    }
+    uint32_t want_crc = (uint32_t)src[src_len - 8] | ((uint32_t)src[src_len - 7] << 8) |
+                        ((uint32_t)src[src_len - 6] << 16) | ((uint32_t)src[src_len - 5] << 24);
+    uint32_t want_size = (uint32_t)src[src_len - 4] | ((uint32_t)src[src_len - 3] << 8) |
+                         ((uint32_t)src[src_len - 2] << 16) | ((uint32_t)src[src_len - 1] << 24);
+    if (want_size != (uint32_t)out_len) return -1;
+    if (gz_crc32(dst, out_len) != want_crc) return -1;
+    return (int)out_len;
+}
+
 int zlib_decompress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_cap) {
     if (src_len < 6) return -1;
     if ((src[0] & 0x0F) != 8) return -1;      // method = deflate

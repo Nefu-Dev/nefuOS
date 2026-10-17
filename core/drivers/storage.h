@@ -18,18 +18,18 @@ void shutdown_storage() {
 }
 
 // storage status
-bool () {
+bool storage_status() {
     return true;
 }
 
 // storage read operation
-int (uint32_t addr, void* buf, uint32_t len) {
+int storage_read(uint32_t addr, void* buf, uint32_t len) {
     // Read from storage
     return (int)len;
 }
 
 // storage write operation
-int (uint32_t addr, const void* buf, uint32_t len) {
+int storage_write(uint32_t addr, const void* buf, uint32_t len) {
     // Write to storage
     return (int)len;
 }

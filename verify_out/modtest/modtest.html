@@ -1,0 +1,19 @@
+<html><head><title>module test</title></head>
+<body><div id="root">modtest</div>
+<script>
+try {
+  var p = import('./mod.js');
+  console.log("[PAGE] import() started, promise=" + (p && typeof p));
+  p.then(function(m) {
+    console.log("[PAGE] import resolved id=" + m.id + " add=" + m.add(2,3));
+    document.getElementById('root').textContent = "resolved:" + m.id;
+  }).catch(function(e) {
+    console.log("[PAGE] import rejected: " + e);
+    document.getElementById('root').textContent = "rejected";
+  });
+} catch (e) {
+  console.log("[PAGE] import threw sync: " + e);
+  document.getElementById('root').textContent = "threw:" + e;
+}
+</script>
+</body></html>

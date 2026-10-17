@@ -18,18 +18,18 @@ void shutdown_display() {
 }
 
 // display status
-bool () {
+bool display_status() {
     return true;
 }
 
 // display read operation
-int (uint32_t addr, void* buf, uint32_t len) {
+int display_read(uint32_t addr, void* buf, uint32_t len) {
     // Read from display
     return (int)len;
 }
 
 // display write operation
-int (uint32_t addr, const void* buf, uint32_t len) {
+int display_write(uint32_t addr, const void* buf, uint32_t len) {
     // Write to display
     return (int)len;
 }

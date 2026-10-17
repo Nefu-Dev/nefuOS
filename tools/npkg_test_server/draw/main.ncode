@@ -1,0 +1,69 @@
+#nefu
+import<std>
+
+# ============ 全局状态（回调在全局环境运行，可访问） ============
+var os;          # start_r_os() 返回的桌面对象
+var frame = 0;   # 帧计数（由定时器驱动）
+var ball_x = 160;
+var bg = 0x10131C;
+
+# ============ 定时器回调（set_interval: 0 参数） ============
+func tick() {
+  frame = frame + 1;
+  ball_x = ball_x + 3;
+  if (ball_x > os.width - 40) { ball_x = 30; }
+  os.background(bg);
+  # 标题栏背景 + 边框
+  os.fill(16, 16, os.width - 32, 40, 0x1F2A3E);
+  os.rect(16, 16, os.width - 32, 40, 0x4A90D9);
+  os.text(28, 26, 0xFFFFFF, "nefuOS .ncode desktop - draw demo");
+  # 中央面板
+  os.fill(16, 66, 200, 120, 0x1B2330);
+  os.rect(16, 66, 200, 120, 0x6B7BA3);
+  os.text(28, 84, 0xAAD3FF, "frame: " + frame);
+  os.text(28, 104, 0xE8A33D, "ball x = " + ball_x);
+  # 移动的圆
+  os.circle(ball_x, 200, 24, 0xE8A33D);
+  os.pixel(ball_x, 200, 0xFFFFFF);
+  # 一条直线（地平线）
+  os.line(30, 260, os.width - 30, 260, 0x3A6EA5);
+  # 提示文字
+  os.text(30, 280, 0x8FA3C8, "keys: b=blue bg  r=red bg  space=save  c=clear");
+  os.text(30, 300, 0x8FA3C8, "mouse: click to draw a pixel (x,y)");
+}
+
+# ============ 键盘回调（on_key: 3 参数 keycode, ascii, down） ============
+func onKey(k, a, down) {
+  if (down == 0) { return; }
+  if (a == 98)  { bg = 0x0A1428; }   # 'b'
+  if (a == 114) { bg = 0x2A0E0E; }   # 'r'
+  if (a == 32)  { os.save(); }       # space -> 立即保存
+  if (a == 99)  { os.fill(0, 0, os.width, os.height, bg); }  # 'c' -> 清屏
+  println("key: code=" + k + " ascii=" + a);
+}
+
+# ============ 鼠标回调（on_mouse: 3 参数 x, y, buttons） ============
+func onMouse(x, y, b) {
+  if (b != 0) {
+    os.pixel(x, y, 0xFFFFFF);
+    os.text(16, 330, 0x8FA3C8, "click at (" + x + "," + y + ") btn=" + b);
+    println("mouse: x=" + x + " y=" + y + " buttons=" + b);
+  }
+}
+
+# ============ 入口 ============
+main() {
+  println("draw package - full start_r_os() desktop demo");
+  os = start_r_os();
+  os.title("draw demo - nefu runtime desktop");
+  os.background(bg);
+  os.text(30, 340, 0xFFFFFF, "autosaves every 0.5s to sandbox desktop.save");
+  # 先尝试恢复上次保存的桌面
+  os.load();
+  # 注册定时器与回调
+  os.set_interval(120, "tick");
+  os.on_key("onKey");
+  os.on_mouse("onMouse");
+  println("window created: " + os.width + "x" + os.height);
+  println("frame=0  ready - press b/r/space/c, move mouse, click");
+}

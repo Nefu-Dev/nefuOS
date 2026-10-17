@@ -1,6 +1,7 @@
-// nefuOS network stack: e1000 (QEMU 82540EM) + ARP + ICMP + minimal TCP
+// nefuOS network stack: e1000 (QEMU 82540EM) + RTL8139 + virtio-net + ARP + ICMP + minimal TCP
 // Pure integer, freestanding. Polled (no interrupts).
 #include "net.h"
+#include "../drivers/network.h"
 #include "../platform.h"
 #include "../klib/klib.h"
 
@@ -14,10 +15,21 @@ static inline uint8_t inb_p(uint16_t port) {
     __asm__ volatile("inb %1, %0" : "=a"(v) : "Nd"(port));
     return v;
 }
+static inline uint16_t inw_p(uint16_t port) {
+    uint16_t v;
+    __asm__ volatile("inw %1, %0" : "=a"(v) : "Nd"(port));
+    return v;
+}
 static inline uint32_t inl_p(uint16_t port) {
     uint32_t v;
     __asm__ volatile("inl %1, %0" : "=a"(v) : "Nd"(port));
     return v;
+}
+static inline void outb_p(uint16_t port, uint8_t v) {
+    __asm__ volatile("outb %0, %1" : : "a"(v), "Nd"(port));
+}
+static inline void outw_p(uint16_t port, uint16_t v) {
+    __asm__ volatile("outw %0, %1" : : "a"(v), "Nd"(port));
 }
 static inline void outl_p(uint16_t port, uint32_t v) {
     __asm__ volatile("outl %0, %1" : : "a"(v), "Nd"(port));
@@ -39,7 +51,10 @@ static void pci_write32(int bus, int dev, int func, int reg, uint32_t val) {
     outl_p(0xCFC, val);
 }
 
-// ---------------- e1000 registers ----------------
+// which driver family is active
+static int s_backend = drivers::NIC_NONE;   // NIC_E1000 / NIC_RTL8139 / NIC_VIRTIO
+
+// ================= e1000 (Intel PRO/1000) =================
 #define REG_CTRL   0x0000
 #define REG_STATUS 0x0008
 #define REG_ICR    0x00C0
@@ -129,7 +144,8 @@ struct EthHdr {
     uint16_t type;
 } __attribute__((packed));
 
-static void eth_send(const uint8_t* dst, uint16_t type, const void* payload, int plen) {
+// e1000 TX path (kept separate; dispatched by net_send_frame)
+static void eth_send_e1000(const uint8_t* dst, uint16_t type, const void* payload, int plen) {
     if (!s_mmio || !s_tx_desc) return;
     // wait for a free descriptor.
     // Old check "TDH != TDT % TX_RING -> free" was wrong on the very first
@@ -175,8 +191,323 @@ struct ArpPkt {
     uint32_t tpa;
 } __attribute__((packed));
 
+static void arp_request(uint32_t ip);
+static void arp_reply(const uint8_t* dst_mac, uint32_t tpa_ip, const uint8_t* target_mac);
+static void arp_handle(const uint8_t* frame, int len);
+static void ip_send(uint32_t dst, uint8_t proto, const void* payload, int plen, uint16_t id);
+static void icmp_handle(const uint8_t* ip_pkt, int iplen);
+static void tcp_handle(const uint8_t* ip_pkt, int iplen);
+static void handle_frame(const uint8_t* frame, int len);
+static void net_send_frame(const uint8_t* dst, uint16_t type, const void* payload, int plen);
+
+// ================= RTL8139 =================
+static uint16_t s_rtl_io = 0;
+static uint8_t* s_rtl_rx = 0;          // 8 KB wrap ring
+static uint8_t* s_rtl_tx[4] = {0,0,0,0};   // 4 x 2 KB TX buffers
+static int s_rtl_tx_slot = 0;
+static uint32_t s_rtl_capr = 0;
+
+#define RTL_IDR0  0x00
+#define RTL_TSD0  0x10
+#define RTL_TSAD0 0x20
+#define RTL_RBSTART 0x30
+#define RTL_RCR   0x34
+#define RTL_CAPR  0x38
+#define RTL_CBR   0x3C
+#define RTL_CMD   0x37
+#define RTL_CONFIG1 0x52
+
+#define RTL_RX_RING_SIZE 8192
+#define RTL_RX_BUF_SIZE  2048
+
+static void rtl_setup(void) {
+    s_rtl_io = (uint16_t)(pci_read32(0, 0, 0, 0x10) & 0xFFFCu);
+    // locate the device via full probe (bar read of the first match)
+    drivers::PciDev devs[64];
+    int n = drivers::pci_scan(devs, 64);
+    for (int i = 0; i < n; i++) {
+        if (devs[i].vendor == 0x10EC && devs[i].device == 0x8139) {
+            s_rtl_io = (uint16_t)(drivers::pci_bar_address(devs[i], 0, 0) & 0xFFFCu);
+            drivers::pci_enable_busmaster(devs[i]);
+            break;
+        }
+    }
+    if (!s_rtl_io) { s_backend = drivers::NIC_NONE; return; }
+
+    // power on + reset
+    outb_p((uint16_t)(s_rtl_io + RTL_CONFIG1), 0x00);
+    for (int i = 0; i < 20000; i++) io_wait_n();
+    outb_p((uint16_t)(s_rtl_io + RTL_CMD), 0x10);   // reset
+    for (int i = 0; i < 200000; i++) io_wait_n();
+
+    // MAC
+    for (int i = 0; i < 6; i++) g_net.mac[i] = inb_p((uint16_t)(s_rtl_io + RTL_IDR0 + i));
+    if (!(g_net.mac[0] || g_net.mac[1] || g_net.mac[2])) {
+        g_net.mac[0] = 0x52; g_net.mac[1] = 0x54; g_net.mac[2] = 0x00;
+        g_net.mac[3] = 0x12; g_net.mac[4] = 0x34; g_net.mac[5] = 0x56;
+    }
+
+    // RX ring (8 KB, wrap)
+    uint8_t* rxb = (uint8_t*)kalloc(RTL_RX_RING_SIZE + 64);
+    uint32_t rxp = (uint32_t)(uintptr_t)rxb;
+    rxp = (rxp + 15u) & ~15u;
+    s_rtl_rx = (uint8_t*)(uintptr_t)rxp;
+    memset(s_rtl_rx, 0, RTL_RX_RING_SIZE);
+    outl_p((uint16_t)(s_rtl_io + RTL_RBSTART), rxp);
+    outl_p((uint16_t)(s_rtl_io + RTL_CAPR), 0);
+    outl_p((uint16_t)(s_rtl_io + RTL_CBR), 0);
+    s_rtl_capr = 0;
+    // RCR: EN(0) | WRAP(7) | AB(2) | AM(3) | APM(4) | AAP(5) | threshold 0x0F<<16
+    outl_p((uint16_t)(s_rtl_io + RTL_RCR), (0x0Fu << 16) | 0x80u | 0x04u | 0x08u | 0x10u | 0x20u | 0x01u);
+
+    // TX buffers
+    for (int i = 0; i < 4; i++) {
+        s_rtl_tx[i] = (uint8_t*)kalloc(2048 + 16);
+        memset(s_rtl_tx[i], 0, 2048 + 16);
+    }
+    s_rtl_tx_slot = 0;
+
+    outb_p((uint16_t)(s_rtl_io + RTL_CMD), 0x0C);   // RE | TE
+    s_backend = drivers::NIC_RTL8139;
+}
+
+static void rtl_send(const uint8_t* dst, uint16_t type, const void* payload, int plen) {
+    if (!s_rtl_io || !s_rtl_tx[0]) return;
+    int slot = s_rtl_tx_slot % 4;
+    uint8_t* p = s_rtl_tx[slot];
+    EthHdr* eh = (EthHdr*)p;
+    for (int i = 0; i < 6; i++) { eh->dst[i] = dst[i]; eh->src[i] = g_net.mac[i]; }
+    eh->type = type;
+    if (plen > 0 && payload) memcpy(p + 14, payload, (size_t)plen);
+    int total = 14 + plen;
+    if (total < 60) total = 60;
+    // wait for the slot to be free (OWN clear)
+    uint32_t wait = 0;
+    while (wait < 2000000u) {
+        if (!(inl_p((uint16_t)(s_rtl_io + RTL_TSD0 + slot * 4)) & 0x100u)) break;
+        wait++;
+    }
+    outl_p((uint16_t)(s_rtl_io + RTL_TSAD0 + slot * 4), (uint32_t)(uintptr_t)p);
+    outl_p((uint16_t)(s_rtl_io + RTL_TSD0 + slot * 4),
+           ((uint32_t)total << 16) | 0x100u | 0x01u);   // OWN | Start
+    s_rtl_tx_slot = (s_rtl_tx_slot + 1) % 4;
+    g_net.tx_count++;
+}
+
+static void rtl_poll(void) {
+    if (!s_rtl_io || !s_rtl_rx) return;
+    uint32_t cbr = inl_p((uint16_t)(s_rtl_io + RTL_CBR));
+    int guard = 0;
+    while (s_rtl_capr != cbr && guard < 32) {
+        uint16_t status = *(const uint16_t*)(s_rtl_rx + s_rtl_capr);
+        uint16_t len = *(const uint16_t*)(s_rtl_rx + s_rtl_capr + 2);
+        if (!(status & 0x01u)) break;                  // ROK
+        if (len >= 4 && len <= RTL_RX_BUF_SIZE) {
+            handle_frame(s_rtl_rx + s_rtl_capr + 4, len - 4);
+            g_net.rx_count++;
+        }
+        s_rtl_capr = (s_rtl_capr + 16u + (uint32_t)len) & (RTL_RX_RING_SIZE - 1u);
+        outl_p((uint16_t)(s_rtl_io + RTL_CAPR), s_rtl_capr);
+        cbr = inl_p((uint16_t)(s_rtl_io + RTL_CBR));
+        guard++;
+    }
+}
+
+// ================= virtio-net (legacy) =================
+#define VIO_DEV_FEATURES 0x00
+#define VIO_GUEST_FEATURES 0x04
+#define VIO_QUEUE_PFN   0x08
+#define VIO_QUEUE_SIZE  0x0C
+#define VIO_QUEUE_SEL   0x0E
+#define VIO_QUEUE_NOTIFY 0x10
+#define VIO_STATUS      0x12
+#define VIO_ISR         0x13
+#define VIO_CONFIG      0x100
+
+#define VRING_SIZE      16
+
+struct vring_desc {
+    uint64_t addr;
+    uint32_t len;
+    uint16_t flags;
+    uint16_t next;
+} __attribute__((packed));          // 16 bytes
+
+struct vring_avail {
+    uint16_t flags;
+    uint16_t idx;
+    uint16_t ring[VRING_SIZE];
+} __attribute__((packed));
+
+struct vring_used_elem {
+    uint32_t id;
+    uint32_t len;
+} __attribute__((packed));
+
+struct vring_used {
+    uint16_t flags;
+    uint16_t idx;
+    vring_used_elem ring[VRING_SIZE];
+} __attribute__((packed));
+
+struct VioRing {
+    vring_desc* desc;
+    vring_avail* avail;
+    vring_used* used;
+    uint16_t qsz;
+    uint16_t last_used;
+};
+
+static uint16_t s_vio_io = 0;
+static VioRing s_vio_rx, s_vio_tx;
+static uint8_t* s_vio_rxbuf[VRING_SIZE];
+static uint8_t* s_vio_txhdr;
+static uint8_t* s_vio_txdata;
+
+struct vnet_hdr {          // virtio-net legacy header (12 bytes)
+    uint8_t  flags;
+    uint8_t  gso_type;
+    uint16_t hdr_len;
+    uint16_t gso_size;
+    uint16_t csum_start;
+    uint16_t csum_offset;
+    uint16_t num_buffers;
+} __attribute__((packed));
+
+static void vio_notify(int q) {
+    outw_p((uint16_t)(s_vio_io + VIO_QUEUE_NOTIFY), (uint16_t)q);
+}
+
+static void vio_setup_ring(VioRing* r, int qsel) {
+    outw_p((uint16_t)(s_vio_io + VIO_QUEUE_SEL), (uint16_t)qsel);
+    r->qsz = inw_p((uint16_t)(s_vio_io + VIO_QUEUE_SIZE));
+    if (r->qsz > VRING_SIZE) r->qsz = VRING_SIZE;
+    if (r->qsz < 2) r->qsz = 2;
+    // three pages: desc / avail / used
+    uint8_t* mem = (uint8_t*)kalloc(4096u * 3u + 4096u);
+    memset(mem, 0, 4096u * 3u + 4096u);
+    uintptr_t base = (uintptr_t)mem;
+    base = (base + 4095u) & ~4095u;
+    r->desc = (vring_desc*)base;
+    r->avail = (vring_avail*)(base + 4096u);
+    r->used = (vring_used*)(base + 8192u);
+    r->last_used = 0;
+    outl_p((uint16_t)(s_vio_io + VIO_QUEUE_PFN), (uint32_t)(base >> 12));
+}
+
+static void vio_setup(void) {
+    s_vio_io = (uint16_t)(pci_read32(0, 0, 0, 0x10) & 0xFFFCu);
+    drivers::PciDev devs[64];
+    int n = drivers::pci_scan(devs, 64);
+    for (int i = 0; i < n; i++) {
+        if (devs[i].vendor == 0x1AF4 && devs[i].class_code == 0x02) {
+            s_vio_io = (uint16_t)(drivers::pci_bar_address(devs[i], 0, 0) & 0xFFFCu);
+            drivers::pci_enable_busmaster(devs[i]);
+            break;
+        }
+    }
+    if (!s_vio_io) { s_backend = drivers::NIC_NONE; return; }
+
+    // device status handshake
+    outb_p((uint16_t)(s_vio_io + VIO_STATUS), 0x01u);          // ACKNOWLEDGE
+    outb_p((uint16_t)(s_vio_io + VIO_STATUS), 0x03u);          // + DRIVER
+    uint32_t feat = inl_p((uint16_t)(s_vio_io + VIO_DEV_FEATURES));
+    (void)feat;
+    outl_p((uint16_t)(s_vio_io + VIO_GUEST_FEATURES), 0u);     // no feature bits needed
+
+    vio_setup_ring(&s_vio_rx, 0);                               // RX queue
+    vio_setup_ring(&s_vio_tx, 1);                               // TX queue
+
+    // MAC from device config space
+    for (int i = 0; i < 6; i++) g_net.mac[i] = inb_p((uint16_t)(s_vio_io + VIO_CONFIG + i));
+    if (!(g_net.mac[0] || g_net.mac[1] || g_net.mac[2])) {
+        g_net.mac[0] = 0x52; g_net.mac[1] = 0x54; g_net.mac[2] = 0x00;
+        g_net.mac[3] = 0x12; g_net.mac[4] = 0x34; g_net.mac[5] = 0x56;
+    }
+
+    // RX descriptors: one buffer per descriptor, no chaining
+    for (int i = 0; i < VRING_SIZE; i++) {
+        s_vio_rxbuf[i] = (uint8_t*)kalloc(RX_BUF + 16);
+        memset(s_vio_rxbuf[i], 0, RX_BUF + 16);
+        s_vio_rx.desc[i].addr = (uint64_t)(uintptr_t)s_vio_rxbuf[i];
+        s_vio_rx.desc[i].len = RX_BUF;
+        s_vio_rx.desc[i].flags = 0;                  // device may write
+        s_vio_rx.desc[i].next = 0xFFFF;
+        s_vio_rx.avail->ring[i] = (uint16_t)i;
+    }
+    s_vio_rx.avail->idx = (uint16_t)VRING_SIZE;
+
+    // TX: one chained pair (header + data)
+    s_vio_txhdr = (uint8_t*)kalloc(64);
+    s_vio_txdata = (uint8_t*)kalloc(2048 + 16);
+    memset(s_vio_txhdr, 0, 64);
+    memset(s_vio_txdata, 0, 2048 + 16);
+    s_vio_tx.desc[0].addr = (uint64_t)(uintptr_t)s_vio_txhdr;
+    s_vio_tx.desc[0].len = sizeof(vnet_hdr);
+    s_vio_tx.desc[0].flags = 0x02u;                 // NEXT
+    s_vio_tx.desc[0].next = 1;
+    s_vio_tx.desc[1].addr = (uint64_t)(uintptr_t)s_vio_txdata;
+    s_vio_tx.desc[1].flags = 0;
+    s_vio_tx.desc[1].next = 0xFFFF;
+
+    outb_p((uint16_t)(s_vio_io + VIO_STATUS), 0x0Fu);          // DRIVER_OK
+    vio_notify(0);                                            // arm RX
+    s_backend = drivers::NIC_VIRTIO;
+}
+
+static void vio_send(const uint8_t* dst, uint16_t type, const void* payload, int plen) {
+    if (!s_vio_io) return;
+    uint8_t* p = s_vio_txdata;
+    EthHdr* eh = (EthHdr*)p;
+    for (int i = 0; i < 6; i++) { eh->dst[i] = dst[i]; eh->src[i] = g_net.mac[i]; }
+    eh->type = type;
+    if (plen > 0 && payload) memcpy(p + 14, payload, (size_t)plen);
+    int total = 14 + plen;
+    if (total < 60) total = 60;
+    s_vio_tx.desc[1].len = (uint32_t)total;
+    vnet_hdr* h = (vnet_hdr*)s_vio_txhdr;
+    memset(h, 0, sizeof(vnet_hdr));
+    uint16_t slot = s_vio_tx.avail->idx % s_vio_tx.qsz;
+    s_vio_tx.avail->ring[slot] = 0;
+    s_vio_tx.avail->idx++;
+    slot = s_vio_tx.avail->idx % s_vio_tx.qsz;
+    s_vio_tx.avail->ring[slot] = 1;
+    s_vio_tx.avail->idx++;
+    vio_notify(1);
+    // wait for the used entry (poll with a bounded budget)
+    uint32_t wait = 0;
+    while (wait < 2000000u) {
+        if (s_vio_tx.used->idx != s_vio_tx.last_used) break;
+        wait++;
+    }
+    s_vio_tx.last_used = s_vio_tx.used->idx;
+    g_net.tx_count++;
+}
+
+static void vio_poll(void) {
+    if (!s_vio_io) return;
+    int guard = 0;
+    while (s_vio_rx.used->idx != s_vio_rx.last_used && guard < VRING_SIZE) {
+        uint16_t idx = (uint16_t)(s_vio_rx.last_used % s_vio_rx.qsz);
+        uint32_t id = s_vio_rx.used->ring[idx].id;
+        uint32_t len = s_vio_rx.used->ring[idx].len;
+        s_vio_rx.last_used++;
+        if (id < VRING_SIZE && len > 0 && len <= RX_BUF) {
+            handle_frame(s_vio_rxbuf[id], (int)len);
+            g_net.rx_count++;
+        }
+        // give the buffer back to the device
+        uint16_t slot = s_vio_rx.avail->idx % s_vio_rx.qsz;
+        s_vio_rx.avail->ring[slot] = (uint16_t)id;
+        s_vio_rx.avail->idx++;
+        guard++;
+    }
+    if (guard > 0) vio_notify(0);
+}
+
+// ---------------- ARP ----------------
 static void arp_request(uint32_t ip) {
-    if (!s_mmio) return;
+    if (!g_net.up) return;
     uint8_t pkt[42];
     memset(pkt, 0, sizeof(pkt));
     ArpPkt* a = (ArpPkt*)(pkt + 14);
@@ -189,7 +520,7 @@ static void arp_request(uint32_t ip) {
     a->spa = __builtin_bswap32(g_net.ip);
     a->tpa = __builtin_bswap32(ip);
     uint8_t bcast[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-    eth_send(bcast, ETH_ARP, pkt + 14, 28);
+    net_send_frame(bcast, ETH_ARP, pkt + 14, 28);
     g_net.arp_reqs++;
 }
 
@@ -205,7 +536,7 @@ static void arp_reply(const uint8_t* dst_mac, uint32_t tpa_ip, const uint8_t* ta
     for (int i = 0; i < 6; i++) { a->sha[i] = g_net.mac[i]; a->tha[i] = target_mac ? target_mac[i] : dst_mac[i]; }
     a->spa = __builtin_bswap32(g_net.ip);
     a->tpa = __builtin_bswap32(tpa_ip);
-    eth_send(dst_mac, ETH_ARP, pkt + 14, 28);
+    net_send_frame(dst_mac, ETH_ARP, pkt + 14, 28);
 }
 
 static void arp_handle(const uint8_t* frame, int len) {
@@ -267,7 +598,7 @@ static void ip_send(uint32_t dst, uint8_t proto, const void* payload, int plen, 
         for (int i = 0; i < 6; i++) g_net.gw_mac[i] = slirp_gw[i];
         klogf("net: arp no reply, using slirp gw mac\n");
     }
-    eth_send(g_net.gw_mac, ETH_IP, pkt, 20 + plen);
+    net_send_frame(g_net.gw_mac, ETH_IP, pkt, 20 + plen);
 }
 
 struct IcmpPkt {
@@ -526,34 +857,43 @@ static void handle_frame(const uint8_t* frame, int len) {
     }
 }
 
-void net_poll() {
-    if (!s_mmio || !s_rx_desc) return;
-    // NIC writes descriptors starting at RDH; software owns descs up to RDT.
-    // Process (RDT+1 .. RDH) then hand them back by advancing RDT.
-    uint32_t rdh = mmio32(REG_RDH);
-    uint32_t cur = (mmio32(REG_RDT) + 1) % RX_RING;
-    int processed = 0;
-    while (processed < RX_RING && cur != rdh) {
-        RxDesc* d = &s_rx_desc[cur];
-        if (!(d->status & 0x01)) break;   // no DD yet
-        int len = d->length;
-        if (len > 0 && len <= RX_BUF) handle_frame(s_rx_buf[cur], len);
-        d->status = 0;
-        mmio_wr(REG_RDT, cur);
-        g_net.rx_count++;
-        cur = (cur + 1) % RX_RING;
-        processed++;
+// ---------------- frame send / poll dispatch ----------------
+void net_send_frame(const uint8_t* dst, uint16_t type, const void* payload, int plen) {
+    switch (s_backend) {
+        case drivers::NIC_RTL8139: rtl_send(dst, type, payload, plen); break;
+        case drivers::NIC_VIRTIO:  vio_send(dst, type, payload, plen); break;
+        default:                   eth_send_e1000(dst, type, payload, plen); break;
     }
 }
 
-// ---------------- init ----------------
-bool net_init() {
-    memset(&g_net, 0, sizeof(g_net));
-    // static config (QEMU user networking)
-    g_net.ip = (10u << 24) | (0u << 16) | (2u << 8) | 15u;       // 10.0.2.15
-    g_net.gw = (10u << 24) | (0u << 16) | (2u << 8) | 2u;        // 10.0.2.2
-    g_net.netmask = (255u << 24) | (255u << 16) | (255u << 8) | 0u;
+void net_poll() {
+    switch (s_backend) {
+        case drivers::NIC_RTL8139: rtl_poll(); break;
+        case drivers::NIC_VIRTIO:  vio_poll(); break;
+        default:
+            if (!s_mmio || !s_rx_desc) return;
+            // NIC writes descriptors starting at RDH; software owns descs up to RDT.
+            uint32_t rdh = mmio32(REG_RDH);
+            uint32_t cur = (mmio32(REG_RDT) + 1) % RX_RING;
+            int processed = 0;
+            while (processed < RX_RING && cur != rdh) {
+                RxDesc* d = &s_rx_desc[cur];
+                if (!(d->status & 0x01)) break;   // no DD yet
+                int len = d->length;
+                if (len > 0 && len <= RX_BUF) handle_frame(s_rx_buf[cur], len);
+                d->status = 0;
+                mmio_wr(REG_RDT, cur);
+                g_net.rx_count++;
+                cur = (cur + 1) % RX_RING;
+                processed++;
+            }
+            break;
+    }
+}
 
+// ---------------- e1000 init ----------------
+static bool net_init_e1000(uint16_t vid, uint16_t did) {
+    (void)vid; (void)did;
     // find e1000 (Intel 82540EM = 0x8086:0x100E)
     int found = -1;
     for (int dev = 0; dev < 32 && found < 0; dev++) {
@@ -625,7 +965,38 @@ bool net_init() {
     // multicast table clear
     for (int i = 0; i < 128; i++) mmio_wr(REG_MTA + i * 4, 0);
 
+    s_backend = drivers::NIC_E1000;
+    return true;
+}
+
+// ---------------- init ----------------
+bool net_init() {
+    memset(&g_net, 0, sizeof(g_net));
+    // static config (QEMU user networking)
+    g_net.ip = (10u << 24) | (0u << 16) | (2u << 8) | 15u;       // 10.0.2.15
+    g_net.gw = (10u << 24) | (0u << 16) | (2u << 8) | 2u;        // 10.0.2.2
+    g_net.netmask = (255u << 24) | (255u << 16) | (255u << 8) | 0u;
+    ksprintf(g_net.name, sizeof(g_net.name), "none");
+
+    uint16_t vid = 0, did = 0;
+    drivers::NicType t = drivers::nic_probe(&vid, &did);
+    if (t == drivers::NIC_NONE) { klogf("net: no supported NIC\n"); return false; }
+    klogf("net: probing %s (vid=%04x did=%04x)\n", drivers::nic_type_name(t), vid, did);
+
+    bool ok = false;
+    switch (t) {
+        case drivers::NIC_E1000:   ok = net_init_e1000(vid, did); break;
+        case drivers::NIC_RTL8139: rtl_setup(); ok = (s_backend == drivers::NIC_RTL8139); break;
+        case drivers::NIC_VIRTIO:  vio_setup();  ok = (s_backend == drivers::NIC_VIRTIO); break;
+        default: break;
+    }
+    if (!ok) { klogf("net: %s init failed\n", drivers::nic_type_name(t)); return false; }
+    if (s_backend == drivers::NIC_E1000)   ksprintf(g_net.name, sizeof(g_net.name), "e1000");
+    else if (s_backend == drivers::NIC_RTL8139) ksprintf(g_net.name, sizeof(g_net.name), "rtl8139");
+    else if (s_backend == drivers::NIC_VIRTIO)  ksprintf(g_net.name, sizeof(g_net.name), "virtio-net");
+
     g_net.up = true;
+    klogf("net: %s up, ip=10.0.2.15\n", g_net.name);
     return true;
 }
 

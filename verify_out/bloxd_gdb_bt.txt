@@ -1,0 +1,118 @@
+[New Thread 31376.0x5028]
+[New Thread 31376.0x7048]
+[New Thread 31376.0x56b8]
+[New Thread 31376.0x7714]
+[New Thread 31376.0x3094]
+[New Thread 31376.0x41b0]
+warning: nefuOS init
+
+argv: app=17 shot=- click=-1,-1
+nefuOS host backend (win32) starting...
+[BOOT] nefuOS boot preparation started...
+[BOOT] Step 0: Starting F2 BIOS key detection thread...
+[BOOT] F2 detection thread started - monitoring for F2 key...
+[BOOT] Step 1: Checking kernel integrity...
+[BOOT] Kernel integrity OK.
+[BOOT] Step 2: Initializing system components...
+[BOOT]   - Graphics subsystem
+[BOOT]   - Input subsystem
+[BOOT]   - File system
+[BOOT]   - Network stack
+[BOOT]   - Audio mixer
+[BOOT] Step 3: Checking BIOS boot keys...
+[BOOT] No special boot keys detected.
+[BOOT] Step 4: Auto-starting desktop widgets...
+[BOOT] Step 5: Running system validation...
+[BOOT]   - Memory check: OK
+[BOOT]   - Display check: OK
+[BOOT]   - Input check: OK
+[BOOT]   - Storage check: OK
+[BOOT] Step 6: Finalizing boot...
+[BOOT] Boot preparation complete! Entering desktop...
+nefuOS init
+warning: no NVFS image found: fresh filesystem + default tree
+
+no NVFS image found: fresh filesystem + default tree
+warning: disk: 2 block device(s)
+
+disk: 2 block device(s)
+warning:   C: 0 MB fixed
+
+  C: 0 MB fixed
+warning:   D: 0 MB fixed
+
+  D: 0 MB fixed
+warning: nefuOS ready on win32
+
+nefuOS ready on win32
+[Thread 31376.0x41b0 exited with code 0]
+[New Thread 31376.0x6bf0]
+[New Thread 31376.0x7ce0]
+[New Thread 31376.0x65c4]
+[New Thread 31376.0x73a0]
+warning: nh m=745,250 b=0 locked=0
+
+[BOOT] F2 not detected, continuing normal boot.
+nh m=745,250 b=0 locked=0
+warning: dh m=745,250 b=0
+
+dh m=745,250 b=0
+warning: browser: paint layout 0 nodes loaded=1 home=1
+browser: paint layout 0 nodes loaded=1 home=1warning: browser: bloxd blit ready=0 mw=0 mh=0 vx=2 vy=60 vw=746 vh=409
+browser: bloxd blit ready=0 mw=0 mh=0 vx=2 vy=60 vw=746 vh=409warning: browser: bloxd blit ready=0 mw=0 mh=0 vx=2 vy=60 vw=746 vh=409
+browser: bloxd blit ready=0 mw=0 mh=0 vx=2 vy=60 vw=746 vh=409[New Thread 31376.0x119c]
+warning: browser: worker parsed 2 nodes, srcs=0 script=84
+browser: worker parsed 2 nodes, srcs=0 script=84warning: browser: dom seed 11 bytes: <div></div>
+browser: dom seed 11 bytes: <div></div>warning: js: run 84 bytes budget 90s
+js: run 84 bytes budget 90s[New Thread 31376.0x7474]
+[New Thread 31376.0x7b84]
+warning: browser: http req GET http://127.0.0.1:8123/mini600.js
+browser: http req GET http://127.0.0.1:8123/mini600.jswarning: BISECT s1 pre-fetch
+
+BISECT s1 pre-fetch
+warning: BISECT s2 post-fetch status=200 len=600 resp=0x67782E48
+
+BISECT s2 post-fetch status=200 len=600 resp=0x67782E48
+warning: BISECT s3 NewObject done
+
+BISECT s3 NewObject done
+warning: BISECT s4 ok
+
+BISECT s4 ok
+warning: BISECT s5 statusText
+
+BISECT s5 statusText
+warning: BISECT s6 url
+
+BISECT s6 url
+warning: BISECT s7 is_bin=0
+
+BISECT s7 is_bin=0
+warning: BISECT s8 text cap=64
+
+BISECT s8 text cap=64
+warning: BISECT s9 text set
+
+BISECT s9 text set
+warning: BISECT s10 b64 cap=64
+
+BISECT s10 b64 cap=64
+warning: BISECT s11 b64 set
+
+BISECT s11 b64 set
+warning: Critical error detected c0000374
+
+
+Program received signal SIGTRAP, Trace/breakpoint trap.
+[Switching to Thread 31376.0x6bf0]
+0x00007ffa9436d9f9 in ?? () from C:\WINDOWS\SYSTEM32\ntdll.dll
+#0  0x00007ffa9436d9f9 in ?? () from C:\WINDOWS\SYSTEM32\ntdll.dll
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+rip            0x7ffa9436d9f9	0x7ffa9436d9f9
+rsp            0x5848dc6190	0x5848dc6190
+rax            0x0	0
+rbx            0xc0000374	3221226356
+rcx            0xcdde3282a03b0000	-3612394314489200640
+rdx            0x7ff700000000	140698833649664
+rsi            0x1	1
+rdi            0x7ffa9450c0e0	140714206871776

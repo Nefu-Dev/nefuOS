@@ -1,0 +1,170 @@
+core\algo\search.cpp: In function 'int nefu::algo::search_self_test()':
+core\algo\search.cpp:214:17: warning: unused variable 'p4' [-Wunused-variable]
+  214 |     const char* p4 = "the";
+      |                 ^~
+core\algo\search.cpp:215:17: warning: unused variable 'p5' [-Wunused-variable]
+  215 |     const char* p5 = "o";
+      |                 ^~
+core\algo\sort.cpp: In function 'void nefu::algo::{anonymous}::check_sort(const char*, void (*)(int*, int, nefu::algo::CompareFn), int*, int, nefu::algo::CompareFn)':
+core\algo\sort.cpp:350:29: warning: unused parameter 'name' [-Wunused-parameter]
+  350 | void check_sort(const char* name, void (*fn)(int*, int, CompareFn), int* a, int n, CompareFn cmp) {
+      |                 ~~~~~~~~~~~~^~~~
+core\algo\sort.cpp: In function 'void nefu::algo::{anonymous}::check_noncmp(const char*, void (*)(int*, int, int, int), int*, int, int, int)':
+core\algo\sort.cpp:367:31: warning: unused parameter 'name' [-Wunused-parameter]
+  367 | void check_noncmp(const char* name, void (*fn)(int*, int, int, int), int* a, int n, int lo, int hi) {
+      |                   ~~~~~~~~~~~~^~~~
+core\algo\sort.cpp: In function 'void nefu::algo::{anonymous}::check_noncmp5(const char*, void (*)(int*, int, int, int, int), int*, int, int, int, int)':
+core\algo\sort.cpp:375:32: warning: unused parameter 'name' [-Wunused-parameter]
+  375 | void check_noncmp5(const char* name, void (*fn)(int*, int, int, int, int), int* a, int n, int lo, int hi, int nb) {
+      |                    ~~~~~~~~~~~~^~~~
+In file included from core\apps\apps.cpp:3:
+core\apps\email.h:658:13: warning: 'void nefu::apps::mail_qp_decode(const char*, char*, int)' defined but not used [-Wunused-function]
+  658 | static void mail_qp_decode(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~
+core\apps\email.h:579:13: warning: 'void nefu::apps::mail_encode_header(const char*, char*, int)' defined but not used [-Wunused-function]
+  579 | static void mail_encode_header(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~~~~
+core\apps\email.h:544:13: warning: 'void nefu::apps::mail_disp_name(const char*, char*, int)' defined but not used [-Wunused-function]
+  544 | static void mail_disp_name(const char* addr, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~
+core\apps\email.h:498:13: warning: 'void nefu::apps::mail_parse_rfc822_date(const char*, char*, int)' defined but not used [-Wunused-function]
+  498 | static void mail_parse_rfc822_date(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~
+core\apps\email.h:451:13: warning: 'void nefu::apps::mail_strip_html(const char*, char*, int)' defined but not used [-Wunused-function]
+  451 | static void mail_strip_html(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~
+core\apps\email.h:425:13: warning: 'void nefu::apps::mail_decode_header(const char*, char*, int)' defined but not used [-Wunused-function]
+  425 | static void mail_decode_header(const char* in, char* out, int outsz) {
+      |             ^~~~~~~~~~~~~~~~~~
+core\apps\audiolab.cpp: In member function 'void nefu::{anonymous}::LabState::write_wav()':
+core\apps\audiolab.cpp:96:13: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+   96 |             if (v > 1.0) v = 1.0; if (v < -1.0) v = -1.0;
+      |             ^~
+core\apps\audiolab.cpp:96:35: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+   96 |             if (v > 1.0) v = 1.0; if (v < -1.0) v = -1.0;
+      |                                   ^~
+In file included from core\apps\browser.cpp:64:
+core\apps\php2html.h: In function 'char* nfuphp::pv_arr_encode(PVm*, const char*, const char*)':
+core\apps\php2html.h:1014:33: warning: unused parameter 'V' [-Wunused-parameter]
+ 1014 | static char* pv_arr_encode(PVm* V, const char* k, const char* v) {
+      |                            ~~~~~^
+core\apps\php2html.h: In function 'nfuphp::PVal nfuphp::vm_call_builtin(PVm*, const char*, PVal*, int, PScratch*)':
+core\apps\php2html.h:1530:21: warning: unused variable 'q' [-Wunused-variable]
+ 1530 |         const char* q = src;
+      |                     ^
+core\apps\php2html.h:1626:13: warning: unused variable 'wn' [-Wunused-variable]
+ 1626 |         int wn = 0;
+      |             ^~
+core\apps\browser.cpp: In constructor 'nefu::{anonymous}::DomNode::DomNode()':
+core\apps\browser.cpp:400:10: warning: 'nefu::{anonymous}::DomNode::has_inl' will be initialized after [-Wreorder]
+  400 |     bool has_inl;
+      |          ^~~~~~~
+core\apps\browser.cpp:398:9: warning:   'int nefu::{anonymous}::DomNode::cw' [-Wreorder]
+  398 |     int cw, ch;        // canvas element size (width/height attrs, default 300x150)
+      |         ^~
+core\apps\browser.cpp:406:5: warning:   when initialized here [-Wreorder]
+  406 |     DomNode() : has_inl(false), cw(300), ch(150), nfu_idx(-1),
+      |     ^~~~~~~
+core\apps\browser.cpp: In member function 'void nefu::{anonymous}::PageParser::parse_until(int)':
+core\apps\browser.cpp:1132:52: warning: unused variable 'srl' [-Wunused-variable]
+ 1132 |                 char srcur[256]; int srn2 = 0; int srl = 0;
+      |                                                    ^~~
+core\apps\browser.cpp: In constructor 'nefu::{anonymous}::Flow::Flow(nefu::{anonymous}::PageLayout*, int, nefu::{anonymous}::Img*, const char*, const nefu::{anonymous}::CSSRule*, int)':
+core\apps\browser.cpp:1438:9: warning: 'nefu::{anonymous}::Flow::css_n' will be initialized after [-Wreorder]
+ 1438 |     int css_n;
+      |         ^~~~~
+core\apps\browser.cpp:1430:9: warning:   'int nefu::{anonymous}::Flow::node_now' [-Wreorder]
+ 1430 |     int node_now;       // DomNode index currently emitted (click mapping)
+      |         ^~~~~~~~
+core\apps\browser.cpp:1441:5: warning:   when initialized here [-Wreorder]
+ 1441 |     Flow(PageLayout* o, int width, Img* im = 0, const char* base = 0,
+      |     ^~~~
+core\apps\browser.cpp: In function 'void nefu::{anonymous}::layout_node_inner(const nefu::List<DomNode>&, int, Flow&, int, const Eff&)':
+core\apps\browser.cpp:1591:33: warning: the address of 'nefu::{anonymous}::DomNode::value' will never be NULL [-Waddress]
+ 1591 |             const char* raw = n.value ? n.value : "";
+      |                               ~~^~~~~
+core\apps\browser.cpp:405:10: note: 'nefu::{anonymous}::DomNode::value' declared here
+  405 |     char value[128];   // current input value (UTF-8)
+      |          ^~~~~
+core\apps\browser.cpp:1690:17: warning: unused variable 'ex' [-Wunused-variable]
+ 1690 |             int ex = f.x, ey = f.y;
+      |                 ^~
+core\apps\browser.cpp:1735:17: warning: unused variable 'ex' [-Wunused-variable]
+ 1735 |             int ex = f.x, ey = f.y;
+      |                 ^~
+core\apps\browser.cpp: In constructor 'nefu::{anonymous}::TabState::TabState()':
+core\apps\browser.cpp:2019:9: warning: 'nefu::{anonymous}::TabState::img_gen' will be initialized after [-Wreorder]
+ 2019 |     int img_gen;          // paint generation counter (visible-image tracking)
+      |         ^~~~~~~
+core\apps\browser.cpp:2014:11: warning:   'char* nefu::{anonymous}::TabState::js_html' [-Wreorder]
+ 2014 |     char* js_html;        // DOM shim re-sync buffer (event re-render)
+      |           ^~~~~~~
+core\apps\browser.cpp:2025:5: warning:   when initialized here [-Wreorder]
+ 2025 |     TabState()
+      |     ^~~~~~~~
+core\apps\browser.cpp:2018:10: warning: 'nefu::{anonymous}::TabState::js_err' will be initialized after [-Wreorder]
+ 2018 |     bool js_err;
+      |          ^~~~~~
+core\apps\browser.cpp:2004:18: warning:   'volatile int nefu::{anonymous}::TabState::js_ev_pending' [-Wreorder]
+ 2004 |     volatile int js_ev_pending, js_ev_done, js_ev_close;
+      |                  ^~~~~~~~~~~~~
+core\apps\browser.cpp:2025:5: warning:   when initialized here [-Wreorder]
+ 2025 |     TabState()
+      |     ^~~~~~~~
+core\apps\browser.cpp: In function 'void nefu::{anonymous}::img_worker(void*)':
+core\apps\browser.cpp:2235:45: warning: the address of 'nefu::{anonymous}::ImgJob::url' will never be NULL [-Waddress]
+ 2235 |     klogf("browser: load_worker url=%s", j->url ? j->url : "(null)");
+      |                                          ~~~^~~
+core\apps\browser.cpp:1969:10: note: 'nefu::{anonymous}::ImgJob::url' declared here
+ 1969 |     char url[256];
+      |          ^~~
+core\apps\browser.cpp:2237:12: warning: the address of 'nefu::{anonymous}::ImgJob::url' will never be NULL [-Waddress]
+ 2237 |     if (j->url && strstr(j->url, "bloxd.io")) {
+      |         ~~~^~~
+core\apps\browser.cpp:1969:10: note: 'nefu::{anonymous}::ImgJob::url' declared here
+ 1969 |     char url[256];
+      |          ^~~
+core\apps\browser.cpp:2243:19: warning: the address of 'nefu::{anonymous}::ImgJob::url' will never be NULL [-Waddress]
+ 2243 |     if (!ok && j->url && strstr(j->url, "chat.deepseek.com")) {
+      |                ~~~^~~
+core\apps\browser.cpp:1969:10: note: 'nefu::{anonymous}::ImgJob::url' declared here
+ 1969 |     char url[256];
+      |          ^~~
+core\apps\browser.cpp: In static member function 'static void nefu::{anonymous}::nefu_render_html_to_bmp(const char*, const char*, int, int)::W::rec(nefu::Surface&, const nefu::List<nefu::{anonymous}::DomNode>&, int, int&, int)':
+core\apps\browser.cpp:4223:29: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 4223 |                             if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                             ^~
+core\apps\browser.cpp:4223:48: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+ 4223 |                             if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                                                ^~~
+core\apps\browser.cpp: In static member function 'static void nefu::{anonymous}::nefu_text_dump(nefu::Surface&, const nefu::List<DomNode>&, int, int, int)::W::rec(nefu::Surface&, const nefu::List<nefu::{anonymous}::DomNode>&, int, int&, int, int, int, int&)':
+core\apps\browser.cpp:4307:25: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 4307 |                         if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                         ^~
+core\apps\browser.cpp:4307:44: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+ 4307 |                         if (was) continue; was = true; if (ci) clean[ci++] = ' ';
+      |                                            ^~~
+core\apps\browser.cpp: In lambda function:
+core\apps\browser.cpp:4756:17: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+ 4756 |                 if (b <= 0) return 0; b--;
+      |                 ^~
+core\apps\browser.cpp:4756:39: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the 'if'
+ 4756 |                 if (b <= 0) return 0; b--;
+      |                                       ^
+core\apps\browser.cpp: At global scope:
+core\apps\browser.cpp:2307:13: warning: 'bool nefu::{anonymous}::jpeg_probe_size(const uint8_t*, uint32_t, int*, int*)' defined but not used [-Wunused-function]
+ 2307 | static bool jpeg_probe_size(const uint8_t* d, uint32_t len, int* w, int* h) {
+      |             ^~~~~~~~~~~~~~~
+core\apps\browser.cpp:2152:13: warning: 'void nefu::{anonymous}::extract_title(const char*, int, char*, int)' defined but not used [-Wunused-function]
+ 2152 | static void extract_title(const char* page, int len, char* out, int cap) {
+      |             ^~~~~~~~~~~~~
+core\apps\browser.cpp:1901:13: warning: 'void nefu::{anonymous}::build_error(PageLayout&, int, const char*, const char*)' defined but not used [-Wunused-function]
+ 1901 | static void build_error(PageLayout& out, int width, const char* url, const char* msg) {
+      |             ^~~~~~~~~~~
+bare compile failed: core\apps\browser.cpp
+ËùÔÚÎ»ÖÃ D:\mycppos1\nefuOS\tools\build_iso.ps1:257 ×Ö·û: 30
++   if ($LASTEXITCODE -ne 0) { throw "bare compile failed: $s" }
++                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (bare compile fa...pps\browser.cpp:String) [], RuntimeException
+    + FullyQualifiedErrorId : bare compile failed: core\apps\browser.cpp
+ 

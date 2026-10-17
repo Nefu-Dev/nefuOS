@@ -1,0 +1,2 @@
+export const id=121;export const ids=[121];export const modules={28635:(uu,Cu,Ju)=>{Ju.r(Cu),Ju.d(Cu,{passPixelShader:()=>Uu});var mC=Ju(1356);const hu="passPixelShader",nu="varying vec2 vUV;uniform sampler2D textureSampler;\n#define CUSTOM_FRAGMENT_DEFINITIONS\nvoid main(void) \n{gl_FragColor=texture2D(textureSampler,vUV);}";mC.e.ShadersStore[hu]||(mC.e.ShadersStore[hu]=nu);const Uu={name:hu,shader:nu}}};
+//# sourceMappingURL=y8i0fs.121.0d2d6b21.chunk.js.map

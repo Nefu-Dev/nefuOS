@@ -527,6 +527,9 @@ int mini_js_run(const char* script, char* out, int out_sz) {
 #include "../platform.h"
 #include <string.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace nefu {
 #ifndef NEFU_BARE
@@ -559,14 +562,40 @@ namespace {
 
 // out-stream writer state shared with the JS callbacks below
 struct RunCtx { char* out; int out_sz; int oi; uint32_t deadline;
-             char* html; int html_sz; int hi; };
+             char* html; int html_sz; int hi;
+             volatile const char* last_c; volatile uint32_t last_c_t;
+             volatile int watch_done; volatile DWORD jtid;
+             volatile unsigned long long exe_base; volatile int rip_printed; volatile uint32_t rip_t;
+             };
+
+// trace which native (C) call the JS thread last entered, for the watchdog
+static void nfu_trace(RunCtx* rc, const char* what) {
+    if (!rc) return;
+    rc->last_c = what;
+    rc->last_c_t = platform_tick_ms();
+}
 
 // kill runaway scripts after the 1s budget: JS_SetInterruptHandler fires
 // between bytecode instructions, so this stops infinite loops cleanly
 static int js_interrupt_cb(JSRuntime* rt, void* opaque) {
     RunCtx* rc = (RunCtx*)opaque;
     if (!rc) return 0;
+#ifndef NEFU_BARE
+    static uint32_t last_t = 0;
+    uint32_t now = platform_tick_ms();
+    if (now - last_t > 1000) {
+        last_t = now;
+        rc->last_c_t = now;   // progress marker for the watchdog
+        JSMemoryUsage mu;
+        JS_ComputeMemoryUsage(rt, &mu);
+        char buf[128];
+        int n = snprintf(buf, sizeof(buf), "\njs: t=%u dl=%u mem=%lld\n", now, rc->deadline, (long long)mu.memory_used_size);
+        if (n > 0) { fwrite(buf, 1, (size_t)n, stdout); fflush(stdout); }
+    }
+    return now > rc->deadline ? 1 : 0;
+#else
     return platform_tick_ms() > rc->deadline ? 1 : 0;
+#endif
 }
 
 static void ctx_emit(RunCtx* rc, const char* s) {
@@ -580,11 +609,35 @@ static void ctx_emitc(RunCtx* rc, char c) {
 static JSValue nfu_out(JSContext* c, JSValueConst thisv, int argc,
                        JSValueConst* argv, int magic) {
     RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
-    if (argc > 0) {
+    nfu_trace(rc, "out");
+    // Only stringify real strings: JS_ToCString on exotic objects (opaque
+    // stubs, arraybuffers) can stall inside quickjs's C ToString, same as
+    // JSON.parse(obj). Real browsers print "[object X]" instantly; we skip.
+    if (argc > 0 && JS_IsString(argv[0])) {
         const char* s = JS_ToCString(c, argv[0]);
         if (s) { ctx_emit(rc, s); JS_FreeCString(c, s); }
     }
     if (magic == 1) ctx_emitc(rc, '\n');
+#ifndef NEFU_BARE
+    // probe: rate-limited console.log trace to stderr (locate where bundle stalls)
+    {
+        static uint32_t last_log_t = 0; static unsigned log_n = 0;
+        uint32_t now = platform_tick_ms();
+        log_n++;
+        const char* mark = 0;
+        if (argc > 0 && JS_IsString(argv[0])) mark = JS_ToCString(c, argv[0]);
+        int urgent = (mark && strstr(mark, "[MARK]")) ? 1 : 0;
+        if (now - last_log_t >= 500 || urgent) {
+            char lb[96];
+            int ln = 0;
+            if (mark) { ln = snprintf(lb, sizeof(lb), "log#%u t=%u: %.60s", log_n, now, mark); }
+            else ln = snprintf(lb, sizeof(lb), "log#%u t=%u: (noarg)", log_n, now);
+            if (ln > 0) { fwrite(lb, 1, (size_t)ln, stdout); fputc('\n', stdout); fflush(stdout); }
+            last_log_t = now;
+        }
+        if (mark) JS_FreeCString(c, mark);
+    }
+#endif
     return JS_UNDEFINED;
 }
 
@@ -607,9 +660,10 @@ static JSValue nfu_domcmd(JSContext* c, JSValueConst thisv, int argc,
 
 static JSValue nfu_len(JSContext* c, JSValueConst thisv, int argc,
                        JSValueConst* argv) {
-    if (argc > 0) {
-        const char* s = JS_ToCString(c, argv[0]);
-        if (s) { int n = (int)strlen(s); JS_FreeCString(c, s); return JS_NewInt32(c, n); }
+    if (argc > 0 && JS_IsString(argv[0])) {
+        size_t L = 0;
+        const char* s = JS_ToCStringLen(c, &L, argv[0]);
+        if (s) { JS_FreeCString(c, s); return JS_NewInt32(c, (int)L); }
     }
     return JS_NewInt32(c, 0);
 }
@@ -728,6 +782,7 @@ static const char* glcmd_names[] = {
 static JSValue nfu_gl(JSContext* c, JSValueConst thisv, int argc,
                       JSValueConst* argv, int magic) {
     RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    nfu_trace(rc, "gl");
     char* cid = gl_cid_of(c, thisv);
     if (!cid) return JS_UNDEFINED;
     char args[1600]; int ap = 0;
@@ -857,11 +912,11 @@ static JSValue nfu_shaderSource(JSContext* c, JSValueConst thisv, int argc,
     if (!cid) return JS_UNDEFINED;
     double d = 0; if (argc > 0) JS_ToFloat64(c, &d, argv[0]);
     int sid = (int)d;
-    const char* src = argc > 1 ? JS_ToCString(c, argv[1]) : 0;
+    size_t sl = 0;
+    const char* src = (argc > 1 && JS_IsString(argv[1])) ? JS_ToCStringLen(c, &sl, argv[1]) : 0;
     if (!src) return JS_UNDEFINED;
     char args[1400];
     int ap = sprintf(args, "%d,%d,", sid, s_sh_type[sid]);
-    int sl = (int)strlen(src);
     if (ap + sl >= (int)sizeof(args) - 1) sl = (int)sizeof(args) - 1 - ap;
     memcpy(args + ap, src, (size_t)sl);
     args[ap + sl] = 0;
@@ -928,12 +983,12 @@ static JSValue nfu_bufferData(JSContext* c, JSValueConst thisv, int argc,
         dn = append_nums(c, argv[1], data, 0, (int)sizeof(data), 160);
     }
     if (!dn) {
-        const char* ds = argc > 1 ? JS_ToCString(c, argv[1]) : 0;
+        size_t sl = 0;
+        const char* ds = (argc > 1 && JS_IsString(argv[1])) ? JS_ToCStringLen(c, &sl, argv[1]) : 0;
         if (ds) {
-            int sl = (int)strlen(ds);
             if (sl > 1100) sl = 1100;
             data[0] = ',';   // keep the ",%g"-style list layout
-            memcpy(data + 1, ds, (size_t)sl);
+            memcpy(data + 1, ds, sl);
             data[1 + sl] = 0;
             JS_FreeCString(c, ds);
         }
@@ -1037,15 +1092,41 @@ static JSValue make_gl_obj(JSContext* c, const char* cid);   // defined below
 static JSValue nfu_getContext(JSContext* c, JSValueConst thisv, int argc,
                               JSValueConst* argv, int magic) {
     RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    nfu_trace(rc, "getContext");
     char* cid = canvas_cid_of(c, thisv);
     if (!cid) return JS_NULL;
     gl_emit(rc, "ctx", cid, "");
     return make_gl_obj(c, cid);
 }
 
+// DOM stub helpers for getElementById wrappers (React compat)
+static JSValue nfu_dom_noop(JSContext* c, JSValueConst thisv, int argc, JSValueConst* argv) {
+    if (argc > 0) return argv[0]; return JS_UNDEFINED;
+}
+static JSValue nfu_dom_noop2(JSContext* c, JSValueConst thisv, int argc, JSValueConst* argv) {
+    return JS_NULL;
+}
+static JSValue nfu_dom_getattr(JSContext* c, JSValueConst thisv, int argc, JSValueConst* argv) {
+    return JS_NULL;
+}
+static JSValue nfu_dom_rect(JSContext* c, JSValueConst thisv, int argc, JSValueConst* argv) {
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "x", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "y", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "width", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "height", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "top", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "left", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "right", JS_NewFloat64(c, 0));
+    JS_SetPropertyStr(c, o, "bottom", JS_NewFloat64(c, 0));
+    return o;
+}
+
 // document.getElementById(id) -> canvas wrapper
 static JSValue nfu_getElementById(JSContext* c, JSValueConst thisv, int argc,
                                   JSValueConst* argv) {
+    RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    nfu_trace(rc, "getElementById");
     const char* idv = argc > 0 ? JS_ToCString(c, argv[0]) : 0;
     JSValue obj = JS_NewObjectClass(c, s_canvas_cls);
     char* op = 0;
@@ -1056,6 +1137,30 @@ static JSValue nfu_getElementById(JSContext* c, JSValueConst thisv, int argc,
     JS_SetOpaque(obj, op);
     JS_SetPropertyStr(c, obj, "getContext",
         JS_NewCFunctionMagic(c, nfu_getContext, "getContext", 1, JS_CFUNC_generic_magic, 0));
+    JS_SetPropertyStr(c, obj, "nodeType", JS_NewInt32(c, 1));
+    JS_SetPropertyStr(c, obj, "nodeName", JS_NewString(c, "CANVAS"));
+    JS_SetPropertyStr(c, obj, "appendChild", JS_NewCFunction(c, nfu_dom_noop, "appendChild", 1));
+    JS_SetPropertyStr(c, obj, "insertBefore", JS_NewCFunction(c, nfu_dom_noop, "insertBefore", 2));
+    JS_SetPropertyStr(c, obj, "removeChild", JS_NewCFunction(c, nfu_dom_noop, "removeChild", 1));
+    JS_SetPropertyStr(c, obj, "replaceChild", JS_NewCFunction(c, nfu_dom_noop, "replaceChild", 2));
+    JS_SetPropertyStr(c, obj, "addEventListener", JS_NewCFunction(c, nfu_dom_noop, "addEventListener", 2));
+    JS_SetPropertyStr(c, obj, "removeEventListener", JS_NewCFunction(c, nfu_dom_noop, "removeEventListener", 2));
+    JS_SetPropertyStr(c, obj, "setAttribute", JS_NewCFunction(c, nfu_dom_noop, "setAttribute", 2));
+    JS_SetPropertyStr(c, obj, "removeAttribute", JS_NewCFunction(c, nfu_dom_noop, "removeAttribute", 1));
+    JS_SetPropertyStr(c, obj, "getAttribute", JS_NewCFunction(c, nfu_dom_getattr, "getAttribute", 1));
+    JS_SetPropertyStr(c, obj, "style", JS_NewObject(c));
+    JS_SetPropertyStr(c, obj, "children", JS_NewArray(c));
+    JS_SetPropertyStr(c, obj, "childNodes", JS_NewArray(c));
+    JS_SetPropertyStr(c, obj, "classList", JS_NewObject(c));
+    JS_SetPropertyStr(c, obj, "innerHTML", JS_NewString(c, ""));
+    JS_SetPropertyStr(c, obj, "textContent", JS_NewString(c, ""));
+    JS_SetPropertyStr(c, obj, "firstChild", JS_UNDEFINED);
+    JS_SetPropertyStr(c, obj, "lastChild", JS_UNDEFINED);
+    JS_SetPropertyStr(c, obj, "parentNode", JS_UNDEFINED);
+    JS_SetPropertyStr(c, obj, "ownerDocument", JS_UNDEFINED);
+    JS_SetPropertyStr(c, obj, "getBoundingClientRect", JS_NewCFunction(c, nfu_dom_rect, "getBoundingClientRect", 0));
+    JS_SetPropertyStr(c, obj, "querySelector", JS_NewCFunction(c, nfu_dom_noop2, "querySelector", 1));
+    JS_SetPropertyStr(c, obj, "querySelectorAll", JS_NewCFunction(c, nfu_dom_noop2, "querySelectorAll", 1));
     if (idv) JS_FreeCString(c, idv);
     return obj;
 }
@@ -1065,12 +1170,26 @@ static JSValue nfu_getElementById(JSContext* c, JSValueConst thisv, int argc,
 static JSValue nfu_nativeSync(JSContext* c, JSValueConst thisv, int argc,
                               JSValueConst* argv) {
     RunCtx* rc = (RunCtx*)JS_GetContextOpaque(c);
+    nfu_trace(rc, "nativeSync");
+    fprintf(stderr, "js: sync-IN argc=%d\n", argc); fflush(stderr);
     if (rc && rc->html && rc->html_sz > 1) {
         rc->hi = 0;
         if (argc > 0 && JS_IsString(argv[0])) {
-            const char* h = JS_ToCString(c, argv[0]);
+            size_t L = 0;
+            const char* h = JS_ToCStringLen(c, &L, argv[0]);
+            fprintf(stderr, "js: sync-LEN=%zu\n", L); fflush(stderr);
             if (h) {
-                size_t L = strlen(h);
+                HANDLE df = CreateFileA("E:\\d3ld\\sync_html.txt", GENERIC_WRITE, FILE_SHARE_READ,
+                                        NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                if (df != INVALID_HANDLE_VALUE) {
+                    char hdr[96];
+                    int hl = snprintf(hdr, sizeof(hdr), "LEN=%zu FIRST500:\n", L);
+                    DWORD wb = 0;
+                    WriteFile(df, hdr, (DWORD)hl, &wb, NULL);
+                    size_t dump = L < 500 ? L : 500;
+                    WriteFile(df, h, (DWORD)dump, &wb, NULL);
+                    CloseHandle(df);
+                }
                 if (L >= (size_t)rc->html_sz - 1) L = (size_t)rc->html_sz - 1;
                 memcpy(rc->html, h, L);
                 rc->hi = (int)L;
@@ -1079,6 +1198,7 @@ static JSValue nfu_nativeSync(JSContext* c, JSValueConst thisv, int argc,
         }
         rc->html[rc->hi] = 0;
     }
+    fprintf(stderr, "js: sync-OUT\n"); fflush(stderr);
     return JS_UNDEFINED;
 }
 
@@ -1159,8 +1279,14 @@ static void ensure_js() {
     // Bare kernel has no per-thread 1MB guard page: JS_NewRuntime2's default
     // stack_limit would wrap on our 32-bit-style stack and reject every call.
     JS_SetMaxStackSize(s_rt, 256 * 1024);
+#else
+    // Win32 host: bound the JS stack so runaway sync recursion (e.g. nested
+    // scheduleCallback through a sync setTimeout polyfill) throws RangeError
+    // instead of growing into an uninterruptible hang.
+    JS_SetMaxStackSize(s_rt, 8 * 1024 * 1024);
 #endif
-    JS_SetMemoryLimit(s_rt, 16 * 1024 * 1024);   // cap runaway scripts
+    JS_SetMemoryLimit(s_rt, 2048 * 1024 * 1024);  // 2GB: avoid runaway GC stalls on big bundles
+    JS_SetGCThreshold(s_rt, 1024 * 1024 * 1024);  // only auto-GC past 1GB (React render churn)
     s_ctx = JS_NewContext(s_rt);
     if (!s_ctx) { JS_FreeRuntime(s_rt); s_rt = 0; return; }
     JSValue g = JS_GetGlobalObject(s_ctx);
@@ -1198,6 +1324,32 @@ static void ensure_js() {
         JS_NewCFunctionMagic(s_ctx, nfu_out, "write", 1, JS_CFUNC_generic_magic, 0));
     JS_SetPropertyStr(s_ctx, doc, "getElementById",
         JS_NewCFunction(s_ctx, nfu_getElementById, "getElementById", 1));
+    JS_SetPropertyStr(s_ctx, doc, "querySelector",
+        JS_NewCFunction(s_ctx, nfu_getElementById, "querySelector", 1));
+    JS_SetPropertyStr(s_ctx, doc, "querySelectorAll",
+        JS_NewCFunction(s_ctx, nfu_getElementById, "querySelectorAll", 1));
+    JS_SetPropertyStr(s_ctx, doc, "createElement",
+        JS_NewCFunction(s_ctx, nfu_getElementById, "createElement", 1));
+    JS_SetPropertyStr(s_ctx, doc, "createTextNode",
+        JS_NewCFunction(s_ctx, nfu_getElementById, "createTextNode", 1));
+    JS_SetPropertyStr(s_ctx, doc, "addEventListener",
+        JS_NewCFunction(s_ctx, nfu_dom_noop, "addEventListener", 2));
+    JS_SetPropertyStr(s_ctx, doc, "removeEventListener",
+        JS_NewCFunction(s_ctx, nfu_dom_noop, "removeEventListener", 2));
+    JSValue dbody = JS_NewObjectClass(s_ctx, s_canvas_cls);
+    JS_SetPropertyStr(s_ctx, dbody, "nodeType", JS_NewInt32(s_ctx, 1));
+    JS_SetPropertyStr(s_ctx, dbody, "appendChild", JS_NewCFunction(s_ctx, nfu_dom_noop, "appendChild", 1));
+    JS_SetPropertyStr(s_ctx, dbody, "insertBefore", JS_NewCFunction(s_ctx, nfu_dom_noop, "insertBefore", 2));
+    JS_SetPropertyStr(s_ctx, dbody, "addEventListener", JS_NewCFunction(s_ctx, nfu_dom_noop, "addEventListener", 2));
+    JS_SetPropertyStr(s_ctx, dbody, "setAttribute", JS_NewCFunction(s_ctx, nfu_dom_noop, "setAttribute", 2));
+    JS_SetPropertyStr(s_ctx, dbody, "style", JS_NewObject(s_ctx));
+    JS_SetPropertyStr(s_ctx, dbody, "children", JS_NewArray(s_ctx));
+    JS_SetPropertyStr(s_ctx, dbody, "classList", JS_NewObject(s_ctx));
+    JS_SetPropertyStr(s_ctx, dbody, "getBoundingClientRect", JS_NewCFunction(s_ctx, nfu_dom_rect, "getBoundingClientRect", 0));
+    JS_SetPropertyStr(s_ctx, doc, "body", dbody);
+    JS_SetPropertyStr(s_ctx, doc, "documentElement", JS_DupValue(s_ctx, dbody));
+    JS_SetPropertyStr(s_ctx, doc, "head", JS_DupValue(s_ctx, dbody));
+    JS_SetPropertyStr(s_ctx, doc, "createEvent", JS_NewCFunction(s_ctx, nfu_dom_noop2, "createEvent", 1));
     JS_SetPropertyStr(s_ctx, doc, "title", JS_NewString(s_ctx, s_env_title ? s_env_title : ""));
     JS_SetPropertyStr(s_ctx, doc, "readyState", JS_NewString(s_ctx, "complete"));
     JS_SetPropertyStr(s_ctx, doc, "URL", JS_NewString(s_ctx, s_env_url ? s_env_url : "about:blank"));
@@ -1214,10 +1366,38 @@ static void ensure_js() {
     JS_SetPropertyStr(s_ctx, wnd, "innerHeight", JS_NewInt32(s_ctx, s_env_h > 0 ? s_env_h : 768));
     JS_SetPropertyStr(s_ctx, wnd, "devicePixelRatio", JS_NewInt32(s_ctx, 1));
     JSValue loc = JS_NewObject(s_ctx);
-    JS_SetPropertyStr(s_ctx, loc, "href", JS_NewString(s_ctx, s_env_url ? s_env_url : "about:blank"));
-    JS_SetPropertyStr(s_ctx, loc, "protocol", JS_NewString(s_ctx, "http:"));
-    JS_SetPropertyStr(s_ctx, loc, "host", JS_NewString(s_ctx, ""));
+    const char* envurl = s_env_url ? s_env_url : "about:blank";
+    char loc_origin[512] = "http://localhost", loc_host[128] = "localhost", loc_hostname[128] = "localhost", loc_search[256] = "", loc_proto[16] = "http:";
+    if (strncmp(envurl, "https://", 8) == 0) { strcpy(loc_proto, "https:"); }
+    const char* p_h = strstr(envurl, "://");
+    if (p_h) {
+        const char* p_slash = strchr(p_h + 3, '/');
+        const char* p_q = strchr(p_h + 3, '?');
+        const char* hostend = p_slash ? p_slash : (p_q ? p_q : p_h + 3 + strlen(p_h + 3));
+        size_t hn = (size_t)(hostend - (p_h + 3));
+        if (hn > 0 && hn < 128) { memcpy(loc_host, p_h + 3, hn); loc_host[hn] = 0; }
+        const char* p_colon = strchr(loc_host, ':');
+        if (p_colon) { size_t h2 = (size_t)(p_colon - loc_host); if (h2 > 0 && h2 < 128) { memcpy(loc_hostname, loc_host, h2); loc_hostname[h2] = 0; } }
+        else strcpy(loc_hostname, loc_host);
+        if (p_q) {
+            const char* qend = p_slash ? p_slash : p_q + strlen(p_q);
+            size_t qn = (size_t)(qend - p_q);
+            if (qn > 0 && qn < 256) { memcpy(loc_search, p_q, qn); loc_search[qn] = 0; }
+        }
+        snprintf(loc_origin, sizeof(loc_origin), "%s//%s", loc_proto, loc_host);
+    }
+    JS_SetPropertyStr(s_ctx, loc, "href", JS_NewString(s_ctx, envurl));
+    JS_SetPropertyStr(s_ctx, loc, "protocol", JS_NewString(s_ctx, loc_proto));
+    JS_SetPropertyStr(s_ctx, loc, "host", JS_NewString(s_ctx, loc_host));
+    JS_SetPropertyStr(s_ctx, loc, "hostname", JS_NewString(s_ctx, loc_hostname));
+    JS_SetPropertyStr(s_ctx, loc, "port", JS_NewString(s_ctx, ""));
     JS_SetPropertyStr(s_ctx, loc, "pathname", JS_NewString(s_ctx, "/"));
+    JS_SetPropertyStr(s_ctx, loc, "search", JS_NewString(s_ctx, loc_search));
+    JS_SetPropertyStr(s_ctx, loc, "hash", JS_NewString(s_ctx, ""));
+    JS_SetPropertyStr(s_ctx, loc, "origin", JS_NewString(s_ctx, loc_origin));
+    JS_SetPropertyStr(s_ctx, loc, "assign", JS_NewCFunction(s_ctx, nfu_dom_noop, "assign", 1));
+    JS_SetPropertyStr(s_ctx, loc, "replace", JS_NewCFunction(s_ctx, nfu_dom_noop, "replace", 1));
+    JS_SetPropertyStr(s_ctx, loc, "reload", JS_NewCFunction(s_ctx, nfu_dom_noop, "reload", 0));
     JS_SetPropertyStr(s_ctx, wnd, "location", loc);
     JSValue nav = JS_NewObject(s_ctx);
     JS_SetPropertyStr(s_ctx, nav, "userAgent", JS_NewString(s_ctx, "nefuOS/0.2 (host)"));
@@ -1248,6 +1428,313 @@ static void ensure_js() {
         JS_FreeValue(s_ctx, ex);
     }
     JS_FreeValue(s_ctx, shr);
+    // minimal console so bundled apps (bloxd etc.) don't die on console.log;
+    // log/warn/error route through print so the C-side rate-limited probe can
+    // trace where a bundle stalls (empty functions would hide it entirely).
+    const char* consrc =
+        "if (typeof console === 'undefined' || !console.log) {"
+        "  console = { log:function(){ print.apply(null, arguments); }, warn:function(){ print.apply(null, arguments); },"
+        "             error:function(){ print.apply(null, arguments); }, info:function(){ print.apply(null, arguments); },"
+        "             debug:function(){}, trace:function(){},"
+        "             assert:function(){}, count:function(){}, table:function(){} };"
+        "}";
+    JSValue cok = JS_Eval(s_ctx, consrc, (size_t)strlen(consrc), "<console>",
+                          JS_EVAL_TYPE_GLOBAL);
+    JS_FreeValue(s_ctx, cok);
+    // base64 helpers many bundles assume (atob/btoa)
+    const char* b64src = R"js(
+if (typeof atob === 'undefined') { atob = function(s) {
+  var b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/', out='', i=0, e1,e2,e3,c1,c2,c3,c4;
+  s = String(s).replace(/[^A-Za-z0-9+/=]/g, '');
+  s = s.replace(/=+$/, '');
+  if ((s.length % 4) === 1) return out;
+  while (i < s.length) {
+    c1=b.indexOf(s[i++]); c2=b.indexOf(s[i++]); c3=b.indexOf(s[i++]); c4=b.indexOf(s[i++]);
+    e1=(c1<<2)|(c2>>4);
+    out += String.fromCharCode(e1);
+    if (c3 >= 0) { e2=((c2&15)<<4)|(c3>>2); out += String.fromCharCode(e2); }
+    if (c4 >= 0) { e3=((c3&3)<<6)|c4; out += String.fromCharCode(e3); }
+  }
+  return out; }; }
+if (typeof btoa === 'undefined') { btoa = function(s) {
+  var b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/', out='', i=0;
+  while (i < s.length) {
+    var c1=s.charCodeAt(i++)&255, c2=s.charCodeAt(i++)&255, c3=s.charCodeAt(i++)&255;
+    out += b.charAt(c1>>2) + b.charAt(((c1&3)<<4)|(c2>>4));
+    if (isNaN(c2)) out += '=='; else out += b.charAt(((c2&15)<<2)|(c3>>6));
+    if (isNaN(c3)) out += '='; else out += b.charAt(c3&63);
+  }
+  return out; }; }
+)js";
+    JSValue b64v = JS_Eval(s_ctx, b64src, (size_t)strlen(b64src), "<b64>",
+                           JS_EVAL_TYPE_GLOBAL);
+    JS_FreeValue(s_ctx, b64v);
+    // common browser globals bundles assume; keep them cheap and non-fatal
+    const char* browser_src = R"js(
+if (typeof performance === 'undefined') performance = { now: function(){ return Date.now(); } };
+if (typeof localStorage === 'undefined') localStorage = { getItem:function(){return null;}, setItem:function(){}, removeItem:function(){}, clear:function(){}, key:function(){return null;}, get length(){return 0;} };
+if (typeof sessionStorage === 'undefined') sessionStorage = localStorage;
+if (typeof screen === 'undefined') screen = { width:1920, height:1080, availWidth:1920, availHeight:1080, colorDepth:24 };
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'undefined') window.matchMedia = function(q){ return { matches:false, media:String(q), addListener:function(){}, removeListener:function(){}, addEventListener:function(){}, removeEventListener:function(){} }; };
+if (typeof matchMedia === 'undefined' && typeof window !== 'undefined' && window.matchMedia) matchMedia = window.matchMedia;
+if (typeof TextEncoder === 'undefined') { TextEncoder = function(){}; TextEncoder.prototype.encode = function(s){ s = String(s == null ? '' : s); var out = []; for (var i = 0; i < s.length; i++) { var c = s.charCodeAt(i); if (c < 128) out.push(c); else if (c < 2048) { out.push(192|(c>>6), 128|(c&63)); } else { out.push(224|(c>>12), 128|((c>>6)&63), 128|(c&63)); } } return new Uint8Array(out); }; }
+if (typeof TextDecoder === 'undefined') { TextDecoder = function(enc){ this.encoding = enc || 'utf-8'; }; TextDecoder.prototype.decode = function(buf){ if (buf == null) return ''; var u8 = (buf instanceof Uint8Array) ? buf : new Uint8Array(buf); var n = u8.length; if (n > 1048576) { print('[TDC-LIMIT] len=' + n); n = 1048576; } var parts = new Array(n); for (var i = 0; i < n; i++) parts[i] = String.fromCharCode(u8[i]); var out = parts.join(''); try { out = decodeURIComponent(escape(out)); } catch(e){} return out; }; }
+if (typeof crypto === 'undefined') { crypto = { getRandomValues: function(arr){ for (var i=0;i<arr.length;i++) arr[i] = Math.floor(Math.random()*256); return arr; }, randomUUID: function(){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){ var r = Math.random()*16|0, v = c=='x'?r:(r&0x3|0x8); return v.toString(16); }); }, subtle: {} }; }
+if (typeof window !== 'undefined' && typeof window.crypto === 'undefined') window.crypto = crypto;
+if (typeof document !== 'undefined' && document) { try { document.defaultView = (typeof window !== 'undefined') ? window : null; } catch(e){} }
+if (!Object.hasOwn) Object.hasOwn = function(o, k){ return Object.prototype.hasOwnProperty.call(o, k); };
+if (!Array.prototype.at) Array.prototype.at = function(i){ var n = this.length; i = i < 0 ? n + i : i; return (i < 0 || i >= n) ? undefined : this[i]; };
+if (!String.prototype.replaceAll) String.prototype.replaceAll = function(a, b){ return this.split(a).join(b); };
+if (typeof structuredClone === 'undefined') structuredClone = function(x){ try { return JSON.parse(JSON.stringify(x)); } catch(e){ return x; } };
+if (typeof queueMicrotask === 'undefined') queueMicrotask = function(f){ try { Promise.resolve().then(f); } catch(e){} };
+if (typeof globalThis === 'undefined') globalThis = (typeof window !== 'undefined') ? window : this;
+if (typeof window !== 'undefined' && window) { try {
+  ['HTMLIFrameElement','HTMLElement','HTMLDivElement','HTMLCanvasElement','HTMLImageElement','HTMLInputElement','HTMLButtonElement','HTMLTextAreaElement','HTMLSelectElement','HTMLFormElement','HTMLAnchorElement','HTMLLinkElement','HTMLScriptElement','HTMLStyleElement','HTMLVideoElement','HTMLAudioElement','HTMLBodyElement','HTMLHeadElement','SVGElement','SVGSVGElement','Element','Node','Document','Window','Event','MouseEvent','KeyboardEvent','PointerEvent','TouchEvent','CustomEvent','MutationObserver'].forEach(function(n){ if (typeof window[n] === 'undefined') { try { var T = function(){}; window[n] = T; } catch(e){} } });
+} catch(e){} }
+if (typeof history === 'undefined') history = { length:0, state:null, pushState:function(){}, replaceState:function(){}, back:function(){}, forward:function(){}, go:function(){} };
+if (typeof window !== 'undefined' && typeof window.history === 'undefined') window.history = history;
+if (typeof requestAnimationFrame === 'undefined') requestAnimationFrame = function(f){ if (typeof f === 'function') { try { f(Date.now()); } catch(e){} } return 1; };
+if (typeof cancelAnimationFrame === 'undefined') cancelAnimationFrame = function(){};
+if (typeof navigator !== 'undefined' && navigator) { try {
+  if (!Array.isArray(navigator.languages)) navigator.languages = ['zh-CN', 'en-US'];
+  if (typeof navigator.language !== 'string') navigator.language = 'zh-CN';
+} catch(e){} }
+if (typeof JSON !== 'undefined' && JSON.parse) { try {
+  var __nfujp = JSON.parse;
+  JSON.parse = function(s){
+    if (s === null) return null;   // JSON.parse(null) === null (real semantics)
+    if (typeof s !== 'string') {
+      // Bypass: ToString on exotic objects (opaque stub / arraybuffer-like)
+      // can stall inside quickjs's C ToString; real browsers stringify then
+      // fail fast. Returning {} keeps the game code moving without hanging.
+      print('[JPS-NSTR] ty=' + (typeof s));
+      return {};
+    }
+    print('[JPS] len=' + s.length + ' head=' + s.slice(0, 80));
+    var r = __nfujp(s);
+    print('[JPE] len=' + s.length);
+    return r;
+  };
+} catch(e){} }
+if (typeof JSON !== 'undefined' && JSON.stringify) { try {
+  var __nfujs = JSON.stringify;
+  JSON.stringify = function(v, r, sp){ var out = __nfujs(v, r, sp); if (typeof out === 'string' && out.length > 512) { print('[JS] len=' + out.length); } return out; };
+} catch(e){} }
+if (typeof RegExp !== 'undefined' && RegExp.prototype) { try {
+  var __reEx = RegExp.prototype.exec, __reTe = RegExp.prototype.test;
+  var __reLt = 0, __reN = 0, __reDLt = 0;
+  var __reDone = function(kind) {
+    var now = (typeof Date !== 'undefined' && Date.now) ? Date.now() : 0;
+    if (now - __reDLt >= 500) { __reDLt = now; print('[RED] ' + kind); }
+  };
+  var __rePr = function(kind, s, re) {
+    __reN++;
+    var now = (typeof Date !== 'undefined' && Date.now) ? Date.now() : 0;
+    if (now - __reLt >= 500) { __reLt = now;
+      var sl = (typeof s === 'string') ? s.length : -1;
+      var src = (re && re.source) ? String(re.source).slice(0, 40) : '?';
+      print('[RE] ' + kind + '#' + __reN + ' sl=' + sl + ' pat=' + src);
+    }
+  };
+  RegExp.prototype.exec = function(s){ __rePr('ex', s, this); var r = __reEx.call(this, s); __reDone('ex'); return r; };
+  RegExp.prototype.test = function(s){ __rePr('te', s, this); var r = __reTe.call(this, s); __reDone('te'); return r; };
+  ['exec','test'].forEach(function(m){
+    var f = RegExp.prototype[m];
+    if (typeof f === 'function') RegExp.prototype[m] = function(s){
+      if (typeof s === 'string' && s.length > 50000) __rePr('rge' + m, s, this);
+      return f.call(this, s);
+    };
+  });
+  var __stM = String.prototype.match, __stR = String.prototype.replace;
+  String.prototype.match = function(re){ __rePr('ma', this, re instanceof RegExp ? re : null); return __stM.apply(this, arguments); };
+  String.prototype.replace = function(re, rp){
+    if (re instanceof RegExp) __rePr('rp', this, re);
+    else if (typeof re === 'string' && this.length > 200) __rePr('rps', this, null);
+    // Fast path: quickjs's C regexp replace can stall on huge inputs with a
+    // simple literal pattern (e.g. /&/g over multi-MB strings). String
+    // split/join is linear C code and returns promptly.
+    if (re instanceof RegExp && re.global && typeof rp === 'string') {
+      var src2 = re.source;
+      if (src2 && src2.length <= 4 && src2.indexOf('\\') < 0) {
+        try {
+          var pr = this.split(re);   // split on the same pattern
+          if (pr && pr.length > 1) {
+            var joined = '';
+            for (var i = 0; i < pr.length; i++) { if (i > 0) joined += rp; joined += pr[i]; }
+            return joined;
+          }
+        } catch(e){}
+      }
+    }
+    return __stR.apply(this, arguments);
+  };
+  ['split','join','slice','substring','indexOf','lastIndexOf','substr','trim','toLowerCase','toUpperCase','concat','charCodeAt','localeCompare'].forEach(function(m){
+    var f = String.prototype[m];
+    if (typeof f === 'function') String.prototype[m] = function(){
+      if (typeof this === 'string' && this.length > 5000) __rePr('st' + m, this, null);
+      return f.apply(this, arguments);
+    };
+  });
+  if (typeof Array !== 'undefined' && Array.prototype) { try {
+    ['push','pop','shift','unshift','splice','sort','map','filter','join','concat','slice','indexOf','includes','reverse'].forEach(function(m){
+      var f = Array.prototype[m];
+      if (typeof f === 'function') Array.prototype[m] = function(){
+        if (this && typeof this.length === 'number' && this.length > 20000) __rePr('ar' + m, {length: this.length}, null);
+        return f.apply(this, arguments);
+      };
+    });
+  } catch(e){} }
+  if (typeof Object !== 'undefined') { try {
+    var __ok = Object.keys, __ov = Object.values;
+    if (__ok) Object.keys = function(o){ if (o && typeof o === 'object') __rePr('keys', {length: (__ok(o)).length}, null); return __ok(o); };
+    if (__ov) Object.values = function(o){ if (o && typeof o === 'object') __rePr('vals', {length: (__ov(o)).length}, null); return __ov(o); };
+  } catch(e){} }
+} catch(e){} }
+if (typeof Function !== 'undefined' && Function.prototype && !window.__fnHook) { try {
+  window.__fnHook = 1;
+  var __Fn = Function;
+  Function = function(){
+    var code = arguments.length ? arguments[arguments.length - 1] : '';
+    if (typeof code === 'string' && code.length > 300) { print('[FNC] len=' + code.length + ' head=' + code.slice(0, 50)); }
+    return __Fn.apply(this, arguments);
+  };
+  Function.prototype = __Fn.prototype;
+  Function.prototype.constructor = Function;
+} catch(e){} }
+if (typeof RegExp !== 'undefined' && RegExp.prototype && !window.__rgHook) { try {
+  window.__rgHook = 1;
+  var __Rg = RegExp;
+  RegExp = function(p, f){
+    if (typeof p === 'string' && p.length > 800) print('[RGX] len=' + p.length + ' head=' + p.slice(0, 80));
+    return new __Rg(p, f);
+  };
+  RegExp.prototype = __Rg.prototype;
+  RegExp.prototype.constructor = RegExp;
+} catch(e){} }
+if (typeof JSON !== 'undefined' && JSON.stringify && !window.__jsHook) { try {
+  window.__jsHook = 1;
+  var __jsf = JSON.stringify;
+  JSON.stringify = function(o, r, sp){
+    var res = __jsf.apply(this, arguments);
+    if (res && res.length > 200000) print('[JSF] len=' + res.length + ' head=' + res.slice(0, 80));
+    return res;
+  };
+} catch(e){} }
+if (typeof TextDecoder !== 'undefined' && TextDecoder.prototype && TextDecoder.prototype.decode && !window.__tdHook) { try {
+  window.__tdHook = 1;
+  var __td = TextDecoder.prototype.decode;
+  TextDecoder.prototype.decode = function(buf, o){
+    var by = (buf && buf.length !== undefined) ? buf.length : -1;
+    if (by > 1048576) { print('[TDC-LIMIT] len=' + by); if (buf && buf.slice) buf = buf.slice(0, 1048576); }
+    return __td.call(this, buf, o);
+  };
+} catch(e){} }
+if (typeof TextEncoder !== 'undefined' && TextEncoder.prototype && TextEncoder.prototype.encode && !window.__teHook) { try {
+  window.__teHook = 1;
+  var __te = TextEncoder.prototype.encode;
+  TextEncoder.prototype.encode = function(s){
+    if (typeof s === 'string' && s.length > 200000) print('[TEN] len=' + s.length);
+    return __te.call(this, s);
+  };
+} catch(e){} }
+['Uint8Array','Uint16Array','Uint32Array','Int8Array','Int16Array','Int32Array','Float32Array','Float64Array','ArrayBuffer'].forEach(function(nm){
+  var C = (typeof window !== 'undefined' && window[nm]) ? window[nm] : (typeof globalThis !== 'undefined' ? globalThis[nm] : undefined);
+  if (C && !(window.__taHook_ + nm)) {
+    window.__taHook_ + nm;
+    try {
+      var F = function(l){
+        var len = (typeof l === 'number') ? l : -1;
+        if (len > 10000000) print('[TA] ' + nm + ' len=' + len);
+        return new C(l);
+      };
+      F.prototype = C.prototype;
+      if (C.from) F.from = C.from;
+      if (C.of) F.of = C.of;
+      if (window[nm]) window[nm] = F;
+      if (typeof globalThis !== 'undefined') globalThis[nm] = F;
+    } catch(e){}
+  }
+});
+setTimeout = function(f, t){ if (typeof f === 'function') { try { Promise.resolve().then(f); } catch(e){} } return 0; };
+clearTimeout = function(){};
+setInterval = function(f, t){ return 0; };
+clearInterval = function(){};
+if (Array && Array.from) { try { var __nfufrom = Array.from; Array.from = function(x, fn, th){ try { return __nfufrom(x, fn, th); } catch(e) { if (x == null) return []; throw e; } }; } catch(e){} }
+if (typeof fetch === 'undefined') fetch = function(){ return new Promise(function(res, rej){ rej(new Error('fetch not supported')); }); };
+if (typeof WebSocket === 'undefined') WebSocket = function(url, p){ this.readyState = 3; this.CONNECTING=0; this.OPEN=1; this.CLOSING=2; this.CLOSED=3; };
+if (typeof XMLHttpRequest === 'undefined') XMLHttpRequest = function(){ this.readyState=0; this.status=0; this.responseText=''; this.open=function(){}; this.send=function(){}; this.setRequestHeader=function(){}; };
+if (typeof Image === 'undefined') Image = function(){ this.src=''; this.width=0; this.height=0; };
+if (typeof URL === 'undefined') URL = function(u, b){
+  this.href = String(u || ''); this.searchParams = { get:function(){ return null; }, has:function(){ return false; } };
+  var m = /^(https?:)?\/\/([^/]+)(\/[^?#]*)?(\?[^#]*)?(#.*)?$/.exec(this.href);
+  this.protocol = (m && m[1]) ? m[1] + ':' : 'https:';
+  this.host = (m && m[2]) ? m[2] : '';
+  this.hostname = this.host.split(':')[0];
+  this.port = this.host.indexOf(':') >= 0 ? this.host.split(':')[1] : '';
+  this.pathname = (m && m[3]) ? m[3] : '/';
+  this.search = (m && m[4]) ? m[4] : '';
+  this.hash = (m && m[5]) ? m[5] : '';
+};
+if (typeof URLSearchParams === 'undefined') URLSearchParams = function(s){ this.get=function(){return null;}; this.has=function(){return false;}; };
+if (typeof Intl === 'undefined') Intl = {
+  DateTimeFormat: function(){ return { format: function(){ return ''; }, resolvedOptions: function(){ return {}; } }; },
+  NumberFormat: function(){ return { format: function(){ return ''; }, resolvedOptions: function(){ return {}; } }; },
+  Collator: function(){ return { compare: function(a,b){ return a<b?-1:a>b?1:0; } }; }
+};
+if (typeof String !== 'undefined' && String.prototype && !String.prototype.includes) {
+  try { String.prototype.includes = function(s){ return this.indexOf(s) >= 0; }; } catch(e){}
+}
+if (typeof Array !== 'undefined' && Array.prototype && !Array.prototype.includes) {
+  try { Array.prototype.includes = function(s){ return this.indexOf(s) >= 0; }; } catch(e){}
+}
+if (typeof Error !== 'undefined' && Error.prototype) {
+  try {
+    Object.defineProperty(Error.prototype, 'stack',
+      { value: '', writable: true, configurable: true });
+  } catch(e){}
+  try { Error.prototype.stack = ''; } catch(e){}
+}
+if (typeof document !== 'undefined') {
+  if (typeof document.location === 'undefined' || !document.location) {
+    try { document.location = window.location; } catch(e){}
+  }
+  if (typeof document.referrer === 'undefined') document.referrer = '';
+  if (typeof document.readyState === 'undefined') document.readyState = 'complete';
+  if (typeof document.addEventListener === 'undefined') document.addEventListener = function(){};
+  if (typeof document.removeEventListener === 'undefined') document.removeEventListener = function(){};
+}
+if (typeof window !== 'undefined') {
+  if (typeof window.devicePixelRatio === 'undefined') window.devicePixelRatio = 1;
+  if (typeof window.innerWidth === 'undefined') window.innerWidth = 800;
+  if (typeof window.innerHeight === 'undefined') window.innerHeight = 600;
+  if (typeof window.addEventListener === 'undefined') window.addEventListener = function(t, f){ window['__on' + t] = f; };
+  if (typeof window.removeEventListener === 'undefined') window.removeEventListener = function(){};
+  if (typeof window.dispatchEvent === 'undefined') window.dispatchEvent = function(){ return true; };
+  if (typeof window.postMessage === 'undefined') window.postMessage = function(){};
+  if (typeof window.parent === 'undefined') window.parent = window;
+  if (typeof window.top === 'undefined') window.top = window;
+  if (typeof window.self === 'undefined') window.self = window;
+  if (typeof window.frameElement === 'undefined') window.frameElement = null;
+  ['chrome-extension','userscript','content.js','options.js','popup.js','.user.js','main.js','index.js','er.js','5','13','stack','captureStackTrace','stackTraceLimit','#IV']
+    .forEach(function(n){ if (typeof window[n] === 'undefined') window[n] = function(){}; });
+  if (typeof window.Error === 'undefined') window.Error = Error;
+  window.Error = window.Error || Error;
+  window["Error"] = window.Error;
+  if (typeof window.stack === 'undefined') window.stack = '';
+  try {
+    if (Error && !Error.__nfuStackSafe) {
+      Error.__nfuStackSafe = 1;
+      var _nfusafe = function(msg){ try { var e = new Error(String(msg)); try { e.stack = ''; } catch(x){} e.message = String(msg); return e; } catch(x) { return { stack: '', message: String(msg) }; } };
+      if (Error && Error.prototype) _nfusafe.prototype = Error.prototype;
+      window.Error = _nfusafe;
+      window["Error"] = _nfusafe;
+    }
+  } catch(e) {}
+}
+)js";
+    JSValue brv = JS_Eval(s_ctx, browser_src, (size_t)strlen(browser_src), "<browser>",
+                          JS_EVAL_TYPE_GLOBAL);
+    JS_FreeValue(s_ctx, brv);
 }
 
 } // namespace
@@ -1260,9 +1747,75 @@ static inline void js_unlock(void) {
     __sync_lock_release(&s_js_lock);
 }
 
+extern "C" USHORT NTAPI RtlCaptureStackBackTrace(ULONG FramesToSkip,
+                                                  ULONG FramesToCapture,
+                                                  PVOID* BackTrace,
+                                                  PULONG BackTraceHash);
+
+static LONG WINAPI nfu_veh(PEXCEPTION_POINTERS ep) {
+    if (ep && ep->ExceptionRecord &&
+        ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+        unsigned long long addr = (unsigned long long)ep->ExceptionRecord->ExceptionAddress;
+        unsigned long long info0 = ep->ExceptionRecord->ExceptionInformation[0];
+        unsigned long long info1 = ep->ExceptionRecord->ExceptionInformation[1];
+        unsigned long long rip = ep->ContextRecord ? (unsigned long long)ep->ContextRecord->Rip : 0;
+        unsigned long long rcx = ep->ContextRecord ? (unsigned long long)ep->ContextRecord->Rcx : 0;
+        // capture the crash stack so the caller chain is visible
+        void* frames[14] = {0};
+        USHORT nf = RtlCaptureStackBackTrace(0, 14, frames, 0);
+        unsigned long long base = (unsigned long long)GetModuleHandleA(NULL);
+        char b[640];
+        int bl = snprintf(b, sizeof(b),
+            "CRASH av=%d addr=%llx info=%llx RIP=%llx RCX=%llx tid=%lu\nSTACK:",
+            (int)(info0 == 0 ? 0 : info0 == 1 ? 1 : 2), addr, info1, rip, rcx,
+            (unsigned long)GetCurrentThreadId());
+        for (USHORT i = 0; i < nf && i < 14; i++) {
+            unsigned long long f = (unsigned long long)frames[i];
+            int extra = snprintf(b + bl, (size_t)sizeof(b) - (size_t)bl - 1, " %llx(off=%llx)",
+                                 f, base ? f - base : 0);
+            if (extra < 0 || bl + extra >= (int)sizeof(b) - 1) break;
+            bl += extra;
+        }
+        HANDLE f = CreateFileA("E:\\d3ld\\crash97.txt", GENERIC_WRITE, FILE_SHARE_READ,
+                               NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (f != INVALID_HANDLE_VALUE) {
+            DWORD wb = 0;
+            WriteFile(f, b, (DWORD)bl, &wb, NULL);
+            CloseHandle(f);
+        }
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+#ifndef NEFU_BARE
+static DWORD WINAPI nfu_watchdog(LPVOID p) {
+    RunCtx* rc = (RunCtx*)p;
+    uint32_t last_report = 0;
+    for (;;) {
+        if (rc->watch_done) break;
+        uint32_t now = platform_tick_ms();
+        if (now - last_report > 2000) {
+            last_report = now;
+            fprintf(stderr, "\njs: WD last_c=%s t=%u now=%u\n",
+                    rc->last_c ? rc->last_c : "?", rc->last_c_t, now);
+            fflush(stderr);
+        }
+        Sleep(250);
+    }
+    return 0;
+}
+#endif
+
 int mini_js_run(const char* script, char* out, int out_sz,
                     char* html, int html_sz) {
     if (!script || !out || out_sz <= 1) return 1;
+    static int veh_once = 0;
+    if (!veh_once) {
+        veh_once = 1;
+#ifndef NEFU_BARE
+        AddVectoredExceptionHandler(1, nfu_veh);
+#endif
+    }
     out[0] = 0;
     js_lock();
     ensure_js();
@@ -1271,7 +1824,19 @@ int mini_js_run(const char* script, char* out, int out_sz,
     rc.out = out; rc.out_sz = out_sz; rc.oi = 0;
     rc.html = html; rc.html_sz = html_sz; rc.hi = 0;
     if (html && html_sz > 0) html[0] = 0;
-    rc.deadline = platform_tick_ms() + 1000;   // 1s script budget
+    rc.deadline = platform_tick_ms() + 90000;   // 90s script budget (bloxd bundles)
+    rc.last_c = 0; rc.last_c_t = 0; rc.watch_done = 0;
+#ifndef NEFU_BARE
+    rc.jtid = GetCurrentThreadId();
+    rc.exe_base = (unsigned long long)GetModuleHandleA(NULL);
+#else
+    rc.jtid = 0;
+    rc.exe_base = 0;
+#endif
+    rc.rip_printed = 0; rc.rip_t = 0;
+#ifndef NEFU_BARE
+    HANDLE wd = CreateThread(NULL, 0, nfu_watchdog, &rc, 0, NULL);
+#endif
     JS_SetInterruptHandler(JS_GetRuntime(s_ctx), js_interrupt_cb, &rc);
     JS_SetContextOpaque(s_ctx, &rc);
     // keep window.location / document.URL/title in sync with the tab
@@ -1280,6 +1845,19 @@ int mini_js_run(const char* script, char* out, int out_sz,
         JSValue loc2 = JS_GetPropertyStr(s_ctx, g2, "location");
         if (JS_IsObject(loc2)) {
             JS_SetPropertyStr(s_ctx, loc2, "href", JS_NewString(s_ctx, s_env_url));
+            const char* u = s_env_url;
+            const char* h1 = strstr(u, "://");
+            const char* host = h1 ? h1 + 3 : u;
+            const char* h2 = strchr(host, '/');
+            int hl = (h2 ? (int)(h2 - host) : (int)strlen(host));
+            char hnb[128];
+            if (hl > 0 && hl < (int)sizeof(hnb)) { memcpy(hnb, host, (size_t)hl); hnb[hl] = 0; }
+            else { hnb[0] = 0; }
+            JS_SetPropertyStr(s_ctx, loc2, "hostname", JS_NewString(s_ctx, hnb));
+            JS_SetPropertyStr(s_ctx, loc2, "host", JS_NewString(s_ctx, hnb));
+            char prot[16] = "https:";
+            if (h1 && h1 >= u + 4 && memcmp(u, "http:", 5) == 0) memcpy(prot, "http:", 6);
+            JS_SetPropertyStr(s_ctx, loc2, "protocol", JS_NewString(s_ctx, prot));
             JS_FreeValue(s_ctx, loc2);
         }
         JSValue doc2 = JS_GetPropertyStr(s_ctx, g2, "document");
@@ -1290,19 +1868,103 @@ int mini_js_run(const char* script, char* out, int out_sz,
         }
         JS_FreeValue(s_ctx, g2);
     }
-    JSValue r = JS_Eval(s_ctx, script, (size_t)strlen(script), "<script>",
+    fprintf(stderr, "js: run %d bytes\n", (int)strlen(script));
+    size_t script_len = strlen(script);
+    if (script_len > 8) {
+        unsigned char e0 = (unsigned char)script[script_len - 1];
+        unsigned char e1 = (unsigned char)script[script_len];
+        fprintf(stderr, "js: script tail byte=%02x nul=%02x\n", e0, e1);
+        fflush(stderr);
+    }
+    const char* presrc = "try { var __si = 0, __to = 0; setInterval(function(){ __si = 7; }, 10); setTimeout(function(){ __to = 9; }, 10); 'SI:' + __si + '|TO:' + __to + '|ATOB:' + atob('RXJyb3I='); } catch(x) { 'WERRX:' + String(x && x.message); }";
+    JSValue prv = JS_Eval(s_ctx, presrc, (size_t)strlen(presrc), "<pre>", JS_EVAL_TYPE_GLOBAL);
+    if (!JS_IsException(prv)) {
+        const char* pm = JS_ToCString(s_ctx, prv);
+        if (pm) { fprintf(stderr, "js: pre: %s\n", pm); JS_FreeCString(s_ctx, pm); }
+    } else { JSValue pe = JS_GetException(s_ctx); JS_FreeValue(s_ctx, pe); }
+    JS_FreeValue(s_ctx, prv);
+#ifndef NEFU_BARE
+    fprintf(stderr, "js: eval-start t=%u tid=%lu\n", platform_tick_ms(),
+            (unsigned long)GetCurrentThreadId());
+#endif
+    fputs("js: S eval-args\n", stderr); fflush(stderr);
+    JSValue r = JS_Eval(s_ctx, script, script_len, "<script>",
                         JS_EVAL_TYPE_GLOBAL);
+    fputs("js: S eval-return\n", stderr); fflush(stderr);
+    fprintf(stderr, "js: run done\n");
+    rc.watch_done = 1;
+#ifndef NEFU_BARE
+    if (wd) { WaitForSingleObject(wd, 2000); CloseHandle(wd); }
+#endif
     int err = 0;
     if (JS_IsException(r)) {
         err = 1;
+        fputs("js: S exc\n", stderr); fflush(stderr);
         JSValue ex = JS_GetException(s_ctx);
         const char* msg = JS_ToCString(s_ctx, ex);
+        fputs("js: S exc-msg\n", stderr); fflush(stderr);
         if (msg) {
             ctx_emit(&rc, "E: ");
             ctx_emit(&rc, msg);
             JS_FreeCString(s_ctx, msg);
         }
+        JSValue stk = JS_GetPropertyStr(s_ctx, ex, "stack");
+        fputs("js: S exc-stk\n", stderr); fflush(stderr);
+        if (JS_IsString(stk)) {
+            const char* st = JS_ToCString(s_ctx, stk);
+            if (st) { fprintf(stderr, "js: stack: %.500s\n", st); JS_FreeCString(s_ctx, st); }
+        }
+        JS_FreeValue(s_ctx, stk);
+        JSValue em2 = JS_GetPropertyStr(s_ctx, ex, "message");
+        fputs("js: S exc-em\n", stderr); fflush(stderr);
+        if (JS_IsString(em2)) {
+            const char* emv = JS_ToCString(s_ctx, em2);
+            if (emv) { fprintf(stderr, "js: emsg: %.600s\n", emv); JS_FreeCString(s_ctx, emv); }
+        }
+        JS_FreeValue(s_ctx, em2);
+        JSValue en2 = JS_GetPropertyStr(s_ctx, ex, "name");
+        if (JS_IsString(en2)) {
+            const char* env = JS_ToCString(s_ctx, en2);
+            if (env) { fprintf(stderr, "js: ename: %.100s\n", env); JS_FreeCString(s_ctx, env); }
+        }
+        JS_FreeValue(s_ctx, en2);
         JS_FreeValue(s_ctx, ex);
+        // diagnostic: window / window.Error state
+        JSValue g3 = JS_GetGlobalObject(s_ctx);
+        JSValue w3 = JS_GetPropertyStr(s_ctx, g3, "window");
+        int winobj = JS_IsObject(w3);
+        int winerr = 0;
+        if (winobj) {
+            JSValue e3 = JS_GetPropertyStr(s_ctx, w3, "Error");
+            winerr = JS_IsFunction(s_ctx, e3);
+            JSValue st3 = JS_GetPropertyStr(s_ctx, e3, "stackTraceLimit");
+            int stl = !JS_IsUndefined(st3);
+            JSValue m3 = JS_GetPropertyStr(s_ctx, w3, "main.js");
+            int winmain = JS_IsFunction(s_ctx, m3);
+            JSValue es = JS_ToString(s_ctx, e3);
+            const char* esv = JS_ToCString(s_ctx, es);
+            fprintf(stderr, "js: dbg win=%d winErrFn=%d stl=%d mainfn=%d errstr=%.30s\n", winobj, winerr, stl, winmain, esv ? esv : "?");
+            if (esv) JS_FreeCString(s_ctx, esv);
+            JS_FreeValue(s_ctx, es);
+            JS_FreeValue(s_ctx, m3);
+            JS_FreeValue(s_ctx, st3);
+            JS_FreeValue(s_ctx, e3);
+        }
+        JS_FreeValue(s_ctx, w3);
+        JS_FreeValue(s_ctx, g3);
+        // try re-running Xj() in isolation
+        const char* xjsrc = "try { var __xjr = String(Xj()); __xjr; } catch(x) { 'XJEXC:' + String(x && x.message); }";
+        JSValue xv = JS_Eval(s_ctx, xjsrc, (size_t)strlen(xjsrc), "<xjtest>", JS_EVAL_TYPE_GLOBAL);
+        if (!JS_IsException(xv)) {
+            const char* xm = JS_ToCString(s_ctx, xv);
+            if (xm) { fprintf(stderr, "js: XJ() = %s\n", xm); JS_FreeCString(s_ctx, xm); }
+        } else {
+            JSValue xe = JS_GetException(s_ctx);
+            const char* xem = JS_ToCString(s_ctx, xe);
+            if (xem) { fprintf(stderr, "js: XJ eval exc: %s\n", xem); JS_FreeCString(s_ctx, xem); }
+            JS_FreeValue(s_ctx, xe);
+        }
+        JS_FreeValue(s_ctx, xv);
     }
     JS_FreeValue(s_ctx, r);
     out[rc.oi] = 0;

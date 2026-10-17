@@ -88,7 +88,8 @@ static void kvfmt(char* buf, size_t bufsz, const char* fmt, va_list ap) {
             prec = 0;
             while (*fmt >= '0' && *fmt <= '9') { prec = prec * 10 + (*fmt - '0'); fmt++; }
         }
-        if (*fmt == 'l') fmt++; // ignore long prefix
+        bool is64 = false;
+        if (*fmt == 'l') { fmt++; if (*fmt == 'l') { fmt++; is64 = true; } }
         int pad = 0; char pc = ' ';
         if (minus) { /* no left alignment needed */ (void)minus; }
         switch (*fmt) {
@@ -108,12 +109,22 @@ static void kvfmt(char* buf, size_t bufsz, const char* fmt, va_list ap) {
         }
         case 'c': pchar(p, end, (char)va_arg(ap, int)); break;
         case 'd': {
-            int v = va_arg(ap, int);
-            if (v < 0) { pchar(p, end, '-'); pnum(p, end, (unsigned int)(-(v + 1)) + 1, 10, false, false); }
-            else pnum(p, end, (unsigned int)v, 10, false, false);
+            if (is64) {
+                long long v = va_arg(ap, long long);
+                if (v < 0) { pchar(p, end, '-'); pnum64(p, end, (unsigned long long)(-(v + 1)) + 1, 10, false); }
+                else pnum64(p, end, (unsigned long long)v, 10, false);
+            } else {
+                int v = va_arg(ap, int);
+                if (v < 0) { pchar(p, end, '-'); pnum(p, end, (unsigned int)(-(v + 1)) + 1, 10, false, false); }
+                else pnum(p, end, (unsigned int)v, 10, false, false);
+            }
             break;
         }
-        case 'u': pnum(p, end, va_arg(ap, unsigned int), 10, false, false); break;
+        case 'u': {
+            if (is64) pnum64(p, end, va_arg(ap, unsigned long long), 10, false);
+            else pnum(p, end, va_arg(ap, unsigned int), 10, false, false);
+            break;
+        }
         case 'x': pnum(p, end, va_arg(ap, unsigned int), 16, false, false); break;
         case 'X': pnum(p, end, va_arg(ap, unsigned int), 16, true, false); break;
         case 'p': pstr(p, end, "0x"); pnum(p, end, (unsigned int)(uintptr_t)va_arg(ap, void*), 16, true, false); break;
@@ -130,6 +141,12 @@ int ksprintf(char* buf, size_t bufsz, const char* fmt, ...) {
     va_start(ap, fmt);
     kvfmt(buf, bufsz, fmt, ap);
     va_end(ap);
+    return (int)strlen(buf);
+}
+
+int kvsnprintf(char* buf, size_t bufsz, const char* fmt, va_list ap) {
+    if (!buf || bufsz == 0) return 0;
+    kvfmt(buf, bufsz, fmt, ap);
     return (int)strlen(buf);
 }
 

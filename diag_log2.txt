@@ -1,0 +1,44 @@
+﻿=== cmd findstr leak-code (function_bytecode = NULL) ===
+6978:        p->u.func.function_bytecode = NULL;
+=== cmd findstr full-code (ref_count) ===
+284:   GC/refcount fields (gc_obj_type/mark/ref_count) that would otherwise sit in
+293:       the object body keeps only JSGCObjectHeader.link (no ref_count/flags). */
+296:    int      ref_count;
+360:    struct list_head gc_zero_ref_count_list;
+435:    uint16_t var_ref_count; /* number of var refs */
+463:    /* ref_count/gc_obj_type/mark live in the allocator block header (js_rc(p),
+507:#define JS_REF_COUNT(p) (js_rc(p)->ref_count)
+645:    int ref_count; /* used during enumeration to avoid freeing the record */
+879:    uint16_t var_ref_count; /* number of local variable references */
+1126:    /* ref_count/gc_obj_type/mark live in the allocator block header; the object
+1933:            nb->ref_count = b->ref_count;
+2338:    init_list_head(&rt->gc_zero_ref_count_list);
+4870:/* return pointer into a JSString with a live ref_count */
+7075:       putting it in gc_zero_ref_count_list */
+7098:        list_add_tail(&p->header.link, &rt->gc_zero_ref_count_list);
+7125:        el = rt->gc_zero_ref_count_list.next;
+7126:        if (el == &rt->gc_zero_ref_count_list)
+7135:/* called with the ref_count of 'v' reaches zero. */
+7182:                list_add(&p->link, &rt->gc_zero_ref_count_list);
+7414:        /* ref_count was 0: remove from tmp_obj_list and add at the
+7482:            list_add_tail(&p->link, &rt->gc_zero_ref_count_list);
+7488:    list_for_each_safe(el, el1, &rt->gc_zero_ref_count_list) {
+7495:    init_list_head(&rt->gc_zero_ref_count_list);
+7541:        double s_ref_count = JS_REF_COUNT(str);
+7542:        hp->str_count += 1 / s_ref_count;
+7544:                          1 - str->is_wide_char) / s_ref_count);
+7731:                            double ref_count = JS_REF_COUNT(var_refs[i]);
+7732:                            s->memory_used_count += 1 / ref_count;
+7733:                            s->js_func_size += sizeof(*var_refs[i]) / ref_count;
+12681:       block-header ref_count slot; this temp is never refcounted/freed. */
+=== cmd findstr var_refs = NULL ===
+6979:        p->u.func.var_refs = NULL;
+7093:    p->u.func.var_refs = NULL;
+17594:    p->u.func.var_refs = NULL;
+31443:    p->u.func.var_refs = NULL;
+38255:        var_refs = NULL;
+=== PS string checks on ReadAllText ===
+text has leak code: True
+text has full ref_count code: True
+text has full free path: True
+text length: 2151464

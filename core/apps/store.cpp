@@ -1,5 +1,6 @@
-// nefuOS app store - LVGL GUI (scrollable catalog, install/uninstall/open)
+// nefuOS app store - LVGL GUI (catalog + npkg online registry, install/open)
 #include "apps.h"
+#include "npkg.h"
 #include "../gui/lvgl_win.h"
 
 namespace nefu {
@@ -97,13 +98,110 @@ void store_save() {
 struct StoreLvState {
     LvglWin* lw;
     lv_obj_t* list;
+    lv_obj_t* status_lbl;
+    int mode;          // 0 = built-in catalog, 1 = npkg online registry
 };
 
 struct StoreKey {
     StoreLvState* st;
     int id;
-    int action;   // 0=install, 1=uninstall, 2=open
+    int action;   // 0=install, 1=uninstall, 2=open, 3=npkg install
+    char name[64];
 };
+
+static void store_lv_btn(lv_event_t* e);
+
+// ---- npkg online registry view ----
+static void store_npkg_status(StoreLvState* st, const char* s) {
+    if (st->status_lbl) lv_label_set_text(st->status_lbl, s);
+}
+
+static void store_npkg_install(StoreLvState* st, const char* name) {
+    char msg[160];
+    bool ok = npkg_gui_install(name, msg, (int)sizeof(msg));
+    (void)ok;
+    store_npkg_status(st, msg);
+}
+
+// Fetch the full npkg registry and rebuild the list with every package.
+static void store_fetch_online(StoreLvState* st) {
+    uint8_t* body = 0;
+    uint32_t blen = 0;
+    if (!npkg_gui_fetch_registry(&body, &blen) || !body) {
+        store_npkg_status(st, "npkg: fetch failed (network?)");
+        return;
+    }
+    int n = npkg_gui_registry_count(body, blen);
+    if (n <= 0) {
+        kfree(body);
+        store_npkg_status(st, "npkg: empty registry");
+        return;
+    }
+    st->mode = 1;
+    if (st->list) lv_obj_clean(st->list);
+    for (int i = 0; i < n && i < 512; i++) {
+        char name[64], ver[32], intro[160];
+        name[0] = 0; ver[0] = 0; intro[0] = 0;
+        if (!npkg_gui_registry_entry(body, blen, i, name, sizeof(name),
+                                     ver, sizeof(ver), intro, sizeof(intro))) continue;
+        int cy = i * 58;
+        lv_obj_t* card = lv_obj_create(st->list);
+        lv_obj_set_pos(card, 8, cy + 2);
+        lv_obj_set_size(card, 496, 52);
+        lv_obj_set_style_bg_color(card, lv_color_hex(0xF5F5F0), 0);
+        lv_obj_set_style_border_color(card, lv_color_hex(0xE0DFD9), 0);
+        lv_obj_set_style_border_width(card, 1, 0);
+        lv_obj_set_style_radius(card, 6, 0);
+        lv_obj_set_style_pad_all(card, 0, 0);
+
+        lv_obj_t* icon = lv_obj_create(card);
+        lv_obj_set_pos(icon, 6, 6);
+        lv_obj_set_size(icon, 40, 40);
+        lv_obj_set_style_bg_color(icon, lv_color_hex(0x2E6F9E), 0);
+        lv_obj_set_style_radius(icon, 4, 0);
+        lv_obj_set_style_border_width(icon, 0, 0);
+        char ic[2] = { (char)('a' + (i % 26)), 0 };
+        lv_obj_t* icl = lv_label_create(icon);
+        lv_label_set_text(icl, ic);
+        lv_obj_center(icl);
+        lv_obj_set_style_text_color(icl, lv_color_hex(0xFFFFFF), 0);
+
+        lv_obj_t* nlabel = lv_label_create(card);
+        lv_label_set_text(nlabel, name);
+        lv_obj_set_pos(nlabel, 54, 4);
+        lv_obj_set_style_text_color(nlabel, lv_color_hex(0x15181E), 0);
+
+        char dv[192];
+        ksprintf(dv, sizeof(dv), "%s  v%s", intro[0] ? intro : name, ver);
+        lv_obj_t* dlabel = lv_label_create(card);
+        lv_label_set_text(dlabel, dv);
+        lv_obj_set_pos(dlabel, 54, 22);
+        lv_obj_set_style_text_color(dlabel, lv_color_hex(0x667788), 0);
+
+        // Install button
+        StoreKey* k = new StoreKey();
+        k->st = st;
+        k->id = i;
+        k->action = 3;
+        int j = 0;
+        while (name[j] && j < (int)sizeof(k->name) - 1) { k->name[j] = name[j]; j++; }
+        k->name[j] = 0;
+        lv_obj_t* b = lv_button_create(card);
+        lv_obj_set_pos(b, 400, 12);
+        lv_obj_set_size(b, 82, 28);
+        lv_obj_set_style_radius(b, 5, 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(0x3D4B66), 0);
+        lv_obj_add_event_cb(b, store_lv_btn, LV_EVENT_CLICKED, k);
+        lv_obj_t* lbl = lv_label_create(b);
+        lv_label_set_text(lbl, "Install");
+        lv_obj_center(lbl);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+    }
+    kfree(body);
+    char stm[96];
+    ksprintf(stm, sizeof(stm), "npkg online: %d package(s) from npkg.site.je", n);
+    store_npkg_status(st, stm);
+}
 
 static void store_lv_btn(lv_event_t* e) {
     StoreKey* k = (StoreKey*)lv_event_get_user_data(e);
@@ -139,6 +237,10 @@ static void store_lv_btn(lv_event_t* e) {
             FSNode* f = g_vfs->resolve(path);
             if (f) g_vfs->remove_node(f);
         }
+        lv_obj_delete((lv_obj_t*)lv_event_get_target(e));
+    } else if (k->action == 3) {
+        // npkg online: download + install from the registry
+        store_npkg_install(k->st, k->name);
         lv_obj_delete((lv_obj_t*)lv_event_get_target(e));
     } else {
         app_launch(id);
@@ -185,11 +287,36 @@ void store_launch() {
     if (!lw) return;
     StoreLvState* st = new StoreLvState();
     st->lw = lw;
+    st->mode = 0;
+    st->status_lbl = 0;
     lw->userdata = st;
 
     // header
     lv_obj_t* hdr = card_label(lw->content, "Software Store", 12, 6, 0x3366AA);
     (void)hdr;
+    // npkg online toggle
+    {
+        lv_obj_t* b = lv_button_create(lw->content);
+        lv_obj_set_pos(b, 340, 4);
+        lv_obj_set_size(b, 90, 24);
+        lv_obj_set_style_radius(b, 5, 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(0x2E6F9E), 0);
+        lv_obj_set_style_bg_color(b, lv_color_hex(0x1D4E75), LV_STATE_PRESSED);
+        struct NpkgBtn { static void cb(lv_event_t* e) {
+            StoreLvState* s = (StoreLvState*)lv_event_get_user_data(e);
+            if (s) store_fetch_online(s);
+        } };
+        lv_obj_add_event_cb(b, NpkgBtn::cb, LV_EVENT_CLICKED, st);
+        lv_obj_t* lbl = lv_label_create(b);
+        lv_label_set_text(lbl, "npkg Online");
+        lv_obj_center(lbl);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
+    }
+    // status line
+    st->status_lbl = lv_label_create(lw->content);
+    lv_label_set_text(st->status_lbl, "built-in catalog (network optional)");
+    lv_obj_set_pos(st->status_lbl, 12, 336);
+    lv_obj_set_style_text_color(st->status_lbl, lv_color_hex(0x5588CC), 0);
 
     // scrollable list
     st->list = lv_obj_create(lw->content);
@@ -239,6 +366,6 @@ void store_launch() {
         }
     }
     // hint
-    card_label(lw->content, "Installed apps appear in the Start menu. Scroll the list.", 12, 334, 0x5588CC);
+    card_label(lw->content, "Built-in apps install instantly; 'npkg Online' fetches the full remote registry.", 12, 350, 0x5588CC);
 }
 } // namespace nefu

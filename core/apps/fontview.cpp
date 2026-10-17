@@ -15,10 +15,13 @@ struct FontViewState {
     int drag_last;
 };
 
+static void fontview_mirror(Window* w);   // scrollbar sync (defined below)
+
 static void fontview_paint(Window* w) {
     FontViewState* st = (FontViewState*)w->userdata;
     Surface& s = w->back;
     s.fill(color::WHITE);
+    fontview_mirror(w);   // keep the WM scrollbar in sync every frame
     gfx::text(s, 14, 12, "Font Viewer - stb_truetype scalable text", color::BLUE, color::WHITE);
     if (!ttf_ready()) {
         gfx::text(s, 14, 48, "TTF engine not available (bitmap font only).", color::RED, color::WHITE);
@@ -75,10 +78,26 @@ static void fontview_mouse(Window* w, int mx, int my, uint8_t buttons) {
     }
 }
 
+static void fontview_mirror(Window* w) {
+    FontViewState* st = (FontViewState*)w->userdata;
+    if (!st) return;
+    const int total = 420;   // full content height (fixed layout)
+    const int maxv = total > w->content_h ? total - w->content_h : 0;
+    if (st->y_off < 0) st->y_off = 0;
+    if (st->y_off > maxv) st->y_off = maxv;
+    w->content_scroll_h = maxv ? total : 0;
+    w->scroll_y = w->content_scroll_h ? st->y_off : 0;
+}
+
 static void fontview_scroll(Window* w, int delta) {
     FontViewState* st = (FontViewState*)w->userdata;
-    st->y_off -= delta * 20;
-    if (st->y_off < 0) st->y_off = 0;
+    if (delta != 0) {
+        st->y_off -= delta * 20;
+    } else {
+        // scrollbar thumb dragged: the WM moved w->scroll_y (pixels)
+        st->y_off = w->scroll_y;
+    }
+    fontview_mirror(w);
 }
 
 static void fontview_close(Window* w) {
@@ -99,6 +118,7 @@ void fontview_launch() {
     w->on_mouse = fontview_mouse;
     w->on_scroll = fontview_scroll;
     w->on_close = fontview_close;
+    w->app_scroll = true;   // fontview paints its own scrolled viewport
 }
 
 } // namespace nefu

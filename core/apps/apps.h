@@ -108,6 +108,13 @@ enum AppId {
     APP_COMPILERLAB,
     APP_GEDEMO,
     APP_DEEPVIZ,
+    APP_CHATBOT,             // tiny rule-based chatbot (minimal, no "thinking")
+    APP_FXGRAPH,             // fx function grapher (fixed-point math)
+    APP_FXSCI,               // fx scientific calculator (fixed-point math)
+    APP_FPSCI,               // float scientific calculator (soft-float engine)
+    APP_BIGINT,              // big integer calculator (arbitrary precision)
+    APP_DATECALC,            // date calculator (Gregorian)
+    APP_SCRATCH,             // Scratch-style block programming playground
     APP_COUNT
 };
 
@@ -122,6 +129,15 @@ void app_dictionary_launch();
 void app_taskmgr_launch();
 void app_launch(const char* name);  // resolve by app name (for autostart)
 
+// system notification store (core/apps/notifcenter.cpp) - read-only accessors
+// for the taskbar notification tray
+void notif_add(const char* title, const char* body);
+int  notif_count();
+bool notif_get(int i, char* title, int title_sz, char* body, int body_sz, uint32_t* time_ms, bool* is_read);
+void notif_mark_all_read();
+void notif_clear();
+void notifcenter_launch();
+
 // system clipboard (history kept in core/apps/clipboard.cpp)
 void clipboard_add(const char* text);
 const char* clipboard_get(int idx);
@@ -132,6 +148,15 @@ bool decode_image_any(const uint8_t* data, uint32_t size, struct Surface& out);
 void app_show_about();
 void app_show_nefud(FSNode* file);
 int  nefud_name_to_app_id(const char* name);
+
+// ---- nefuOS .deb environment API ----
+// Probe / install / locate-ELF for a real Debian .deb (ar archive) file.
+// Probe and install write human-readable text into `out` (NUL-terminated);
+// install returns the number of entries written to the VFS (-1 on failure).
+// find_elf fills vfs_path ("/usr/bin/...") of the first ELF in data.tar(.gz).
+int nefud_deb_probe(FSNode* f, char* out, int outsz);
+int nefud_deb_install(FSNode* f, char* out, int outsz);
+int nefud_deb_find_elf(FSNode* f, char* vfs_path, int path_sz);
 void calendar_launch();
 void diskusage_launch();
 void passgen_launch();
@@ -217,6 +242,13 @@ void rayview_launch();
 void compilerlab_launch();
 void gedemo_launch();
 void deepviz_launch();
+void chatbot_launch();
+void fxgraph_launch();
+void fxsci_launch();
+void fpsci_launch();
+void bigint_launch();
+void datecalc_launch();
+void scratch_launch();
 void wiki_launch();
 void download_list_launch();
 void lockscreen_launch();

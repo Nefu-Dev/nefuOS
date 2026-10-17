@@ -3758,7 +3758,10 @@ static void on_paint(Window* w) {
             }
         }
     }
-    paint_scrollbar(*s, cw - SB_W, vy, vh, tab.scroll, tab.layout.height);
+    // mirror the total content height so the WM draws the unified scrollbar
+    // (with draggable thumb); browser keeps the SB_W gutter in its layout
+    w->content_scroll_h = vh + tab.max_scroll;
+    w->scroll_y = tab.scroll;
 
     // ---- status ----
     paint_status(*s, tab, cw, ch);
@@ -3978,8 +3981,12 @@ static void on_scroll(Window* w, int delta) {
     tab.scroll += delta * 25;
     if (tab.scroll < 0) tab.scroll = 0;
     if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll;
-    // keep the chrome fixed: the WM auto-scrolls w->scroll_y, reset it
-    w->scroll_y = 0;
+    // app_scroll window: the WM scrollbar mirrors our offset (thumb dragging
+    // arrives as delta==0 with w->scroll_y already set)
+    if (delta == 0) tab.scroll = w->scroll_y;
+    if (tab.scroll < 0) tab.scroll = 0;
+    if (tab.scroll > tab.max_scroll) tab.scroll = tab.max_scroll;
+    w->scroll_y = tab.scroll;
 }
 
 static void on_close(Window* w) {
@@ -4068,6 +4075,7 @@ void browser_launch_url(const char* url) {
     w->on_mouse = on_mouse;
     w->on_scroll = on_scroll;
     w->on_close = on_close;
+    w->app_scroll = true;   // browser draws its own scrolled viewport; WM scrollbar mirrors it
 
     g_wm->raise(w);
 }

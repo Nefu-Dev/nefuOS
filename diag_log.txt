@@ -1,0 +1,76 @@
+﻿PS TEMP=C:\Users\huawei\AppData\Local\Temp
+--- cmd TEMP ---
+C:\Users\huawei\AppData\Local\Temp
+--- findstr nefuOS in D:\ quickjs.c ---
+3871:        // nefuOS: chunk-chain stress can hand us a corrupted atom index
+6973:        /* nefuOS: bloxd chunk eval leaves bytecode functions with a corrupted
+7174:                    /* nefuOS: a value whose GC link is already detached (bloxd
+31425:        /* nefuOS: a chunk module whose func_obj is missing/null (seen with
+31522:        /* nefuOS: bloxd chunk chain passes a corrupted module pointer into
+31554:        return index;   // nefuOS: cyclic/shared dynamic import mid-eval; already in progress
+31556:        return index;   // nefuOS: corrupted status byte (gclassic80); treat as in-progress
+31575:            /* nefuOS: corrupted dependency status (gclassic81); do not abort */
+31751:    // nefuOS: webpack chunk graphs can reach js_link_module twice for the same
+31765:        /* nefuOS: bloxd chunk chain can hand js_link_module a def whose status
+31784:        /* nefuOS: bloxd chunk chain leaves a def neither linked nor evaluated
+32455:        /* nefuOS: corrupted module status entering evaluation (gclassic88).
+--- findstr nefuOS in D:\ quickjs_leakfix.c ---
+3871:        // nefuOS: chunk-chain stress can hand us a corrupted atom index
+6973:        /* nefuOS: bloxd chunk eval leaves bytecode functions with a corrupted
+7174:                    /* nefuOS: a value whose GC link is already detached (bloxd
+31425:        /* nefuOS: a chunk module whose func_obj is missing/null (seen with
+31522:        /* nefuOS: bloxd chunk chain passes a corrupted module pointer into
+31554:        return index;   // nefuOS: cyclic/shared dynamic import mid-eval; already in progress
+31556:        return index;   // nefuOS: corrupted status byte (gclassic80); treat as in-progress
+31575:            /* nefuOS: corrupted dependency status (gclassic81); do not abort */
+31751:    // nefuOS: webpack chunk graphs can reach js_link_module twice for the same
+31765:        /* nefuOS: bloxd chunk chain can hand js_link_module a def whose status
+31784:        /* nefuOS: bloxd chunk chain leaves a def neither linked nor evaluated
+32455:        /* nefuOS: corrupted module status entering evaluation (gclassic88).
+--- findstr nefuOS in PS-TEMP quickjs2.c ---
+3871:        // nefuOS: chunk-chain stress can hand us a corrupted atom index
+6973:        /* nefuOS: bloxd chunk eval leaves bytecode functions with a corrupted
+7174:                    /* nefuOS: a value whose GC link is already detached (bloxd
+31425:        /* nefuOS: a chunk module whose func_obj is missing/null (seen with
+31522:        /* nefuOS: bloxd chunk chain passes a corrupted module pointer into
+31554:        return index;   // nefuOS: cyclic/shared dynamic import mid-eval; already in progress
+31556:        return index;   // nefuOS: corrupted status byte (gclassic80); treat as in-progress
+31575:            /* nefuOS: corrupted dependency status (gclassic81); do not abort */
+31751:    // nefuOS: webpack chunk graphs can reach js_link_module twice for the same
+31765:        /* nefuOS: bloxd chunk chain can hand js_link_module a def whose status
+31784:        /* nefuOS: bloxd chunk chain leaves a def neither linked nor evaluated
+32455:        /* nefuOS: corrupted module status entering evaluation (gclassic88).
+--- findstr nefuOS in cmd-TEMP quickjs2.c ---
+3871:        // nefuOS: chunk-chain stress can hand us a corrupted atom index
+6973:        /* nefuOS: bloxd chunk eval leaves bytecode functions with a corrupted
+7174:                    /* nefuOS: a value whose GC link is already detached (bloxd
+31425:        /* nefuOS: a chunk module whose func_obj is missing/null (seen with
+31522:        /* nefuOS: bloxd chunk chain passes a corrupted module pointer into
+31554:        return index;   // nefuOS: cyclic/shared dynamic import mid-eval; already in progress
+31556:        return index;   // nefuOS: corrupted status byte (gclassic80); treat as in-progress
+31575:            /* nefuOS: corrupted dependency status (gclassic81); do not abort */
+31751:    // nefuOS: webpack chunk graphs can reach js_link_module twice for the same
+31765:        /* nefuOS: bloxd chunk chain can hand js_link_module a def whose status
+31784:        /* nefuOS: bloxd chunk chain leaves a def neither linked nor evaluated
+32455:        /* nefuOS: corrupted module status entering evaluation (gclassic88).
+--- gcc version ---
+gcc.exe (GCC) 15.2.0
+--- file hashes ---
+
+Algorithm       Hash                                                                   Path                            
+---------       ----                                                                   ----                            
+MD5             13EFA46DC61F45659672537579C19B1D                                       D:\mycppos1\nefuOS\third_part...
+
+
+
+Algorithm       Hash                                                                   Path                            
+---------       ----                                                                   ----                            
+MD5             13EFA46DC61F45659672537579C19B1D                                       C:\Users\huawei\AppData\Local...
+
+
+
+Algorithm       Hash                                                                   Path                            
+---------       ----                                                                   ----                            
+MD5             F262483617675A070795426631B732B6                                       C:\Users\huawei\AppData\Local...
+
+
