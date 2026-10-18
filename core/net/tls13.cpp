@@ -6,6 +6,7 @@
 #include "../crypto/mac.h"
 #include "../sys/sha256.h"
 #include "../crypto/rng.h"
+#include "../klib/klib.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -407,6 +408,7 @@ static void chacha20_poly1305_seal(const uint8_t key[32], const uint8_t iv[12],
     int cpad = (16 - (inlen & 15)) & 15;
     int total = aadlen + aadpad + inlen + cpad + 16;
     uint8_t buf[16384 + 512];
+    memset(buf, 0, sizeof(buf));   // zero the pad regions: poly1305 MAC input
     int p = 0;
     if (aadlen) { memcpy(buf + p, aad, (size_t)aadlen); p += aadlen; }
     p += aadpad;
@@ -423,11 +425,31 @@ static int chacha20_poly1305_open(const uint8_t key[32], const uint8_t iv[12],
                                   const uint8_t* aad, int aadlen,
                                   const uint8_t* in, int inlen,
                                   const uint8_t tag[16], uint8_t* out) {
+    // compute the expected tag over the CIPHERTEXT (RFC 8439 AEAD): the
+    // tag authenticates (aad || ct). sealing reuses out for the ct, but in
+    // the open direction out holds the decrypted plaintext, so we must
+    // build the mac input from `in` directly instead of reusing seal.
+    uint8_t polykey[64];
+    crypto::chacha20_block(key, 0, iv, polykey);
+    int aadpad = (16 - (aadlen & 15)) & 15;
+    int cpad = (16 - (inlen & 15)) & 15;
+    uint8_t buf[16384 + 512];
+    memset(buf, 0, sizeof(buf));   // zero the pad regions: poly1305 MAC input
+    int p = 0;
+    if (aadlen) { memcpy(buf + p, aad, (size_t)aadlen); p += aadlen; }
+    p += aadpad;
+    if (inlen) { memcpy(buf + p, in, (size_t)inlen); p += inlen; }
+    p += cpad;
+    uint64_t la = (uint64_t)aadlen, lc = (uint64_t)inlen;
+    for (int i = 0; i < 8; i++) buf[p++] = (uint8_t)(la >> (8*i));
+    for (int i = 0; i < 8; i++) buf[p++] = (uint8_t)(lc >> (8*i));
     uint8_t t2[16];
-    chacha20_poly1305_seal(key, iv, aad, aadlen, in, inlen, out, t2);
+    crypto::poly1305_mac(polykey, buf, p, t2);
     uint8_t diff = 0;
     for (int j = 0; j < 16; j++) diff |= (uint8_t)(t2[j] ^ tag[j]);
-    return diff == 0 ? 0 : -1;
+    if (diff) return -1;
+    crypto::chacha20_crypt(key, iv, 1, in, out, inlen);
+    return 0;
 }
 
 // ============================================================
@@ -604,7 +626,10 @@ static int tls_fill_plain(Tls13Conn* c, uint8_t* dst, int n, int timeout_ms) {
         if (tls_read_record(c, &type, &pl, &plen, timeout_ms) < 0) return -1;
         if (c->hs_encrypted) {
             if (type == TLS_RT_CCS) continue;   // TLS 1.3 compat: skip ChangeCipherSpec
-            if (type != TLS_RT_APP) return -1;
+            if (type != TLS_RT_APP) {
+                snprintf(c->err, sizeof(c->err), "hs enc rec type=%d (want app)", type);
+                return -1;
+            }
             uint8_t plain[16384 + 256];
             int olen;
             int ct = tls_decrypt_into(c, c->s_hs_key, c->s_hs_iv, c->hs_recv_seq++, pl, plen, plain, &olen);
@@ -616,12 +641,35 @@ static int tls_fill_plain(Tls13Conn* c, uint8_t* dst, int n, int timeout_ms) {
                 for (int i = 0; i < dn; i++) fprintf(stderr, "%02x ", pl[i]);
                 fprintf(stderr, "\n"); }
 #endif
-            if (ct < 0) return -1;
+            if (ct < 0) {
+                snprintf(c->err, sizeof(c->err), "hs decrypt fail type=%d plen=%d seq=%llu",
+                         type, plen, (unsigned long long)(c->hs_recv_seq - 1));
+                klogf("[tls] decrypt fail alg=%d keylen=%d\n", c->alg, c->keylen);
+                klogf("[tls] s_hs_key=\n");
+                for (int i = 0; i < c->keylen; i++) { klogf("%02x", c->s_hs_key[i]); if (i % 16 == 15) klogf("\n"); }
+                klogf("[tls] s_hs_iv=");
+                for (int i = 0; i < 12; i++) klogf("%02x", c->s_hs_iv[i]);
+                klogf("\n[tls] rec_hdr=");
+                for (int i = 0; i < 5; i++) klogf("%02x", c->rec_hdr[i]);
+                {
+                    // copy the ciphertext so a later recv cannot clobber rbuf
+                    // while we print, and emit 16 bytes per line so the COM1
+                    // log cannot truncate a 64-hex line
+                    uint8_t ctcopy[512];
+                    int ctn = plen < (int)sizeof(ctcopy) ? plen : (int)sizeof(ctcopy);
+                    memcpy(ctcopy, pl, (size_t)ctn);
+                    klogf("\n[tls] ct[%d]=\n", plen);
+                    for (int i = 0; i < ctn; i++) { klogf("%02x", ctcopy[i]); if (i % 16 == 15) klogf("\n"); }
+                    klogf("\n");
+                }
+                return -1;
+            }
             if (ct != TLS_RT_HANDSHAKE && ct != TLS_RT_APP) return -1;
             if (c->dec_len + olen > (int)sizeof(c->dec)) return -1;
             memcpy(c->dec + c->dec_len, plain, (size_t)olen);
             c->dec_len += olen;
         } else {
+            if (type == TLS_RT_CCS) continue;   // plaintext phase: server may send compat CCS before/around ServerHello
             if (type != TLS_RT_HANDSHAKE) return -1;
             if (c->dec_len + plen > (int)sizeof(c->dec)) return -1;
             memcpy(c->dec + c->dec_len, pl, (size_t)plen);
@@ -640,7 +688,9 @@ static int tls_read_hs_msg(Tls13Conn* c, HsBuf& hb, int timeout_ms) {
         if (hb.want < 0) {
             uint8_t h4[4];
             if (tls_fill_plain(c, h4, 4, timeout_ms) < 0) {
-                snprintf(c->err, sizeof(c->err), "hs header read fail: %s", c->err);
+                // keep the inner error verbatim (no recursive re-wrap that
+                // eats the whole 160-byte diagnostic buffer)
+                if (c->err[0] == 0) snprintf(c->err, sizeof(c->err), "hs header read fail");
                 return -1;
             }
             hb.data[0]=h4[0]; hb.data[1]=h4[1]; hb.data[2]=h4[2]; hb.data[3]=h4[3];
@@ -693,9 +743,11 @@ static int build_client_hello(uint8_t* out, int outsz, const char* hostname,
     rand_bytes(sid, 32);
     p[0] = 32; p += 1;
     memcpy(p, sid, 32); p += 32;
-    // cipher suites (17 with GREASE, Chrome order)
+    // cipher suites (GREASE + Chrome order, minus TLS_AES_256_GCM_SHA384:
+    // the bare-metal crypto stack only implements AES-128-GCM / ChaCha20,
+    // so do not advertise a suite we cannot actually use)
     static const uint16_t suites[] = {
-        0x0a0a, 0x1301, 0x1302, 0x1303, 0xC02B, 0xC02F, 0xC02C, 0xC02E,
+        0x0a0a, 0x1301, 0x1303, 0xC02B, 0xC02F, 0xC02C, 0xC02E,
         0xCCA9, 0xCCA8, 0xC014, 0xC013, 0x009C, 0x009D, 0x002F, 0x0035, 0x000A
     };
     int nsuites = (int)(sizeof(suites)/sizeof(suites[0]));
@@ -942,7 +994,11 @@ Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
     // ---- ServerHello (plaintext) ----
     HsBuf hb;
     memset(&hb, 0, sizeof(hb));
-    if (tls_read_hs_msg(c, hb, 10000) < 0) { snprintf(c->err, sizeof(c->err), "recv server hello"); goto fail; }
+    // keep the inner error (recv short / bad record) instead of overwriting it
+    if (tls_read_hs_msg(c, hb, 10000) < 0) {
+        if (c->err[0] == 0) snprintf(c->err, sizeof(c->err), "recv server hello");
+        goto fail;
+    }
     if (hb.data[0] != TLS_HS_SERVER_HELLO) { snprintf(c->err, sizeof(c->err), "expected server hello, got %d", hb.data[0]); goto fail; }
 #ifdef NEFU_DUMP_REC
     { fprintf(stderr, "[sh] len=%d: ", hb.want);
@@ -979,6 +1035,53 @@ Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
     derive_secret(hs_secret, "s hs traffic", c, c->s_hs_sec);
     derive_traffic_keys(c, c->c_hs_sec, c->c_hs_key, c->c_hs_iv);
     derive_traffic_keys(c, c->s_hs_sec, c->s_hs_key, c->s_hs_iv);
+    // full-key diagnostic: on the host build stdout is lossless, so this is the
+    // reference for cross-checking the bare COM1 dumps with tls_keychain.py
+    klogf("[tls] alg=%d keylen=%d\n", c->alg, c->keylen);
+    klogf("[tls] host s_hs_key=");
+    for (int i = 0; i < c->keylen; i++) klogf("%02x", c->s_hs_key[i]);
+    klogf("\n[tls] host s_hs_iv=");
+    for (int i = 0; i < 12; i++) klogf("%02x", c->s_hs_iv[i]);
+    klogf("\n");
+    // diagnostic dumps (16 bytes per line so the COM1 log cannot truncate a
+    // 64-hex line and corrupt the comparison)
+    klogf("[tls] priv=\n");
+    for (int i = 0; i < 32; i++) { klogf("%02x", priv[i]); if (i % 16 == 15) klogf("\n"); }
+    klogf("[tls] server_pub=\n");
+    for (int i = 0; i < 32; i++) { klogf("%02x", server_pub[i]); if (i % 16 == 15) klogf("\n"); }
+    klogf("[tls] shared=\n");
+    for (int i = 0; i < 32; i++) { klogf("%02x", shared[i]); if (i % 16 == 15) klogf("\n"); }
+    {
+        uint8_t thd[32]; th_hash(c, thd);
+        klogf("[tls] th=\n");
+        for (int i = 0; i < 32; i++) { klogf("%02x", thd[i]); if (i % 16 == 15) klogf("\n"); }
+    }
+    // HKDF intermediate values (16 per line; each value is printed twice so a
+    // dropped nibble in one copy can be recovered from the other)
+    klogf("[tls] cli_pub=\n");
+    for (int rep = 0; rep < 2; rep++) {
+        for (int i = 0; i < 32; i++) { klogf("%02x", pub[i]); if (i % 16 == 15) klogf("\n"); }
+    }
+    klogf("[tls] early=\n");
+    for (int rep = 0; rep < 2; rep++) {
+        for (int i = 0; i < 32; i++) { klogf("%02x", early[i]); if (i % 16 == 15) klogf("\n"); }
+    }
+    klogf("[tls] derived=\n");
+    for (int rep = 0; rep < 2; rep++) {
+        for (int i = 0; i < 32; i++) { klogf("%02x", derived[i]); if (i % 16 == 15) klogf("\n"); }
+    }
+    klogf("[tls] hs_secret=\n");
+    for (int rep = 0; rep < 2; rep++) {
+        for (int i = 0; i < 32; i++) { klogf("%02x", hs_secret[i]); if (i % 16 == 15) klogf("\n"); }
+    }
+    klogf("[tls] c_hs_sec=\n");
+    for (int rep = 0; rep < 2; rep++) {
+        for (int i = 0; i < 32; i++) { klogf("%02x", c->c_hs_sec[i]); if (i % 16 == 15) klogf("\n"); }
+    }
+    klogf("[tls] s_hs_sec=\n");
+    for (int rep = 0; rep < 2; rep++) {
+        for (int i = 0; i < 32; i++) { klogf("%02x", c->s_hs_sec[i]); if (i % 16 == 15) klogf("\n"); }
+    }
 #ifdef NEFU_DUMP_KEY
     { FILE* fp = fopen("keys_dump.bin", "wb");
       if (fp) {
@@ -995,13 +1098,23 @@ Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
     // ---- encrypted handshake phase ----
     c->hs_encrypted = 1;
     // EncryptedExtensions (skip), Certificate (skip), CertificateVerify (skip), Finished (verify)
+    // Long timeout: the server's final TLS data segment (CertificateVerify+
+    // Finished records) is delayed by its RTO backoff when the client ACK is
+    // dropped by slirp, reaching us ~15s after the burst. 15s sat 8ms short in
+    // the 2026-10-18 run; 25s covers the backoff with margin.
     for (int i = 0; i < 3; i++) {
-        if (tls_read_hs_msg(c, hb, 10000) < 0) { snprintf(c->err, sizeof(c->err), "recv hs msg %d", i); goto fail; }
+        if (tls_read_hs_msg(c, hb, 25000) < 0) {
+            if (c->err[0] == 0) snprintf(c->err, sizeof(c->err), "recv hs msg %d", i);
+            goto fail;
+        }
         if (i == 0) parse_ee_alpn(hb.data, hb.len, c);   // EncryptedExtensions: ALPN
         th_append(c, hb.data, hb.len);
     }
     // Finished
-    if (tls_read_hs_msg(c, hb, 10000) < 0) { snprintf(c->err, sizeof(c->err), "recv finished"); goto fail; }
+    if (tls_read_hs_msg(c, hb, 25000) < 0) {
+        if (c->err[0] == 0) snprintf(c->err, sizeof(c->err), "recv finished");
+        goto fail;
+    }
     if (hb.data[0] != TLS_HS_FINISHED) { snprintf(c->err, sizeof(c->err), "expected finished, got %d", hb.data[0]); goto fail; }
     {
         uint8_t fin_key[32];

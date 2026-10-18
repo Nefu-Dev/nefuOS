@@ -141,6 +141,22 @@ These are the original, hand-written parts that make nefuOS different from a "co
 - GUI: store app shows "npkg Online" with install action; verified: `registry bytes=432 packages=2` (nefud, cubehu), `install 'nefud' -> OK`
 - Terminal: `npkg update / install / remove / start / list / upgrade`
 
+### 19. Bare-metal HTTPS (TLS 1.3) & OTA update
+- Native TLS 1.3 client in the bare-metal kernel (`core/net/tls13.cpp` + `httpbare.cpp`):
+  X25519 ECDHE, HKDF-SHA256 key schedule, ChaCha20-Poly1305 AEAD (suite 0x1303)
+- Fetches `https://nefuos.site.je/update.json` for the OTA manifest (same slowAES
+  challenge page flow as npkg), and `http://npkg.site.je/package.json` for the registry
+- Headless verification: `powershell -File tools\verify_bare_net.ps1` boots QEMU,
+  waits for `net-selftest: done`, and PASSes only when both markers appear:
+  `net-selftest: npkg registry OK` + `net-selftest: update manifest OK`
+- **Root cause fixed (2026-10-18)**: the TCP ACK segment's `seq` field mirrored the
+  peer's sequence number (`tcp_send_seg(c, ACK, 0, 0, c->rcv_nxt)`), so Linux
+  rejected every ACK as out-of-window and only delivered the final TLS records via
+  RTO backoff ~25 s later — past the handshake timeout. Passing `c->snd_nxt` makes
+  the peer advance its send window immediately; verified `RESULT: PASS` in QEMU.
+- Crypto self-checks: RFC 7748 X25519 vectors, HKDF early/derived keychain, and a
+  real pcap AEAD `open` of the first encrypted record all pass independently
+
 ---
 ## Features
 

@@ -736,12 +736,18 @@ int tcp_connect(uint32_t ip, uint16_t port, int timeout_ms) {
     c->rx_closed = false;
     int fd = (int)(c - s_conns);
     tcp_send_seg(c, 0x02, 0, 0, c->snd_nxt);   // SYN
+    klogf("tcp: SYN sent to %u.%u.%u.%u:%u\n",
+          (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff,
+          (unsigned)port);
     uint32_t start = platform_tick_ms();
     while (platform_tick_ms() - start < (uint32_t)timeout_ms) {
         net_poll();
         if (c->state == TCP_ESTABLISHED) { g_net.tcp_conns++; return fd; }
         if (c->state == TCP_CLOSED) return -1;
     }
+    klogf("tcp: connect TIMEOUT ip=%u.%u.%u.%u:%u state=%d\n",
+          (ip >> 24) & 0xff, (ip >> 16) & 0xff, (ip >> 8) & 0xff, ip & 0xff,
+          (unsigned)port, c->state);
     c->state = TCP_CLOSED;
     return -1;
 }
@@ -791,8 +797,14 @@ static void tcp_handle(const uint8_t* ip_pkt, int iplen) {
     if (total < hl + 20 || total > iplen) return;
     const TcpHdr* t = (const TcpHdr*)(ip_pkt + hl);
     int tcp_len = total - hl;
-    int data_len = tcp_len - 20;
-    const uint8_t* data = ip_pkt + hl + 20;
+    // TCP header length from the data-offset field: servers commonly attach
+    // timestamp/SACK options to every segment, so assuming 20 bytes shifts the
+    // payload and corrupts the HTTP/TLS stream (the npkg/update failure mode).
+    int tcp_hl = (t->off_flags >> 4) * 4;
+    if (tcp_hl < 20) tcp_hl = 20;
+    if (tcp_len < tcp_hl) return;
+    int data_len = tcp_len - tcp_hl;
+    const uint8_t* data = ip_pkt + hl + tcp_hl;
     uint16_t srcp = __builtin_bswap16(t->src), dstp = __builtin_bswap16(t->dst);
     uint32_t pkt_src_ip = __builtin_bswap32(ip->src);
     TcpConn* c = 0;
@@ -813,6 +825,9 @@ static void tcp_handle(const uint8_t* ip_pkt, int iplen) {
             c->snd_nxt = ack;
             c->state = TCP_ESTABLISHED;
             tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);   // ACK
+            klogf("tcp: SYNACK from %u.%u.%u.%u:%u -> ESTABLISHED\n",
+                  (pkt_src_ip >> 24) & 0xff, (pkt_src_ip >> 16) & 0xff,
+                  (pkt_src_ip >> 8) & 0xff, pkt_src_ip & 0xff, (unsigned)srcp);
             return;
         }
         return;
@@ -822,21 +837,55 @@ static void tcp_handle(const uint8_t* ip_pkt, int iplen) {
         tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);
         return;
     }
-    if (data_len > 0 && (flags & 0x08)) {  // PSH data
-        if (c->rx_len + data_len <= TCP_RXBUFSZ) {
-            memcpy(c->rxbuf + c->rx_len, data, (size_t)data_len);
-            c->rx_len += data_len;
+    // Every data segment must be appended, PSH or not: servers fill large
+    // TLS/HTTP segments up to the MSS and only set PSH on the last one, so
+    // gating on PSH silently dropped whole ServerHello records.
+    if (data_len > 0) {
+        // Diagnostics: print handshake-range segments (seq 0x0012xxxx = the TLS
+        // flow) so we can see which frames reach tcp_handle and whether they are
+        // appended (a=1) or dropped (a=0). Bounded to avoid the retransmit storm.
+        static int s_dbg = 0;
+        if ((seq >> 16) == 0x0012 && s_dbg < 90) {
+            s_dbg++;
+            klogf("tcp: s=%08x l=%d r=%08x a=%d\n", seq, data_len, c->rcv_nxt,
+                  (seq == c->rcv_nxt) ? 1 : 0);
         }
-        c->rcv_nxt = seq + (uint32_t)data_len;
-        tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);   // ACK
-    } else if (data_len > 0) {
-        c->rcv_nxt = seq + (uint32_t)data_len;
+        // Buffer strictly in-order data only, and ACK with the next expected
+        // RECEIVE sequence. ACKing with the send sequence (snd_nxt) was a
+        // stale number below the server's ISN, so the server retransmitted
+        // the whole stream and the duplicates corrupted the TLS record
+        // stream (kernel ct dump != pcap ct for the first encrypted record).
+        if (seq == c->rcv_nxt) {
+            if (c->rx_len + data_len <= TCP_RXBUFSZ) {
+                memcpy(c->rxbuf + c->rx_len, data, (size_t)data_len);
+                c->rx_len += data_len;
+            }
+            c->rcv_nxt = seq + (uint32_t)data_len;
+        } else if (seq < c->rcv_nxt &&
+                   (uint64_t)seq + (uint32_t)data_len > (uint64_t)c->rcv_nxt) {
+            // Partial overlap (e.g. a retransmitted merged segment that starts
+            // before rcv_nxt but carries new bytes beyond it): append only the
+            // bytes we have not seen yet, then advance rcv_nxt.
+            uint32_t skip = c->rcv_nxt - seq;
+            int new_len = data_len - (int)skip;
+            if (new_len > 0 && c->rx_len + new_len <= TCP_RXBUFSZ) {
+                memcpy(c->rxbuf + c->rx_len, data + skip, (size_t)new_len);
+                c->rx_len += new_len;
+            }
+            c->rcv_nxt = seq + (uint32_t)data_len;
+        }
+        // ACK with our OWN send sequence in the seq field (tcp_send_seg writes
+        // param #5 into the TCP seq field and always fills the ack field with
+        // rcv_nxt). Passing rcv_nxt here mirrored the server's sequence number
+        // into our ACK segment, which the Linux peer rejected as out-of-window,
+        // so it never advanced its send window and only delivered the final
+        // TLS records via RTO backoff ~25s later (past our handshake timeout).
         tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);
     }
     if (flags & 0x01) {  // FIN
         c->rcv_nxt = seq + (uint32_t)data_len + 1;
         c->rx_closed = true;
-        tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);
+        tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);   // ACK (seq = our send seq)
     }
 }
 
@@ -996,7 +1045,7 @@ bool net_init() {
     else if (s_backend == drivers::NIC_VIRTIO)  ksprintf(g_net.name, sizeof(g_net.name), "virtio-net");
 
     g_net.up = true;
-    klogf("net: %s up, ip=10.0.2.15\n", g_net.name);
+    klogf("net: %s up, ip=10.0.2.15\n", drivers::nic_type_name(t));
     return true;
 }
 
