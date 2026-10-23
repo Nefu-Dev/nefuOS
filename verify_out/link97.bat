@@ -1,0 +1,3 @@
+@echo off
+"D:\CLion\bin\mingw\bin\g++.exe" -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I D:\mycppos1\nefuOS\core -I D:\mycppos1\nefuOS\third_party -I D:\mycppos1\nefuOS\third_party\lvgl_conf -I D:\mycppos1\nefuOS\third_party\lvgl_src\lvgl-9.2.0 -DLV_CONF_PATH=D:\mycppos1\nefuOS\third_party\lvgl_conf\lv_conf.h -DNEFU_LVGL_DEMO @"%TEMP%\nefu_objs97.rsp" -Wl,--stack,67108864 -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 -o "%TEMP%\nefu_fix_test\nefuOS_webgl_97.exe"
+echo LINK_EXIT=%ERRORLEVEL%

@@ -22801,6 +22801,7 @@ static __exception int js_parse_string(JSParseState *s, int sep,
             break;
         }
         if (c == '\\') {
+            const uint8_t* bs = p - 1;
             c = *p;
             switch(c) {
             case '\0':
@@ -22873,6 +22874,7 @@ static __exception int js_parse_string(JSParseState *s, int sep,
                 }
                 break;
             }
+            fprintf(stderr, "BS: %ld -> %ld nxt=%d\n", (long)(bs - s->buf_start), (long)(p - s->buf_start), (int)*bs);
         } else if (c >= 0x80) {
             c = utf8_decode(p - 1, &p_next);
             if (p_next == p)
@@ -40782,7 +40784,7 @@ static JSAtom find_atom(JSContext *ctx, const char *name)
             if (str->len == len && !memcmp(str8(str), name, len))
                 return JS_DupAtom(ctx, atom);
         }
-        abort();
+        return JS_NewAtom(ctx, name);
     } else {
         atom = JS_NewAtom(ctx, name);
     }

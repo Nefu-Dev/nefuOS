@@ -30,7 +30,8 @@ $coreExclude = @(
   "core\apps\calculator.cpp", "core\apps\html5.cpp", "core\apps\lockscreen.cpp",
   "core\apps\recycle.cpp", "core\apps\stubs.cpp",
   "core\apps\terminal_commands.cpp", "core\apps\terminal_extra.cpp",
-  "core\sys\sysapi_extended.cpp"
+  "core\sys\sysapi_extended.cpp",
+  "core\net\tls13.cpp"   # frozen tls13_fixed.cpp is the only TLS 1.3 client
 )
 $coreRoot = (Get-Location).Path
 $coreSrc = @(Get-ChildItem "core" -Recurse -Filter *.cpp |
@@ -97,8 +98,12 @@ foreach ($s in $coreSrc) {
   $obj = "$bareOut\$name"
   $cflags = $bareFlags
   if ($s -like "*minijs.cpp") { $cflags = $bareFpuFlags }
-  & $g @cflags $s -o $obj
-  if ($LASTEXITCODE -ne 0) { throw "bare compile failed: $s" }
+  $srcTime = (Get-Item $s).LastWriteTime
+  $need = (-not (Test-Path $obj)) -or ((Get-Item $obj).LastWriteTime -lt $srcTime)
+  if ($need) {
+    & $g @cflags $s -o $obj
+    if ($LASTEXITCODE -ne 0) { throw "bare compile failed: $s" }
+  }
   $objs += $obj
 }
 # LVGL 9.2.0 bare objects (pure C; LV_USE_FLOAT=0 so the public API is
@@ -134,6 +139,9 @@ $objs += "$bareOut\bare_barelibc.o"
 # QuickJS (bare kernel): same sources as the host engine, but single-threaded
 # (CONFIG_DISABLE_ATOMICS kills the pthread path), assert-free (NDEBUG; there
 # is no __assert_fail in a freestanding kernel) and linked against bare_libc.
+$qjSrc = @(
+  "quickjs.c", "libregexp.c", "libunicode.c", "cutils.c", "dtoa.c"
+)
 $qjBareFlags = @("-std=gnu11", "-ffreestanding", "-fno-builtin", "-fno-stack-protector",
                  "-fno-asynchronous-unwind-tables", "-Os", "-w", "-D_GNU_SOURCE",
                  "-DCONFIG_DISABLE_ATOMICS", "-DNDEBUG",
@@ -258,15 +266,15 @@ $isoKernelMax = 4194304 * 2048   # ISO layout: kernel occupies up to 1024 x 2048
 Write-Output "isoKernelMax=$isoKernelMax kSize=$kSize (make_iso cap = 4194304)"
 if ($kSize -gt $isoKernelMax) { throw "kernel too large for ISO (max $isoKernelMax bytes, got $kSize)" }
 # memory map check: the flat kernel loads at 0x100000 and must stay BELOW the
-# stub staging base 0x620000 -- otherwise the stub's inflate destination
+# stub staging base 0xB00000 -- otherwise the stub's inflate destination
 # (0x100000..0x100000+kSize) overlaps the staging/source region and corrupts
 # the compressed stream (observed as inflate error -24).  Fixed in stub.s /
 # entry.s / bare.cpp.  Fail loudly instead of producing a broken image.
 $kEnd = 0x100000 + $kSize
-if ($kEnd -ge 0x620000) {
-    throw "kernel image ends at 0x$('{0:X}' -f $kEnd) >= 0x620000 (staging base): raise STAGE_BASE/stacks/ARENA_BASE"
+if ($kEnd -ge 0xB00000) {
+    throw "kernel image ends at 0x$('{0:X}' -f $kEnd) >= 0xB00000 (staging base): raise STAGE_BASE/stacks/ARENA_BASE"
 }
-Write-Output "memmap OK: kernel ends at 0x$('{0:X}' -f $kEnd) (< 0x620000 staging, < 0x900000 stacks, < 0x920000 arena)"
+Write-Output "memmap OK: kernel ends at 0x$('{0:X}' -f $kEnd) (< 0xB00000 staging, < 0x2000000 stacks, < 0x2020000 arena)"
 
 # 4b) patch the multiboot2 header (entry.s) so GRUB/ESP boot works:
 #     Address-tag load_end_addr/bss_end_addr + in-kernel kernel_boot_params

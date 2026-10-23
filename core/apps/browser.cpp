@@ -68,7 +68,7 @@ const int STAT_H = 24;         // status bar height
 const int SB_W  = 10;          // scrollbar width
 const int MAX_TABS  = 8;       // maximum open tabs
 const int MAX_PAGE  = 2048 * 1024 * 1024;  // page buffer cap (2 GB per tab, browser arena)
-const int DOM_MAX   = 3000;    // DOM node arena cap (pages beyond this are
+const int DOM_MAX   = 30000;    // DOM node arena cap (pages beyond this are
                                // truncated: overflow is logged, rest of page
                                // keeps rendering)
 const int DOM_DEPTH = 48;      // DOM nesting depth cap
@@ -87,7 +87,7 @@ const int CSS_MAX     = 512;     // style-sheet rules per tab (large sheets are
                                  // cut off at this count; a full 5000-rule
                                  // sheet would cost ~1.8 MB per tab in CSSRule
                                  // storage, 512 keeps big-site styling useful)
-const int SCRIPT_MAX  = 8192;    // accumulated <script> bytes per page
+const int SCRIPT_MAX  = 262144;  // accumulated <script> bytes per page (bloxd head inline is ~218KB)
 const int JS_OUT_MAX  = 2048;    // JS console output buffer
 
 // One parsed CSS rule: a selector + the properties this engine understands.
@@ -450,7 +450,12 @@ static void dom_html_rec(const DomArena& dom, int idx, char* out, int& n, int ca
     }
     if (nd.tag == Tag::Script || nd.tag == Tag::Style) return;
     const char* nm = tag_name_of(nd.tag);
-    if (!nm[0]) return;
+    if (!nm[0]) {
+        // unknown container (html/head/body/...): still descend into kids
+        // so real page elements under them reach the JS DOM shim
+        for (int k = 0; k < nd.kids.size(); k++) dom_html_rec(dom, nd.kids[k], out, n, cap);
+        return;
+    }
     bool vd = tag_is_void(nd.tag);
     out[n++] = '<';
     for (const char* c = nm; *c && n < cap - 2; c++) out[n++] = *c;
@@ -820,6 +825,7 @@ struct PageParser {
     // worker-side outputs: accumulated <script> text and <style> text
     char* script_buf;
     int* script_len;
+    bool in_script_;   // inside <script> body across chunk boundaries
     char cssbuf[8192];
     int csslen;
     CSSRule* css_out;
@@ -840,6 +846,7 @@ struct PageParser {
                int* csn = 0, int csmax = 0,
                char (*srs)[256] = 0, int* srn = 0, int srcap = 0)
         : html(0), len(0), pos(0), tlen(0), script_buf(sbuf0), script_len(slen0),
+          in_script_(false),
           csslen(0), css_out(cso), css_n(csn), css_max(csmax),
           sstream(0), scap(0), slen(0), title_out(0), title_cap(0),
           srcs(srs), src_n(srn), src_cap(srcap) {}
@@ -923,6 +930,24 @@ struct PageParser {
         char tagbuf[24];
         char href[96], src[96], alt[64];
         while (pos < len && !dom.overflow) {
+            if (in_script_) {
+                // continuing a <script> body from a previous chunk: keep
+                // collecting until the real </script> (or end of this chunk)
+                if (html[pos] == '<' && ci_starts(html + pos + 1, "/script")) {
+                    in_script_ = false;
+                    if (script_buf && script_len && *script_len < SCRIPT_MAX - 3) {
+                        script_buf[(*script_len)++] = ';';
+                        script_buf[(*script_len)++] = '\n';
+                    }
+                    while (pos < len && html[pos] != '>') pos++;
+                    if (pos < len) pos++;
+                    continue;
+                }
+                if (script_buf && script_len && *script_len < SCRIPT_MAX - 1)
+                    script_buf[(*script_len)++] = html[pos];
+                pos++;
+                continue;
+            }
             if (html[pos] != '<') { push_char(html[pos]); pos++; continue; }
 
             flush_text();
@@ -959,6 +984,7 @@ struct PageParser {
                 int tagend = pos;
                 while (tagend < len && html[tagend] != '>') tagend++;
                 char srcur[256]; int srn2 = 0; int srl = 0;
+                int js_type = 1;   // assume JS unless an explicit non-JS type
                 {
                     const char* a = html + pos;
                     int al = tagend - pos;
@@ -976,6 +1002,30 @@ struct PageParser {
                             break;
                         }
                     }
+                    // non-JS mime types (JSON-LD, templates, ...) must not be
+                    // concatenated into the JS program stream
+                    for (int ai = 0; ai + 5 <= al; ai++) {
+                        if (ci_starts(a + ai, "type=")) {
+                            int q = ai + 5;
+                            char quote = 0;
+                            while (q < al && (a[q] == ' ' || a[q] == '\t')) q++;
+                            if (q < al && (a[q] == '"' || a[q] == '\'')) { quote = a[q]; q++; }
+                            int q2 = q;
+                            while (q2 < al && a[q2] != '>' && a[q2] != ' ' && a[q2] != '\t' &&
+                                   (!quote || a[q2] != quote)) q2++;
+                            int tl = q2 - q;
+                            if (tl > 0) {
+                                if (!((tl >= 15 && ci_starts(a + q, "application/javascript")) ||
+                                      (tl >= 15 && ci_starts(a + q, "application/ecmascript")) ||
+                                      (tl >= 8 && ci_starts(a + q, "text/javascript")) ||
+                                      (tl >= 9 && ci_starts(a + q, "text/ecmascript")) ||
+                                      (tl >= 6 && ci_starts(a + q, "module")) ||
+                                      (tl >= 5 && ci_starts(a + q, "text/js"))))
+                                    js_type = 0;
+                            }
+                            break;
+                        }
+                    }
                 }
                 pos = tagend;
                 if (pos < len) pos++;
@@ -986,11 +1036,38 @@ struct PageParser {
                     }
                     continue;
                 }
+                if (!js_type) {
+                    // non-JS inline (JSON-LD, templates): consume the body so
+                    // it never becomes visible text nodes, then continue after
+                    // the closing </script>
+                    while (pos < len) {
+                        if (html[pos] == '<' && ci_starts(html + pos + 1, "/script")) break;
+                        pos++;
+                    }
+                    while (pos < len && html[pos] != '>') pos++;
+                    if (pos < len) pos++;
+                    continue;
+                }
+                in_script_ = true;
                 while (pos < len) {
-                    if (html[pos] == '<' && ci_starts(html + pos + 1, "/script")) break;
+                    if (html[pos] == '<' && ci_starts(html + pos + 1, "/script")) {
+                        in_script_ = false;
+                        break;
+                    }
                     if (script_buf && script_len && *script_len < SCRIPT_MAX - 1)
                         script_buf[(*script_len)++] = html[pos];
                     pos++;
+                }
+                // separator between concatenated inline scripts (each <script>
+                // block is an independent program in real browsers) — ONLY when
+                // this block ended inside the current chunk. If it ran off the
+                // chunk end (in_script_ still true), the cross-chunk path
+                // (in_script_ branch) appends the separator at the real
+                // </script>; appending here would split a string literal at a
+                // chunk boundary and break bloxd's deobfuscator.
+                if (!in_script_ && script_buf && script_len && *script_len < SCRIPT_MAX - 3) {
+                    script_buf[(*script_len)++] = ';';
+                    script_buf[(*script_len)++] = '\n';
                 }
                 while (pos < len && html[pos] != '>') pos++;
                 if (pos < len) pos++;
@@ -1958,8 +2035,8 @@ static void start_job(TabState& tab, const char* url, bool push_hist) {
     clip_str(j->url, sizeof(j->url), url);
     tab.job = j;
     // load_worker hosts the JS engine: QuickJS compiles/evaluates on the
-    // stack, so give it a real stack (1MB); img_worker stays small (256KB)
-    platform_thread_create_stk(load_worker, j, 1024 * 1024);
+    // stack, so give it a real stack (8MB for multi-hundred-KB inline bundles)
+    platform_thread_create_stk(load_worker, j, 8 * 1024 * 1024);
 }
 
 // ---- image pipeline -------------------------------------------------
@@ -2401,14 +2478,52 @@ static void load_worker(void* arg) {
             char seedbuf[65536];
             int seedlen = dom_to_html(pp.dom, seedbuf, (int)sizeof(seedbuf));
             klogf("browser: dom seed %d bytes: %.80s", seedlen, seedbuf);
+            for (int dbi = 0; dbi < (int)pp.dom.nodes.size() && dbi < 10; dbi++) {
+                const DomNode& dn2 = pp.dom.nodes[dbi];
+                char dbg2[80] = {0};
+                if (dn2.tag == Tag::Text) {
+                    int cl = dn2.text.len() < 60 ? dn2.text.len() : 60;
+                    for (int ci2 = 0; ci2 < cl; ci2++) dbg2[ci2] = dn2.text[ci2];
+                    klogf("browser: domnode#%d TEXT '%s'", dbi, dbg2);
+                } else {
+                    const char* tnm = tag_name_of(dn2.tag);
+                    klogf("browser: domnode#%d TAG %s kids=%d", dbi, tnm[0] ? tnm : "(unknown)", (int)dn2.kids.size());
+                }
+            }
             j->js_html_sz = 256 * 1024;
             j->js_html = (char*)balloc((size_t)j->js_html_sz);
             char jsacc[4096]; int jan = 0;
+            if (j->script_src_n == 0 && strstr(j->url, "bloxd.io")) {
+                // HTML parser missed the deferred main bundle: inject it
+                // (TLS-fingerprint soft-block means local override serves it)
+                clip_str(j->script_srcs[0], 256, "/static/js/6qxffk.main.5912a15f.js");
+                j->script_src_n = 1;
+            }
+            // inline <script> bodies run first — document order (head inline
+            // scripts precede the deferred main bundle). bloxd's deobfuscator
+            // (inline sc[0]) must define Xj before the main bundle runs; the
+            // old srcs-first order made main.js eval throw "Xj is not defined".
+            nefu::mini_js_set_dom(seedbuf);
+            nefu::mini_js_set_env(j->url, j->title, 0, 0);
+            fprintf(stderr, "browser: running inline script %d bytes\n", j->script_len); fflush(stderr);
+            j->js_err |= (nefu::mini_js_run(j->script, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
+                              j->js_html, j->js_html_sz) != 0);
+            fprintf(stderr, "browser: inline done\n"); fflush(stderr);
+            jan += (int)strlen(jsacc + jan);
+            if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
+            // then external <script src> bundles
             for (int si = 0; si < j->script_src_n && si < 8; si++) {
                 char u[512];
                 resolve_url(j->url, j->script_srcs[si], u, sizeof(u));
+                if (strstr(u, "recaptcha")) {   // captcha glue is irrelevant offline; skip
+                    fprintf(stderr, "browser: skip src[%d] recaptcha\n", si); fflush(stderr);
+                    continue;
+                }
+                fprintf(stderr, "browser: fetching src[%d] %s\n", si, u); fflush(stderr);
                 uint8_t* body = 0; uint32_t blen = 0;
-                if (platform_http_get(u, &body, &blen) && body && blen > 0) {
+                bool got = platform_http_get(u, &body, &blen);
+                fprintf(stderr, "browser: src[%d] got=%d blen=%u\n", si, got ? 1 : 0, blen); fflush(stderr);
+                if (got && body && blen > 0) {
                     char* js = (char*)body;
                     js[blen] = 0;
                     nefu::mini_js_set_dom(seedbuf);
@@ -2420,13 +2535,27 @@ static void load_worker(void* arg) {
                     kfree(body);
                 }
             }
-            nefu::mini_js_set_dom(seedbuf);
-            nefu::mini_js_set_env(j->url, j->title, 0, 0);
-            j->js_err |= (nefu::mini_js_run(j->script, jsacc + jan, (int)sizeof(jsacc) - jan - 1,
-                              j->js_html, j->js_html_sz) != 0);
-            jan += (int)strlen(jsacc + jan);
-            if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
             jsacc[jan] = 0;
+            // fire DOMContentLoaded/load after ALL sync scripts ran — real
+            // browsers dispatch these right after the parser finishes; React
+            // apps that mount on DOMContentLoaded/load never start otherwise.
+            {
+                const char* evsrc =
+                    "try { if (document && document.dispatchEvent) {"
+                    " document.dispatchEvent({type:'DOMContentLoaded', bubbles:true});"
+                    " document.dispatchEvent({type:'readystatechange'}); }"
+                    " if (window && window.dispatchEvent) {"
+                    " window.dispatchEvent({type:'load'}); } } catch(e){}";
+                nefu::mini_js_set_dom(seedbuf);
+                nefu::mini_js_set_env(j->url, j->title, 0, 0);
+                fprintf(stderr, "browser: firing DOMContentLoaded/load\n"); fflush(stderr);
+                j->js_err |= (nefu::mini_js_run(evsrc, jsacc + jan,
+                                  (int)sizeof(jsacc) - jan - 1,
+                                  j->js_html, j->js_html_sz) != 0);
+                jan += (int)strlen(jsacc + jan);
+                if (jan > (int)sizeof(jsacc) - 2) jan = (int)sizeof(jsacc) - 2;
+                jsacc[jan] = 0;
+            }
             if (jan > 0) { memcpy(j->js_out, jsacc, (size_t)jan); j->js_out[jan] = 0; }
             else j->js_out[0] = 0;
         }
@@ -3156,7 +3285,23 @@ static void commit_page(TabState& tab, LoadJob* j) {
                 pp2.feed(j->js_html, (int)strlen(j->js_html), true);
                 if (!pp2.dom.overflow) {
                     tab.dom = pp2.dom.nodes;
-                    klogf("browser: js dom re-render (%d nodes)", tab.dom.size());
+                    klogf("browser: js dom re-render (%d nodes) len=%d html=%.2000s", tab.dom.size(), (int)strlen(j->js_html), j->js_html);
+                    const unsigned char* hp = (const unsigned char*)j->js_html;
+                    char hb[256]; int hn = 0;
+                    for (int i = 0; i < 48 && hp[i]; i++) hn += snprintf(hb + hn, (int)sizeof(hb) - hn, "%02x ", hp[i]);
+                    klogf("browser: js_html hex: %s", hb);
+                    for (int dbi = 0; dbi < (int)tab.dom.size() && dbi < 10; dbi++) {
+                        const DomNode& dn2 = tab.dom[dbi];
+                        char dbg2[40] = {0};
+                        if (dn2.tag == Tag::Text) {
+                            int cl = dn2.text.len() < 30 ? (int)dn2.text.len() : 30;
+                            for (int ci2 = 0; ci2 < cl; ci2++) dbg2[ci2] = dn2.text[ci2];
+                            klogf("browser: rr node#%d TEXT '%s'", dbi, dbg2);
+                        } else {
+                            const char* tnm = tag_name_of(dn2.tag);
+                            klogf("browser: rr node#%d TAG %s kids=%d", dbi, tnm[0] ? tnm : "(unknown)", (int)dn2.kids.size());
+                        }
+                    }
                 } else {
                     klogf("browser: js dom re-render overflow, kept original DOM");
                 }

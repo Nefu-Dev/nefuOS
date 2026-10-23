@@ -1,1 +1,18 @@
-core sources: 442
+core sources: 441
+menu.bin OK: 1024 bytes
+rebin OK: bss_start=0x0 bss_size=0x0
+kernel.bin OK: 5517824 bytes
+isoKernelMax=8589934592 kSize=5517824 (make_iso cap = 4194304)
+memmap OK: kernel ends at 0x643200 (< 0x680000 staging, < 0x900000 stacks, < 0x920000 arena)
+multiboot2 header at file offset 0x8, length 88
+  address tag @0x30: header_addr=0x100008 load_addr=0x100000
+patched: load_end_addr=0x643200 bss_end_addr=0x643200
+patched: kernel_boot_params@0x60 bss_start=0x0 bss_size=0x0 (0 bytes)
+OK: C:\Users\huawei\AppData\Local\Temp\nefu_build\bare\kernel.bin (5517824 bytes)
+stub.bin OK: 2548 bytes
+kernel.gz OK: 5517824 -> 2363171
+payload.bin OK: 2365719 bytes (stub 2548 + gz 2363171)
+boot.bin patched: 4621 kernel sectors (kernel_count@0x58)
+ISO OK: 4247552 bytes, 2074 blocks (kernel 2048 blocks)
+ISO OK: 4247552 bytes
+BUILD DONE

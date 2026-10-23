@@ -39549,7 +39549,7 @@ static JSAtom find_atom(JSContext *ctx, const char *name)
             if (str->len == len && !memcmp(str->u.str8, name, len))
                 return JS_DupAtom(ctx, atom);
         }
-        abort();
+        return JS_ATOM_NULL;
     } else {
         atom = JS_NewAtom(ctx, name);
     }

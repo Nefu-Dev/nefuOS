@@ -222,80 +222,56 @@ void cmac_aes(const uint8_t* key, int key_len,
 }
 
 // =====================================================================
-// Poly1305 (RFC 8439) —— 用 26 位 limbs 实现
+// Poly1305 (RFC 8439) - TweetNaCl byte-sliced implementation (widely
+// verified). 17 byte-level digits, cyclic convolution mod 2^130-5.
 // =====================================================================
+static void poly_add1305(uint32_t *h, const uint32_t *c) {
+    uint32_t j, u = 0;
+    for (j = 0; j < 17; ++j) { u += h[j] + c[j]; h[j] = u & 255; u >>= 8; }
+}
+static const uint32_t poly_minusp[17] = {
+    5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252
+};
 void poly1305_mac(const uint8_t key[32], const uint8_t* msg, int len, uint8_t out[16]) {
-    uint32_t r[5], h[5];
-    // 解析 r（低 16 字节），并按规范清位
-    r[0] = (uint32_t)key[0]  | ((uint32_t)key[1]<<8)  | ((uint32_t)key[2]<<16) | ((uint32_t)key[3]<<24);
-    r[1] = (uint32_t)key[4]  | ((uint32_t)key[5]<<8)  | ((uint32_t)key[6]<<16) | ((uint32_t)key[7]<<24);
-    r[2] = (uint32_t)key[8]  | ((uint32_t)key[9]<<8)  | ((uint32_t)key[10]<<16)| ((uint32_t)key[11]<<24);
-    r[3] = (uint32_t)key[12] | ((uint32_t)key[13]<<8) | ((uint32_t)key[14]<<16)| ((uint32_t)key[15]<<24);
-    r[0] &= 0x03ffffff; r[1] &= 0x03ffff03; r[2] &= 0x03ffc00f; r[3] &= 0x03fffc0f;
-    r[4] = 0; // r 只占 16 字节
-    for (int i=0;i<5;i++) h[i]=0;
-    int i=0;
-    while (i<len) {
-        uint8_t block[16]={0};
-        int m=len-i; if (m>16) m=16;
-        memcpy(block, msg+i, m);
-        uint32_t t[5];
-        t[0]=(uint32_t)block[0]|((uint32_t)block[1]<<8)|((uint32_t)block[2]<<16)|((uint32_t)block[3]<<24);
-        t[1]=(uint32_t)block[4]|((uint32_t)block[5]<<8)|((uint32_t)block[6]<<16)|((uint32_t)block[7]<<24);
-        t[2]=(uint32_t)block[8]|((uint32_t)block[9]<<8)|((uint32_t)block[10]<<16)|((uint32_t)block[11]<<24);
-        t[3]=(uint32_t)block[12]|((uint32_t)block[13]<<8)|((uint32_t)block[14]<<16)|((uint32_t)block[15]<<24);
-        t[4]=1u<<(m*8);   // 追加 1
-        h[0]+=t[0]; h[1]+=t[1]; h[2]+=t[2]; h[3]+=t[3]; h[4]+=t[4];
-        // h *= r mod p
-        uint64_t d0=(uint64_t)h[0]*r[0]+(uint64_t)h[1]*r[4]+(uint64_t)h[2]*r[3]+(uint64_t)h[3]*r[2]+(uint64_t)h[4]*r[1];
-        uint64_t d1=(uint64_t)h[0]*r[1]+(uint64_t)h[1]*r[0]+(uint64_t)h[2]*r[4]+(uint64_t)h[3]*r[3]+(uint64_t)h[4]*r[2];
-        uint64_t d2=(uint64_t)h[0]*r[2]+(uint64_t)h[1]*r[1]+(uint64_t)h[2]*r[0]+(uint64_t)h[3]*r[4]+(uint64_t)h[4]*r[3];
-        uint64_t d3=(uint64_t)h[0]*r[3]+(uint64_t)h[1]*r[2]+(uint64_t)h[2]*r[1]+(uint64_t)h[3]*r[0]+(uint64_t)h[4]*r[4];
-        uint64_t d4=(uint64_t)h[0]*r[4]+(uint64_t)h[1]*r[3]+(uint64_t)h[2]*r[2]+(uint64_t)h[3]*r[1]+(uint64_t)h[4]*r[0];
-        // 26-bit 压缩
-        uint32_t c;
-        c=(uint32_t)(d0>>26); h[0]=(uint32_t)d0&0x3ffffff; d1+=c;
-        c=(uint32_t)(d1>>26); h[1]=(uint32_t)d1&0x3ffffff; d2+=c;
-        c=(uint32_t)(d2>>26); h[2]=(uint32_t)d2&0x3ffffff; d3+=c;
-        c=(uint32_t)(d3>>26); h[3]=(uint32_t)d3&0x3ffffff; d4+=c;
-        c=(uint32_t)(d4>>26); h[4]=(uint32_t)d4&0x3ffffff; h[0]+=c*5;
-        c=h[0]>>26; h[0]&=0x3ffffff; h[1]+=c;
-        i+=m;
+    uint32_t s, i, j, u, x[17], r[17], h[17], c[17], g[17];
+    for (j = 0; j < 17; ++j) r[j] = h[j] = 0;
+    for (j = 0; j < 16; ++j) r[j] = key[j];
+    r[3] &= 15;
+    r[4] &= 252;
+    r[7] &= 15;
+    r[8] &= 252;
+    r[11] &= 15;
+    r[12] &= 252;
+    r[15] &= 15;
+    int n = len;
+    const uint8_t* m = msg;
+    while (n > 0) {
+        for (j = 0; j < 17; ++j) c[j] = 0;
+        for (j = 0; (j < 16) && (j < n); ++j) c[j] = m[j];
+        c[j] = 1;               // append the high 1 bit
+        m += j; n -= j;
+        poly_add1305(h, c);
+        for (i = 0; i < 17; ++i) {
+            x[i] = 0;
+            for (j = 0; j < 17; ++j)
+                x[i] += h[j] * ((j <= i) ? r[i - j] : 320 * r[i + 17 - j]);
+        }
+        for (i = 0; i < 17; ++i) h[i] = x[i];
+        u = 0;
+        for (j = 0; j < 16; ++j) { u += h[j]; h[j] = u & 255; u >>= 8; }
+        u += h[16]; h[16] = u & 3;
+        u = 5 * (u >> 2);
+        for (j = 0; j < 16; ++j) { u += h[j]; h[j] = u & 255; u >>= 8; }
+        u += h[16]; h[16] = u;
     }
-    // 进位
-    uint32_t c=h[1]>>26; h[1]&=0x3ffffff; h[2]+=c;
-    c=h[2]>>26; h[2]&=0x3ffffff; h[3]+=c;
-    c=h[3]>>26; h[3]&=0x3ffffff; h[4]+=c;
-    c=h[4]>>26; h[4]&=0x3ffffff; h[0]+=c*5;
-    c=h[0]>>26; h[0]&=0x3ffffff; h[1]+=c;
-    // h - p
-    uint32_t g[5];
-    g[0]=h[0]+5; c=g[0]>>26; g[0]&=0x3ffffff;
-    g[1]=h[1]+c; c=g[1]>>26; g[1]&=0x3ffffff;
-    g[2]=h[2]+c; c=g[2]>>26; g[2]&=0x3ffffff;
-    g[3]=h[3]+c; c=g[3]>>26; g[3]&=0x3ffffff;
-    g[4]=h[4]+c-(1u<<26);
-    uint32_t mask = (g[4]>>31)-1;   // 0xFFFFFFFF 若 h<p
-    g[0]&=mask; g[1]&=mask; g[2]&=mask; g[3]&=mask; g[4]&=mask;
-    uint32_t nmask=~mask;
-    h[0]=(h[0]&nmask)|g[0]; h[1]=(h[1]&nmask)|g[1]; h[2]=(h[2]&nmask)|g[2];
-    h[3]=(h[3]&nmask)|g[3]; h[4]=(h[4]&nmask)|g[4];
-    // 压缩为 128 位
-    h[1]|=h[0]>>26; h[2]|=h[1]>>26; h[3]|=h[2]>>26; h[4]|=h[3]>>26;
-    uint32_t f0=(h[0]&0x3ffffff)|(h[1]<<26);
-    uint32_t f1=(h[1]>>6)|(h[2]<<20);
-    uint32_t f2=(h[2]>>12)|(h[3]<<14);
-    uint32_t f3=(h[3]>>18)|(h[4]<<8);
-    // 加 n（高 16 字节）
-    uint32_t n0=(uint32_t)key[16]|((uint32_t)key[17]<<8)|((uint32_t)key[18]<<16)|((uint32_t)key[19]<<24);
-    uint32_t n1=(uint32_t)key[20]|((uint32_t)key[21]<<8)|((uint32_t)key[22]<<16)|((uint32_t)key[23]<<24);
-    uint32_t n2=(uint32_t)key[24]|((uint32_t)key[25]<<8)|((uint32_t)key[26]<<16)|((uint32_t)key[27]<<24);
-    uint32_t n3=(uint32_t)key[28]|((uint32_t)key[29]<<8)|((uint32_t)key[30]<<16)|((uint32_t)key[31]<<24);
-    f0+=n0; c=f0<n0; f1+=n1+c; c=f1<(n1+c); f2+=n2+c; c=f2<(n2+c); f3+=n3+c;
-    out[0]=(uint8_t)f0;out[1]=(uint8_t)(f0>>8);out[2]=(uint8_t)(f0>>16);out[3]=(uint8_t)(f0>>24);
-    out[4]=(uint8_t)f1;out[5]=(uint8_t)(f1>>8);out[6]=(uint8_t)(f1>>16);out[7]=(uint8_t)(f1>>24);
-    out[8]=(uint8_t)f2;out[9]=(uint8_t)(f2>>8);out[10]=(uint8_t)(f2>>16);out[11]=(uint8_t)(f2>>24);
-    out[12]=(uint8_t)f3;out[13]=(uint8_t)(f3>>8);out[14]=(uint8_t)(f3>>16);out[15]=(uint8_t)(f3>>24);
+    for (j = 0; j < 17; ++j) g[j] = h[j];
+    poly_add1305(h, poly_minusp);
+    s = (uint32_t)(-(int32_t)(h[16] >> 7));
+    for (j = 0; j < 17; ++j) h[j] ^= s & (g[j] ^ h[j]);
+    for (j = 0; j < 16; ++j) c[j] = key[j + 16];
+    c[16] = 0;
+    poly_add1305(h, c);
+    for (j = 0; j < 16; ++j) out[j] = (uint8_t)h[j];
 }
 
 // =====================================================================

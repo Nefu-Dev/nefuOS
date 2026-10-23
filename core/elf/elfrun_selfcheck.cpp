@@ -80,6 +80,7 @@ extern "C" void nefu_elf_selfcheck(void) {
         sc_puts("[ELFREQ] build_guest FAIL rc="); sc_puthex((uint64_t)(int64_t)be); sc_puts("\r\n"); return;
     }
     SysCtx ctx; memset(&ctx, 0, sizeof(ctx));
+    ctx.x_fd = -1;                       // no X connection for the demo ELF
     ctx.write_fn = sc_write;
     ctx.brk_cur = g.brk; ctx.brk_limit = g.brk_limit;
     ctx.mmap_cur = g.brk; ctx.mmap_limit = g.brk_limit;

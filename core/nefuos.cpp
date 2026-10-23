@@ -20,6 +20,7 @@
 extern "C" void nefu_elf_selfcheck(void);   // VFS-backed Linux-ELF run (runelf path)
 extern "C" void nefu_deb_selftest(void);    // VFS-backed .deb install + run selftest
 extern "C" void nefu_x11_selftest(void);    // embedded X11 server + guest X client
+extern "C" void nefu_net_selftest(void);    // bare HTTP(S): npkg registry + update manifest
 #endif
 
 namespace nefu {
@@ -511,6 +512,13 @@ void nefuos_tick() {
             } else {
                 klogf("net: tcp connect FAIL (no listener on 10.0.2.2:8000)\n");
             }
+#ifdef NEFU_BARE
+            // bare HTTP(S) proof: npkg registry (http) + update manifest (https).
+            // Runs here (a few seconds after boot) because platform_tick_ms is
+            // live in the main loop - at cold init the tick source is not yet
+            // running and timeout loops would spin forever.
+            nefu_net_selftest();
+#endif
         }
     }
     // per-window animation / game update heartbeat

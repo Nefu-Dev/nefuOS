@@ -19,6 +19,7 @@
 #include "../../core/gui/gfx.h"   // full Surface definition
 #include "../../core/apps/apps.h"  // app_launch for --app
 #include "../../core/apps/npkg.h"  // npkg_gui_* registry API (--npkg-test)
+#include "../../core/apps/update.h" // update_run_pipeline (--update-test)
 #include "../../core/apps/bios.h"  // classic BIOS setup utility (F2 boot key)
 #include "../../core/net/tls13.h"
 #include "../../core/lib/deflate.h"
@@ -1306,6 +1307,7 @@ static const char* s_media_path = 0;   // --media: autoplay a real media file (v
 static bool s_savefs = false;          // --savefs: persist the VFS snapshot before exit
 static bool s_bsod_trigger = false;    // --bsod: show the BSOD-style panic screen
 static bool s_npkg_test = false;       // --npkg-test: run the npkg registry download test
+static bool s_update_test = false;     // --update-test: run the https update manifest pipeline
 static int s_shot_delay_ms = 6000;     // --shotdelay: how long the --shot window runs
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
@@ -1440,8 +1442,11 @@ int main(int argc, char** argv) {
         if (strcmp(argv[i], "--bios") == 0) s_enter_bios = true;  // enter BIOS directly (for testing, same as pressing F2 at boot)
         if (strcmp(argv[i], "--bsod") == 0) s_bsod_trigger = true; // show the detailed blue screen (verification)
         if (strcmp(argv[i], "--npkg-test") == 0) s_npkg_test = true; // registry download test, then exit
+        if (strcmp(argv[i], "--update-test") == 0) s_update_test = true; // https manifest pipeline, then exit
         }
     SetUnhandledExceptionFilter(crash_handler);
+    setvbuf(stdout, NULL, _IONBF, 0);   // live output even when redirected
+    setvbuf(stderr, NULL, _IONBF, 0);
     printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
            s_shot_path ? s_shot_path : "-", s_click_x, s_click_y);
     printf("nefuOS host backend (win32) starting...\n");
@@ -1531,6 +1536,19 @@ int main(int argc, char** argv) {
             printf("[NPKG] fetch FAIL (network unavailable)\n");
         }
         return 0;   // headless test: no window loop
+    }
+    if (s_update_test) {
+        // --update-test: drive the real https update manifest pipeline over the
+        // hand-rolled TLS 1.3 stack.  The TLS diagnostic dumps (klogf) go to
+        // stdout on the host, so a full HKDF/key derivation can be verified
+        // without COM1 line truncation.  Headless: exit after the pipeline.
+        printf("[UPDATE] TLS 1.3 manifest pipeline (host)...\n");
+        nefu::UpdateOut uo;
+        uo.print = [](void*, const char* s) { printf("%s", s); };
+        uo.ud = 0;
+        int rc = nefu::update_run_pipeline(uo, "https://nefuos.site.je/update.json", true);
+        printf("[UPDATE] pipeline rc=%d\n", rc);
+        return 0;
     }
     if (s_enter_bios) {
         // F2 was pressed during the 3s boot window (or --bios was given):
@@ -1640,7 +1658,9 @@ int main(int argc, char** argv) {
             printf("fs saved\n");
         }
         save_bmp(s_shot_path);
-        return 0;
+        // keep the process alive after the shot window so JS-heavy pages
+        // (bloxd main bundle) can keep decoding/rendering in the worker;
+        // fall through into the normal message loop instead of returning.
         }
     ShowWindow(s_hwnd, SW_SHOW);
     SetTimer(s_hwnd, 1, 10, 0);

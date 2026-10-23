@@ -1,18 +1,18 @@
 # nefuOS boot stub — 32-bit protected-mode, position-independent.
 # Ping-pong loader partner of boot.s: runs first at 0x20000 (window 1), then,
-# after copying itself out of the load window, at 0x680000 for every later
+# after copying itself out of the load window, at 0xB00000 for every later
 # window.  boot.s far-jumps here via `pushw pm_sel; pushl pm_off; data32 lret`
-# (pm_off = 0x20000 initially, updated to 0x680000 by this stub on pass 1).
+# (pm_off = 0x20000 initially, updated to 0xB00000 by this stub on pass 1).
 #
 # Payload layout (built by tools/build_iso.ps1):
-#   +0x00  this stub + inflate code (linked at VMA 0x680000, so inflate's
+#   +0x00  this stub + inflate code (linked at VMA 0xB00000, so inflate's
 #          absolute references to its const tables are correct once window 1
-#          has been copied to 0x680000; the stub's own references are all
-#          base-relative, so it works from 0x20000 or 0x680000 alike)
+#          has been copied to 0xB00000; the stub's own references are all
+#          base-relative, so it works from 0x20000 or 0xB00000 alike)
 #   +0x80  kernel_src_off (u32)  <- offset of compressed kernel in payload
 #   +0x84  kernel_src_len (u32)  <- compressed kernel size (bytes)
 #   +0x88  kernel_dst_cap (u32)  <- decompressed capacity (bytes)
-#   +0x8C  copy_dst (u32)        <- next staging destination (init 0x680000)
+#   +0x8C  copy_dst (u32)        <- next staging destination (init 0xB00000)
 #   +0x90  inflate code, then the compressed kernel (raw DEFLATE, wbits=-15)
 #
 # Each pass: copy the 512KB window 0x20000..0xA0000 to copy_dst (staging slots
@@ -39,13 +39,13 @@
 .equ WIN_SZ,        0x80000      # 512KB load window
 .equ WIN_BASE,      0x20000
 # Staging sits ABOVE the kernel image: the inflate destination is
-# 0x100000..0x100000+kSize (kSize ~5.5MB, ends ~0x63E200), so a staging base
+# 0x100000..0x100000+kSize (kSize ~9.3MB, ends ~0xA52000), so a staging base
 # below that would let the decompressor overwrite the not-yet-consumed
-# compressed source (observed as inflate error -24).  0x680000 clears the
-# kernel end (enforced by the build's memmap check); 7 windows of 512KB end at
-# 0x9C0000, below the 0xA00000 stacks (stub + entry).
-.equ STAGE_BASE,    0x680000
-.equ STAGE_STACK,   0xA00000
+# compressed source (observed as inflate error -24).  0xB00000 clears the
+# kernel end (enforced by the build's memmap check); windows of 512KB end well
+# below the 0x2000000 stacks (stub + entry).
+.equ STAGE_BASE,    0xB00000
+.equ STAGE_STACK,   0x2000000
 
 .code32
 .section .text

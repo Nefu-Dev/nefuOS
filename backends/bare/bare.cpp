@@ -6,6 +6,7 @@
 #include "../../core/platform.h"
 #include "../../core/gui/gfx.h"   // full Surface definition
 #include "../../core/audio/audio_engine.h"   // integer audio engine (PCI sound cards)
+#include "../../core/net/httpbare.h"   // bare-metal HTTP(S) client for npkg/update
 
 namespace nefu {
 
@@ -39,13 +40,13 @@ static void uart_putc(char c) {
 }
 
 // ===================== =====================
-// Arena starts at 0xA20000: above the kernel image (linked at 0x100000,
-// ends < 0x680000, enforced at build time) and above the entry/stub stacks
-// (0xA00000) and the stub staging region (0x680000..~0x9C0000).
+// Arena starts at 0x2020000: above the kernel image (linked at 0x100000,
+// ends < 0xB00000, enforced at build time) and above the entry/stub stacks
+// (0x2000000) and the stub staging region (0xB00000..~0x13D0000).
 // Kernel arena: 512 MB budget (kernel + NVFS + network). Browser arena:
 // a separate 2 GB region (BROWSER_ARENA_BASE..+2GB) so the browser can grow
 // up to its own 2 GB budget without starving the kernel.
-#define ARENA_BASE 0xA20000u
+#define ARENA_BASE 0x2020000u
 #define ARENA_SIZE (512u * 1024u * 1024u)      // kernel + NVFS + network
 #define BROWSER_ARENA_BASE 0x40000000u
 #define BROWSER_ARENA_SIZE (2048u * 1024u * 1024u)  // browser, 2 GB
@@ -712,23 +713,18 @@ bool platform_http_stream(const char* url, void* ctx,
 }
 
 bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
-    (void)url;
-    if (out) *out = 0;
-    if (out_size) *out_size = 0;
-    return false;   // bare uses the in-house TCP stack (IP literals only)
+    // bare: in-house TCP stack + native TLS 1.3 via core/net/httpbare
+    return nefu::net::httpbare_request("GET", url, 0, 0, 0, 0, out, out_size);
 }
 
-// Generic HTTP request (bare): not implemented - the in-house TCP stack is
-// IP-literal only, so npkg/update report failure instead of hanging.
+// Generic HTTP request (bare): in-house TCP stack + native TLS 1.3. Supports
+// the extra headers the npkg slowAES challenge needs (Cookie: __test=...).
 bool platform_http_request(const char* method, const char* url,
                            const char* headers,
                            const uint8_t* body, uint32_t body_len,
                            int* out_status, uint8_t** out_body, uint32_t* out_body_len) {
-    (void)method; (void)url; (void)headers; (void)body; (void)body_len;
-    if (out_status) *out_status = 0;
-    if (out_body) *out_body = 0;
-    if (out_body_len) *out_body_len = 0;
-    return false;
+    return nefu::net::httpbare_request(method, url, headers, body, body_len,
+                                       out_status, out_body, out_body_len);
 }
 
 // Streaming HTTP request (bare): not implemented (see platform_http_request).

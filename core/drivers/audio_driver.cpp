@@ -34,15 +34,27 @@ static int       s_volume       = 70;
 
 #define AC97_BLOCK_BYTES (AUDIO_OUTPUT_BLOCK_FRAMES * 4u)   // 8 KB
 
-static volatile uint32_t* s_ac97      = 0;   // NABMBAR
+static uint16_t   s_ac97         = 0;    // NABMBAR (IO port base)
 static uint8_t* s_ac97_bdl            = 0;   // 128-byte aligned BDL
 static uint8_t* s_ac97_buf            = 0;   // 8 KB DMA buffer
 static bool     s_ac97_bdl_written    = false;
 static bool     s_ac97_playing        = false;
 static uint32_t s_ac97_block_bytes    = 0;
 
-static inline uint32_t mmio_rd32(uint32_t reg) { return s_ac97[reg / 4u]; }
-static inline void mmio_wr32(uint32_t reg, uint32_t v) { s_ac97[reg / 4u] = v; }
+// NABMBAR is an I/O-mapped register window (QEMU AC97 exposes it as an IO BAR
+// at 0xC000).  Register width follows the AC'97 spec: 16-bit mixer/BM regs and
+// the 32-bit BDL base.
+static inline uint16_t ac97_rd16(uint32_t reg) {
+    uint16_t v;
+    __asm__ volatile("inw %1, %0" : "=a"(v) : "Nd"((uint16_t)(s_ac97 + reg)));
+    return v;
+}
+static inline void ac97_wr16(uint32_t reg, uint16_t v) {
+    __asm__ volatile("outw %0, %1" : : "a"(v), "Nd"((uint16_t)(s_ac97 + reg)));
+}
+static inline void ac97_wr32(uint32_t reg, uint32_t v) {
+    __asm__ volatile("outl %0, %1" : : "a"(v), "Nd"((uint16_t)(s_ac97 + reg)));
+}
 
 static bool ac97_probe_and_init(void) {
     // QEMU -soundhw ac97 exposes 8086:2415; real boards use the ICH family
@@ -67,18 +79,19 @@ static bool ac97_probe_and_init(void) {
     bool is_io = false;
     uint64_t bar = pci_bar_address(dev, 0, &is_io);
     klogf("audio: ac97 bar0=0x%08X io=%d\n", (unsigned)bar, is_io ? 1 : 0);
-    if (!bar || is_io) return false;
+    if (!bar) return false;   // NABMBAR may be IO- or MMIO-mapped; QEMU uses IO
     pci_enable_busmaster(dev);
-    s_ac97 = (volatile uint32_t*)(uintptr_t)bar;
+    s_ac97 = (uint16_t)bar;
 
     // cold reset: pulse GLOB_CNT bit0, wait for GLOB_STA bit0 (codec ready)
-    mmio_wr32(AC97_GLOB_CNT, 0x0001u);
+    ac97_wr16(AC97_GLOB_CNT, 0x0001u);
     for (uint32_t i = 0; i < 200000u; i++) pci_io_wait();
-    mmio_wr32(AC97_GLOB_CNT, 0x0000u);
+    ac97_wr16(AC97_GLOB_CNT, 0x0000u);
     for (uint32_t i = 0; i < 200000u; i++) pci_io_wait();
-    uint32_t gsta = mmio_rd32(AC97_GLOB_STA);
+    uint32_t gsta = ac97_rd16(AC97_GLOB_STA);
     klogf("audio: ac97 glob_sta=0x%04X\n", gsta);
-    if (!(gsta & 0x0001u)) { s_ac97 = 0; return false; }   // no codec attached
+    // QEMU's AC97 reports glob_sta=0xBB80 with the codec always present;
+    // the codec-ready bit is not guaranteed to be bit0, so do not reject.
 
     // allocate BDL (128-byte aligned) + DMA buffer
     s_ac97_bdl = (uint8_t*)kalloc(128u + 16u);
@@ -95,12 +108,12 @@ static bool ac97_probe_and_init(void) {
     s_ac97_buf = (uint8_t*)buf;
 
     // master volume to maximum (0), unmuted
-    mmio_wr32(AC97_PCM_VOL, 0x0000u);
+    ac97_wr16(AC97_PCM_VOL, 0x0000u);
     // sample rate 44100 (stereo 16-bit)
-    mmio_wr32(AC97_PCM_RATE, 44100u);
+    ac97_wr16(AC97_PCM_RATE, 44100u);
 
     // stop the engine first (clean state)
-    mmio_wr32(AC97_BM_CTRL, 0x0000u);
+    ac97_wr16(AC97_BM_CTRL, 0x0000u);
     s_ac97_playing = false;
     klogf("audio: AC'97 controller ready (NABMBAR 0x%08X)\n", (unsigned)bar);
     return true;
@@ -108,9 +121,9 @@ static bool ac97_probe_and_init(void) {
 
 static void ac97_set_volume(int pct) {
     if (!s_ac97) return;
-    uint32_t v = 31u - (uint32_t)(pct * 31u / 100u);
+    uint16_t v = 31u - (uint16_t)(pct * 31u / 100u);
     if (v > 31u) v = 31u;
-    mmio_wr32(AC97_PCM_VOL, (v << 8) | v);
+    ac97_wr16(AC97_PCM_VOL, (uint16_t)((v << 8) | v));
 }
 
 static bool ac97_submit(const int16_t* pcm, uint32_t frames) {
@@ -123,13 +136,13 @@ static bool ac97_submit(const int16_t* pcm, uint32_t frames) {
     bd[0] = (uint32_t)(uintptr_t)s_ac97_buf;
     bd[1] = (uint32_t)((bytes - 1) & 0x3FFFu);
     if (!s_ac97_bdl_written) {
-        mmio_wr32(AC97_BDL_BASE, (uint32_t)(uintptr_t)s_ac97_bdl);
+        ac97_wr32(AC97_BDL_BASE, (uint32_t)(uintptr_t)s_ac97_bdl);
         s_ac97_bdl_written = true;
     }
-    mmio_wr32(AC97_LVI, 0);
+    ac97_wr16(AC97_LVI, 0);
     // restart: stop then run
-    mmio_wr32(AC97_BM_CTRL, 0x0000u);
-    mmio_wr32(AC97_BM_CTRL, 0x0002u);
+    ac97_wr16(AC97_BM_CTRL, 0x0000u);
+    ac97_wr16(AC97_BM_CTRL, 0x0002u);
     s_ac97_playing = true;
     s_ac97_block_bytes = bytes;
     return true;
@@ -137,7 +150,7 @@ static bool ac97_submit(const int16_t* pcm, uint32_t frames) {
 
 static uint32_t ac97_pump(void) {
     if (!s_ac97 || !s_ac97_playing) return 0;
-    uint32_t st = mmio_rd32(AC97_BM_STATUS);
+    uint32_t st = ac97_rd16(AC97_BM_STATUS);
     if (st & 0x0001u) {                       // ring empty -> block finished
         s_ac97_playing = false;
         uint32_t fr = s_ac97_block_bytes / 4u;
@@ -149,7 +162,7 @@ static uint32_t ac97_pump(void) {
 
 static void ac97_stop(void) {
     if (!s_ac97) return;
-    mmio_wr32(AC97_BM_CTRL, 0x0000u);
+    ac97_wr16(AC97_BM_CTRL, 0x0000u);
     s_ac97_playing = false;
 }
 
@@ -165,19 +178,24 @@ static void ac97_stop(void) {
 #define HDA_RIRBLBASE 0x50u
 #define HDA_RIRBUBASE 0x54u
 #define HDA_RIRBWP   0x58u
+#define HDA_RINTCNT  0x5Au
 #define HDA_RIRBCTL  0x5Cu
+#define HDA_RIRBSTS  0x5Du
 #define HDA_RIRBSIZE 0x5Eu
-// SD0 stream descriptor (base 0x80)
-#define HDA_SD0CTL   0x80u
-#define HDA_SD0STS   0x84u
-#define HDA_SD0LPIB  0x88u
-#define HDA_SD0CBL   0x8Cu
-#define HDA_SD0LVI   0x90u
-#define HDA_SD0FMT   0x96u
-#define HDA_SD0BDLPL 0x98u
-#define HDA_SD0BDLPU 0x9Cu
+// SDO0 output stream descriptor (base 0x100; SDI0=0x80 is a capture stream)
+#define HDA_SD0CTL   0x100u
+#define HDA_SD0STS   0x103u
+#define HDA_SD0LPIB  0x104u
+#define HDA_SD0CBL   0x108u
+#define HDA_SD0LVI   0x10Cu
+#define HDA_SD0FMT   0x112u
+#define HDA_SD0BDLPL 0x118u
+#define HDA_SD0BDLPU 0x11Cu
+// SD0CTL bits: stream tag 1 at bit 20, DMA start at bit 1
+#define HDA_SD0_TAG1      0x00100000u
+#define HDA_SD0_DMA_START 0x00000002u
 
-#define HDA_RING_ENTRIES 64u        // 2 KB CORB/RIRB
+#define HDA_RING_ENTRIES 256u       // CORBSIZE/RIRBSIZE = 2 selects 256 entries
 #define HDA_BDL_ALIGN    128u
 
 // verbs
@@ -195,8 +213,14 @@ static uint8_t*  s_hda_buf            = 0;   // 8 KB DMA buffer
 static bool      s_hda_playing        = false;
 static uint32_t  s_hda_block_bytes    = 0;
 
-static inline uint32_t hda_rd(uint32_t reg) { return s_hda[reg / 4u]; }
-static inline void hda_wr(uint32_t reg, uint32_t v) { s_hda[reg / 4u] = v; }
+// HDA registers mix 16-bit and 32-bit widths; access them by exact width so
+// adjacent registers (e.g. CORBWP/CORBRP, SD0FMT/SD0BDLPL) are never clobbered.
+static inline uint32_t hda_rd32(uint32_t reg) { return *(volatile uint32_t*)((uint8_t*)s_hda + reg); }
+static inline void hda_wr32(uint32_t reg, uint32_t v) { *(volatile uint32_t*)((uint8_t*)s_hda + reg) = v; }
+static inline uint16_t hda_rd16(uint32_t reg) { return *(volatile uint16_t*)((uint8_t*)s_hda + reg); }
+static inline void hda_wr16(uint32_t reg, uint16_t v) { *(volatile uint16_t*)((uint8_t*)s_hda + reg) = v; }
+static inline uint8_t hda_rd8(uint32_t reg) { return *(volatile uint8_t*)((uint8_t*)s_hda + reg); }
+static inline void hda_wr8(uint32_t reg, uint8_t v) { *(volatile uint8_t*)((uint8_t*)s_hda + reg) = v; }
 
 // send one verb to codec 0 and wait for the RIRB response
 static uint32_t hda_verb(uint32_t nid, uint32_t verb, uint32_t payload);
@@ -227,16 +251,18 @@ static bool hda_probe_and_init(void) {
     pci_enable_busmaster(dev);
     s_hda = (volatile uint32_t*)(uintptr_t)bar;
 
-    // global reset: CRST 1 -> wait -> CRST 0 -> wait
-    hda_wr(HDA_GCTL, 0x00000001u);
+    // global reset: CRST 0 -> wait -> CRST 1 -> controller leaves reset.
+    // (HDA GCTL.CRST: 0 = in reset, 1 = running; CORB/RIRB DMA only works
+    // after CRST=1 has been accepted.)
+    hda_wr32(HDA_GCTL, 0x00000000u);
     for (uint32_t i = 0; i < 200000u; i++) pci_io_wait();
-    hda_wr(HDA_GCTL, 0x00000000u);
+    hda_wr32(HDA_GCTL, 0x00000001u);
     for (uint32_t i = 0; i < 200000u; i++) pci_io_wait();
-    if (hda_rd(HDA_GCTL) & 1u) { s_hda = 0; return false; }
+    if (!(hda_rd32(HDA_GCTL) & 1u)) { s_hda = 0; return false; }   // still in reset
 
     // clear STATESTS (a codec must have responded after reset)
-    uint32_t sts = hda_rd(HDA_STATESTS);
-    hda_wr(HDA_STATESTS, sts);
+    uint32_t sts = hda_rd16(HDA_STATESTS);
+    hda_wr16(HDA_STATESTS, sts);
     klogf("audio: hda statests=0x%04X\n", sts);
     if (!(sts & 0x0001u)) { s_hda = 0; return false; }   // no codec on SDI0
 
@@ -251,50 +277,61 @@ static bool hda_probe_and_init(void) {
     memset(s_hda_rirb, 0, HDA_RING_ENTRIES * 8u);
 
     // CORB setup (size=2 -> 2 KB)
-    hda_wr(HDA_CORBSIZE, 0x00000002u);
-    hda_wr(HDA_CORBLBASE, (uint32_t)(corb & 0xFFFFFFFFu));
-    hda_wr(HDA_CORBUBASE, 0);
-    hda_wr(HDA_CORBRP, 0);
-    hda_wr(HDA_CORBCTL, 0x00000001u);   // DMA enable
+    hda_wr16(HDA_CORBSIZE, 0x00000002u);
+    hda_wr32(HDA_CORBLBASE, (uint32_t)(corb & 0xFFFFFFFFu));
+    hda_wr32(HDA_CORBUBASE, 0);
+    hda_wr16(HDA_CORBRP, 0);
+    hda_wr16(HDA_CORBCTL, 0x00000002u);   // CORB run (bit 1)
     s_hda_corbwp = 0;
-    hda_wr(HDA_CORBWP, 0);
+    hda_wr16(HDA_CORBWP, 0);
     // RIRB setup
-    hda_wr(HDA_RIRBSIZE, 0x00000002u);
-    hda_wr(HDA_RIRBLBASE, (uint32_t)(rirb & 0xFFFFFFFFu));
-    hda_wr(HDA_RIRBUBASE, 0);
-    hda_wr(HDA_RIRBWP, 0);
-    hda_wr(HDA_RIRBCTL, 0x00000000u);   // response IRQ off (polled)
+    hda_wr16(HDA_RIRBSIZE, 0x00000002u);
+    hda_wr32(HDA_RIRBLBASE, (uint32_t)(rirb & 0xFFFFFFFFu));
+    hda_wr32(HDA_RIRBUBASE, 0);
+    hda_wr16(HDA_RIRBWP, 0);
+    hda_wr16(HDA_RIRBCTL, 0x00000002u);   // RIRB DMA enable (bit 1), IRQ off
+    // RIRB interrupt count (RINTCNT, 0x5A): QEMU's intel-hda stalls the CORB
+    // engine while rirb_count == rirb_cnt (default 0).  A large count (255)
+    // keeps the engine running without needing the RIRB interrupt path.
+    hda_wr16(HDA_RINTCNT, 0x00FFu);
 
     // ---- codec enumeration (codec 0) ----
     // NID 0 subnode count -> audio function group
     uint32_t snc = hda_verb(0x00, HDA_GET_PARAM, 0x04u);
     uint32_t afg = snc & 0xFFu;                 // first subnode = AFG
-    if (afg == 0) { hda_wr(HDA_CORBCTL, 0); s_hda = 0; return false; }
-    // AFG subnode count -> widgets
+    klogf("audio: hda afg_snc=0x%04X\n", snc);
+    if (afg == 0) { hda_wr16(HDA_CORBCTL, 0); s_hda = 0; return false; }
+    // AFG subnode count -> widgets (AC_PAR_NODE_COUNT: start NID in bits 0-7,
+    // node count in bits 16-23)
     uint32_t afg_snc = hda_verb(afg, HDA_GET_PARAM, 0x04u);
     uint32_t wstart = afg_snc & 0xFFu;
-    uint32_t wcount = (afg_snc >> 8) & 0xFFu;
-    if (wcount == 0 || wcount > 32) { hda_wr(HDA_CORBCTL, 0); s_hda = 0; return false; }
+    uint32_t wcount = (afg_snc >> 16) & 0xFFu;
+    klogf("audio: hda widgets start=0x%X count=%u\n", wstart, wcount);
+    if (wcount == 0 || wcount > 32) { hda_wr16(HDA_CORBCTL, 0); s_hda = 0; return false; }
 
     // find the first audio-output (DAC) widget and the first pin widget
     uint32_t dac = 0, pin = 0;
     for (uint32_t w = 0; w < wcount; w++) {
         uint32_t nid = wstart + w;
-        uint32_t caps = hda_verb(nid, HDA_GET_PARAM, 0x05u);   // audio widget caps
+        uint32_t caps = hda_verb(nid, HDA_GET_PARAM, 0x09u);   // AC_PAR_AUDIO_WIDGET_CAP
         uint32_t type = (caps >> 20) & 0x0Fu;
         if (type == 0x0 && dac == 0) dac = nid;     // output (DAC)
         else if (type == 0x4 && pin == 0) pin = nid; // pin complex
     }
-    if (dac == 0) { hda_wr(HDA_CORBCTL, 0); s_hda = 0; return false; }
+    klogf("audio: hda dac=0x%X pin=0x%X\n", dac, pin);
+    if (dac == 0) { hda_wr16(HDA_CORBCTL, 0); s_hda = 0; return false; }
 
     // configure the pin to output + route the DAC
     if (pin) {
         hda_verb(pin, HDA_SET_PIN_WCTRL, 0x0040u);   // PIN_OUT
         hda_verb(pin, 0x701u, 0);                    // SET_CONNECTION_SELECT -> first input
     }
-    // DAC: unmute output amp, set stream format 44100/16/stereo = 0x0611
+    // DAC: unmute output amp, set stream format 44100/16/stereo = 0x4111
     hda_verb(dac, HDA_SET_AMP, 0x0000u);             // gain 0, unmuted
-    hda_verb(dac, HDA_SET_STREAM_FMT, 0x0611u);
+    hda_verb(dac, HDA_SET_STREAM_FMT, 0x4111u);
+    // route stream tag 1 to the DAC: the codec only pulls data from SD0 once
+    // its channel-stream-id matches the stream tag set in SD0CTL
+    hda_verb(dac, 0x706u, (1u << 4));                // SET_CHANNEL_STREAMID: tag 1, chan 0
 
     // BDL + DMA buffer
     s_hda_bdl = (uint8_t*)kalloc(HDA_BDL_ALIGN + 16u);
@@ -303,15 +340,20 @@ static bool hda_probe_and_init(void) {
     uintptr_t buf = ((uintptr_t)s_hda_buf + 63u) & ~(uintptr_t)63u;
     s_hda_bdl = (uint8_t*)bdl;
     s_hda_buf = (uint8_t*)buf;
-    // BDL[0]: low dword = address, high dword = (len-1) | high address
+    // BDL entry (16 bytes): dword0-1 = 64-bit address, dword2 = len-1,
+    // dword3 = IOC (bit 0) - matches QEMU's intel_hda_parse_bdl layout
     uint32_t* hb = (uint32_t*)bdl;
     hb[0] = (uint32_t)buf;
-    hb[1] = (uint32_t)((AC97_BLOCK_BYTES - 1) & 0xFFFFu) | ((uint32_t)((buf >> 32) & 0xFFFFu) << 16);
+    hb[1] = (uint32_t)(buf >> 32);
+    hb[2] = (uint32_t)(AC97_BLOCK_BYTES - 1);
+    hb[3] = 0x00000001u;                       // IOC on completion
 
-    hda_wr(HDA_SD0LVI, 0);
-    hda_wr(HDA_SD0FMT, 0x0611u);
-    hda_wr(HDA_SD0BDLPL, (uint32_t)(bdl & 0xFFFFFFFFu));
-    hda_wr(HDA_SD0BDLPU, (uint32_t)(bdl >> 32));
+    hda_wr16(HDA_SD0LVI, 0);
+    hda_wr16(HDA_SD0FMT, 0x4111u);                // 44100/16/2ch
+    hda_wr32(HDA_SD0BDLPL, (uint32_t)(bdl & 0xFFFFFFFFu));
+    hda_wr32(HDA_SD0BDLPU, (uint32_t)(bdl >> 32));
+    hda_wr32(HDA_SD0CBL, AC97_BLOCK_BYTES);       // ring buffer size (QEMU needs it)
+    hda_wr32(HDA_SD0CTL, HDA_SD0_TAG1);          // tag 1, DMA off
     s_hda_playing = false;
     klogf("audio: Intel HD Audio ready (dac 0x%X pin 0x%X)\n", dac, pin);
     return true;
@@ -324,23 +366,38 @@ static uint32_t hda_verb(uint32_t nid, uint32_t verb, uint32_t payload) {
     // wait for CORB room: device consumes when CORBRP follows CORBWP
     uint32_t wait = 0;
     for (;;) {
-        uint32_t rp = hda_rd(HDA_CORBRP) & 0xFFu;
+        uint32_t rp = hda_rd16(HDA_CORBRP) & 0xFFu;
         if (rp == (uint32_t)(s_hda_corbwp & 0xFFu)) break;
-        if (++wait > 2000000u) return 0;
+        if (++wait > 2000000u) {
+            klogf("audio: hda verb CORB full (rp=%u wp=%u)\n", rp, s_hda_corbwp);
+            return 0;
+        }
     }
-    s_hda_corb[s_hda_corbwp % HDA_RING_ENTRIES] = cmd;
+    // QEMU's CORB engine reads entry (corbrp+1); the first verb must therefore
+    // be written at the NEW write-pointer value (corb[1] first, not corb[0]).
     s_hda_corbwp = (uint16_t)((s_hda_corbwp + 1) & 0xFFu);
-    hda_wr(HDA_CORBWP, s_hda_corbwp);
-    // wait for the response in RIRB
-    uint32_t base = hda_rd(HDA_RIRBWP) & 0x7Fu;
+    s_hda_corb[s_hda_corbwp % HDA_RING_ENTRIES] = cmd;
+    // read the RIRB write pointer BEFORE kicking CORB: QEMU services the CORB
+    // verb synchronously on the CORBWP write, so the response may already be
+    // in the ring when we return from the write.
+    uint32_t base = hda_rd16(HDA_RIRBWP) & 0xFFu;
+    hda_wr16(HDA_CORBWP, s_hda_corbwp);
+    // wait for the response in RIRB (256-entry ring)
     wait = 0;
     uint32_t wp = base;
     for (;;) {
-        wp = hda_rd(HDA_RIRBWP) & 0x7Fu;
+        wp = hda_rd16(HDA_RIRBWP) & 0xFFu;
         if (wp != base) break;
-        if (++wait > 4000000u) return 0;
+        if (++wait > 4000000u) {
+            klogf("audio: hda verb RIRB timeout (nid=%u verb=0x%X gctl=0x%08X rirbctl=0x%04X rirbwp=%u corbrp=%u corbwp=%u)\n",
+                  nid, verb, hda_rd32(HDA_GCTL), hda_rd16(HDA_RIRBCTL), wp,
+                  hda_rd16(HDA_CORBRP) & 0xFFu, s_hda_corbwp);
+            return 0;
+        }
     }
-    uint32_t idx = (wp - 1u) % HDA_RING_ENTRIES;
+    // RIRBWP points at the slot just written by the controller (QEMU writes
+    // entry [wp] after incrementing), so the response lives at index wp.
+    uint32_t idx = wp % HDA_RING_ENTRIES;
     return s_hda_rirb[idx * 2u];                 // response dword of the entry
 }
 
@@ -357,7 +414,7 @@ static void hda_set_volume(int pct) {
     if (wcount > 32) wcount = 32;
     for (uint32_t w = 0; w < wcount; w++) {
         uint32_t nid = wstart + w;
-        uint32_t caps = hda_verb(nid, HDA_GET_PARAM, 0x05u);
+        uint32_t caps = hda_verb(nid, HDA_GET_PARAM, 0x09u);
         if (((caps >> 20) & 0x0Fu) == 0x0) {
             uint32_t gain = 127u - (uint32_t)(pct * 127u / 100u);
             if (gain > 127u) gain = 127u;
@@ -374,11 +431,14 @@ static bool hda_submit(const int16_t* pcm, uint32_t frames) {
     memcpy(s_hda_buf, pcm, bytes);
     uint32_t* hb = (uint32_t*)s_hda_bdl;
     hb[0] = (uint32_t)(uintptr_t)s_hda_buf;
-    hb[1] = (uint32_t)((bytes - 1) & 0xFFFFu) | ((uint32_t)((uintptr_t)s_hda_buf >> 32) << 16);
-    // restart the stream: clear RUN, then set RUN + tag 1
-    hda_wr(HDA_SD0CTL, 0x00000001u);            // tag 1, RUN off
-    hda_wr(HDA_SD0LVI, 0);
-    hda_wr(HDA_SD0CTL, 0x00000011u);            // RUN + tag 1
+    hb[1] = (uint32_t)((uintptr_t)s_hda_buf >> 32);
+    hb[2] = (uint32_t)(bytes - 1);
+    hb[3] = 0x00000001u;                       // IOC on completion
+    // restart the stream: DMA off, ring size, then DMA start + tag 1
+    hda_wr32(HDA_SD0CTL, HDA_SD0_TAG1);               // tag 1, DMA off
+    hda_wr32(HDA_SD0CBL, bytes);                      // ring buffer size
+    hda_wr16(HDA_SD0LVI, 0);
+    hda_wr32(HDA_SD0CTL, HDA_SD0_TAG1 | HDA_SD0_DMA_START); // tag 1 + DMA start
     s_hda_playing = true;
     s_hda_block_bytes = bytes;
     return true;
@@ -386,10 +446,10 @@ static bool hda_submit(const int16_t* pcm, uint32_t frames) {
 
 static uint32_t hda_pump(void) {
     if (!s_hda || !s_hda_playing) return 0;
-    uint32_t sts = hda_rd(HDA_SD0STS);
-    if (sts & 0x10u) {                            // BCIS: buffer complete
-        hda_wr(HDA_SD0STS, 0x10u);                // clear
-        hda_wr(HDA_SD0CTL, 0x00000001u);          // RUN off
+    uint32_t sts = hda_rd8(HDA_SD0STS);
+    if (sts & 0x04u) {                            // SD_INT_COMPLETE
+        hda_wr8(HDA_SD0STS, 0x04u);               // clear
+        hda_wr32(HDA_SD0CTL, HDA_SD0_TAG1);       // tag 1, DMA off
         s_hda_playing = false;
         uint32_t fr = s_hda_block_bytes / 4u;
         s_played_frames += fr;
@@ -400,7 +460,7 @@ static uint32_t hda_pump(void) {
 
 static void hda_stop(void) {
     if (!s_hda) return;
-    hda_wr(HDA_SD0CTL, 0x00000001u);              // RUN off
+    hda_wr32(HDA_SD0CTL, HDA_SD0_TAG1);          // tag 1, DMA off
     s_hda_playing = false;
 }
 
@@ -442,7 +502,7 @@ bool audio_output_start(uint32_t rate, uint8_t channels) {
     s_channels = channels ? channels : 2u;
     s_played_frames = 0;
     // AC'97: program the sample rate register
-    if (s_backend == AUDIO_AC97) mmio_wr32(AC97_PCM_RATE, s_rate);
+    if (s_backend == AUDIO_AC97) ac97_wr16(AC97_PCM_RATE, (uint16_t)s_rate);
     return true;
 }
 

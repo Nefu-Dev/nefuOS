@@ -583,7 +583,10 @@ static int js_interrupt_cb(JSRuntime* rt, void* opaque) {
 #ifndef NEFU_BARE
     static uint32_t last_t = 0;
     uint32_t now = platform_tick_ms();
-    if (now - last_t > 1000) {
+    if (now - last_t > 10000) {   // memory+log every 10s (was 1s): the per-1s
+                                  // JS_ComputeMemoryUsage + stdout fprintf in
+                                  // this hot callback measurably slowed bloxd's
+                                  // deobfuscation loops
         last_t = now;
         rc->last_c_t = now;   // progress marker for the watchdog
         JSMemoryUsage mu;
@@ -1202,6 +1205,31 @@ static JSValue nfu_nativeSync(JSContext* c, JSValueConst thisv, int argc,
     return JS_UNDEFINED;
 }
 
+// synchronous HTTP GET exposed to the XHR shim: returns the response body
+// (local overrides + chunk cache make bloxd's resource loads fast)
+static JSValue nfu_httpGet(JSContext* c, JSValueConst thisv, int argc,
+                           JSValueConst* argv) {
+    if (argc < 1 || !JS_IsString(argv[0])) return JS_NewString(c, "");
+    size_t L = 0;
+    const char* u = JS_ToCStringLen(c, &L, argv[0]);
+    if (!u) return JS_NewString(c, "");
+    char* url = (char*)malloc(L + 1);
+    if (!url) { JS_FreeCString(c, u); return JS_NewString(c, ""); }
+    memcpy(url, u, L); url[L] = 0;
+    JS_FreeCString(c, u);
+    uint8_t* body = 0; uint32_t blen = 0;
+    bool got = platform_http_get(url, &body, &blen);
+    JSValue r;
+    if (got && body && blen > 0) {
+        r = JS_NewStringLen(c, (const char*)body, blen);
+        kfree(body);
+    } else {
+        r = JS_NewString(c, "");
+    }
+    free(url);
+    return r;
+}
+
 // make a GL object bound to a canvas id (shared by canvas wrapper + DOM node)
 static JSValue make_gl_obj(JSContext* c, const char* cid) {
     JSValue g = JS_NewObjectClass(c, s_gl_cls);
@@ -1292,6 +1320,8 @@ static void ensure_js() {
     JSValue g = JS_GetGlobalObject(s_ctx);
     JS_SetPropertyStr(s_ctx, g, "__nfuSync",
         JS_NewCFunction(s_ctx, nfu_nativeSync, "__nfuSync", 1));
+    JS_SetPropertyStr(s_ctx, g, "__nfuHttpGet",
+        JS_NewCFunction(s_ctx, nfu_httpGet, "__nfuHttpGet", 1));
     JS_SetPropertyStr(s_ctx, g, "__getGL",
         JS_NewCFunction(s_ctx, nfu_getGL, "__getGL", 1));
     JS_SetPropertyStr(s_ctx, g, "print",
@@ -1434,7 +1464,7 @@ static void ensure_js() {
     const char* consrc =
         "if (typeof console === 'undefined' || !console.log) {"
         "  console = { log:function(){ print.apply(null, arguments); }, warn:function(){ print.apply(null, arguments); },"
-        "             error:function(){ print.apply(null, arguments); }, info:function(){ print.apply(null, arguments); },"
+        "             error:function(){ print('[MARK][ERR]', Array.prototype.join.call(arguments, ' ')); }, info:function(){ print.apply(null, arguments); },"
         "             debug:function(){}, trace:function(){},"
         "             assert:function(){}, count:function(){}, table:function(){} };"
         "}";
@@ -1662,7 +1692,18 @@ clearInterval = function(){};
 if (Array && Array.from) { try { var __nfufrom = Array.from; Array.from = function(x, fn, th){ try { return __nfufrom(x, fn, th); } catch(e) { if (x == null) return []; throw e; } }; } catch(e){} }
 if (typeof fetch === 'undefined') fetch = function(){ return new Promise(function(res, rej){ rej(new Error('fetch not supported')); }); };
 if (typeof WebSocket === 'undefined') WebSocket = function(url, p){ this.readyState = 3; this.CONNECTING=0; this.OPEN=1; this.CLOSING=2; this.CLOSED=3; };
-if (typeof XMLHttpRequest === 'undefined') XMLHttpRequest = function(){ this.readyState=0; this.status=0; this.responseText=''; this.open=function(){}; this.send=function(){}; this.setRequestHeader=function(){}; };
+if (typeof XMLHttpRequest === 'undefined') XMLHttpRequest = function(){
+  this.readyState=0; this.status=0; this.responseText=''; this.response='';
+  this.open=function(m,u){ this._method=m; this._url=u; };
+  this.setRequestHeader=function(){};
+  this.send=function(body){
+    var d='';
+    try { if (this._url && typeof __nfuHttpGet === 'function') { d = __nfuHttpGet(this._url) || ''; } } catch(e){ d=''; }
+    this.readyState=4; this.status=200; this.responseText=d; this.response=d; this.responseURL=this._url||'';
+    if (typeof this.onreadystatechange==='function') { try { this.onreadystatechange(); } catch(e){} }
+    if (typeof this.onload==='function') { try { this.onload(); } catch(e){} }
+  };
+};
 if (typeof Image === 'undefined') Image = function(){ this.src=''; this.width=0; this.height=0; };
 if (typeof URL === 'undefined') URL = function(u, b){
   this.href = String(u || ''); this.searchParams = { get:function(){ return null; }, has:function(){ return false; } };
@@ -1741,7 +1782,15 @@ if (typeof window !== 'undefined') {
 
 static volatile int s_js_lock = 0;   // serializes quickjs across threads
 static inline void js_lock(void) {
-    while (__sync_lock_test_and_set(&s_js_lock, 1)) {}
+    uint32_t lk0 = platform_tick_ms();
+    while (__sync_lock_test_and_set(&s_js_lock, 1)) {
+        if (platform_tick_ms() - lk0 > 2000) {
+            fprintf(stderr, "js: LOCK STUCK s_js_lock=%d forcing release\n", s_js_lock); fflush(stderr);
+            __sync_lock_release(&s_js_lock);
+            lk0 = platform_tick_ms();
+        }
+        Sleep(1);   // yield: never busy-spin the whole core
+    }
 }
 static inline void js_unlock(void) {
     __sync_lock_release(&s_js_lock);
@@ -1809,6 +1858,19 @@ static DWORD WINAPI nfu_watchdog(LPVOID p) {
 int mini_js_run(const char* script, char* out, int out_sz,
                     char* html, int html_sz) {
     if (!script || !out || out_sz <= 1) return 1;
+    // debug: dump every script fed to the engine (NF_DUMP_JS=<dir>)
+    {
+        const char* ddir = getenv("NF_DUMP_JS");
+        if (ddir && *ddir) {
+            static int dn = 0;
+            char dp[320];
+            int dn2 = dn++;
+            snprintf(dp, sizeof(dp), "%s\\js_%03d.js", ddir, dn2);
+            FILE* df = fopen(dp, "wb");
+            if (df) { fwrite(script, 1, strlen(script), df); fclose(df); }
+            fprintf(stderr, "jsdump: %s len=%zu\n", dp, strlen(script)); fflush(stderr);
+        }
+    }
     static int veh_once = 0;
     if (!veh_once) {
         veh_once = 1;
@@ -1824,7 +1886,8 @@ int mini_js_run(const char* script, char* out, int out_sz,
     rc.out = out; rc.out_sz = out_sz; rc.oi = 0;
     rc.html = html; rc.html_sz = html_sz; rc.hi = 0;
     if (html && html_sz > 0) html[0] = 0;
-    rc.deadline = platform_tick_ms() + 90000;   // 90s script budget (bloxd bundles)
+    const char* dl_env = getenv("NEFU_JS_DEADLINE");
+    rc.deadline = platform_tick_ms() + (dl_env && *dl_env ? (int)strtol(dl_env, 0, 10) : 700000);   // script budget (bloxd engine init + React mount)
     rc.last_c = 0; rc.last_c_t = 0; rc.watch_done = 0;
 #ifndef NEFU_BARE
     rc.jtid = GetCurrentThreadId();
@@ -1890,6 +1953,77 @@ int mini_js_run(const char* script, char* out, int out_sz,
     fputs("js: S eval-args\n", stderr); fflush(stderr);
     JSValue r = JS_Eval(s_ctx, script, script_len, "<script>",
                         JS_EVAL_TYPE_GLOBAL);
+    // drain promise microtasks: React/Vue schedule work via setTimeout which our
+    // shim maps to Promise.then; without JS_RunJob those callbacks never run and
+    // the rendered DOM never reaches nativeSync.
+    {
+        int drain_guard = 0;
+        int exc_printed = 0;
+        uint32_t drain_start = platform_tick_ms();
+        // drain regardless of eval exception AND regardless of the budget
+        // deadline; bounded by count + wall-clock so a runaway render loop
+        // (React re-scheduling itself forever) cannot freeze the host.
+        // promise microtask drain re-enabled with tight bounds: React 18
+        // schedules its render commits through promise/microtask chains, and
+        // with the drain disabled the menu DOM never materializes (js_html
+        // stays empty). bellard's JS_ExecutePendingJob has no interrupt check,
+        // so bound by count and wall-clock; a runaway job loop cannot freeze
+        // the host beyond the 8s window.
+        {
+            JSContext* job_ctx = NULL;
+            while (JS_IsJobPending(s_rt) && drain_guard < 200000 &&
+                   (platform_tick_ms() - drain_start) < 8000) {
+                int jr = JS_ExecutePendingJob(s_rt, &job_ctx);
+                if (jr < 0 && job_ctx) {
+                    JSValue jx = JS_GetException(job_ctx);
+                    if (!exc_printed) {
+                        const char* jm = JS_ToCString(job_ctx, jx);
+                        fprintf(stderr, "js: job exc: %s\n", jm ? jm : "?");
+                        if (jm) JS_FreeCString(job_ctx, jm);
+                        exc_printed = 1;
+                    }
+                    JS_FreeValue(job_ctx, jx);
+                }
+                drain_guard++;
+            }
+        }
+        fprintf(stderr, "js: drain done n=%d jobs_pending=%d\n", drain_guard,
+                JS_IsJobPending(s_rt) ? 1 : 0);
+        // run queued setTimeout callbacks (bounded, FIFO). bloxd's inline
+        // deobfuscator defers Xj assignment into a setTimeout; the main bundle
+        // (next eval) needs Xj to exist, so flush timers after every eval.
+        {
+            uint32_t ts_start = platform_tick_ms();
+            const char* tsrc =
+                "try { var __nft = 0; while (globalThis.__nfuTimers && globalThis.__nfuTimers.length && __nft < 4000) { var __ff = globalThis.__nfuTimers.shift(); __nft++; try { __ff(); } catch(e) {} } "
+                "'T:' + __nft + '|XJ:' + (typeof Xj) + '|SO:' + (typeof setTimeout) + '|W:' + (typeof window) + '|D:' + (typeof document) + '|GL:' + (typeof WebGLRenderingContext) + '|HCE:' + (typeof HTMLCanvasElement) + '|UA:' + ((navigator&&navigator.userAgent)?navigator.userAgent.substring(0,16):'?') + '|DPR:' + ((window&&window.devicePixelRatio)?window.devicePixelRatio:'?'); } catch(x) { 'TERR:' + String(x && x.message); }";
+            JSValue tv = JS_Eval(s_ctx, tsrc, (size_t)strlen(tsrc), "<timers>", JS_EVAL_TYPE_GLOBAL);
+            if (!JS_IsException(tv)) {
+                const char* tm = JS_ToCString(s_ctx, tv);
+                if (tm) { fprintf(stderr, "js: timers: %s\n", tm); JS_FreeCString(s_ctx, tm); }
+            } else { JSValue te = JS_GetException(s_ctx); JS_FreeValue(s_ctx, te); }
+            JS_FreeValue(s_ctx, tv);
+        }
+        // post-drain DOM dump: did React produce menu markup?
+        const char* dmp = "try { var __bd = document.body.innerHTML; var __rt = (document.getElementById('root')||{}).innerHTML || ''; 'BODYLEN=' + __bd.length + ' ROOTLEN=' + __rt.length + ' HEAD=' + __bd.substring(0, 200); } catch(x) { 'DUMPEXC:' + String(x && x.message); }";
+        JSValue dv = JS_Eval(s_ctx, dmp, (size_t)strlen(dmp), "<dump>", JS_EVAL_TYPE_GLOBAL);
+        if (!JS_IsException(dv)) {
+            const char* dm = JS_ToCString(s_ctx, dv);
+            if (dm) { fprintf(stderr, "js: %s\n", dm); JS_FreeCString(s_ctx, dm); }
+        } else { JSValue de = JS_GetException(s_ctx); JS_FreeValue(s_ctx, de); }
+        JS_FreeValue(s_ctx, dv);
+        // force-commit the latest DOM: engine mutations (e.g. innerHTML writes
+        // that replaced the preload loader with the VAPE menu) may have bypassed
+        // dirty(), so push the live body markup into the C-side rc->html buffer.
+        // Give the flush its own budget: the main eval's 300s deadline has long
+        // expired by now and would otherwise interrupt the serialization itself.
+        uint32_t saved_deadline = rc.deadline;
+        rc.deadline = platform_tick_ms() + 5000;
+        const char* fs2 = "try { __nfuSync(document.body.innerHTML); } catch(x) { 0; }";
+        JSValue fv = JS_Eval(s_ctx, fs2, (size_t)strlen(fs2), "<flush>", JS_EVAL_TYPE_GLOBAL);
+        JS_FreeValue(s_ctx, fv);
+        rc.deadline = saved_deadline;
+    }
     fputs("js: S eval-return\n", stderr); fflush(stderr);
     fprintf(stderr, "js: run done\n");
     rc.watch_done = 1;
