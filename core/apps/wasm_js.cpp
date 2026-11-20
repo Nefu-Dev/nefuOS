@@ -252,7 +252,14 @@ struct InstanceState {
     ModuleState* mod;  // borrowed, kept alive by the JS Module object
     ImportSet imports; // glue callbacks; owns one JS reference per live slot
     struct MemoryState* mem; // owned by the instance's WebAssembly.Memory object
+    InstanceState* next;     // registry link, see g_insts
 };
+
+// Instances live as long as the page, but the page is torn down at navigation
+// (and bloxd reloads itself after a failed wasm load). The glue slots hold real
+// JS function references, so every instance has to be released before the
+// context dies; otherwise QuickJS trips its leak assertion in JS_FreeRuntime.
+static InstanceState* g_insts = NULL;
 
 struct MemoryState {
     InstanceState* inst;  // borrowed
@@ -1020,6 +1027,8 @@ static JSValue instantiate_from_state(JSContext* ctx, ModuleState* ms, JSValueCo
     }
     inst->rt = rt;
     inst->mod = ms;
+    inst->next = g_insts;
+    g_insts = inst;
 
     link_glue(mod, &inst->imports, ctx, imports);
     WLOG("wasm: linked\n");
@@ -1655,9 +1664,44 @@ bool wasm_js_install(JSContext* ctx, JSValue global) {
 }
 
 void wasm_js_shutdown(JSContext* ctx) {
-    (void)ctx;
     // The environment is process-wide and deliberately outlives contexts: the
     // browser keeps it for the next page load instead of re-parsing wasm3.
+    //
+    // Instances cannot outlive the context though. Their glue slots hold JS
+    // function references the glue passed in `imports`, and QuickJS asserts on
+    // any object still alive when JS_FreeRuntime runs - which is exactly what
+    // bloxd triggered by reloading itself after a failed wasm load. Drop the
+    // references here while the context is still usable, then free wasm3.
+    InstanceState* p = g_insts;
+    g_insts = NULL;
+    int n = 0;
+    while (p) {
+        InstanceState* nx = p->next;
+        for (int i = 0; i < kMaxImportSlots; i++) {
+            ImportSlot* s = &p->imports.slots[i];
+            if (s->live) {
+                if (ctx && !JS_IsUndefined(s->fn)) JS_FreeValue(ctx, s->fn);
+                s->fn = JS_UNDEFINED;
+                s->live = false;
+            }
+        }
+        p->mem = NULL;  // owned by the (about to die) JS Memory object
+        if (p->rt) { m3_FreeRuntime(p->rt); p->rt = NULL; }
+        free(p);
+        p = nx;
+        n++;
+    }
+    // Thunk side table entries point at freed instances; drop them as well so
+    // the slots are reusable by the next page.
+    for (int i = 0; i < g_nthunks; i++) {
+        free(g_thunks[i]);
+        g_thunks[i] = NULL;
+    }
+    g_nthunks = 0;
+    if (wasm_trace()) {
+        fprintf(stderr, "wasm: shutdown instances=%d\n", n);
+        fflush(stderr);
+    }
 }
 
 }  // namespace nefu

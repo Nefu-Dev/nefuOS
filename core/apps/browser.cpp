@@ -67,6 +67,14 @@
 #include <cstdio>
 #include <cstdlib>
 
+// Out-of-band upload pool implemented in swgl.cpp. The definition lives in
+// namespace nefu (outside the internal helper block), so the declaration has to
+// sit in that namespace too; a global declaration leaves the symbol undefined.
+namespace nefu {
+int nefu_glbin_take(unsigned id, const uint8_t** out);
+void nefu_glbin_release(unsigned id);
+}
+
 namespace nefu {
 
 // Test-harness hook state: --nfuclick N dispatches a DOM click on the element
@@ -7351,8 +7359,19 @@ static void load_worker(void* arg) {
             // and its WebGL init was killed at 30s, leaving the page stuck
             // on the LogoLoader spinner forever. Fast portals (qq) finish
             // their bundles well inside 30s either way.
-            const uint32_t js_budget_end = platform_tick_ms() + 90000;
-            nefu::mini_js_set_run_deadline(90000);
+            // NF_JS_BUDGET_MS overrides the worker budget. bloxd.io jumped to a
+            // 2.5 MB single-file bundle (teusab) whose bootstrap runs the whole
+            // Babylon engine inside the interpreter; 90 s was not even enough to
+            // finish the top-level pass, so the commit aborted mid-init. The
+            // override exists so a slow target can be measured instead of
+            // guessed at.
+            uint32_t js_budget_ms = 90000;
+            if (const char* b = getenv("NF_JS_BUDGET_MS")) {
+                long v = atol(b);
+                if (v > 1000 && v < 1800000) js_budget_ms = (uint32_t)v;
+            }
+            const uint32_t js_budget_end = platform_tick_ms() + js_budget_ms;
+            nefu::mini_js_set_run_deadline(js_budget_ms);
 
             auto run_src_seg = [&](int si) -> void {
                 if (si < 0 || si >= j->script_src_n) return;
@@ -7634,6 +7653,10 @@ struct NfuGl {
     void (*glGenBuffers)(GLsizei, GLuint*);
     void (*glBindBuffer)(GLenum, GLuint);
     void (*glBufferData)(GLenum, GLsizeiptr, const void*, GLenum);
+    // GLES/WebGL pages stream vertex data with bufferSubData; without this
+    // entry every incremental upload was a no-op and the mesh stayed in the
+    // first (often empty) bufferData allocation.
+    void (*glBufferSubData)(GLenum, GLintptr, GLsizeiptr, const void*);
     void (*glVertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
     void (*glEnableVertexAttribArray)(GLuint);
     void (*glDrawArrays)(GLenum, GLint, GLsizei);
@@ -7715,6 +7738,7 @@ static void gl_load_ext() {
     GLF(glGenBuffers, void (*)(GLsizei, GLuint*));
     GLF(glBindBuffer, void (*)(GLenum, GLuint));
     GLF(glBufferData, void (*)(GLenum, GLsizeiptr, const void*, GLenum));
+    GLF(glBufferSubData, void (*)(GLenum, GLintptr, GLsizeiptr, const void*));
     GLF(glVertexAttribPointer, void (*)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*));
     GLF(glEnableVertexAttribArray, void (*)(GLuint));
     GLF(glDrawArrays, void (*)(GLenum, GLint, GLsizei));
@@ -7830,6 +7854,13 @@ static int parse_ints(const char* s, int* out, int maxn) {
     return n;
 }
 
+// Engine-side canvas ids do not always match the DOM id: bloxd renders the
+// world through a context created while the canvas was still called "noa"
+// (noa-engine names it before wrapping it as "noa-canvas" in the page). Treat
+// a prefix as the same canvas so the surface gets the real size and is blitted
+// into the visible element instead of drawing into an offscreen 300x150 box.
+static int gl_cid_matches(const char* surf, const char* nodeid);
+
 static GlCanvas* gl_find_or_create(const char* cid, const DomNode* nodes, int nn) {
     // The canvas id may carry its backing-store size: getContext sends
     // "id|<w>x<h>" because the JS-side canvas.width/height are DOM properties
@@ -7909,9 +7940,9 @@ static GlCanvas* gl_find_or_create(const char* cid, const DomNode* nodes, int nn
 }
 
 // out-of-band upload pool (defined in swgl.cpp): vertex/shader payloads too
-// large for the text command line travel through these.
-int nefu_glbin_take(unsigned id, const uint8_t** out);
-void nefu_glbin_release(unsigned id);
+// large for the text command line travel through these. Declared at global
+// scope so the definition in swgl.cpp is the one linked, not a namespace-local
+// symbol that would stay undefined.
 
 // Engine-side canvas ids do not always match the DOM id: bloxd renders the
 // world through a context created while the canvas was still called "noa"

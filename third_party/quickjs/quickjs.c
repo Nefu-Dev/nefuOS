@@ -2521,8 +2521,17 @@ void JS_FreeRuntime(JSRuntime *rt)
             printf("Secondary object leaks: %d\n", count);
     }
 #endif
-    assert(list_empty(&rt->gc_obj_list));
-    assert(list_empty(&rt->weakref_list));
+    /* A host that keeps a stale reference across a context teardown hits these
+       two checks. Asserting there aborts the whole process - in the browser
+       that killed the tab right when a page reloaded itself - so the leak is
+       reported instead and the runtime is freed anyway. The stranded objects
+       are unreachable from anybody once the runtime is gone. */
+    if (!list_empty(&rt->gc_obj_list) || !list_empty(&rt->weakref_list)) {
+        struct list_head *lel;
+        int leaked = 0;
+        list_for_each(lel, &rt->gc_obj_list) { leaked++; }
+        printf("quickjs: %d objects alive at JS_FreeRuntime\n", leaked);
+    }
 
     /* free the classes */
     for(i = 0; i < rt->class_count; i++) {

@@ -26,6 +26,12 @@
 
 #include <cstdio>   // fprintf(stderr) - bare libc routes it to the debugcon
 
+// The host build reads NF_GLTRACE from the environment. The bare build has no
+// environment at all, so the include is host-only and the lookup compiles out.
+#ifndef NEFU_BARE
+#include <cstdlib>
+#endif
+
 namespace nefu {
 namespace {
 

@@ -91,3 +91,7 @@ tools/mail_*.txt
 tools/evt_one.py
 tools/clean_dbg.py
 tools/imgtest.html
+
+# Browser run-frame dumps and its one-off runner (never upload)
+/bd*_*.png
+tools/_bd_*.ps1

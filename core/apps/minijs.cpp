@@ -538,6 +538,7 @@ int mini_js_run(const char* script, char* out, int out_sz) {
 
 #include "quickjs/quickjs.h"
 #include "../platform.h"
+#include "../cryptlib/sha256.h"
 #include <string.h>
 #include <stdlib.h>
 #ifdef _WIN32
@@ -2831,10 +2832,48 @@ static JSValue nfu_metricsCookiesValue(JSContext* c, JSValueConst thisv, int arg
 //   NEFU_WASM_FILE=<path>   (default: bloxd_wasm_bg.wasm in cwd)
 static JSValue nfu_localWasm(JSContext* c, JSValueConst thisv, int argc,
                              JSValueConst* argv) {
-    (void)thisv; (void)argc; (void)argv;
-    const char* path = getenv("NEFU_WASM_FILE");
+    (void)thisv;
+    // The build ships several wasm modules, each with its own integrity hash
+    // checked by the page (bloxd_wasm_webgl_bg, bloxd_wasm_workers_bg, and
+    // Draco's decoder). Serving one blob for every .wasm URL makes the page
+    // reject it ("is not the module this build ships"), so the caller passes
+    // the request URL and the module is picked by name.
+    const char* url = (argc > 0 && JS_IsString(argv[0])) ? JS_ToCString(c, argv[0]) : 0;
+    const char* path = 0;
+    if (url) {
+        if (strstr(url, "workers")) path = getenv("NEFU_WASM_WORKERS_FILE");
+        else if (strstr(url, "webgl")) path = getenv("NEFU_WASM_WEBGL_FILE");
+        else if (strstr(url, "draco")) path = getenv("NEFU_WASM_DRACO_FILE");
+    }
+    if (!path || !*path) path = getenv("NEFU_WASM_FILE");
     if (!path || !*path) path = "bloxd_wasm_bg.wasm";
-    return JS_NewString(c, path);
+    JSValue v = JS_NewString(c, path);
+    if (url) JS_FreeCString(c, url);
+    return v;
+}
+
+// Native SHA-256 for crypto.subtle.digest. bloxd hashes every wasm module
+// before instantiating it and the JS implementation cost ~1 s per 200 KB; the
+// new build's 5 MB core module would spend minutes there and blow the loader's
+// own stall timeout. The kernel already has a tested implementation.
+static JSValue nfu_sha256(JSContext* c, JSValueConst thisv, int argc,
+                          JSValueConst* argv) {
+    (void)thisv;
+    if (argc < 1) return JS_ThrowTypeError(c, "sha256: no data");
+    const char* s = 0; size_t sl = 0;
+    uint8_t* buf = 0; size_t n = 0;
+    if (JS_IsString(argv[0])) {
+        s = JS_ToCStringLen(c, &sl, argv[0]);
+        if (!s) return JS_EXCEPTION;
+        buf = (uint8_t*)s; n = sl;
+    } else {
+        buf = JS_GetArrayBuffer(c, &n, argv[0]);
+        if (!buf) return JS_EXCEPTION;   // JS_GetArrayBuffer already threw
+    }
+    unsigned char out[32];
+    nefu::crypt::sha256(buf, (int)n, out);
+    if (s) JS_FreeCString(c, s);
+    return JS_NewArrayBufferCopy(c, out, 32);
 }
 
 static JSValue nfu_readFile(JSContext* c, JSValueConst thisv, int argc,
@@ -4021,6 +4060,8 @@ static void ensure_js() {
         JS_NewCFunction(s_ctx, nfu_localWasm, "__nfuLocalWasm", 0));
     JS_SetPropertyStr(s_ctx, g, "__nfuReadFile",
         JS_NewCFunction(s_ctx, nfu_readFile, "__nfuReadFile", 1));
+    JS_SetPropertyStr(s_ctx, g, "__nfuSha256",
+        JS_NewCFunction(s_ctx, nfu_sha256, "__nfuSha256", 1));
     // Native UTF-8 codec so TextEncoder/TextDecoder never burn the JS budget on
     // large payloads (bloxd room messages are hundreds of KB per frame).
     JS_SetPropertyStr(s_ctx, g, "__nfuUtf8Enc",
@@ -5010,7 +5051,17 @@ int mini_js_run(const char* script, char* out, int out_sz,
             // deadline, so an unbounded inline flush turned one click into
             // 40 s of dead UI. 2.5 s inline; the rest runs on later ticks.
             const char* tsrc =
-                "try { var __nft = 0; var __t0 = Date.now(); while (globalThis.__nfuTimers && globalThis.__nfuTimers.length && __nft < 4000 && Date.now() - __t0 < 2500) { var __it = globalThis.__nfuTimers.shift(); __nft++; var __ff = (typeof __it === 'function') ? __it : (__it && __it.f); if (typeof __ff === 'function') { try { __ff(); } catch(e) {} } } "
+                "try { var __nft = 0; var __t0 = Date.now(); var __now = (typeof __nfuNow === 'function') ? __nfuNow() : Date.now(); var __keep = []; var __q = globalThis.__nfuTimers || []; var __n = __q.length; "
+                "for (var __i = 0; __i < __n && __nft < 4000 && Date.now() - __t0 < 2500; __i++) { var __it = __q[__i]; "
+                // Their downloader arms a 15 s stall timer that must NOT fire
+                // early: running a timer whose due time is still in the future
+                // made every wasm fetch look stalled after ~2 s. Entries without
+                // a due time are internal shim work (script-load callbacks) and
+                // still run inline.
+                "if (__it && typeof __it.due === 'number' && __it.due > __now) { __keep.push(__it); __nft++; continue; } "
+                "__nft++; var __ff = (typeof __it === 'function') ? __it : (__it && __it.f); if (typeof __ff === 'function') { try { __ff(); } catch(e) {} } } "
+                "for (var __j = __i; __j < __n; __j++) { if (__q[__j]) __keep.push(__q[__j]); } "
+                "__q.length = 0; for (var __k = 0; __k < __keep.length; __k++) __q.push(__keep[__k]); "
                 "'T:' + __nft + '|XJ:' + (typeof Xj) + '|SO:' + (typeof setTimeout) + '|W:' + (typeof window) + '|D:' + (typeof document) + '|GL:' + (typeof WebGLRenderingContext) + '|HCE:' + (typeof HTMLCanvasElement) + '|UA:' + ((navigator&&navigator.userAgent)?navigator.userAgent.substring(0,16):'?') + '|DPR:' + ((window&&window.devicePixelRatio)?window.devicePixelRatio:'?'); } catch(x) { 'TERR:' + String(x && x.message); }";
             JSValue tv = JS_Eval(s_ctx, tsrc, (size_t)strlen(tsrc), "<timers>", JS_EVAL_TYPE_GLOBAL);
             if (!JS_IsException(tv)) {
@@ -5141,6 +5192,10 @@ int mini_js_run(const char* script, char* out, int out_sz,
 void mini_js_reset(void) {
     js_lock();
     if (js_trace_enabled()) { fprintf(stderr, "js: reset (ctx=%p)\n", (void*)s_ctx); fflush(stderr); }
+    // WebAssembly instances own JS function references from the glue's import
+    // object; release them before the context goes away or QuickJS aborts on
+    // its leak assertion while freeing the runtime.
+    if (s_ctx) nefu::wasm_js_shutdown(s_ctx);
     if (s_ctx) { JS_FreeContext(s_ctx); s_ctx = 0; }
     if (s_rt) { JS_FreeRuntime(s_rt); s_rt = 0; }
     s_mem_dead = 0;   // new page gets a fresh fuse
