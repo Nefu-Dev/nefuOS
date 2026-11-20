@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS app registration & common utils
 #include "apps.h"
 #include "email.h"
@@ -164,15 +169,16 @@ const char* app_name(int id) {
     case APP_CONNECT4: return T("四子棋", "Connect Four");
     case APP_MINESWEEPER2: return T("高级扫雷", "Minesweeper Pro");
     case APP_LIFE: return T("生命游戏", "Game of Life");
-    case APP_MLLAB: return T("机器学习实验室", "ML Lab");
-    case APP_REPL: return T("迷你解释器", "Mini REPL");
-    case APP_SYSMON: return T("系统监视器", "SysMon");
-    case APP_NETLAB: return T("网络实验室", "NetLab");
-    case APP_FSVIEW: return T("文件系统查看器", "FSView");
-    case APP_RAYVIEW: return T("光线追踪", "RayView");
-    case APP_COMPILERLAB: return T("编译器实验室", "CompilerLab");
-    case APP_GEDEMO: return T("游戏引擎演示", "GE Demo");
+    case APP_MLLAB: return T("机器学习实验室", "ML Lab");
+    case APP_REPL: return T("迷你解释器", "Mini REPL");
+    case APP_SYSMON: return T("系统监视器", "SysMon");
+    case APP_NETLAB: return T("网络实验室", "NetLab");
+    case APP_FSVIEW: return T("文件系统查看器", "FSView");
+    case APP_RAYVIEW: return T("光线追踪", "RayView");
+    case APP_COMPILERLAB: return T("编译器实验室", "CompilerLab");
+    case APP_GEDEMO: return T("游戏引擎演示", "GE Demo");
     case APP_DEEPVIZ: return T("深度学习可视化", "DeepViz");
+    case APP_CHATBOT:   return T("AI 助手", "AI Assistant");
     default: return "?";
     }
 }
@@ -208,6 +214,7 @@ int nefud_name_to_app_id(const char* name) {
     if (strcmp(name, "LVGL Demo") == 0) return APP_LVGLDEMO;
 #endif
     if (strcmp(name, "Video Player") == 0) return APP_VIDEOPLAYER;
+    if (strcmp(name, "AI Assistant") == 0) return APP_CHATBOT;
     return -1;
 }
 
@@ -224,7 +231,7 @@ static const int PREINSTALLED[] = {
     APP_ALGOVIZ, APP_GFXLAB, APP_SIMLAB, APP_TEXTTOOL,
     APP_CRYPTOLAB, APP_COMPRESSTOOL, APP_SERIALAB, APP_AUDIOLAB, APP_GFX3DVIEW, APP_MATHTOOL, APP_WIDGETGALLERY,
     APP_DBMANAGER, APP_BREAKOUT, APP_PONG, APP_FLAPPY, APP_SPACEINV, APP_PACMAN,
-    APP_TICTACTOE, APP_CONNECT4, APP_MINESWEEPER2, APP_LIFE, APP_MLLAB
+    APP_TICTACTOE, APP_CONNECT4, APP_MINESWEEPER2, APP_LIFE, APP_MLLAB, APP_CHATBOT
 };
 
 void apps_preinstall_defaults() {
@@ -276,7 +283,7 @@ static void about_close(Window* w) {
 void app_show_about() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("About nefuOS", x, y, 460, 220);
+    Window* w = g_wm->create_window(T("关于 nefuOS", "About nefuOS"), x, y, 460, 220);
     if (!w) return;
     w->userdata = 0;
     w->on_paint = about_paint;
@@ -298,7 +305,7 @@ static void notinst_paint(Window* w) {
 void app_show_not_installed(const char* name) {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("App", x, y, 340, 110);
+    Window* w = g_wm->create_window(T("应用", "App"), x, y, 340, 110);
     if (!w) return;
     w->userdata = (void*)name;
     w->on_paint = notinst_paint;
@@ -465,15 +472,16 @@ void app_launch(int id) {
     case APP_CONNECT4: connect4_launch(); break;
     case APP_MINESWEEPER2: minesweeper2_launch(); break;
     case APP_LIFE: life_launch(); break;
-    case APP_MLLAB: mllab_launch(); break;
-    case APP_REPL: repl_launch(); break;
-    case APP_SYSMON: sysmon_launch(); break;
-    case APP_NETLAB: netlab_launch(); break;
-    case APP_FSVIEW: fsview_launch(); break;
-    case APP_RAYVIEW: rayview_launch(); break;
-    case APP_COMPILERLAB: compilerlab_launch(); break;
-    case APP_GEDEMO: gedemo_launch(); break;
+    case APP_MLLAB: mllab_launch(); break;
+    case APP_REPL: repl_launch(); break;
+    case APP_SYSMON: sysmon_launch(); break;
+    case APP_NETLAB: netlab_launch(); break;
+    case APP_FSVIEW: fsview_launch(); break;
+    case APP_RAYVIEW: rayview_launch(); break;
+    case APP_COMPILERLAB: compilerlab_launch(); break;
+    case APP_GEDEMO: gedemo_launch(); break;
     case APP_DEEPVIZ: deepviz_launch(); break;
+    case APP_CHATBOT: chatbot_launch(); break;
 #ifdef NEFU_LVGL_DEMO
     case APP_LVGLDEMO: lvgl_demo_launch(); break;
 #endif
@@ -575,7 +583,7 @@ static void widgets_tick(Window* w) {
 }
 
 void widgets_launch() {
-    Window* w = g_wm->create_window("Widgets", 100, 100, 460, 360);
+    Window* w = g_wm->create_window(T("控件演示", "Widgets"), 100, 100, 460, 360);
     if (!w) return;
     s_widgets_last_tick = 0;
     widgets_paint(w);
@@ -586,3 +594,4 @@ void widgets_launch() {
 }
 
 } // namespace nefu
+

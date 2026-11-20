@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS platform abstraction layer.
 // The core only depends on the interfaces declared here; the backends
 // (win32 / bare) implement them separately.
@@ -53,6 +58,17 @@ struct DateInfo {
 };
 bool platform_rtc_date(DateInfo* out);   // CMOS RTC on bare, GetLocalTime on host
 
+// ---- timezone ----
+// time() itself is always true UTC. Two facts decide how the hardware clock is
+// turned into it: what the RTC stores (0 = local wall clock, the Windows
+// dual-boot convention; 1 = UTC, the Linux one), and which zone we are in
+// (minutes EAST of UTC: CST-8 => +480). localtime() and the desktop clock
+// apply the offset. Host build: Windows owns the zone, the setter is a no-op.
+int  platform_tz_offset_minutes();
+void platform_set_tz_offset_minutes(int minutes);
+bool platform_rtc_is_utc();
+void platform_set_rtc_is_utc(bool on);
+
 uint32_t nefuos_uptime_ms();        // ms since nefuOS started (bare: uptime)
 
 // ===================== debug output =====================
@@ -65,6 +81,9 @@ void nefuos_handle_scroll(int delta);
 void nefuos_tick();     // periodic heartbeat (clock/animation)
 void nefuos_frame();    // redraw every frame
 void nefuos_init();     // system init
+// The backend reports a new framebuffer size (host window resized, or the
+// firmware handed us a different mode). The desktop re-lays out to match.
+void nefuos_screen_resized(int w, int h);
 void nefuos_mark_firstboot_done(); // mark first-boot wizard complete (test mode)
 void nefuos_unlock(); // unlock the lock screen (test mode)
 void nefuos_shutdown(); // cleanup on exit (saves VFS etc.)
@@ -73,15 +92,34 @@ void nefuos_shutdown(); // cleanup on exit (saves VFS etc.)
 void platform_mem_stats(uint32_t* used, uint32_t* total);
 const char* platform_name();
 
-// ===================== persistence (host only, bare: no-op) =====================
+// ===================== persistence (host file / bare ATA disk) =====================
 bool platform_fs_load(uint8_t** out, uint32_t* out_size);
 void platform_fs_save(const uint8_t* data, uint32_t size);
+
+// Incremental variant used by the NVFS write-back: persist only the 512-byte
+// blocks [first_block, first_block+count) of an image whose full size is
+// total_size. The backend falls back to a full write whenever the stored copy
+// is missing or has a different size, so a partial write can never leave a
+// short (unmountable) image behind. Returns false when nothing was written.
+bool platform_fs_save_range(const uint8_t* data, uint32_t total_size,
+                            uint32_t first_block, uint32_t count);
+
+// How often the NVFS write-back should flush: the bare-metal kernel keeps four
+// commits per second (250 ms), the host only once every 4 s - it already holds
+// the image in RAM, so rewriting the persistence file four times a second
+// would buy nothing and cost a lot of disk churn.
+uint32_t platform_fs_flush_interval_ms();
 
 // ===================== LLM model blob =====================
 // Load the neural-model blob (TinyStories int8). Host may read a model file;
 // bare has no model disk and returns false, so the app falls back to its
 // rule table.
 bool platform_llm_load(uint8_t** out, uint32_t* out_size);
+
+// Opt-in for the neural path (host CLI `--llm`). Off by default: the int8
+// engine is still experimental (intermittent fault on long generations), so
+// the shipped chatbot answers from its rule table unless asked otherwise.
+extern bool g_llm_opt_in;
 
 // ===================== power off / exit =====================
 void platform_poweroff();
@@ -158,6 +196,12 @@ bool platform_ping(uint32_t ip, int timeout_ms);
 // On success *out is a malloc'd buffer (caller frees), *out_size its length.
 bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size);
 
+// ===================== local file access (host) =====================
+// Read a whole file into a kalloc'd buffer (caller kfree's). Used by the
+// browser for file:// URLs (local HTML test pages, saved snapshots).
+// bare: only VFS-backed paths could succeed; returns false otherwise.
+bool platform_read_file(const char* path, uint8_t** out, uint32_t* out_size);
+
 // ===================== threading =====================
 void* platform_thread_create(void (*func)(void*), void* arg);
 // like platform_thread_create but with an explicit stack size (bytes); use for
@@ -179,12 +223,66 @@ bool platform_http_request(const char* method, const char* url,
                            const uint8_t* body, uint32_t body_len,
                            int* out_status, uint8_t** out_body, uint32_t* out_body_len);
 
+// Cookies set by the most recent platform_http_request, one raw
+// "name=value; attrs" line per '\n'. Empty when the response carried none, or
+// when the backend has its own cookie store (WinINet keeps one per process, so
+// the host backend simply returns ""). The pointer is only valid until the next
+// request; the JS layer copies it immediately.
+const char* platform_http_last_set_cookie();
+
+// Response headers of the most recent platform_http_request, flattened to
+// "Name: value" lines separated by '\n' (status line removed). Empty when the
+// backend does not expose them. Same lifetime rule: valid until the next
+// request, so the caller must copy what it keeps.
+const char* platform_http_last_headers();
+
 // Streaming variant: cb is called once per received block (return false to
 // abort). *out_status receives the HTTP status code.
 bool platform_http_stream_request(const char* method, const char* url,
                                   const char* headers, void* ctx,
                                   bool (*cb)(void* ctx, const uint8_t* data, uint32_t len),
                                   int* out_status);
+
+// Streaming variant with a request body - what a form POST needs. Same
+// callback contract as platform_http_stream_request(); `body` (may be null
+// when body_len is 0) is sent with the request. Redirects are followed with
+// the usual semantics: 303 (and any 3xx except 307/308) drops the body and
+// re-issues a GET.
+bool platform_http_stream_send(const char* method, const char* url,
+                               const char* headers,
+                               const uint8_t* body, uint32_t body_len,
+                               void* ctx,
+                               bool (*cb)(void* ctx, const uint8_t* data, uint32_t len),
+                               int* out_status);
+
+// ===================== WebSocket client (RFC 6455) =====================
+// Minimal client for the browser's JS runtime (bloxd.io live channel, SPA
+// push channels). Supports ws:// and wss://, the HTTP Upgrade handshake,
+// text/binary frames and close.
+//
+// The host backend runs a reader thread per socket, so the frame loop only
+// ever pops already-complete messages: polling never blocks, and a stalled
+// server cannot freeze the UI.
+//
+//   int h = platform_ws_open("wss://host/path");  // < 0 on failure
+//   while (platform_ws_state(h) == 1) { ... }
+//   platform_ws_send(h, bytes, len, /*binary=*/1);
+//   int len = platform_ws_peek(h, &is_binary);    // 0 = none, <0 = closed
+//   platform_ws_read(h, buf, len);
+//   platform_ws_close(h);
+//
+// Messages are delivered whole: peek reports the full length, read copies
+// (and consumes) it. Fragmented frames are reassembled by the backend.
+int  platform_ws_open(const char* url);
+// Same handshake, but with an explicit extra-headers block ("Name: value\r\n"
+// lines) sent on the Upgrade request. Colyseus authenticates the socket with
+// the cookie minted by the social host, and WinHTTP sends no cookie by itself.
+int  platform_ws_open_hdr(const char* url, const char* extra_headers);
+int  platform_ws_state(int h);          // 0 connecting, 1 open, 2 closed
+int  platform_ws_send(int h, const uint8_t* data, int len, int binary);
+int  platform_ws_peek(int h, int* out_binary);   // >0 len, 0 none, -1 closed
+int  platform_ws_read(int h, uint8_t* buf, int cap);
+void platform_ws_close(int h);
 
 void  platform_thread_sleep(uint32_t ms);
 
@@ -270,3 +368,4 @@ int nefu_http_request(const char* method, const char* url,
 #ifdef __cplusplus
 }
 #endif
+

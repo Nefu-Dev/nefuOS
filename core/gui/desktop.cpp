@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS desktop - LVGL 9.2.0 (MIT) is now the GUI engine for the desktop
 // layer: wallpaper, icon grid, taskbar, live clock, start menu and context
 // menus are all LVGL objects flushed through the nefuOS Surface. stb_truetype
@@ -7,8 +12,10 @@
 #include "../apps/apps.h"
 #include "../sys/settings.h"
 #include "../sys/power.h"
+#include "../sys/sha256.h"     // account avatar colour derived from the user name
 #include "../platform.h"
 #include "lv_cjk_font.h"
+#include "i18n_zh.h"
 #include "lvgl.h"
 
 #if !defined(NEFU_BARE) && defined(_WIN32)
@@ -27,9 +34,12 @@ const char* nefuos_lock_pwd();
 uint32_t nefuos_lock_fail_ms();
 
 static const int TASKBAR_H = 30;
-static const int ICON_W = 60, ICON_H = 60;
-static const int ICON_GAP = 4;   // gap between desktop icons
-static const int TILE = 40;
+// Tile geometry sized so an English desktop name can use two lines: the icon
+// art (TILE 44) sits on top of a 2-line 16px label. ICON_W must fit the longest
+// single word ("Calculator" ~10 chars) on one line, otherwise it has to be cut.
+static const int ICON_W = 96, ICON_H = 84;
+static const int ICON_GAP = 6;   // gap between desktop icons
+static const int TILE = 44;      // icon art
 
 // aggregate-only (no ctor): bare kernel never runs C++ static ctors
 struct DesktopIcon {
@@ -41,115 +51,62 @@ struct DesktopIcon {
 };
 
 // Desktop icon grid: every usable app is a shortcut, laid out horizontally
-// (fill the width first), and everything must fit above the taskbar on the
-// 800x600 screen so no icon overflows off-screen:
-//   (800 - 2*14 margin + 4 gap) / (60 icon + 4 gap)     = 12 columns
-//   (600 - 30 taskbar - 14 margin + 4 gap) / (60 + 4)   = 8 rows  -> 96 slots
-static const int GRID_COLS = (800 - 2 * 14 + ICON_GAP) / (ICON_W + ICON_GAP);
-static const int GRID_ROWS = (600 - TASKBAR_H - 14 + ICON_GAP) / (ICON_H + ICON_GAP);
+// (fill the width first). The column/row count is derived at runtime from the
+// real screen size (see desktop_grid_for), so the desktop adapts to whatever
+// resolution it is running at instead of assuming 800x600:
+//   (W - 2*14 margin + 4 gap) / (60 icon + 4 gap)        columns
+//   (H - 30 taskbar - 14 margin + 4 gap) / (64 + 4)      rows
+static int s_grid_cols = 12;                // recomputed by desktop_grid_for()
+static int s_grid_rows = 8;
+static int s_scr_w = 800, s_scr_h = 600;    // last known screen size
 static const int MAX_ICONS = 96;            // total slots (builtin + runtime shortcuts)
 
-// All usable apps as desktop shortcuts. Positions are assigned at init from
-// the slot index (horizontal-first grid), so x/y are zero here.
+static void desktop_grid_for(int W, int H) {
+    int cols = (W - 2 * 14 + ICON_GAP) / (ICON_W + ICON_GAP);
+    int rows = (H - TASKBAR_H - 14 + ICON_GAP) / (ICON_H + ICON_GAP);
+    if (cols < 1) cols = 1;
+    if (rows < 1) rows = 1;
+    int cap = MAX_ICONS;
+    if (cols * rows > cap) {           // never claim more cells than slots exist
+        rows = (cap + cols - 1) / cols;
+        if (rows < 1) rows = 1;
+    }
+    s_grid_cols = cols;
+    s_grid_rows = rows;
+}
+
+// Positions are assigned at init from the slot index (horizontal-first grid),
+// so x/y are zero here.
+// Desk shortcuts: only the apps a person actually opens all day. Everything
+// else lives in the start menu (grouped, see kMenuGroups below), which is
+// where the other ~75 entries went: a desktop with 94 icons is a wall of
+// noise, not a desktop. Runtime "New Shortcut" still fills the free slots.
 static DesktopIcon s_icons[MAX_ICONS] = {
-    // --- core apps (kept in the original order) ---
-    {0, 0, "文件管理器", APP_FILEMGR, false, true},
+    {0, 0, "文件", APP_FILEMGR, false, true},
     {0, 0, "终端", APP_TERMINAL, false, true},
-    {0, 0, "计算器", APP_CALC, false, true},
-    {0, 0, "文本查看器", APP_TEXTVIEW, false, true},
-    {0, 0, "数据库维基", APP_WIKI, false, true},
-    {0, 0, "设置", APP_SETTINGS, false, true},
-    {0, 0, "软件商店", APP_STORE, false, true},
-    {0, 0, "图片查看器", APP_IMAGEVIEWER, false, true},
-    {0, 0, "音乐播放器", APP_MUSIC, false, true},
-    {0, 0, "系统监视器", APP_MONITOR, false, true},
     {0, 0, "浏览器", APP_BROWSER, false, true},
-    {0, 0, "网络", APP_NETCFG, false, true},
-    {0, 0, "应用启动器", APP_NEFUD, false, true},
-    {0, 0, "日历", APP_CALENDAR, false, true},
-    {0, 0, "磁盘分析", APP_DISKUSAGE, false, true},
-    {0, 0, "密码生成器", APP_PASSGEN, false, true},
-    {0, 0, "便签", APP_STICKY, false, true},
-    {0, 0, "邮箱", APP_EMAIL, false, true},
-    {0, 0, "游戏中心", APP_GAMECENTER, false, true},
-    {0, 0, "小组件", APP_WIDGETS, false, true},
-    {0, 0, "时钟", APP_CLOCK_TIMER, false, true},
-    {0, 0, "单位换算", APP_CONVERTER, false, true},
-    {0, 0, "视频播放器", APP_VIDEOPLAYER, false, true},
-    {0, 0, "俄罗斯方块", APP_TETRIS, false, true},
-    {0, 0, "2048", APP_GAME2048, false, true},
-    {0, 0, "数独", APP_SUDOKU, false, true},
-    {0, 0, "十六进制编辑器", APP_HEXEDIT, false, true},
-    {0, 0, "番茄钟", APP_POMODORO, false, true},
-    {0, 0, "记忆翻牌", APP_MEMORYMATCH, false, true},
-    {0, 0, "JSON 查看器", APP_JSONVIEW, false, true},
-    {0, 0, "文件查找", APP_FINDFILES, false, true},
-    {0, 0, "秒表", APP_STOPWATCH, false, true},
-    {0, 0, "字数统计", APP_WORDCOUNT, false, true},
-    {0, 0, "排序可视化", APP_ALGOVIZ, false, true},
-    {0, 0, "图形实验室", APP_GFXLAB, false, true},
-    // --- system / tools / games / labs added so every usable app is on the desktop ---
-    {0, 0, "系统信息", APP_SYSINFO, false, true},
-    {0, 0, "关于", APP_ABOUT, false, true},
-    {0, 0, "贪吃蛇", APP_SNAKE, false, true},
-    {0, 0, "画图", APP_PAINT, false, true},
-    {0, 0, "记事本", APP_NOTEPAD, false, true},
-    {0, 0, "扫雷", APP_MINER, false, true},
-    {0, 0, "字体查看器", APP_FONTVIEW, false, true},
-    {0, 0, "代码编辑器", APP_EDITOR, false, true},
-    {0, 0, "截图", APP_SCREENSHOT, false, true},
-    {0, 0, "取色器", APP_COLORPICKER, false, true},
-    {0, 0, "搜索", APP_SEARCH, false, true},
+    {0, 0, "设置", APP_SETTINGS, false, true},
+    {0, 0, "商店", APP_STORE, false, true},
+    {0, 0, "AI", APP_CHATBOT, false, true},
+    {0, 0, "编辑器", APP_EDITOR, false, true},
+    {0, 0, "图片", APP_IMAGEVIEWER, false, true},
+    {0, 0, "音乐", APP_MUSIC, false, true},
+    {0, 0, "视频", APP_VIDEOPLAYER, false, true},
+    {0, 0, "计算器", APP_CALC, false, true},
+    {0, 0, "监视器", APP_SYSMON, false, true},
     {0, 0, "回收站", APP_RECYCLEBIN, false, true},
-    {0, 0, "天气", APP_WEATHER, false, true},
+    {0, 0, "便签", APP_STICKY, false, true},
+    {0, 0, "游戏", APP_GAMECENTER, false, true},
+    {0, 0, "任务", APP_TASKMGR, false, true},
     {0, 0, "帮助", APP_HELP, false, true},
-    {0, 0, "词典", APP_DICTIONARY, false, true},
-    {0, 0, "任务管理器", APP_TASKMGR, false, true},
-    {0, 0, "输入法", APP_INPUTMETHOD, false, true},
-    {0, 0, "剪贴板", APP_CLIPBOARD, false, true},
-    {0, 0, "通知中心", APP_NOTIFCENTER, false, true},
-    {0, 0, "快捷键", APP_SHORTCUTS, false, true},
-    {0, 0, "壁纸", APP_WALLPAPER, false, true},
-    {0, 0, "主题", APP_THEME, false, true},
-    {0, 0, "进程列表", APP_PROCESSLIST, false, true},
-    {0, 0, "关于详细", APP_ABOUTFULL, false, true},
-    {0, 0, "详细系统信息", APP_SYSINFOEXT, false, true},
-    {0, 0, "致谢", APP_CREDITS, false, true},
-    {0, 0, "更新日志", APP_RELEASENOTES, false, true},
-    {0, 0, "安装程序", APP_INSTALLER, false, true},
-    {0, 0, "仿真实验室", APP_SIMLAB, false, true},
-    {0, 0, "文本工具", APP_TEXTTOOL, false, true},
-    {0, 0, "密码学实验室", APP_CRYPTOLAB, false, true},
-    {0, 0, "压缩工具", APP_COMPRESSTOOL, false, true},
-    {0, 0, "格式转换台", APP_SERIALAB, false, true},
-    {0, 0, "音频实验室", APP_AUDIOLAB, false, true},
-    {0, 0, "3D 查看器", APP_GFX3DVIEW, false, true},
-    {0, 0, "数学工具箱", APP_MATHTOOL, false, true},
-    {0, 0, "UI 组件库", APP_WIDGETGALLERY, false, true},
-    {0, 0, "数据库管理", APP_DBMANAGER, false, true},
-    {0, 0, "打砖块", APP_BREAKOUT, false, true},
-    {0, 0, "乒乓球", APP_PONG, false, true},
-    {0, 0, "像素鸟", APP_FLAPPY, false, true},
-    {0, 0, "太空侵略者", APP_SPACEINV, false, true},
-    {0, 0, "吃豆人", APP_PACMAN, false, true},
-    {0, 0, "井字棋", APP_TICTACTOE, false, true},
-    {0, 0, "四子棋", APP_CONNECT4, false, true},
-    {0, 0, "高级扫雷", APP_MINESWEEPER2, false, true},
-    {0, 0, "生命游戏", APP_LIFE, false, true},
-    {0, 0, "机器学习实验室", APP_MLLAB, false, true},
-    {0, 0, "迷你解释器", APP_REPL, false, true},
-    {0, 0, "系统监视器", APP_SYSMON, false, true},
-    {0, 0, "网络实验室", APP_NETLAB, false, true},
-    {0, 0, "文件系统", APP_FSVIEW, false, true},
-    {0, 0, "光线追踪", APP_RAYVIEW, false, true},
-    {0, 0, "编译器", APP_COMPILERLAB, false, true},
-    {0, 0, "游戏引擎", APP_GEDEMO, false, true},
-    {0, 0, "深度学习", APP_DEEPVIZ, false, true},
 };
 
+// Labels are kept to <= 3 hanzi: a 16px CJK glyph is 16px wide, so three
+// characters fit the 60px icon card on one line (longer names wrap and push
+// into the next row). The start menu still shows the full names.
 static const char* icon_label(int app) {
     switch (app) {
-    case APP_FILEMGR:    return T("文件管理器", "Files");
+    case APP_FILEMGR:    return T("文件", "Files");
     case APP_TERMINAL:   return T("终端", "Terminal");
     case APP_CALC:       return T("计算器", "Calculator");
     case APP_TEXTVIEW:   return T("文本查看器", "Text View");
@@ -157,28 +114,29 @@ static const char* icon_label(int app) {
     case APP_ABOUT:      return T("关于", "About");
     case APP_WIKI:       return T("数据库维基", "Wiki");
     case APP_SETTINGS:   return T("设置", "Settings");
-    case APP_STORE:      return T("软件商店", "Store");
+    case APP_STORE:      return T("商店", "Store");
+    case APP_CHATBOT:    return T("AI", "AI");
     case APP_SNAKE:      return T("贪吃蛇", "Snake");
     case APP_PAINT:      return T("画图", "Paint");
     case APP_CLOCK_TIMER:      return T("时钟", "Clock");
     case APP_CONVERTER:        return T("单位换算", "Unit Converter");
     case APP_NOTEPAD:    return T("记事本", "Notepad");
     case APP_MINER:      return T("扫雷", "Minesweeper");
-    case APP_IMAGEVIEWER:return T("图片查看器", "Images");
-    case APP_MUSIC:      return T("音乐播放器", "Music");
-    case APP_VIDEOPLAYER:return T("视频播放器", "Video");
-    case APP_MONITOR:    return T("系统监视器", "Monitor");
+    case APP_IMAGEVIEWER:return T("图片", "Images");
+    case APP_MUSIC:      return T("音乐", "Music");
+    case APP_VIDEOPLAYER:return T("视频", "Video");
+    case APP_MONITOR:    return T("监视器", "Monitor");
     case APP_BROWSER:    return T("浏览器", "Browser");
     case APP_NETCFG:     return T("网络", "Network");
     case APP_NEFUD:      return T("应用启动器", "Launcher");
     case APP_FONTVIEW:   return T("字体查看器", "Fonts");
-    case APP_EDITOR:     return T("代码编辑器", "Editor");
+    case APP_EDITOR:     return T("编辑器", "Editor");
     case APP_CALENDAR:   return T("日历", "Calendar");
     case APP_DISKUSAGE:  return T("磁盘分析", "Disk Usage");
     case APP_PASSGEN:    return T("密码生成器", "Password");
     case APP_STICKY:     return T("便签", "Sticky Note");
     case APP_EMAIL:      return T("邮箱", "Email");
-    case APP_GAMECENTER: return T("游戏中心", "Games");
+    case APP_GAMECENTER: return T("游戏", "Games");
     case APP_WIDGETS:    return T("小组件", "Widgets");
     case APP_SCREENSHOT: return T("截图", "Screenshot");
     case APP_COLORPICKER:return T("取色器", "Color Picker");
@@ -187,7 +145,7 @@ static const char* icon_label(int app) {
     case APP_WEATHER:    return T("天气", "Weather");
     case APP_HELP:       return T("帮助", "Help");
     case APP_DICTIONARY: return T("词典", "Dictionary");
-    case APP_TASKMGR:    return T("任务管理器", "Task Manager");
+    case APP_TASKMGR:    return T("任务", "Task Manager");
     case APP_INPUTMETHOD:return T("输入法", "Input Method");
     case APP_CLIPBOARD:  return T("剪贴板", "Clipboard");
     case APP_NOTIFCENTER:return T("通知中心", "Notifications");
@@ -250,11 +208,16 @@ static lv_indev_t* s_indev = 0;
 static lv_color_t* s_fb_buf = 0;
 static Surface* s_surf = 0;
 static lv_obj_t* s_clock_label = 0;
+static lv_obj_t* s_taskwin_bar = 0;   // container for the per-window buttons
+static lv_obj_t* s_taskbar_bar = 0;   // the taskbar strip itself
 static lv_obj_t* s_start_menu = 0;
 static lv_obj_t* s_rmenu = 0;          // icon shortcut context menu
 static lv_obj_t* s_rmenu_desk = 0;     // blank-desktop context menu
 static lv_obj_t* s_icon_objs[MAX_ICONS];
 static lv_obj_t* s_icon_labels[MAX_ICONS];
+static lv_obj_t* s_wband = 0;         // wallpaper gradient band (resized with the screen)
+static lv_obj_t* s_watermark = 0;     // "nefuOS 0.1 (LVGL GUI)" corner label
+static lv_obj_t* s_start_label = 0;   // "Start" / "开始" label on the start button
 static lv_obj_t* s_rmenu_items[8];
 static lv_obj_t* s_rmenu_desk_items[8];
 static int s_rmenu_icon = -1;
@@ -270,8 +233,16 @@ static uint8_t s_last_buttons = 0;
 static uint32_t s_icon_color[MAX_ICONS];
 static bool s_dirty = false;
 static uint32_t s_last_sig = 0;
-static int s_menu_apps[32];
+// Start menu rows. A row whose app id is negative is a group header; its
+// group index is stored in s_menu_group[] so the header can be labelled.
+// 192 rows is far more than the ~95 we fill, and it removes the old 32-entry
+// cap that silently hid two thirds of the installed apps.
+static int s_menu_apps[192];
+static int s_menu_group[192];
 static int s_menu_count = 0;
+// flat, unique list of every launchable app (used by the shortcut picker)
+static int s_all_apps[128];
+static int s_all_count = 0;
 
 // ---- LVGL keyboard input (keypad indev + shared group) ----
 static uint32_t s_lv_keys[32];
@@ -460,8 +431,8 @@ static void on_icon_release(lv_event_t* e) {
     if (col < 0) col = 0;
     if (row < 0) row = 0;
     int best_c = col, best_r = row, best_d2 = 0x7FFFFFFF;
-    for (int r = 0; r < GRID_ROWS; r++) {
-        for (int c = 0; c < GRID_COLS; c++) {
+    for (int r = 0; r < s_grid_rows; r++) {
+        for (int c = 0; c < s_grid_cols; c++) {
             bool taken = false;
             for (int k = 0; k < MAX_ICONS; k++) {
                 if (k == i || !s_icons[k].used || s_icons[k].deleted) continue;
@@ -486,6 +457,7 @@ static void start_menu_toggle() {
     if (!s_start_menu) return;
     if (lv_obj_has_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN)) {
         lv_obj_remove_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(s_start_menu);   // an open menu must sit above app windows
         s_start_open = true;
     } else {
         lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
@@ -802,8 +774,8 @@ static void rmenu_props_icon(int i) {
 }
 
 static bool icon_free_cell(int* cx, int* cy) {
-    for (int r = 0; r < GRID_ROWS; r++) {
-        for (int c = 0; c < GRID_COLS; c++) {
+    for (int r = 0; r < s_grid_rows; r++) {
+        for (int c = 0; c < s_grid_cols; c++) {
             bool taken = false;
             for (int k = 0; k < MAX_ICONS; k++) {
                 if (!s_icons[k].used || s_icons[k].deleted) continue;
@@ -821,13 +793,13 @@ static void arrange_icons() {
     int n = 0;
     for (int i = 0; i < MAX_ICONS; i++) {
         if (!s_icons[i].used || s_icons[i].deleted) continue;
-        int row = n / GRID_COLS;
-        if (row >= GRID_ROWS) {         // grid full: keep the slot, hide the tile
+        int row = n / s_grid_cols;
+        if (row >= s_grid_rows) {         // grid full: keep the slot, hide the tile
             if (s_icon_objs[i]) lv_obj_add_flag(s_icon_objs[i], LV_OBJ_FLAG_HIDDEN);
             n++;
             continue;
         }
-        s_icons[i].x = 14 + (n % GRID_COLS) * (ICON_W + ICON_GAP);
+        s_icons[i].x = 14 + (n % s_grid_cols) * (ICON_W + ICON_GAP);
         s_icons[i].y = 14 + row * (ICON_H + ICON_GAP);
         if (s_icon_objs[i]) {
             lv_obj_remove_flag(s_icon_objs[i], LV_OBJ_FLAG_HIDDEN);
@@ -840,7 +812,7 @@ static void arrange_icons() {
 
 static void on_pick_app(lv_event_t* e) {
     int idx = (int)(intptr_t)lv_event_get_user_data(e);
-    int app = (idx >= 0 && idx < s_menu_count) ? s_menu_apps[idx] : -1;
+    int app = (idx >= 0 && idx < s_all_count) ? s_all_apps[idx] : -1;
     if (app >= 0) {
         int slot = -1;
         for (int i = 0; i < MAX_ICONS; i++) { if (!s_icons[i].used) { slot = i; break; } }
@@ -866,12 +838,12 @@ static void on_pick_app(lv_event_t* e) {
 }
 
 static void rmenu_new_shortcut() {
-    if (s_dialog || s_menu_count <= 0) return;
+    if (s_dialog || s_all_count <= 0) return;
     RmenuDialog* d = new RmenuDialog();
     d->icon = -1;
     d->ta = 0;
     d->overlay = rmenu_dialog_overlay();
-    int list_rows = s_menu_count < 8 ? s_menu_count : 8;
+    int list_rows = s_all_count < 8 ? s_all_count : 8;
     int ph = 40 + list_rows * 26 + 10;
     d->panel = rmenu_dialog_panel(d->overlay, 240, ph);
     lv_obj_t* title = lv_label_create(d->panel);
@@ -886,7 +858,7 @@ static void rmenu_new_shortcut() {
     lv_obj_set_style_radius(list, 0, 0);
     lv_obj_set_style_pad_all(list, 0, 0);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
-    for (int i = 0; i < s_menu_count; i++) {
+    for (int i = 0; i < s_all_count; i++) {
         lv_obj_t* b = lv_button_create(list);
         lv_obj_set_size(b, 220, 24);
         lv_obj_set_pos(b, 2, i * 26);
@@ -894,7 +866,7 @@ static void rmenu_new_shortcut() {
         lv_obj_set_style_radius(b, 4, 0);
         lv_obj_add_event_cb(b, on_pick_app, LV_EVENT_CLICKED, (void*)(intptr_t)i);
         lv_obj_t* l = lv_label_create(b);
-        lv_label_set_text(l, app_name(s_menu_apps[i]));
+        lv_label_set_text(l, app_name(s_all_apps[i]));
         lv_obj_set_style_text_color(l, lv_color_hex(0x22262A), 0);
         lv_obj_align(l, LV_ALIGN_LEFT_MID, 10, 0);
     }
@@ -911,6 +883,7 @@ static void build_wallpaper(lv_obj_t* scr, int W, int H) {
     lv_obj_t* gband = lv_obj_create(scr);
     lv_obj_set_size(gband, W, H - TASKBAR_H);
     lv_obj_set_pos(gband, 0, 0);
+    s_wband = gband;
     lv_obj_set_style_bg_color(gband, lv_color_hex(top & 0xFFFFFF), 0);
     lv_obj_set_style_bg_grad_color(gband, lv_color_hex(bottom & 0xFFFFFF), 0);
     lv_obj_set_style_bg_grad_dir(gband, LV_GRAD_DIR_VER, 0);
@@ -918,11 +891,13 @@ static void build_wallpaper(lv_obj_t* scr, int W, int H) {
     lv_obj_set_style_bg_opa(gband, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(gband, 0, 0);
     lv_obj_set_style_radius(gband, 0, 0);
-    // title watermark
-    lv_obj_t* wm = lv_label_create(scr);
-    lv_label_set_text(wm, "nefuOS 0.1  (LVGL GUI)");
-    lv_obj_set_style_text_color(wm, lv_color_hex(0x60FFFFFF), 0);
-    lv_obj_align(wm, LV_ALIGN_BOTTOM_RIGHT, -14, -TASKBAR_H - 16);
+    // title watermark (kept so a language switch can retranslate it)
+    if (!s_watermark) {
+        s_watermark = lv_label_create(scr);
+        lv_obj_set_style_text_color(s_watermark, lv_color_hex(0x60FFFFFF), 0);
+        lv_obj_align(s_watermark, LV_ALIGN_BOTTOM_RIGHT, -14, -TASKBAR_H - 16);
+    }
+    lv_label_set_text(s_watermark, nefu::zh_ui("nefuOS 0.1  (LVGL GUI)"));
 }
 
 // ---- icon tile color helper ----
@@ -991,6 +966,7 @@ static uint32_t icon_color(int app) {
     case APP_COMPILERLAB: return 0xE67E22;
     case APP_GEDEMO: return 0x27AE60;
     case APP_DEEPVIZ: return 0x9B59B6;
+    case APP_CHATBOT: return 0x00A6A6;
     case APP_WEATHER:    return 0x3498DB;
     case APP_HELP:       return 0x9B59B6;
     case APP_DICTIONARY: return 0xE67E22;
@@ -1035,10 +1011,17 @@ static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
     ic.label[sizeof(ic.label) - 1] = 0;
     lv_obj_t* lab = lv_label_create(card);
     lv_label_set_text(lab, ic.label);
-    lv_label_set_long_mode(lab, LV_LABEL_LONG_CLIP);
-    lv_obj_set_width(lab, ICON_W);   // clip at card width: left part stays readable
+    // Wrap at the space onto a second line: an English name is up to twice the
+    // width of a Chinese one ("Recycle Bin", "Task Manager"), and a hard clip
+    // leaves an unreadable fragment. No explicit height: letting LVGL size the
+    // label keeps the bottom-aligned layout stable.
+    lv_label_set_long_mode(lab, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lab, ICON_W - 4);
+    lv_obj_set_style_pad_all(lab, 0, 0);       // theme padding would eat the tail
+    lv_obj_set_style_text_align(lab, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_line_space(lab, 2, 0);
     lv_obj_set_style_text_color(lab, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(lab, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(lab, &nefu::lv_font_cjk_16, 0);
     lv_obj_align(lab, LV_ALIGN_BOTTOM_MID, 0, -4);
     s_icon_labels[i] = lab;
     lv_obj_add_event_cb(card, on_icon_click, LV_EVENT_CLICKED, (void*)(intptr_t)i);
@@ -1046,27 +1029,125 @@ static lv_obj_t* make_icon(lv_obj_t* scr, int i, int x, int y) {
     return card;
 }
 
-// start menu entries: built-in apps + settings + store + installed store apps
-// + every desktop shortcut (games, tools, ...) so no app becomes unreachable.
-static int build_menu(int* list) {
+// ---- start menu catalogue ----------------------------------------------
+// Every launchable app, grouped like a real desktop's application list. The
+// desktop itself only carries the 16 most-used ones, so this catalogue is what
+// guarantees that *nothing* is unreachable: it is the single source of truth
+// for the menu, and the menu scrolls through all of it.
+struct MenuGroup {
+    const char* zh;
+    const char* en;
+    const int*  ids;      // rodata: no static ctor, safe on the bare kernel
+    int         count;
+};
+
+// 1) everyday apps (same set as the desktop, so the two agree)
+static const int kGrpEvery[] = {
+    APP_FILEMGR, APP_TERMINAL, APP_BROWSER, APP_STORE, APP_SETTINGS, APP_NEFUD,
+    APP_NOTEPAD, APP_TEXTVIEW, APP_EDITOR, APP_IMAGEVIEWER, APP_MUSIC, APP_VIDEOPLAYER,
+    APP_CHATBOT,
+};
+// 2) office & documents
+static const int kGrpOffice[] = {
+    APP_WIKI, APP_STICKY, APP_EMAIL, APP_CALENDAR, APP_TEXTTOOL, APP_WORDCOUNT,
+    APP_DICTIONARY, APP_HEXEDIT, APP_JSONVIEW, APP_DBMANAGER,
+};
+// 3) graphics & media
+static const int kGrpMedia[] = {
+    APP_PAINT, APP_SCREENSHOT, APP_COLORPICKER, APP_FONTVIEW, APP_GFX3DVIEW,
+    APP_AUDIOLAB, APP_CONVERTER, APP_COMPRESSTOOL,
+};
+// 4) system tools & settings
+static const int kGrpSystem[] = {
+    APP_SYSMON, APP_MONITOR, APP_SYSINFO, APP_SYSINFOEXT, APP_TASKMGR, APP_PROCESSLIST,
+    APP_DISKUSAGE, APP_FINDFILES, APP_SEARCH, APP_RECYCLEBIN, APP_WALLPAPER, APP_THEME,
+    APP_SHORTCUTS, APP_INPUTMETHOD, APP_CLIPBOARD, APP_NOTIFCENTER, APP_WIDGETS,
+    APP_NETCFG, APP_FSVIEW, APP_PASSGEN, APP_CLOCK_TIMER, APP_STOPWATCH, APP_POMODORO,
+    APP_MATHTOOL, APP_SERIALAB, APP_HELP, APP_ABOUT, APP_ABOUTFULL, APP_CREDITS,
+    APP_RELEASENOTES, APP_INSTALLER, APP_WEATHER,
+};
+// 5) games
+static const int kGrpGames[] = {
+    APP_GAMECENTER, APP_SNAKE, APP_MINER, APP_MINESWEEPER2, APP_TETRIS, APP_GAME2048,
+    APP_SUDOKU, APP_MEMORYMATCH, APP_BREAKOUT, APP_PONG, APP_FLAPPY, APP_SPACEINV,
+    APP_PACMAN, APP_TICTACTOE, APP_CONNECT4, APP_LIFE,
+};
+// 6) labs / developer toys
+static const int kGrpLabs[] = {
+    APP_ALGOVIZ, APP_GFXLAB, APP_SIMLAB, APP_CRYPTOLAB, APP_MLLAB, APP_REPL,
+    APP_NETLAB, APP_RAYVIEW, APP_COMPILERLAB, APP_GEDEMO, APP_DEEPVIZ, APP_WIDGETGALLERY,
+};
+
+#define GRP_COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
+static const MenuGroup kMenuGroups[] = {
+    { "常用",       "Everyday",   kGrpEvery,  GRP_COUNT(kGrpEvery)  },
+    { "办公文档",   "Office",     kGrpOffice, GRP_COUNT(kGrpOffice) },
+    { "图像媒体",   "Media",      kGrpMedia,  GRP_COUNT(kGrpMedia)  },
+    { "系统工具",   "System",     kGrpSystem, GRP_COUNT(kGrpSystem) },
+    { "游戏",       "Games",      kGrpGames,  GRP_COUNT(kGrpGames)  },
+    { "实验室",     "Labs",       kGrpLabs,   GRP_COUNT(kGrpLabs)   },
+};
+static const int kMenuGroupCount = GRP_COUNT(kMenuGroups);
+
+static bool menu_has_app(int app) {
+    for (int i = 0; i < s_all_count; i++) if (s_all_apps[i] == app) return true;
+    return false;
+}
+
+static void menu_add_app(int app) {
+    if (app < 0 || s_all_count >= (int)(sizeof(s_all_apps) / sizeof(s_all_apps[0]))) return;
+    if (menu_has_app(app)) return;
+    s_all_apps[s_all_count++] = app;
+}
+
+// Build both views: the flat unique catalogue (s_all_apps) and the grouped
+// row list (s_menu_apps + s_menu_group) rendered by build_start_menu.
+static int build_menu(int* list, int* groups) {
     int n = 0;
-    for (int i = 0; i < APP_BUILTIN_COUNT && n < 30; i++) list[n++] = i;
-    if (n < 30) list[n++] = APP_SETTINGS;
-    if (n < 30) list[n++] = APP_STORE;
+    s_all_count = 0;
+    for (int g = 0; g < kMenuGroupCount; g++) {
+        const MenuGroup& gr = kMenuGroups[g];
+        if (n < 190) { list[n] = -1; groups[n] = g; n++; }   // header row
+        for (int i = 0; i < gr.count; i++) {
+            int app = gr.ids[i];
+            if (app < 0) continue;
+            menu_add_app(app);
+            if (n < 191) { list[n] = app; groups[n] = -1; n++; }
+        }
+    }
+    // installed store apps (npkg) and user shortcuts that have no group of
+    // their own still have to be reachable
     int ids[8];
     int cnt = app_installed_list(ids, 8);
-    for (int i = 0; i < cnt && n < 30; i++) list[n++] = ids[i];
-    for (int i = 0; i < MAX_ICONS && n < 30; i++) {
+    bool extra = false;
+    for (int i = 0; i < cnt; i++) {
+        if (!menu_has_app(ids[i])) extra = true;
+    }
+    for (int i = 0; i < MAX_ICONS; i++) {
         if (!s_icons[i].used || s_icons[i].deleted) continue;
-        int a = s_icons[i].app;
-        bool dup = false;
-        for (int k = 0; k < n; k++) if (list[k] == a) { dup = true; break; }
-        if (!dup) list[n++] = a;
+        if (!menu_has_app(s_icons[i].app)) extra = true;
+    }
+    if (extra && n < 190) {
+        list[n] = -1; groups[n] = kMenuGroupCount; n++;       // "More / Store"
+        for (int i = 0; i < cnt; i++) {
+            if (menu_has_app(ids[i])) continue;
+            menu_add_app(ids[i]);
+            if (n < 191) { list[n] = ids[i]; groups[n] = -1; n++; }
+        }
+        for (int i = 0; i < MAX_ICONS; i++) {
+            if (!s_icons[i].used || s_icons[i].deleted) continue;
+            if (menu_has_app(s_icons[i].app)) continue;
+            menu_add_app(s_icons[i].app);
+            if (n < 191) { list[n] = s_icons[i].app; groups[n] = -1; n++; }
+        }
     }
     return n;
 }
 
 // ---- taskbar + start menu ----
+// forward declaration: the taskbar builds its per-window buttons through it
+static void build_taskbar_windows(lv_obj_t* bar, int W);
+
 static void build_taskbar(lv_obj_t* scr, int W, int H) {
     lv_obj_t* bar = lv_obj_create(scr);
     lv_obj_set_size(bar, W, TASKBAR_H);
@@ -1077,6 +1158,7 @@ static void build_taskbar(lv_obj_t* scr, int W, int H) {
     lv_obj_set_style_border_color(bar, lv_color_hex(0x4F5A66), 0);
     lv_obj_set_style_radius(bar, 0, 0);
     lv_obj_set_style_pad_all(bar, 0, 0);
+    lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);   // no phantom scrollbar on the strip
     lv_obj_move_foreground(bar);
 
     // start button
@@ -1091,29 +1173,178 @@ static void build_taskbar(lv_obj_t* scr, int W, int H) {
     lv_label_set_text(sl, T("开始", "Start"));
     lv_obj_set_style_text_color(sl, lv_color_hex(0xFFFFFF), 0);
     lv_obj_center(sl);
+    s_start_label = sl;
 
     // clock
     s_clock_label = lv_label_create(bar);
     lv_label_set_text(s_clock_label, "--:--");
     lv_obj_set_style_text_color(s_clock_label, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(s_clock_label, &lv_font_montserrat_14, 0);
-    lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_font(s_clock_label, &nefu::lv_font_cjk_16, 0);
+    // fixed width, right aligned: an auto-width label is clipped at the screen
+    // edge and the minutes digit went missing ("13:1")
+    lv_obj_set_width(s_clock_label, 52);
+    lv_obj_set_style_text_align(s_clock_label, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_long_mode(s_clock_label, LV_LABEL_LONG_CLIP);
+    lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -8, 0);
+
+    build_taskbar_windows(bar, W);
+    s_taskbar_bar = bar;
 }
 
-static void build_start_menu(lv_obj_t* scr, int W, int H) {
-    s_menu_count = build_menu(s_menu_apps);
-    int rows = s_menu_count;
-    int mw = 196;
-    int mh = rows * 26 + 10 + 32;
-    int mx = 4, my = H - TASKBAR_H - mh;
-    if (my < 0) {
-        // Too many apps to fit above the taskbar: cap the height and let
-        // LVGL scroll the item list (the Power Off row stays reachable).
-        mh = H - TASKBAR_H - 8;
-        my = H - TASKBAR_H - mh;
+// ---- taskbar window buttons ---------------------------------------------
+// One button per open window: click to focus it, click again to minimize it
+// (or restore it). Without them a minimized window is unreachable on the
+// bare kernel, which has no mouse by default.
+static void on_taskwin_click(lv_event_t* e) {
+    Window* w = (Window*)(intptr_t)lv_event_get_user_data(e);
+    if (!w || w->closed) return;
+    if (w->minimized) g_wm->toggle_minimize(w);
+    else {
+        g_wm->raise(w);
+        // clicking the focused window minimizes it, like every desktop
+        if (g_wm->focus() == w) g_wm->toggle_minimize(w);
     }
+}
+
+// LVGL app window button: restore a shrunk window (semantically "come back to
+// exactly where you were"), or just bring a visible one to the front.
+static void on_lvgl_taskwin_click(lv_event_t* e) {
+    LvglWin* lw = (LvglWin*)(intptr_t)lv_event_get_user_data(e);
+    if (!lw || !lw->win || !lw->open) return;
+    if (lw->minimized) lvgl_win_restore(lw);
+    else lv_obj_move_foreground(lw->win);
+    s_dirty = true;
+}
+
+// (re)create the per-window buttons. Called when the set of open windows
+// changes, so the buttons always match what is on screen.
+static void build_taskbar_windows(lv_obj_t* bar, int W) {
+    if (!bar) return;
+    if (s_taskwin_bar) { lv_obj_del(s_taskwin_bar); s_taskwin_bar = 0; }
+    // The container must have a real size: LVGL clips children to the parent,
+    // so the old 0x0 container made every window button invisible. It starts
+    // right of the Start button and stops short of the clock, and never
+    // overlaps either of them.
+    const int LX = 76;
+    const int LW = (W - 190 > 60) ? (W - 190) : 60;
+    s_taskwin_bar = lv_obj_create(bar);
+    lv_obj_set_size(s_taskwin_bar, LW, TASKBAR_H);
+    lv_obj_set_pos(s_taskwin_bar, LX, 0);
+    lv_obj_set_style_bg_opa(s_taskwin_bar, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(s_taskwin_bar, 0, 0);
+    lv_obj_set_style_radius(s_taskwin_bar, 0, 0);
+    lv_obj_set_style_pad_all(s_taskwin_bar, 0, 0);
+    lv_obj_remove_flag(s_taskwin_bar, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_move_foreground(s_taskwin_bar);
+
+    List<Window*>& ws = g_wm->windows();
+    int x = 0;
+    int room = LW;       // container width is the room
+    for (int i = 0; i < ws.size(); i++) {
+        Window* w = ws[i];
+        if (!w || w->closed || !w->visible) continue;
+        if (w->fullscreen) continue;
+        String t = w->title;
+        if (t.len() > 18) t = t.substr(0, 17);
+        lv_obj_t* b = lv_button_create(s_taskwin_bar);
+        int bw = 24 + t.len() * 8;
+        if (x + bw > room) break;
+        lv_obj_set_size(b, bw, 24);
+        lv_obj_set_pos(b, x, 3);
+        lv_obj_set_style_bg_color(b, lv_color_hex(w->minimized ? 0x3A4048 : 0x4F5A66), 0);
+        lv_obj_set_style_radius(b, 4, 0);
+        lv_obj_add_event_cb(b, on_taskwin_click, LV_EVENT_CLICKED, (void*)w);
+        lv_obj_t* l = lv_label_create(b);
+        lv_label_set_text(l, t.c_str());
+        lv_obj_set_style_text_color(l, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_text_font(l, &nefu::lv_font_cjk_16, 0);
+        lv_obj_center(l);
+        x += bw + 4;
+    }
+
+    // LVGL app windows (the majority of apps): every live one gets a button,
+    // a shrunk one shows dimmed and restores on click.
+    int nlv = lvgl_win_count();
+    for (int i = 0; i < nlv; i++) {
+        LvglWin* lw = lvgl_win_at(i);
+        if (!lw || !lw->open || !lw->win || lw->system_window) continue;
+        char t[24];
+        strncpy(t, lw->title[0] ? lw->title : "app", sizeof(t) - 1);
+        t[sizeof(t) - 1] = 0;
+        int tl = (int)strlen(t);
+        if (tl > 16) { t[16] = 0; tl = 16; }
+        int bw = 24 + tl * 8;
+        if (x + bw > room) break;
+        lv_obj_t* b = lv_button_create(s_taskwin_bar);
+        lv_obj_set_size(b, bw, 24);
+        lv_obj_set_pos(b, x, 3);
+        lv_obj_set_style_bg_color(b, lv_color_hex(lw->minimized ? 0x2C333B : 0x4F5A66), 0);
+        lv_obj_set_style_radius(b, 4, 0);
+        lv_obj_add_event_cb(b, on_lvgl_taskwin_click, LV_EVENT_CLICKED, (void*)(intptr_t)lw);
+        lv_obj_t* l = lv_label_create(b);
+        lv_label_set_text(l, t);
+        lv_obj_set_style_text_color(l, lv_color_hex(lw->minimized ? 0x9AA4B0 : 0xFFFFFF), 0);
+        lv_obj_set_style_text_font(l, &nefu::lv_font_cjk_16, 0);
+        lv_obj_center(l);
+        x += bw + 4;
+    }
+}
+
+// ---- start menu ---------------------------------------------------------
+static const char* group_title(int g) {
+    if (g >= 0 && g < kMenuGroupCount) return T(kMenuGroups[g].zh, kMenuGroups[g].en);
+    return T("更多应用", "More apps");
+}
+
+// Avatar colour derived from the account name: stable across reboots, and it
+// needs no image decoder and no bitmap asset (bare kernel friendly).
+static uint32_t avatar_color() {
+    const char* nm = g_uefi.username[0] ? g_uefi.username : "user";
+    uint8_t h[32];
+    nefu_sha256((const uint8_t*)nm, (uint32_t)strlen(nm), h);
+    static const uint32_t pal[8] = {
+        0x2E86DE, 0x8E44AD, 0x27AE60, 0xE67E22,
+        0xC0392B, 0x16A085, 0x34495E, 0xD35400,
+    };
+    return pal[h[0] & 7];
+}
+
+static void close_start_menu() {
+    if (s_start_menu) lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
+    s_start_open = false;
+}
+
+// account strip: click anywhere on it -> Settings (which owns the account page)
+static void on_account_click(lv_event_t* e) {
+    (void)e;
+    close_start_menu();
+    app_launch(APP_SETTINGS);
+}
+
+static void on_menu_power(lv_event_t* e) {
+    (void)e;
+    close_start_menu();
+    os_shutdown();          // saves the filesystem, then powers off
+}
+
+// The menu is a fixed header (avatar + account strip), a scrolling application
+// list grouped by category and a fixed footer (Settings / Power Off). The
+// footer never scrolls away, and the list scrolls through every entry, so no
+// app can be unreachable even though the desktop only carries 16 icons.
+static void build_start_menu(lv_obj_t* scr, int W, int H) {
+    s_menu_count = build_menu(s_menu_apps, s_menu_group);
+    int rows = s_menu_count;
+    const int MW = 254, HDR_H = 58, ROW_H = 24, FOOT_H = 66;
+    int avail = H - TASKBAR_H - 8;
+    int body_h = rows * 26 + 4;
+    int mh = HDR_H + body_h + FOOT_H;
+    if (mh > avail) { body_h = avail - HDR_H - FOOT_H; mh = avail; }
+    if (body_h < 96) { body_h = 96; mh = HDR_H + body_h + FOOT_H; }   // never a zero-height list
+    int mx = 6, my = H - TASKBAR_H - mh;
+    if (my < 2) my = 2;
+
     s_start_menu = lv_obj_create(scr);
-    lv_obj_set_size(s_start_menu, mw, mh);
+    lv_obj_set_size(s_start_menu, MW, mh);
     lv_obj_set_pos(s_start_menu, mx, my);
     lv_obj_set_style_bg_color(s_start_menu, lv_color_hex(0xF2F2F0), 0);
     lv_obj_set_style_bg_opa(s_start_menu, LV_OPA_COVER, 0);
@@ -1121,40 +1352,137 @@ static void build_start_menu(lv_obj_t* scr, int W, int H) {
     lv_obj_set_style_border_width(s_start_menu, 1, 0);
     lv_obj_set_style_border_color(s_start_menu, lv_color_hex(0xA0A8B0), 0);
     lv_obj_set_style_pad_all(s_start_menu, 0, 0);
-    lv_obj_set_scrollbar_mode(s_start_menu, LV_SCROLLBAR_MODE_AUTO);
+    lv_obj_remove_flag(s_start_menu, LV_OBJ_FLAG_SCROLLABLE);   // the body scrolls, not the panel
     lv_obj_add_flag(s_start_menu, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(s_start_menu);
 
-    int y = 4;
+    // ---- account strip: avatar + user name + gear ----
+    lv_obj_t* hdr = lv_button_create(s_start_menu);
+    lv_obj_set_size(hdr, MW - 4, HDR_H - 4);
+    lv_obj_set_pos(hdr, 2, 2);
+    lv_obj_set_style_bg_color(hdr, lv_color_hex(0xE3E8EE), 0);
+    lv_obj_set_style_radius(hdr, 6, 0);
+    lv_obj_set_style_shadow_width(hdr, 0, 0);
+    lv_obj_add_event_cb(hdr, on_account_click, LV_EVENT_CLICKED, 0);
+
+    lv_obj_t* av = lv_obj_create(hdr);
+    lv_obj_set_size(av, 38, 38);
+    lv_obj_set_pos(av, 9, 8);
+    lv_obj_set_style_radius(av, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(av, lv_color_hex(avatar_color()), 0);
+    lv_obj_set_style_bg_opa(av, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(av, 2, 0);
+    lv_obj_set_style_border_color(av, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_shadow_width(av, 0, 0);
+    lv_obj_remove_flag(av, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(av, LV_OBJ_FLAG_SCROLLABLE);
+    {
+        const char* nm = g_uefi.username[0] ? g_uefi.username : "user";
+        char ini[2];
+        ini[0] = nm[0];
+        if (ini[0] >= 'a' && ini[0] <= 'z') ini[0] = (char)(ini[0] - 'a' + 'A');
+        ini[1] = 0;
+        lv_obj_t* il = lv_label_create(av);
+        lv_label_set_text(il, ini);
+        lv_obj_set_style_text_font(il, &nefu::lv_font_cjk_16, 0);
+        lv_obj_set_style_text_color(il, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_center(il);
+        lv_obj_remove_flag(il, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* un = lv_label_create(hdr);
+        lv_label_set_text(un, nm);
+        lv_obj_set_pos(un, 54, 7);
+        lv_obj_set_style_text_color(un, lv_color_hex(0x1E2430), 0);
+        lv_obj_set_style_text_font(un, &nefu::lv_font_cjk_16, 0);
+        lv_obj_remove_flag(un, LV_OBJ_FLAG_CLICKABLE);
+
+        lv_obj_t* sub = lv_label_create(hdr);
+        lv_label_set_text(sub, T("本地账户 · 点击打开设置", "Local account"));
+        lv_obj_set_pos(sub, 54, 29);
+        lv_obj_set_style_text_color(sub, lv_color_hex(0x5A6472), 0);
+        lv_obj_set_style_text_font(sub, &nefu::lv_font_cjk_16, 0);
+        lv_obj_remove_flag(sub, LV_OBJ_FLAG_CLICKABLE);
+    }
+    lv_obj_t* gear = lv_label_create(hdr);
+    lv_label_set_text(gear, LV_SYMBOL_SETTINGS);
+    lv_obj_align(gear, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_set_style_text_color(gear, lv_color_hex(0x4A5464), 0);
+    lv_obj_set_style_text_font(gear, &nefu::lv_font_cjk_16, 0);
+    lv_obj_remove_flag(gear, LV_OBJ_FLAG_CLICKABLE);
+
+    // ---- scrolling, grouped application list ----
+    lv_obj_t* body = lv_obj_create(s_start_menu);
+    lv_obj_set_size(body, MW - 6, body_h);
+    lv_obj_set_pos(body, 3, HDR_H);
+    lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(body, 0, 0);
+    lv_obj_set_style_pad_all(body, 0, 0);
+    lv_obj_set_style_pad_right(body, 10, 0);   // room for the scrollbar
+    lv_obj_set_scroll_dir(body, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(body, LV_SCROLLBAR_MODE_AUTO);
+
+    int y = 2;
     for (int i = 0; i < rows; i++) {
-        lv_obj_t* it = lv_button_create(s_start_menu);
-        lv_obj_set_size(it, mw - 6, 24);
+        if (s_menu_apps[i] < 0) {
+            lv_obj_t* gl = lv_label_create(body);
+            lv_label_set_text(gl, group_title(s_menu_group[i]));
+            lv_obj_set_pos(gl, 8, y + 4);
+            lv_obj_set_style_text_color(gl, lv_color_hex(0x6B7785), 0);
+            lv_obj_set_style_text_font(gl, &nefu::lv_font_cjk_16, 0);
+            lv_obj_remove_flag(gl, LV_OBJ_FLAG_CLICKABLE);
+            y += 24;
+            continue;
+        }
+        lv_obj_t* it = lv_button_create(body);
+        lv_obj_set_size(it, MW - 22, ROW_H);
         lv_obj_set_pos(it, 3, y);
         lv_obj_set_style_bg_color(it, lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_style_radius(it, 4, 0);
+        lv_obj_set_style_shadow_width(it, 0, 0);
         lv_obj_add_event_cb(it, on_menu_launch, LV_EVENT_CLICKED, (void*)(intptr_t)i);
         lv_obj_t* l = lv_label_create(it);
         lv_label_set_text(l, app_name(s_menu_apps[i]));
         lv_obj_set_style_text_color(l, lv_color_hex(0x22262A), 0);
+        lv_obj_set_style_text_font(l, &nefu::lv_font_cjk_16, 0);
         lv_obj_align(l, LV_ALIGN_LEFT_MID, 10, 0);
-        y += 26;
+        y += ROW_H + 2;
     }
+
+    // ---- fixed footer: Settings + Power Off (always reachable) ----
+    int fy = HDR_H + body_h + 2;
     lv_obj_t* sep = lv_obj_create(s_start_menu);
-    lv_obj_set_size(sep, mw - 16, 1);
-    lv_obj_set_pos(sep, 8, y + 4);
+    lv_obj_set_size(sep, MW - 16, 1);
+    lv_obj_set_pos(sep, 8, fy);
     lv_obj_set_style_bg_color(sep, lv_color_hex(0xC0C4C8), 0);
     lv_obj_set_style_border_width(sep, 0, 0);
     lv_obj_set_style_radius(sep, 0, 0);
-    y += 10;
+    lv_obj_remove_flag(sep, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(sep, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* st = lv_button_create(s_start_menu);
+    lv_obj_set_size(st, MW - 8, ROW_H);
+    lv_obj_set_pos(st, 4, fy + 6);
+    lv_obj_set_style_bg_color(st, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_radius(st, 4, 0);
+    lv_obj_set_style_shadow_width(st, 0, 0);
+    lv_obj_add_event_cb(st, on_account_click, LV_EVENT_CLICKED, 0);
+    lv_obj_t* stl = lv_label_create(st);
+    lv_label_set_text(stl, T("设置", "Settings"));
+    lv_obj_set_style_text_color(stl, lv_color_hex(0x22262A), 0);
+    lv_obj_set_style_text_font(stl, &nefu::lv_font_cjk_16, 0);
+    lv_obj_align(stl, LV_ALIGN_LEFT_MID, 10, 0);
+
     lv_obj_t* po = lv_button_create(s_start_menu);
-    lv_obj_set_size(po, mw - 6, 24);
-    lv_obj_set_pos(po, 3, y);
+    lv_obj_set_size(po, MW - 8, ROW_H);
+    lv_obj_set_pos(po, 4, fy + 6 + ROW_H + 3);
     lv_obj_set_style_bg_color(po, lv_color_hex(0xF5DEDC), 0);
     lv_obj_set_style_radius(po, 4, 0);
-    lv_obj_add_event_cb(po, on_menu_launch, LV_EVENT_CLICKED, (void*)(intptr_t)(-1));
+    lv_obj_set_style_shadow_width(po, 0, 0);
+    lv_obj_add_event_cb(po, on_menu_power, LV_EVENT_CLICKED, 0);
     lv_obj_t* pl = lv_label_create(po);
     lv_label_set_text(pl, T("关机", "Power Off"));
     lv_obj_set_style_text_color(pl, lv_color_hex(0xC22A2A), 0);
+    lv_obj_set_style_text_font(pl, &nefu::lv_font_cjk_16, 0);
     lv_obj_align(pl, LV_ALIGN_LEFT_MID, 10, 0);
 }
 
@@ -1219,6 +1547,9 @@ static uint32_t window_signature() {
               (uint32_t)w->w * 17u + (uint32_t)w->h * 19u +
               (uint32_t)w->title.len() + (w->minimized ? 5u : 0u);
     }
+    // LVGL app windows: opening, closing or shrinking one must rebuild the
+    // taskbar buttons too, otherwise a shrunk window has no way back
+    sig = sig * 131u + lvgl_win_signature();
     return sig;
 }
 
@@ -1229,6 +1560,10 @@ static uint32_t window_signature() {
 static void desktop_lvgl_init(Surface& fb) {
     if (s_initialized) return;
     int W = fb.width, H = fb.height;
+    // the icon grid follows the real framebuffer size, not a fixed 800x600
+    s_scr_w = W;
+    s_scr_h = H;
+    desktop_grid_for(W, H);
     lv_init();
     s_fb_buf = (lv_color_t*)kalloc((size_t)W * 24u * 4u);
     if (!s_fb_buf) { s_initialized = true; return; }
@@ -1250,16 +1585,24 @@ static void desktop_lvgl_init(Surface& fb) {
     lv_indev_set_group(s_kb_indev, s_kb_group);
     lv_group_set_default(s_kb_group);
 
+    // The shell and every app window are bilingual. Montserrat carries no CJK
+    // glyphs, so the theme is re-armed with our own font: it becomes the
+    // default text font for every widget created from here on and knows how
+    // to resolve Chinese code points (ASCII still goes through Montserrat,
+    // see core/gui/lv_cjk_font.cpp).
+    lv_theme_default_init(s_disp, lv_color_hex(0x2F6FEB), lv_color_hex(0xE05A5A),
+                          false, &lv_font_cjk_16);
+
     lv_obj_t* scr = lv_screen_active();
     build_wallpaper(scr, W, H);
     // Icons are stored as a horizontal-first list: assign each shortcut its
-    // grid cell (GRID_COLS wide, GRID_ROWS tall) so every usable app is on
+    // grid cell (s_grid_cols wide, s_grid_rows tall) so every usable app is on
     // the desktop and nothing overflows below the taskbar / off-screen.
     int grid_i = 0;
     for (int i = 0; i < MAX_ICONS; i++) {
         if (!s_icons[i].used || s_icons[i].deleted) continue;
-        int col = grid_i % GRID_COLS, row = grid_i / GRID_COLS;
-        if (row >= GRID_ROWS) { s_icon_objs[i] = 0; continue; }  // defensive
+        int col = grid_i % s_grid_cols, row = grid_i / s_grid_cols;
+        if (row >= s_grid_rows) { s_icon_objs[i] = 0; continue; }  // defensive
         s_icons[i].x = 14 + col * (ICON_W + ICON_GAP);
         s_icons[i].y = 14 + row * (ICON_H + ICON_GAP);
         s_icon_objs[i] = make_icon(scr, i, s_icons[i].x, s_icons[i].y);
@@ -1277,13 +1620,29 @@ void desktop_mark_dirty() {
     s_dirty = true;
 }
 
+void desktop_dirty_rect(int x, int y, int w, int h) {
+    if (!s_initialized || !s_disp || w <= 0 || h <= 0) return;
+    lv_area_t a;
+    a.x1 = (int32_t)x;
+    a.y1 = (int32_t)y;
+    a.x2 = (int32_t)(x + w - 1);
+    a.y2 = (int32_t)(y + h - 1);
+    lv_obj_invalidate_area(lv_screen_active(), &a);
+}
+
 void desktop_paint(Surface& fb) {
     desktop_lvgl_init(fb);
     if (!s_initialized) return;
     int W = fb.width, H = fb.height;
     // external overlay changed? then repaint the full desktop
     uint32_t sig = window_signature();
-    if (sig != s_last_sig) { s_dirty = true; s_last_sig = sig; }
+    if (sig != s_last_sig) {
+        s_dirty = true;
+        s_last_sig = sig;
+        // the set of open windows (or their minimized state) changed: the
+        // taskbar buttons have to follow
+        if (s_taskbar_bar) build_taskbar_windows(s_taskbar_bar, W);
+    }
     if (s_dirty) {
         lv_obj_update_layout(lv_screen_active()); // layout first so coords exist
         lv_obj_invalidate(lv_screen_active());
@@ -1295,17 +1654,34 @@ void desktop_paint(Surface& fb) {
     lv_refr_now(s_disp);
     s_surf = 0;
 }
-
 void desktop_paint_boot(Surface& fb) {
     fb.fill(0x0012141A);
     int W = fb.width, H = fb.height;
     gfx::text_scale(fb, W / 2 - 4 * 8 * 4, H / 2 - 90, "nefuOS", color::WHITE, 0x0012141A, 4);
-    gfx::text(fb, W / 2 - 52, H / 2 - 18, "v0.1.0  C++/C  tiny OS", color::BLUE_LT, 0x0012141A);
+    gfx::text(fb, W / 2 - 52, H / 2 - 18, T("v0.1.0  C++/C  迷你操作系统", "v0.1.0  C++/C  tiny OS"), color::BLUE_LT, 0x0012141A);
     int bw = 300, bx = W / 2 - bw / 2, by = H / 2 + 16;
     gfx::rect(fb, bx, by, bw, 12, 0x00404A58);
     int p = (platform_tick_ms() / 40) % (bw - 8);
     gfx::fillrect(fb, bx + 3, by + 3, p, 6, color::BLUE_LT);
-    gfx::text(fb, W / 2 - 30, by + 18, "Loading...", color::TEXT2, 0x0012141A);
+    gfx::text(fb, W / 2 - 30, by + 18, T("正在加载...", "Loading..."), color::TEXT2, 0x0012141A);
+}
+
+// Smooth vertical wallpaper gradient. Used by the boot/lock/setup screens: a
+// flat fill plus a coarse "shading band" used to leave hard dark stripes on the
+// lower half of the screen on bare metal.
+static void paint_gradient(Surface& fb, uint32_t top, uint32_t bottom) {
+    int H = fb.height, W = fb.width;
+    if (H <= 0 || W <= 0) return;
+    int r0 = (int)((top >> 16) & 0xFF), g0 = (int)((top >> 8) & 0xFF), b0 = (int)(top & 0xFF);
+    int r1 = (int)((bottom >> 16) & 0xFF), g1 = (int)((bottom >> 8) & 0xFF), b1 = (int)(bottom & 0xFF);
+    for (int y = 0; y < H; y++) {
+        int k = (H > 1) ? (y * 255) / (H - 1) : 0;
+        int r = r0 + ((r1 - r0) * k) / 255;
+        int g = g0 + ((g1 - g0) * k) / 255;
+        int b = b0 + ((b1 - b0) * k) / 255;
+        gfx::fillrect(fb, 0, y, W, 1,
+                      ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b);
+    }
 }
 
 // Lock screen: full-screen wallpaper + UEFI username + password gate. Shown
@@ -1313,14 +1689,8 @@ void desktop_paint_boot(Surface& fb) {
 void desktop_paint_lock(Surface& fb) {
     uint32_t top, bottom, base;
     wallpaper_colors(g_settings.wallpaper_lock, &top, &bottom, &base);
-    fb.fill(top);
+    paint_gradient(fb, top, bottom);
     int W = fb.width, H = fb.height;
-    // bottom shading band so the panel stands out
-    for (int y = H - 200; y < H; y += 4) {
-        int t = (y - (H - 200)) * 30 / 200;
-        gfx::fillrect(fb, 0, y, W, 2,
-                      ((t >> 3) << 16) | ((t >> 2) << 8) | (t >> 2) | 0xFF000000);
-    }
     // big clock
     uint32_t sec = platform_seconds_of_day();
     char tbuf[24];
@@ -1332,20 +1702,20 @@ void desktop_paint_lock(Surface& fb) {
     gfx::fillrect(fb, px, py, 380, 132, 0xFF161C28);
     gfx::rect(fb, px, py, 380, 132, 0xFF3A4458);
     char line[96];
-    ksprintf(line, sizeof(line), "User: %s",
+    ksprintf(line, sizeof(line), T("用户: %s", "User: %s"),
              g_uefi.username[0] ? g_uefi.username : "user");
     gfx::text(fb, px + 16, py + 14, line, color::WHITE, 0xFF161C28);
-    gfx::text(fb, px + 16, py + 46, "Password:", color::BLUE_LT, 0xFF161C28);
+    gfx::text(fb, px + 16, py + 46, T("密码:", "Password:"), color::BLUE_LT, 0xFF161C28);
     int n = nefuos_lock_len();
     if (n > 40) n = 40;
     char stars[48];
     for (int i = 0; i < n; i++) stars[i] = '*';
     stars[n] = 0;
     gfx::text(fb, px + 120, py + 46, stars, color::WHITE, 0xFF161C28);
-    gfx::text(fb, px + 16, py + 80, "Enter = unlock   ESC = reboot", color::TEXT2, 0xFF161C28);
+    gfx::text(fb, px + 16, py + 80, T("回车 = 解锁   ESC = 重启", "Enter = unlock   ESC = reboot"), color::TEXT2, 0xFF161C28);
     uint32_t now = platform_tick_ms();
     if (nefuos_lock_fail_ms() && now - nefuos_lock_fail_ms() < 1500)
-        gfx::text(fb, px + 16, py + 104, "Wrong password - try again", color::RED, 0xFF161C28);
+        gfx::text(fb, px + 16, py + 104, T("密码错误,请重试", "Wrong password - try again"), color::RED, 0xFF161C28);
 }
 
 // First-boot setup wizard: full-screen account + browser-engine setup.
@@ -1353,20 +1723,22 @@ void desktop_paint_lock(Surface& fb) {
 void desktop_paint_setup(Surface& fb) {
     uint32_t top, bottom, base;
     wallpaper_colors(g_settings.wallpaper_boot, &top, &bottom, &base);
-    fb.fill(top);
+    paint_gradient(fb, top, bottom);
     int W = fb.width, H = fb.height;
     // panel
     int pw = 560, ph = 396, px = W / 2 - pw / 2, py = H / 2 - ph / 2;
     gfx::fillrect(fb, px, py, pw, ph, 0xFF161C28);
     gfx::rect(fb, px, py, pw, ph, 0xFF3A4458);
-    gfx::text_scale(fb, px + 24, py + 18, "nefuOS First Boot Setup", color::WHITE, 0xFF161C28, 2);
-    gfx::text(fb, px + 24, py + 52, "Create your account and choose the browser engine.",
+    gfx::text_scale(fb, px + 24, py + 18, T("nefuOS 首次启动设置", "nefuOS First Boot Setup"), color::WHITE, 0xFF161C28, 2);
+    gfx::text(fb, px + 24, py + 52, T("创建你的账户,并选择浏览器引擎。",
+                    "Create your account and choose the browser engine."),
               color::TEXT2, 0xFF161C28);
 
     int fy = py + 88;                 // first field top
     int fh = 46, fw = pw - 48;
     const char* labels[4] = {
-        "Username", "Password", "Confirm password", "Browser engine"
+        T("用户名", "Username"), T("密码", "Password"),
+        T("确认密码", "Confirm password"), T("浏览器引擎", "Browser engine")
     };
     int cur = nefuos_setup_field();
     for (int f = 0; f < 4; f++) {
@@ -1387,8 +1759,8 @@ void desktop_paint_setup(Surface& fb) {
             for (int i = 0; i < n; i++) val[i] = '*';
             val[n] = 0;
         } else {
-            strcpy(val, nefuos_setup_engine() == 1 ? "No Script (HTML only)"
-                                                   : "Mini JS (execute <script>)");
+            strcpy(val, nefuos_setup_engine() == 1 ? T("无脚本(仅 HTML)", "No Script (HTML only)")
+                                                   : T("Mini JS(执行 <script>)", "Mini JS (execute <script>)"));
         }
         gfx::text(fb, vx + 6, vy + 5, val, color::WHITE, 0xFF0D1117);
         // blinking caret in the active text field
@@ -1404,12 +1776,14 @@ void desktop_paint_setup(Surface& fb) {
         }
     }
     gfx::text(fb, px + 24, fy + 4 * (fh + 10) + 6,
-              "Tab = next field   Enter = continue   <-  -> = choose   ESC = finish",
+              T("Tab = 下一项   回车 = 继续   <-  -> = 选择   ESC = 完成",
+              "Tab = next field   Enter = continue   <-  -> = choose   ESC = finish"),
               color::TEXT2, 0xFF161C28);
     uint32_t fm = nefuos_setup_fail_ms();
     if (fm && platform_tick_ms() - fm < 2500) {
         gfx::text(fb, px + 24, fy + 4 * (fh + 10) + 26,
-                  "Passwords do not match or are empty - try again",
+                  T("两次密码不一致或为空,请重试",
+                  "Passwords do not match or are empty - try again"),
                   color::RED, 0xFF161C28);
     }
 }
@@ -1566,4 +1940,80 @@ bool desktop_handle_key(int keycode, char ascii, uint8_t mods, const char* utf8)
     return false;
 }
 
+// ===================== runtime screen-size adaptation =====================
+// The desktop must follow the real framebuffer size: the host window is sized
+// from the monitor's work area (and may be dragged/resized), the bare kernel
+// takes whatever VBE/GOP mode the firmware set (800x600, 1024x768, 1920x1080,
+// ...). Everything laid out in absolute pixels - wallpaper band, icon grid,
+// taskbar, start menu - is recomputed here instead of assuming 800x600.
+
+// Recreate the LVGL display at a new resolution: the draw buffer is sized for
+// 24 rows of the new width, so a wider window cannot overflow it.
+static void desktop_display_resize(int W, int H) {
+    if (!s_disp || W <= 0 || H <= 0) return;
+    if (lv_display_get_horizontal_resolution(s_disp) == W &&
+        lv_display_get_vertical_resolution(s_disp) == H) return;
+    size_t buf_bytes = (size_t)W * 24u * 4u;
+    lv_color_t* nb = (lv_color_t*)kalloc(buf_bytes);
+    if (!nb) return;
+    lv_display_set_resolution(s_disp, W, H);
+    lv_display_set_buffers(s_disp, nb, NULL, buf_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    if (s_fb_buf) kfree(s_fb_buf);
+    s_fb_buf = nb;
+}
+
+void desktop_on_screen_resize(int W, int H) {
+    if (W < 320 || H < 200) return;          // refuse nonsense sizes
+    s_scr_w = W;
+    s_scr_h = H;
+    desktop_grid_for(W, H);
+    if (!s_initialized) { s_dirty = true; return; }
+    desktop_display_resize(W, H);
+    if (s_wband) lv_obj_set_size(s_wband, W, H - TASKBAR_H);
+    // icons: reflow into the new grid
+    arrange_icons();
+    if (s_taskbar_bar) {
+        lv_obj_set_size(s_taskbar_bar, W, TASKBAR_H);
+        lv_obj_set_pos(s_taskbar_bar, 0, H - TASKBAR_H);
+        if (s_clock_label) {
+            lv_obj_set_width(s_clock_label, 52);
+            lv_obj_align(s_clock_label, LV_ALIGN_RIGHT_MID, -8, 0);
+        }
+        build_taskbar_windows(s_taskbar_bar, W);
+        lv_obj_move_foreground(s_taskbar_bar);
+    }
+    // the start menu is sized from the screen height: rebuild it (it is hidden
+    // unless open, so closing it here is not noticeable)
+    if (s_start_menu) {
+        lv_obj_delete(s_start_menu);
+        s_start_menu = 0;
+        s_start_open = false;
+        build_start_menu(lv_screen_active(), W, H);
+    }
+    s_dirty = true;
+}
+
+// Re-apply the current UI language to everything the desktop itself owns:
+// icon labels, the Start button, taskbar window buttons, start menu entries.
+// Called right after the language toggle, so switching is visible immediately
+// instead of only after a reboot.
+void desktop_relabel_lang() {
+    if (!s_initialized) return;
+    for (int i = 0; i < MAX_ICONS; i++) {
+        if (!s_icon_labels[i] || !s_icons[i].used || s_icons[i].deleted) continue;
+        lv_label_set_text(s_icon_labels[i], icon_label(s_icons[i].app));
+    }
+    if (s_start_label) lv_label_set_text(s_start_label, T("开始", "Start"));
+    if (s_watermark) lv_label_set_text(s_watermark, nefu::zh_ui("nefuOS 0.1  (LVGL GUI)"));
+    if (s_taskbar_bar) build_taskbar_windows(s_taskbar_bar, s_scr_w);
+    if (s_start_menu) {
+        lv_obj_delete(s_start_menu);
+        s_start_menu = 0;
+        s_start_open = false;
+        build_start_menu(lv_screen_active(), s_scr_w, s_scr_h);
+    }
+    s_dirty = true;
+}
+
 } // namespace nefu
+

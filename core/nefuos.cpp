@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS system main entry:init,input dispatch,frame loop
 #include "platform.h"
 #include "klib/klib.h"
@@ -20,10 +25,21 @@
 extern "C" void nefu_elf_selfcheck(void);   // VFS-backed Linux-ELF run (runelf path)
 extern "C" void nefu_deb_selftest(void);    // VFS-backed .deb install + run selftest
 extern "C" void nefu_x11_selftest(void);    // embedded X11 server + guest X client
+extern "C" void nefu_time_selftest(void);   // RTC decode + timezone contract (COM1)
 extern "C" void nefu_net_selftest(void);    // bare HTTP(S): npkg registry + update manifest
+extern "C" void nefu_net_selftest_reset(void);
+extern "C" bool nefu_net_selftest_step(void);
 #endif
 
 namespace nefu {
+
+// -1 = use the persisted /etc/settings.conf value, 0/1 = force English/Chinese
+// (host CLI `--lang N`; also handy for kiosk deployments).
+int g_lang_override = -1;
+
+// Off unless the host passes `--llm` (see core/platform.h): the int8 inference
+// engine is experimental, so the shipped chatbot stays on its rule table.
+bool g_llm_opt_in = false;
 
 // nefuLLM boot self-test (bare COM1): load the real model disk, build the
 // tokenizer workspace, run one short generation, log the result, then free
@@ -64,6 +80,7 @@ static bool s_inited = false;
 static bool s_booted = false;
 static uint32_t s_boot_start = 0;
 static bool s_net_selftest_done = false;
+static bool s_net_selftest_started = false;
 static int s_mx = -8, s_my = -8;
 // modifier key state: bit0=Shift bit1=Ctrl bit2=Alt (fed into KeyEvent.mods)
 static uint8_t s_mods = 0;
@@ -151,9 +168,18 @@ static void finish_setup() {
         g_vfs->write_file(conf, (const uint8_t*)buf, (uint32_t)strlen(buf));
     }
     // firstboot marker so the setup wizard does not run again
-    FSNode* d0 = g_vfs->mkdir("/var/lib/nefuos");
+    g_vfs->mkdir("/var/lib/nefuos");
     FSNode* m = g_vfs->create_file("/var/lib/nefuos/firstboot");
     if (m) g_vfs->write_file(m, (const uint8_t*)"done", 4);
+    // The account itself, for platforms whose firmware store is not writable
+    // (bare metal): nefuos_init() restores user + hash from here.
+    {
+        char abuf[160];
+        ksprintf(abuf, sizeof(abuf), "user=%s\nhash=%s\n", g_uefi.username,
+                 g_uefi.password_hash);
+        FSNode* af = g_vfs->create_file("/var/lib/nefuos/account");
+        if (af) g_vfs->write_file(af, (const uint8_t*)abuf, (uint32_t)strlen(abuf));
+    }
     s_setup = false;
     s_locked = true;
     s_lock_len = 0;
@@ -229,6 +255,7 @@ void nefuos_init() {
     uint8_t* data = 0;
     uint32_t sz = 0;
     bool storage = platform_fs_load(&data, &sz) && data;
+    bool fresh_nvfs = false;            // image built this boot (no disk copy yet)
     if (storage && nvfs::load_image(data, sz) && nvfs::mount(0)) {
         // Real NVFS image: journal replay already ran inside mount().
         nvfs::nvfs_to_vfs();
@@ -238,19 +265,81 @@ void nefuos_init() {
         // Legacy NFS1 snapshot: keep the tree, convert it to NVFS on save.
         klogf("legacy VFS snapshot loaded (%u bytes); converting to NVFS on save\n", sz);
         nvfs::init();
+        fresh_nvfs = true;
     } else {
         if (storage) nvfs::unmount();   // release the unreadable buffer
         nvfs::init();
         g_vfs->create_default_tree();
+        fresh_nvfs = true;
         klogf("no NVFS image found: fresh filesystem + default tree\n");
     }
     // even after loading a snapshot the standard hierarchy must exist
     g_vfs->ensure_standard_dirs();
     g_vfs->ensure_default_files();
+    // like a fresh Ubuntu install: every directory carries at least one real
+    // file, so no folder in the image is blank
+    g_vfs->seed_empty_dirs();
     // remove stray nodes left by an older browser_save_page that flattened
     // the whole path into a single name (e.g. "_usr_downloads_page_...")
     g_vfs->cleanup_stray_nodes();
+    // Account: bare metal has no writable firmware store (platform_uefi_save is
+    // a stub there), so the wizard keeps the account in the filesystem too.
+    // Apply it only when the platform itself has no password configured, which
+    // keeps a host-side uefi config or a manual setup authoritative.
+    if (g_uefi.password_hash[0] == 0) {
+        FSNode* acc = g_vfs->resolve("/var/lib/nefuos/account");
+        if (acc && acc->data && acc->size > 0 && acc->size < 512) {
+            char abuf[512];
+            memcpy(abuf, acc->data, acc->size);
+            abuf[acc->size] = 0;
+            char* u = strstr(abuf, "user=");
+            char* hh = strstr(abuf, "hash=");
+            if (u) {
+                u += 5;
+                char* e = u; while (*e && *e != '\n' && *e != '\r') e++;
+                *e = 0;
+                if (*u) strncpy(g_uefi.username, u, 31), g_uefi.username[31] = 0;
+            }
+            if (hh) {
+                hh += 5;
+                char* e = hh; while (*e && *e != '\n' && *e != '\r') e++;
+                *e = 0;
+                if (*hh) strncpy(g_uefi.password_hash, hh, 64), g_uefi.password_hash[64] = 0;
+            }
+            klogf("account restored from NVFS: user=%s\n", g_uefi.username);
+        }
+    }
+    klogf("nvfs: boot tree dirty: all=%d paths=%d\n", (int)g_vfs->dirty_all(), g_vfs->dirty_count());
+    // The steps above can change the tree on any boot, not just the first one:
+    // a later boot still fills directories that were empty in the image and adds
+    // default files that were missing. Persist those edits now — dirty_reset()
+    // below throws the dirty table away, so anything left unflushed here would
+    // silently vanish on the next boot.
+    if (nvfs::is_mounted() &&
+        (fresh_nvfs || g_vfs->dirty_all() || g_vfs->dirty_count() > 0)) {
+        klogf("nvfs: boot changes: all=%d paths=%d\n", (int)g_vfs->dirty_all(), g_vfs->dirty_count());
+        for (int i = 0; i < 4 && i < g_vfs->dirty_count(); i++)
+            klogf("  dirty: %s\n", g_vfs->dirty_path(i));
+        nvfs::vfs_to_nvfs();
+        int nw = nvfs::flush();
+        klogf("nvfs: boot tree written (%d blocks, %u free)\n",
+              nw, (unsigned)(nvfs::free_space() / 512));
+    }
+    // whatever the boot itself wrote is already mirrored
+    g_vfs->dirty_reset();
     settings_load();
+    // deployment / testing override: `nefuOS.exe --lang 1` forces Chinese even
+    // when /etc/settings.conf was written with another value. Applied after
+    // settings_load() (which resets the struct) and before the desktop builds
+    // its labels, so every T() picks the forced language.
+    if (g_lang_override >= 0) g_settings.lang = g_lang_override;
+    // Hand the persisted timezone to the time layer before anything draws a
+    // clock: time() is true UTC, localtime() and the desktop clock add this
+    // offset. /etc/settings.conf keeps tz=<minutes east> and rtc_utc=<0|1>.
+    platform_set_tz_offset_minutes(g_settings.tz_offset_min);
+    platform_set_rtc_is_utc(g_settings.rtc_is_utc);
+    klogf("time: tz=%d min, rtc=%s\n", g_settings.tz_offset_min,
+          g_settings.rtc_is_utc ? "utc" : "local");
     ime::init();
     apps_preinstall_defaults();   // ship store apps pre-installed
     store_load();
@@ -288,6 +377,7 @@ void nefuos_init() {
     nefu_elf_selfcheck();   // VFS-backed Linux-ELF run (runelf path), headless COM1
     nefu_deb_selftest();    // VFS-backed .deb install + run (headless COM1)
     nefu_x11_selftest();    // embedded X11 server + guest X client (headless COM1)
+    nefu_time_selftest();   // RTC decode + timezone contract (headless COM1)
     llm_boot_selftest();    // nefuLLM: load the real model disk + run one reply (COM1)
 #endif
     s_inited = true;
@@ -349,6 +439,10 @@ void nefuos_handle_key(int keycode, char ascii, bool down, const char* utf8) {
     // Track modifier keys (both down and up); they are consumed here and never
     // become normal key events. This is what powers Shift+/Ctrl+ shortcuts.
     if (keycode == KEY_SHIFT) { if (down) s_mods |= 0x01; else s_mods &= ~0x01; return; }
+    // Ctrl was never tracked, so every "mods & 0x02" test in the system was
+    // dead code (Ctrl+Shift+U, the browser's Ctrl+L/T/W shortcuts). Both
+    // backends already deliver KEY_CTRL, so tracking it is all that is needed.
+    if (keycode == KEY_CTRL)  { if (down) s_mods |= 0x02; else s_mods &= ~0x02; return; }
     if (keycode == KEY_FAST) {
         if (down) {
             s_mods |= 0x08;
@@ -473,6 +567,63 @@ void nefuos_handle_scroll(int delta) {
     g_wm->handle_scroll(delta);
 }
 
+// ---- NVFS write-back (autosave) ----
+// The bare-metal kernel commits the filesystem four times a second; the host
+// only every four seconds (platform_fs_flush_interval_ms decides). Only the
+// paths the VFS reported as changed are mirrored into the image, and flush()
+// writes just the blocks those paths dirtied: a full 4 MiB rebuild at this
+// cadence would be unaffordable on a PIO disk. A delete or a move cannot be
+// mirrored path by path, so the VFS raises dirty_all() and we fall back to the
+// original full rebuild for that interval.
+static uint32_t s_fs_flush_ms = 0;
+static bool     s_fs_flush_started = false;
+
+static void nvfs_autosave() {
+    if (!nvfs::is_mounted() || !g_vfs) return;
+    uint32_t now = platform_tick_ms();
+    if (!s_fs_flush_started) {           // first tick: just take the baseline
+        s_fs_flush_started = true;
+        s_fs_flush_ms = now;
+        return;
+    }
+    if (now - s_fs_flush_ms < platform_fs_flush_interval_ms()) return;
+    s_fs_flush_ms = now;
+
+    if (g_vfs->dirty_all()) {
+        nvfs::vfs_to_nvfs();
+        g_vfs->dirty_reset();
+        int n = nvfs::flush();
+        klogf("nvfs: rebuild, %d blocks written\n", n);
+        return;
+    }
+    int count = g_vfs->dirty_count();
+    if (count == 0) {
+        if (nvfs::dirty_blocks() > 0) nvfs::flush();   // e.g. journal cleared on mount
+        return;
+    }
+    for (int i = 0; i < count; i++) {
+        if (!nvfs::sync_path(g_vfs->dirty_path(i))) {
+            klogf("nvfs: cannot mirror %s, rebuilding image\n", g_vfs->dirty_path(i));
+            nvfs::vfs_to_nvfs();
+            g_vfs->dirty_reset();
+            nvfs::flush();
+            return;
+        }
+    }
+    g_vfs->dirty_drop(count);
+    if (nvfs::flush() < 0)
+        klogf("nvfs: flush failed, %u blocks pending\n", nvfs::dirty_blocks());
+}
+
+void nefuos_screen_resized(int w, int h) {
+    if (w < 320 || h < 200) return;
+    klogf("screen: resized to %dx%d\n", w, h);
+    desktop_on_screen_resize(w, h);
+    // windows that now sit outside the smaller work area are pulled back in
+    // on the next paint (wm.cpp clamps against the live screen size)
+    desktop_mark_dirty();
+}
+
 void nefuos_tick() {
     // audio heartbeat: keep the real sound card fed (mix + submit each tick)
 #ifdef NEFU_BARE
@@ -485,9 +636,17 @@ void nefuos_tick() {
     }
     if (g_net.up) {
         net_poll();   // drain NIC
-        // deferred link self-test: run once a few seconds after boot so the
-        // cold-start path stays fast (ping/tcp waits must not block init)
-        if (!s_net_selftest_done && s_booted &&
+        // Deferred link self-test: run once a few seconds after boot so the
+        // cold-start path stays fast (ping/tcp waits must not block init).
+        //
+        // It must also wait for the first-boot wizard to be finished: the
+        // self-test is a long blocking chain (ping + TLS + a 3 MB bundle
+        // download + matchmaking + a WebSocket round trip) that takes tens of
+        // seconds. Running it while the wizard is up freezes the UI, and the
+        // keystrokes typed into the wizard are lost, so the setup never
+        // completes and the desktop never appears. Only start it once the
+        // user is actually in.
+        if (!s_net_selftest_done && s_booted && !s_setup && !s_locked &&
             platform_tick_ms() - s_boot_start > 3000) {
             s_net_selftest_done = true;
             uint32_t t0 = platform_tick_ms();
@@ -517,17 +676,42 @@ void nefuos_tick() {
             // Runs here (a few seconds after boot) because platform_tick_ms is
             // live in the main loop - at cold init the tick source is not yet
             // running and timeout loops would spin forever.
-            nefu_net_selftest();
+            //
+            // The self-test is stepped, not run in one go: a monolithic run
+            // blocks the single bare thread for tens of seconds and the UI
+            // freezes with it. The link check below stays in this branch; the
+            // HTTP(S) self-test advances one step per frame further down.
+            nefu_net_selftest_reset();
+            s_net_selftest_started = true;
 #endif
         }
+#ifdef NEFU_BARE
+        // Advance the bare HTTP(S) self-test by one step per frame. Each step
+        // is a separate network round trip, so the UI keeps running between
+        // them instead of freezing for the whole chain.
+        if (s_net_selftest_started && !s_net_selftest_done) {
+            if (nefu_net_selftest_step()) s_net_selftest_done = true;
+        }
+#endif
     }
     // per-window animation / game update heartbeat
     if (g_wm) g_wm->tick();
+    // filesystem write-back (bare: 4x per second, host: every 4 s)
+    if (s_inited && !s_setup) nvfs_autosave();
 }
 
 void nefuos_frame() {
     if (!s_inited) return;
     Surface fb = screen_surface();
+    // Bare metal paints its own pointer. LVGL only redraws dirty regions, so
+    // the pixel under the previous arrow has to be invalidated before the
+    // desktop pass, otherwise every move leaves a trail of cursors behind.
+    static int s_cur_drawn_x = -1, s_cur_drawn_y = -1;
+    if (s_mx >= 0 && s_my >= 0 && platform_name()[0] == 'b' &&
+        s_cur_drawn_x >= 0 && (s_cur_drawn_x != s_mx || s_cur_drawn_y != s_my) &&
+        s_booted && !s_locked && !s_setup) {
+        desktop_dirty_rect(s_cur_drawn_x - 1, s_cur_drawn_y - 1, 10, 15);
+    }
     // Blue screen: paint it INSTEAD of the desktop + windows so it fills the
     // whole screen and nothing can overlap it.
     if (g_crash_active) {
@@ -568,7 +752,9 @@ void nefuos_frame() {
     // host the real system cursor is used, so painting one here would leave
     // trails on the LVGL desktop (LVGL redraws only invalid regions).
     if (s_mx >= 0 && s_my >= 0 && platform_name()[0] == 'b') draw_cursor(fb, s_mx, s_my);
+    if (platform_name()[0] == 'b') { s_cur_drawn_x = s_mx; s_cur_drawn_y = s_my; }
     platform_present();
 }
 
 } // namespace nefu
+

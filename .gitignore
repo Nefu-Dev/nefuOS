@@ -55,6 +55,16 @@ crash.txt
 crash_pre*.txt
 crash_test_backup.txt
 
+# Local verification / test output (never upload)
+verify_out/
+_sweep_out/
+verify_bsod/
+media_verify/
+nai_history/
+
+# Downloaded third-party drops kept locally
+ventoy-*/
+
 _p_*.py
 a/
 

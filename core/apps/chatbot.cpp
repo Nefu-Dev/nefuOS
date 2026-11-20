@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS tiny chatbot -- core/apps/chatbot.cpp
 // ----------------------------------------------------------------------------
 // an intentionally MINIMAL conversational AI: no reasoning, no inference, no
@@ -33,6 +38,7 @@ static size_t            g_sc_sz = 0;
 
 static bool llm_try_load() {
     if (g_llm) return true;
+    if (!nefu::g_llm_opt_in) return false;   // rules unless started with --llm
     uint8_t* blob = 0; uint32_t blob_sz = 0;
     if (!nefu::platform_llm_load(&blob, &blob_sz)) return false;
     size_t ws = nefu::llm::llm_workspace_needed(blob, blob_sz);
@@ -40,7 +46,7 @@ static bool llm_try_load() {
     if (!wp) { nefu::kfree(blob); return false; }
     nefu::llm::Model* m = 0;
     if (nefu::llm::llm_load(blob, blob_sz, wp, ws, &m) != 0) {
-        nefu::kfree(blob); nefu::kfree(wp); return false;
+        kfree(blob); kfree(wp); return false;
     }
     size_t sc = nefu::llm::llm_scratch_needed(m);
     void* sp = nefu::kalloc(sc ? sc : 1);
@@ -141,17 +147,29 @@ struct ChatState {
     }
 
     // ---- tiny "model": keyword -> template table ----
-    struct Rule { const char* key; const char* const* out; int nout; };
+    // every rule carries a Chinese and an English reply set; the UI language
+    // decides which one is spoken (the neural path below is English-only).
+    struct Rule { const char* key; const char* const* out; const char* const* en; int nout; };
     static const char* const R_HELLO[3];
+    static const char* const R_HELLO_EN[3];
     static const char* const R_WHO[3];
+    static const char* const R_WHO_EN[3];
     static const char* const R_MAKER[3];
+    static const char* const R_MAKER_EN[3];
     static const char* const R_OS[3];
+    static const char* const R_OS_EN[3];
     static const char* const R_HELP[3];
+    static const char* const R_HELP_EN[3];
     static const char* const R_FEEL[3];
+    static const char* const R_FEEL_EN[3];
     static const char* const R_THANKS[2];
+    static const char* const R_THANKS_EN[2];
     static const char* const R_BYE[3];
+    static const char* const R_BYE_EN[3];
     static const char* const R_JOKE[2];
+    static const char* const R_JOKE_EN[2];
     static const char* const R_FALLBACK[5];
+    static const char* const R_FALLBACK_EN[5];
 
     static const Rule RULES[34];
     static const int  RULE_COUNT = 34;
@@ -183,21 +201,24 @@ struct ChatState {
         lower_ascii(text, buf, sizeof(buf));
         for (int r = 0; r < RULE_COUNT; r++) {
             if (strstr(buf, RULES[r].key)) {
+                const char* const* set = (g_settings.lang == 0 && RULES[r].en)
+                    ? RULES[r].en : RULES[r].out;
                 int t = rule_turn[r] % RULES[r].nout;
                 rule_turn[r]++;
-                add(RULES[r].out[t], true);
+                add(set[t], true);
                 return;
             }
         }
         // fallback: no rule hit
+        const char* const* fb = (g_settings.lang == 0) ? R_FALLBACK_EN : R_FALLBACK;
         int t = rule_turn[RULE_COUNT] % 5;
         rule_turn[RULE_COUNT]++;
-        add(R_FALLBACK[t], true);
+        add(fb[t], true);
     }
 
     void submit() {
         if (input_len == 0) {
-            add("(没有文字。说点什么，比如：你好)", true);
+            add(T("(没有文字。说点什么，比如：你好)", "(empty line -- try: hello)"), true);
             return;
         }
         add(input, false);
@@ -261,12 +282,14 @@ struct ChatState {
 
         // header strip
         gfx::fillrect(s, 0, 0, W, 22, 0x002E3A46);
-        gfx::text(s, M, 4, "nefu TinyBot — 内置真实模型（68M，英文推理）", 0xFFFFFFFF, 0x002E3A46);
+        gfx::text(s, M, 4, T("nefu TinyBot - 内置规则表（中/英）| --llm：68M 模型",
+                             "nefu TinyBot - rule table (EN/ZH) | --llm: 68M model"),
+                  0xFFFFFFFF, 0x002E3A46);
 
         // tuning bar: 温度 / 重复惩罚 两个滑块
         gfx::fillrect(s, 0, 22, W, SL_TOP + 2 * SL_ROWH - 22, 0x00EEF1F5);
-        draw_slider(s, SL_TOP + 2, "温度", temp_cs, SL_TEMP_MIN, SL_TEMP_MAX, 0x001F6FEB);
-        draw_slider(s, SL_TOP + 2 + SL_ROWH, "重复惩罚", rep_cs, SL_REP_MIN, SL_REP_MAX, 0x0026A269);
+        draw_slider(s, SL_TOP + 2, T("温度", "Temp"), temp_cs, SL_TEMP_MIN, SL_TEMP_MAX, 0x001F6FEB);
+        draw_slider(s, SL_TOP + 2 + SL_ROWH, T("重复", "Repeat"), rep_cs, SL_REP_MIN, SL_REP_MAX, 0x0026A269);
 
         // input line at the bottom
         int in_y = H - 26;
@@ -301,7 +324,7 @@ struct ChatState {
 namespace nefu { namespace tinybot {
 
 const char* const ChatState::R_HELLO[3] = {
-    "你好！我是 TinyBot。英文输入走本地真实模型，中文走内置规则。",
+    "你好！我是 TinyBot，nefuOS 内置的聊天 AI。",
     "嗨～ 我能陪你聊几句，但真的没脑子。",
     "哈喽！关键词匹配，命中即答。",
 };
@@ -351,41 +374,93 @@ const char* const ChatState::R_FALLBACK[5] = {
     "我的“大脑”就一张表，能答的有限。",
 };
 
+// ---- the same rule table speaking English (default UI language) ----
+const char* const ChatState::R_HELLO_EN[3] = {
+    "Hello! I am TinyBot, the chat AI built into nefuOS.",
+    "Hi there. I can chat a little -- no thinking, just patterns.",
+    "Hey! Say a keyword and I answer. That is the whole trick.",
+};
+const char* const ChatState::R_WHO_EN[3] = {
+    "I am TinyBot, the smallest chat AI nefuOS ships.",
+    "Name? TinyBot. My brain is one keyword table.",
+    "I am TinyBot. No reasoning, no weights, just rules.",
+};
+const char* const ChatState::R_MAKER_EN[3] = {
+    "I am a small C++ app written into nefuOS by its developer.",
+    "Who made me? A few hundred lines of pattern matching.",
+    "My creator gave me a keyword table, not a brain.",
+};
+const char* const ChatState::R_OS_EN[3] = {
+    "I live inside nefuOS, a desktop OS written in C++.",
+    "nefuOS: two backends, a Windows host build and a bare-metal kernel.",
+    "I am one of the native apps of nefuOS.",
+};
+const char* const ChatState::R_HELP_EN[3] = {
+    "Try: hello / who are you / tell me a joke / bye.",
+    "What I do: match keywords, return a canned line. That is all.",
+    "Type Chinese or English -- a rule hit gets you an answer.",
+};
+const char* const ChatState::R_FEEL_EN[3] = {
+    "Doing fine! No thinking means no worries.",
+    "Very stable -- I have no feelings to begin with.",
+    "Status: online. Model: tiny. Mood: none.",
+};
+const char* const ChatState::R_THANKS_EN[2] = {
+    "You are welcome (not that I did much).",
+    "Got it. Happy to match a keyword for you.",
+};
+const char* const ChatState::R_BYE_EN[3] = {
+    "Bye! Press Esc to close me.",
+    "See you. I will not miss you -- I cannot.",
+    "Later! Hope you can still find me next time.",
+};
+const char* const ChatState::R_JOKE_EN[2] = {
+    "Joke: I am the most power-efficient AI, because I never think.",
+    "A programmer joke: 0 and 1 meet. 1 says: you have no weight.",
+};
+const char* const ChatState::R_FALLBACK_EN[5] = {
+    "Hmm, I did not catch that. Fine -- I have no thinking to begin with.",
+    "That is outside my rule table. Try something I can hit?",
+    "I am a tiny model: a handful of keywords, nothing more.",
+    "Mm-hm (pretending to understand). Go on?",
+    "My brain is one table, so my answers are limited.",
+};
+
 const ChatState::Rule ChatState::RULES[34] = {
-    { "who are you", R_WHO, 3 },
-    { "你是谁",       R_WHO, 3 },
-    { "你叫什么",     R_WHO, 3 },
-    { "名字",         R_WHO, 3 },
-    { "谁做",         R_MAKER, 3 },
-    { "谁创建",       R_MAKER, 3 },
-    { "作者",         R_MAKER, 3 },
-    { "created by",   R_MAKER, 3 },
-    { "help",         R_HELP, 3 },
-    { "帮助",         R_HELP, 3 },
-    { "能做什么",     R_HELP, 3 },
-    { "你会什么",     R_HELP, 3 },
-    { "how are you",  R_FEEL, 3 },
-    { "好吗",         R_FEEL, 3 },
-    { "怎么样",       R_FEEL, 3 },
-    { "thank",        R_THANKS, 2 },
-    { "谢谢",         R_THANKS, 2 },
-    { "感谢",         R_THANKS, 2 },
-    { "bye",          R_BYE, 3 },
-    { "再见",         R_BYE, 3 },
-    { "拜拜",         R_BYE, 3 },
-    { "退出",         R_BYE, 3 },
-    { "joke",         R_JOKE, 2 },
-    { "笑话",         R_JOKE, 2 },
-    { "讲个",         R_JOKE, 2 },
-    { "hello",        R_HELLO, 3 },
-    { "hi",           R_HELLO, 3 },
-    { "你好",         R_HELLO, 3 },
-    { "嗨",           R_HELLO, 3 },
-    { "哈喽",         R_HELLO, 3 },
-    { "nefuos",       R_OS, 3 },
-    { "nefu",         R_OS, 3 },
-    { "操作系统",     R_OS, 3 },
-    { "系统",         R_OS, 3 },
+    { "who are you", R_WHO,        R_WHO_EN,        3 },
+    { "你是谁",       R_WHO,        R_WHO_EN,        3 },
+    { "你叫什么",     R_WHO,        R_WHO_EN,        3 },
+    { "名字",         R_WHO,        R_WHO_EN,        3 },
+    { "谁做",         R_MAKER,      R_MAKER_EN,      3 },
+    { "谁创建",       R_MAKER,      R_MAKER_EN,      3 },
+    { "作者",         R_MAKER,      R_MAKER_EN,      3 },
+    { "created by",   R_MAKER,      R_MAKER_EN,      3 },
+    { "help",         R_HELP,       R_HELP_EN,       3 },
+    { "帮助",         R_HELP,       R_HELP_EN,       3 },
+    { "能做什么",     R_HELP,       R_HELP_EN,       3 },
+    { "你会什么",     R_HELP,       R_HELP_EN,       3 },
+    { "how are you",  R_FEEL,       R_FEEL_EN,       3 },
+    { "好吗",         R_FEEL,       R_FEEL_EN,       3 },
+    { "怎么样",       R_FEEL,       R_FEEL_EN,       3 },
+    { "thank",        R_THANKS,     R_THANKS_EN,     2 },
+    { "谢谢",         R_THANKS,     R_THANKS_EN,     2 },
+    { "感谢",         R_THANKS,     R_THANKS_EN,     2 },
+    { "bye",          R_BYE,        R_BYE_EN,        3 },
+    { "再见",         R_BYE,        R_BYE_EN,        3 },
+    { "拜拜",         R_BYE,        R_BYE_EN,        3 },
+    { "退出",         R_BYE,        R_BYE_EN,        3 },
+    { "joke",         R_JOKE,       R_JOKE_EN,       2 },
+    { "笑话",         R_JOKE,       R_JOKE_EN,       2 },
+    { "讲个",         R_JOKE,       R_JOKE_EN,       2 },
+    { "hello",        R_HELLO,      R_HELLO_EN,     3 },
+    { "hi",           R_HELLO,      R_HELLO_EN,     3 },
+    { "你好",         R_HELLO,      R_HELLO_EN,     3 },
+    { "嗨",           R_HELLO,      R_HELLO_EN,     3 },
+    { "哈喽",         R_HELLO,      R_HELLO_EN,     3 },
+    { "nefuos",       R_OS,         R_OS_EN,        3 },
+    { "nefu",         R_OS,         R_OS_EN,        3 },
+    { "操作系统",     R_OS,         R_OS_EN,        3 },
+    { "系统",         R_OS,         R_OS_EN,        3 },
 };
 
 }} // namespace
@@ -460,11 +535,13 @@ static void bot_close(Window* w) {
 void nefu::chatbot_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("TinyBot", x, y, WIN_W, WIN_H);
+    Window* w = g_wm->create_window(T("小机器人", "TinyBot"), x, y, WIN_W, WIN_H);
     if (!w) return;
     ChatState* b = new ChatState();
-    b->add("我是 TinyBot，nefuOS 内置聊天 AI：英文走本地真实模型，中文走内置规则。", true);
-    b->add("用英文问（如 Once upon a time / What is a cat?）会由 68M 神经网络推理作答。", true);
+    b->add(T("我是 TinyBot，nefuOS 内置的聊天 AI：中英文都由内置规则表作答。",
+             "I am TinyBot, the chat AI built into nefuOS: I answer from a built-in rule table, English or Chinese."), true);
+    b->add(T("启动 nefuOS 时加 --llm，我就能用本地 68M 神经网络推理；Esc 关窗。",
+             "Start nefuOS with --llm and the local 68M neural net can think for me. Esc closes me."), true);
     w->userdata = b;
     w->on_paint = bot_paint;
     w->on_key = bot_key;
@@ -472,3 +549,4 @@ void nefu::chatbot_launch() {
     w->on_close = bot_close;
     g_wm->raise(w);
 }
+

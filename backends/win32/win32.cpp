@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Win32
 // compile: g++ ... backends/win32/win32.cpp -lgdi32 -luser32
 #include <windows.h>
@@ -20,6 +25,7 @@
 #include "../../core/apps/apps.h"  // app_launch for --app
 #include "../../core/apps/npkg.h"  // npkg_gui_* registry API (--npkg-test)
 #include "../../core/apps/update.h" // update_run_pipeline (--update-test)
+#include "../../core/apps/minijs.h"  // JS engine self-test (--jstest)
 #include "../../core/apps/bios.h"  // classic BIOS setup utility (F2 boot key)
 #include "../../core/net/tls13.h"
 #include "../../core/lib/deflate.h"
@@ -27,7 +33,10 @@
 
 using namespace nefu;
 
-static const int SW = 800, SH = 600;
+// Framebuffer size. Not fixed any more: it is derived from the monitor work
+// area at startup and follows the window when the user resizes it, so the
+// desktop can adapt to whatever resolution the machine actually runs at.
+static int SW = 800, SH = 600;
 static const char* PERSIST_FILE = "nefuos.fs";
 
 static HWND s_hwnd = 0;
@@ -35,6 +44,51 @@ static HBITMAP s_dib = 0;
 static void* s_bits = 0;
 static uint32_t s_heap_used = 0;
 static uint8_t s_mouse_buttons = 0;
+
+// (Re)create the 32bpp top-down DIB the whole core draws into. Destroying the
+// old section while the window still paints is safe: nothing references the
+// bits between frames.
+static bool dib_reset(int w, int h) {
+    if (w < 320 || h < 200) return false;
+    if (w == SW && h == SH && s_dib && s_bits) return true;
+    BITMAPINFO bi;
+    memset(&bi, 0, sizeof(bi));
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = -h;   // top-down
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    HDC sdc = GetDC(0);
+    HBITMAP nb = CreateDIBSection(sdc, &bi, DIB_RGB_COLORS, &s_bits, 0, 0);
+    ReleaseDC(0, sdc);
+    if (!nb || !s_bits) return false;
+    if (s_dib) DeleteObject(s_dib);
+    s_dib = nb;
+    SW = w;
+    SH = h;
+    return true;
+}
+
+// Choose the startup client size: the monitor work area, minus a little
+// breathing room, never smaller than 800x600 and never larger than 1920x1200
+// (bigger framebuffers only cost CPU in a software renderer).
+static void pick_initial_size(int* out_w, int* out_h) {
+    int w = 800, h = 600;
+    RECT wa;
+    if (SystemParametersInfoA(0x0030 /* SPI_GETWORKAREA */, 0, &wa, 0)) {
+        w = wa.right - wa.left;
+        h = wa.bottom - wa.top;
+        w -= 16;              // keep a visible border
+        h -= 16;
+    }
+    if (w < 800) w = 800;
+    if (h < 600) h = 600;
+    if (w > 1920) w = 1920;
+    if (h > 1200) h = 1200;
+    *out_w = w;
+    *out_h = h;
+}
 
 // ---------------- platform implementation ----------------
 namespace nefu {
@@ -191,7 +245,13 @@ void* platform_thread_create(void (*func)(void*), void* arg) {
 
 void* platform_thread_create_stk(void (*func)(void*), void* arg, uint32_t stack_bytes) {
     DWORD tid;
-    HANDLE h = CreateThread(0, stack_bytes, (LPTHREAD_START_ROUTINE)func, arg, 0, &tid);
+    // STACK_SIZE_PARAM_IS_A_RESERVATION: without this flag dwStackSize is a
+    // COMMIT size and the RESERVE stays at the PE default (16MB via
+    // -Wl,--stack) — so a "256MB stack" request actually reserved only 16MB
+    // and quickjs's parser recursion (deep nesting in bloxd.io's inline
+    // bundle) walked past the stack base into the guard page (0xC0000005).
+    HANDLE h = CreateThread(0, stack_bytes, (LPTHREAD_START_ROUTINE)func, arg,
+                            0x00010000 /* STACK_SIZE_PARAM_IS_A_RESERVATION */, &tid);
     return (void*)h;
 }
 
@@ -267,6 +327,22 @@ bool platform_rtc_date(DateInfo* out) {
     return true;
 }
 
+// Windows owns the timezone: report the real bias and ignore attempts to set it.
+// (The kernel's own localtime()/clock path only exists on bare; the host build
+// links the real CRT, which already knows about the zone.)
+int platform_tz_offset_minutes() {
+    TIME_ZONE_INFORMATION tzi;
+    DWORD r = GetTimeZoneInformation(&tzi);
+    // Bias is minutes WEST of UTC; nefuOS wants minutes EAST.
+    int east = -(int)tzi.Bias;
+    if (r == TIME_ZONE_ID_DAYLIGHT) east -= (int)tzi.DaylightBias;
+    else                          east -= (int)tzi.StandardBias;
+    return east;
+}
+void platform_set_tz_offset_minutes(int minutes) { (void)minutes; }
+bool platform_rtc_is_utc() { return false; }
+void platform_set_rtc_is_utc(bool on) { (void)on; }
+
 void platform_dbg(const char* s) {
     OutputDebugStringA(s);
     fputs(s, stdout);
@@ -290,12 +366,38 @@ bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
     return true;
 }
 
-// No LLM model file convention on the host backend either; returning false
-// makes the chatbot fall back to its built-in rule table.
+// The real nefuLLM weights ship as a single NEFL blob (llm_model.img, ~68 MB).
+// Probe the usual spots so both `cd dist; .\nefuOS.exe` and a repo-root launch
+// find it; a missing or malformed file simply leaves the chatbot on its rule
+// table.
 bool platform_llm_load(uint8_t** out, uint32_t* out_size) {
     if (out) *out = 0;
     if (out_size) *out_size = 0;
-    return false;
+    static const char* kModelPaths[] = {
+        "llm_model.img",
+        "dist\\llm_model.img",
+        "..\\dist\\llm_model.img"
+    };
+    FILE* f = 0;
+    for (int i = 0; i < 3 && !f; i++) f = fopen(kModelPaths[i], "rb");
+    if (!f) { klogf("llm: no llm_model.img next to the exe\n"); return false; }
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (n <= 4096 || n > (long)(256u * 1024u * 1024u)) { fclose(f); return false; }
+    uint8_t* buf = (uint8_t*)kalloc((size_t)n);
+    if (!buf) { fclose(f); return false; }
+    size_t r = fread(buf, 1, (size_t)n, f);
+    fclose(f);
+    if (r != (size_t)n || memcmp(buf, "NEFL", 4) != 0) {
+        kfree(buf);
+        klogf("llm: llm_model.img is not a NEFL blob\n");
+        return false;
+    }
+    *out = buf;
+    *out_size = (uint32_t)n;
+    klogf("llm: loaded model blob %u bytes\n", (unsigned)n);
+    return true;
 }
 
 void platform_fs_save(const uint8_t* data, uint32_t size) {
@@ -304,6 +406,40 @@ void platform_fs_save(const uint8_t* data, uint32_t size) {
     fwrite(data, 1, size, f);
     fclose(f);
 }
+
+// Incremental write-back: overwrite just the blocks that changed since the
+// last flush. When the file on disk is missing or a different length a partial
+// write would leave a truncated image the next boot cannot mount, so those two
+// cases drop back to a full save.
+bool platform_fs_save_range(const uint8_t* data, uint32_t total_size,
+                            uint32_t first_block, uint32_t count) {
+    if (!data || total_size == 0 || count == 0) return false;
+    uint32_t off = first_block * 512u;
+    if (off >= total_size) return true;                 // nothing left to write
+    uint32_t len = count * 512u;
+    if (off + len > total_size) len = total_size - off;
+    long have = 0;
+    FILE* rf = fopen(PERSIST_FILE, "rb");
+    if (rf) {
+        fseek(rf, 0, SEEK_END);
+        have = ftell(rf);
+        fclose(rf);
+    }
+    if (have != (long)total_size) {                     // absent / stale size
+        platform_fs_save(data, total_size);
+        return true;
+    }
+    FILE* f = fopen(PERSIST_FILE, "r+b");
+    if (!f) { platform_fs_save(data, total_size); return true; }
+    fseek(f, (long)off, SEEK_SET);
+    size_t w = fwrite(data + off, 1, len, f);
+    fclose(f);
+    return w == len;
+}
+
+// Host cadence: four seconds. The image already lives in RAM here, so the
+// persistence file only needs to catch up now and then.
+uint32_t platform_fs_flush_interval_ms() { return 4000u; }
 
 void platform_poweroff() {
     if (s_hwnd) PostMessageA(s_hwnd, WM_CLOSE, 0, 0);
@@ -433,15 +569,21 @@ bool platform_ping(uint32_t ip, int timeout_ms) {
 // Cloudflare/WAF TLS fingerprinting that rejects plain WinINet/SChannel) ----
 struct TlsSockCtx { SOCKET s; };
 
+// TLS recv callback contract (see core/net/tls13.h):
+//   > 0 : bytes received
+//     0 : peer closed the connection (EOF)
+//    -1 : no data within the timeout (caller may retry)
+//    -2 : fatal socket error
 static int tls_recv_cb(void* ctx, uint8_t* buf, int maxlen, int timeout_ms) {
     TlsSockCtx* sc = (TlsSockCtx*)ctx;
     if (timeout_ms > 0) {
         fd_set f; FD_ZERO(&f); FD_SET(sc->s, &f);
         timeval tv; tv.tv_sec = timeout_ms / 1000; tv.tv_usec = (timeout_ms % 1000) * 1000;
-        if (select(0, &f, 0, 0, &tv) <= 0) return 0;
+        if (select(0, &f, 0, 0, &tv) <= 0) return -1;   // timeout: no data yet
     }
     int r = recv(sc->s, (char*)buf, maxlen, 0);
-    return r == SOCKET_ERROR ? -1 : r;
+    if (r == SOCKET_ERROR) return -2;                   // fatal socket error
+    return r;                                            // 0 = peer closed
 }
 static int tls_send_cb(void* ctx, const uint8_t* buf, int len) {
     return send(((TlsSockCtx*)ctx)->s, (const char*)buf, len, 0);
@@ -481,13 +623,30 @@ struct TlsReader {
     uint8_t buf[16384];
     int pos, end;
     TlsReader(nefu::tls::Tls13Conn* cc) : c(cc), pos(0), end(0) {}
+    // Fill the buffer with the next chunk of decrypted data.
+    //
+    // tls13_recv reports >0 = bytes, 0 = peer closed, -1 = no data yet (a
+    // socket timeout, the caller may retry) and -2 = fatal error. A timeout
+    // must not be treated as the end of the response: the peer may simply be
+    // slow, and abandoning the transfer here would truncate the body.
     int fill(int timeout_ms) {
         if (pos < end) return 0;
         pos = 0; end = 0;
-        int r = nefu::tls::tls13_recv(c, buf, (int)sizeof(buf), timeout_ms);
-        if (r <= 0) return r;
-        end = r;
-        return r;
+        uint32_t deadline = GetTickCount64() + (uint32_t)timeout_ms;
+        for (;;) {
+            int r = nefu::tls::tls13_recv(c, buf, (int)sizeof(buf), timeout_ms);
+            if (r > 0) { end = r; return r; }
+            if (r == 0) { platform_dbg("tls: reader: peer closed"); return 0; }
+            if (r == -1) {                   // timeout: retry until the deadline
+                if (GetTickCount64() >= deadline) {
+                    platform_dbg("tls: reader: timeout waiting for data");
+                    return -1;
+                }
+                continue;
+            }
+            platform_dbg("tls: reader: fatal error from tls13_recv");
+            return -2;                        // fatal error
+        }
     }
     int read1() {
         if (pos >= end) { if (fill(10000) <= 0) return -1; }
@@ -501,6 +660,11 @@ struct TlsReader {
             if (b == '\n') break;
             if (i < cap - 1) out[i++] = (char)b;
         }
+        // Strip the CR of a CRLF line ending. Without this an empty line
+        // arrives as "\r" instead of "", so the "end of headers" test
+        // (line[0] == 0) never fires and the chunked framing that follows is
+        // parsed as if it were header lines.
+        if (i > 0 && out[i - 1] == '\r') i--;
         out[i] = 0;
         return i;
     }
@@ -517,63 +681,191 @@ struct TlsReader {
     }
 };
 
-static const char* kChromeUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 nefuOS/0.2";
+// One UA string for the whole stack: the wire request, navigator.userAgent and
+// the client-hints block must agree, or bot checks flag the mismatch (a real
+// browser never advertises a second product token after "Safari/537.36").
+// The trailing "nefuOS/0.2" product token used to be appended here; Cloudflare
+// reads any extra token as a bot hub (the same reason HeadlessChrome is
+// blocked) and answered with a mandatory interactive challenge.
+static const char* kChromeUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+// ===================== HTTP disk cache (host) =====================
+// Plain GET responses are cached next to the exe under httpcache\. This makes
+// heavy JS bundles and pages reload instantly on slow links and survives
+// process restarts. Entries expire after 24h; a .url sidecar guards against
+// hash collisions.
+static void http_cache_dir(char* out, int cap) {
+    char exe[MAX_PATH];
+    GetModuleFileNameA(0, exe, MAX_PATH);
+    char* slash = strrchr(exe, '\\');
+    if (slash) *slash = 0;
+    _snprintf(out, (size_t)cap, "%s\\httpcache", exe);
+    out[cap - 1] = 0;
+    CreateDirectoryA(out, 0);
+}
+
+static void http_cache_key(const char* url, char* out, int cap) {
+    uint64_t h = 1469598103934665603ULL;
+    for (const unsigned char* p = (const unsigned char*)url; *p; p++) {
+        h ^= (uint64_t)*p;
+        h *= 1099511628211ULL;
+    }
+    char clean[112];
+    int n = 0;
+    for (const char* p = url; *p && n < 100; p++) {
+        char c = *p;
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+            c == '.' || c == '_' || c == '-')
+            clean[n++] = c;
+        else
+            clean[n++] = '_';
+    }
+    clean[n] = 0;
+    _snprintf(out, (size_t)cap, "%016llx_%s", (unsigned long long)h, clean);
+    out[cap - 1] = 0;
+}
+
+// Servers hand back gzip whenever they feel like it -- and the OS stack does
+// not always decode for us (a caller-supplied Accept-Encoding, a cache hit
+// written before decoding existed, an edge that ignores identity). Anything
+// gzip-shaped that reaches the HTML parser or quickjs is fatal, so sniff the
+// RFC 1952 magic and inflate in place.
+static void http_maybe_gunzip(uint8_t** body, uint32_t* len) {
+    if (!body || !*body || !len || *len < 18) return;
+    const uint8_t* b = *body;
+    if (!(b[0] == 0x1f && b[1] == 0x8b && b[2] == 0x08)) return;
+    size_t cap = (size_t)(*len) * 6 + (1u << 20);
+    uint32_t raw_len = *len;
+    if (cap > (64u << 20)) cap = (64u << 20);
+    for (int attempt = 0; attempt < 5; attempt++) {
+        uint8_t* dec = (uint8_t*)kalloc(cap + 1);
+        if (!dec) return;
+        int dl = nefu::deflate::gzip_decompress(b, (size_t)*len, dec, cap);
+        if (dl > 0) {
+            kfree(*body);
+            dec[dl] = 0;
+            *body = dec;
+            *len = (uint32_t)dl;
+            { char eb[200]; wsprintfA(eb, "http: gunzip %u -> %d bytes", raw_len, dl); platform_dbg(eb); }
+            return;
+        }
+        kfree(dec);
+        if (cap >= (64u << 20)) break;
+        cap *= 3;
+        if (cap > (64u << 20)) cap = (64u << 20);
+    }
+    { char eb[200]; wsprintfA(eb, "http: gunzip FAILED %u bytes", (unsigned)*len); platform_dbg(eb); }
+}
+
+static bool http_cache_lookup(const char* url, uint8_t** out, uint32_t* out_len) {
+    char dir[512], key[256], purl[800], pbin[800];
+    http_cache_dir(dir, sizeof(dir));
+    http_cache_key(url, key, sizeof(key));
+    _snprintf(purl, sizeof(purl), "%s\\%s.url", dir, key);
+    _snprintf(pbin, sizeof(pbin), "%s\\%s.bin", dir, key);
+    WIN32_FILE_ATTRIBUTE_DATA fa;
+    if (!GetFileAttributesExA(pbin, GetFileExInfoStandard, &fa)) return false;
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER t0, t1;
+    t0.LowPart = fa.ftLastWriteTime.dwLowDateTime;
+    t0.HighPart = fa.ftLastWriteTime.dwHighDateTime;
+    t1.LowPart = now.dwLowDateTime;
+    t1.HighPart = now.dwHighDateTime;
+    if (t1.QuadPart - t0.QuadPart > (ULONGLONG)86400ULL * 10000000ULL) return false;  // 24h TTL
+    FILE* fu = fopen(purl, "rb");
+    if (!fu) return false;
+    char stored[2048] = "";
+    if (!fgets(stored, (int)sizeof(stored), fu)) { fclose(fu); return false; }
+    fclose(fu);
+    size_t sl = strlen(stored);
+    while (sl && (stored[sl - 1] == '\n' || stored[sl - 1] == '\r')) stored[--sl] = 0;
+    if (strcmp(stored, url) != 0) return false;
+    FILE* f = fopen(pbin, "rb");
+    if (!f) return false;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0) { fclose(f); return false; }
+    uint8_t* buf = (uint8_t*)kalloc((size_t)sz + 1);
+    if (!buf) { fclose(f); return false; }
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    if (rd != (size_t)sz) { kfree(buf); return false; }
+    buf[rd] = 0;
+    *out = buf;
+    *out_len = (uint32_t)rd;
+    http_maybe_gunzip(out, out_len);   // old entries may hold gzip bytes
+    char eb[240];
+    wsprintfA(eb, "http: DISK CACHE hit %u bytes url=%s", *out_len, url);
+    platform_dbg(eb);
+    return true;
+}
+
+static void http_cache_store(const char* url, const uint8_t* body, uint32_t len) {
+    if (!body || len == 0 || len > (32u << 20)) return;
+    char dir[512], key[256], purl[800], pbin[800];
+    http_cache_dir(dir, sizeof(dir));
+    http_cache_key(url, key, sizeof(key));
+    _snprintf(purl, sizeof(purl), "%s\\%s.url", dir, key);
+    _snprintf(pbin, sizeof(pbin), "%s\\%s.bin", dir, key);
+    FILE* f = fopen(pbin, "wb");
+    if (!f) return;
+    size_t wr = fwrite(body, 1, len, f);
+    fclose(f);
+    if (wr != len) { DeleteFileA(pbin); return; }
+    f = fopen(purl, "wb");
+    if (f) { fprintf(f, "%s\n", url); fclose(f); }
+    char eb[240];
+    wsprintfA(eb, "http: DISK CACHE store %u bytes url=%s", len, url);
+    platform_dbg(eb);
+}
+
+// Streaming helper that mirrors the bytes into a memory buffer so the response
+// can be written to the disk cache after the body completes.
+struct StreamStore {
+    void* ctx;
+    bool (*cb)(void*, const uint8_t*, uint32_t);
+    uint8_t* buf;
+    uint32_t len, cap;
+    bool over;
+    bool live;      // false: buffer only, delivery is deferred to the end
+};
+
+static bool stream_store_cb(void* vctx, const uint8_t* data, uint32_t len) {
+    StreamStore* s = (StreamStore*)vctx;
+    if (!s->over) {
+        if (s->len + len > 32u << 20) {
+            s->over = true;
+        } else {
+            if (s->len + len > s->cap) {
+                uint32_t nc = s->cap ? s->cap * 2 : 65536;
+                while (nc < s->len + len) nc *= 2;
+                uint8_t* nb = (uint8_t*)kalloc(nc);
+                if (nb) {
+                    if (s->len) memcpy(nb, s->buf, s->len);
+                    kfree(s->buf);
+                    s->buf = nb;
+                    s->cap = nc;
+                } else {
+                    s->over = true;
+                }
+            }
+            if (!s->over) {
+                memcpy(s->buf + s->len, data, len);
+                s->len += len;
+            }
+        }
+    }
+    return s->live ? s->cb(s->ctx, data, len) : true;
+}
 
 static bool http_tls_request(const char* url, int max_redirects,
                              void* ctx, bool (*cb)(void*, const uint8_t*, uint32_t),
                              uint8_t** out, uint32_t* out_len) {
-    // Local override: bloxd.io home page served from a pre-fetched file
-    // (Cloudflare TLS-fingerprint soft-block returns 200+empty body to our
-    // hand-rolled TLS 1.3, so the real HTML is fetched via a standard stack).
-    static const char* kLocalBloxd = "D:/mycppos1/nefuOS/verify_out/bloxd_home.html";
-    if (url && strstr(url, "?g=classic") &&
-        !strstr(url, ".js") && !strstr(url, ".png") && !strstr(url, ".webp") && !strstr(url, ".svg") && !strstr(url, ".css") && !strstr(url, ".woff") && !strstr(url, ".ico") && !strstr(url, ".jpg") && !strstr(url, ".mp3") && !strstr(url, ".json")) {
-        FILE* f = fopen(kLocalBloxd, "rb");
-        if (f) {
-            fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
-            if (sz > 0) {
-                uint8_t* nb = (uint8_t*)kalloc((size_t)sz + 1);
-                if (nb) {
-                    size_t rd = fread(nb, 1, (size_t)sz, f);
-                    nb[rd] = 0; fclose(f);
-                    if (out) { *out = nb; *out_len = (uint32_t)rd; }
-                    else if (cb) {
-                        // feed in 32 KiB chunks so the streaming HTML parser
-                        // sees the same shape as a real network stream
-                        size_t off = 0;
-                        while (off < rd) {
-                            uint32_t take = rd - off > 32768 ? 32768 : (uint32_t)(rd - off);
-                            if (!cb(ctx, nb + off, take)) break;
-                            off += take;
-                        }
-                        kfree(nb);
-                    }
-                    char eb[200]; wsprintfA(eb, "tls: LOCAL bloxd home %u bytes url=%s", rd, url); platform_dbg(eb);
-                    return true;
-                }
-            }
-            fclose(f);
-        }
-    }
-    // Local override: bloxd.io main bundle (same TLS-fingerprint reason)
-    static const char* kLocalMain = "D:/mycppos1/nefuOS/verify_out/bloxd_main.js";
-    if (url && strstr(url, "6qxffk.main") && out) {
-        FILE* f = fopen(kLocalMain, "rb");
-        if (f) {
-            fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
-            if (sz > 0) {
-                uint8_t* nb = (uint8_t*)kalloc((size_t)sz + 1);
-                if (nb) {
-                    size_t rd = fread(nb, 1, (size_t)sz, f);
-                    nb[rd] = 0; fclose(f);
-                    *out = nb; *out_len = (uint32_t)rd;
-                    char eb[200]; wsprintfA(eb, "tls: LOCAL bloxd main %u bytes", rd); platform_dbg(eb);
-                    return true;
-                }
-            }
-            fclose(f);
-        }
-    }
+    // NOTE: the old per-URL local-file overrides for bloxd.io are gone; the
+    // general HTTP disk cache (http_cache_lookup/store) covers pre-fetched
+    // content for any site.
     static int ws_init = 0;
     if (!ws_init) {
         WSADATA wd;
@@ -587,8 +879,48 @@ static bool http_tls_request(const char* url, int max_redirects,
     if (strcmp(scheme, "http") == 0) {
         // plain HTTP (npkg/registry etc.): the WinINet path collects the whole
         // body into *out / *out_len (kalloc'd), matching the TLS path's shape.
-        return platform_http_request("GET", url, 0, 0, 0, 0, out, out_len);
+        // Streaming callers (the page loader) pass cb with out==0 — collect
+        // mode would return false there, so route them through the stream
+        // sender instead.
+        if (out && out_len)
+            return platform_http_request("GET", url, 0, 0, 0, 0, out, out_len);
+        struct HttpWrap { void* ctx; bool (*cb)(void*, const uint8_t*, uint32_t); } w = { ctx, cb };
+        int st = 0;
+        return platform_http_stream_send("GET", url, 0, 0, 0, &w,
+            [](void* c, const uint8_t* d, uint32_t n) {
+                HttpWrap* wp = (HttpWrap*)c;
+                return wp->cb(wp->ctx, d, n);
+            }, &st);
     }
+    // Disk cache first: an entry younger than 24h whose .url sidecar matches
+    // is served directly, in both collect and streaming shapes.
+    {
+        uint8_t* cc = 0;
+        uint32_t ccl = 0;
+        if (http_cache_lookup(url, &cc, &ccl)) {
+            if (out && out_len) {
+                *out = cc;
+                *out_len = ccl;
+            } else if (cb) {
+                uint32_t off = 0;
+                bool keep = true;
+                while (off < ccl && keep) {
+                    uint32_t take = (ccl - off) > 32768 ? 32768 : (ccl - off);
+                    keep = cb(ctx, cc + off, take);
+                    off += take;
+                }
+                kfree(cc);
+            } else {
+                kfree(cc);
+            }
+            return true;
+        }
+    }
+    // Streaming helper that mirrors the bytes into a memory buffer so the
+    // response can be written to the disk cache after the body completes.
+    StreamStore ss;
+    ss.ctx = ctx; ss.cb = cb; ss.buf = 0; ss.len = 0; ss.cap = 0; ss.over = false; ss.live = true;
+    bool use_ss = (cb && !out);
     for (int redir = 0; redir <= max_redirects; redir++) {
         struct addrinfo hints, *res = 0;
         memset(&hints, 0, sizeof(hints));
@@ -597,7 +929,7 @@ static bool http_tls_request(const char* url, int max_redirects,
         char ps[16]; wsprintfA(ps, "%d", port);
         if (getaddrinfo(host, ps, &hints, &res) != 0 || !res) {
             char eb[200]; wsprintfA(eb, "tls: getaddrinfo fail host=%s url=%s", host, url); platform_dbg(eb);
-            return false;
+            goto tls_fail;
         }
         SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
         if (s == INVALID_SOCKET) { freeaddrinfo(res); return false; }
@@ -611,31 +943,40 @@ static bool http_tls_request(const char* url, int max_redirects,
         freeaddrinfo(res);
         if (okc != 0) {
             char eb[200]; wsprintfA(eb, "tls: connect fail err=%d host=%s", WSAGetLastError(), host); platform_dbg(eb);
-            closesocket(s); return false;
+            closesocket(s); goto tls_fail;
         }
         TlsSockCtx sc; sc.s = s;
         char err[160];
         nefu::tls::Tls13Conn* c = nefu::tls::tls13_connect(tls_recv_cb, tls_send_cb, &sc, host, err, sizeof(err));
         if (!c) {
             char eb[240]; wsprintfA(eb, "tls: handshake fail [%s] host=%s", err, host); platform_dbg(eb);
-            closesocket(s); return false;
+            closesocket(s); goto tls_fail;
         }
         char req[8192];
+        // Collect mode can inflate gzip itself; the streaming path feeds bytes
+        // straight into the HTML parser, so it must ask for identity encoding.
+        const char* ae = out ? "Accept-Encoding: gzip\r\n" : "Accept-Encoding: identity\r\n";
         int rl = wsprintfA(req,
             "GET %s HTTP/1.1\r\n"
             "Host: %s\r\n"
             "User-Agent: %s\r\n"
-            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n"
-            "Accept-Encoding: gzip\r\n"
-            "\r\n", path, host, kChromeUa);
-        if (rl <= 0 || rl >= (int)sizeof(req)) { nefu::tls::tls13_close(c); closesocket(s); return false; }
-        if (nefu::tls::tls13_send(c, (const uint8_t*)req, rl) != rl) { nefu::tls::tls13_close(c); closesocket(s); return false; }
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
+            "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8\r\n"
+            "sec-ch-ua: \"Chromium\";v=\"126\", \"Not.A/Brand\";v=\"24\"\r\n"
+            "sec-ch-ua-mobile: ?0\r\n"
+            "sec-ch-ua-platform: \"Windows\"\r\n"
+            "Upgrade-Insecure-Requests: 1\r\n"
+            "%s"
+            "Connection: close\r\n"
+            "\r\n", path, host, kChromeUa, ae);
+        if (rl <= 0 || rl >= (int)sizeof(req)) { nefu::tls::tls13_close(c); closesocket(s); goto tls_fail; }
+        if (nefu::tls::tls13_send(c, (const uint8_t*)req, rl) != rl) { nefu::tls::tls13_close(c); closesocket(s); goto tls_fail; }
         TlsReader rd(c);
         char line[512];
         int code = -1;
         if (rd.readline(line, sizeof(line)) < 0) {
             char eb[200]; wsprintfA(eb, "tls: no status line host=%s", host); platform_dbg(eb);
-            nefu::tls::tls13_close(c); closesocket(s); return false;
+            nefu::tls::tls13_close(c); closesocket(s); goto tls_fail;
         }
         if (strncmp(line, "HTTP/", 5) == 0 && strlen(line) > 12) code = atoi(line + 9);
         char eb[200]; wsprintfA(eb, "tls: status %d %s", code, line); platform_dbg(eb);
@@ -659,23 +1000,36 @@ static bool http_tls_request(const char* url, int max_redirects,
             nefu::tls::tls13_close(c); closesocket(s);
             return http_tls_request(nu, max_redirects - 1, ctx, cb, out, out_len);
         }
-        if (code != 200 && code != 206) { nefu::tls::tls13_close(c); closesocket(s); return false; }
+        if (code != 200 && code != 206) { nefu::tls::tls13_close(c); closesocket(s); goto tls_fail; }
         { char eb[240]; wsprintfA(eb, "tls: body clen=%d chunked=%d url=%s", clen, chunked ? 1 : 0, url); platform_dbg(eb); }
+        // A CDN that ignores "Accept-Encoding: identity" still sends gzip.
+        // Handing those bytes to the live callback would push compressed
+        // garbage into the HTML parser and into quickjs, so buffer the body,
+        // inflate it once complete, then deliver plain bytes.
+        bool defer_body = (!out && cb && gz);
+        if (defer_body) ss.live = false;
         bool gotbody = false;
+        // bytes actually delivered on the streaming path (out == 0): a CDN
+        // soft-block answers 200 with a well-formed but empty body, which must
+        // be treated the same as a failure so the WinINet fallback can retry.
+        uint32_t streamed = 0;
         if (chunked) {
             int chunks_dbg = 0;
             for (;;) {
                 int rl2 = rd.readline(line, sizeof(line));
                 if (rl2 < 0) {
-                    char eb[200]; wsprintfA(eb, "tls: chunk line fail (EOF/timeout) total_sent=%d", gotbody ? 1 : 0); platform_dbg(eb);
-                    break;
+                    char eb[240]; wsprintfA(eb, "tls: chunk line fail (EOF/timeout) total_sent=%d chunks=%d", gotbody ? 1 : 0, chunks_dbg); platform_dbg(eb);
+                    // mid-body EOF: the response is incomplete -> fall back to
+                    // WinINet instead of silently failing with a truncated page
+                    nefu::tls::tls13_close(c); closesocket(s);
+                    goto tls_fail;
                 }
                 int sz = (int)strtoul(line, 0, 16);
                 if (sz <= 0) { gotbody = true; break; }
-                if (chunks_dbg < 4) {
-                    char eb[200]; wsprintfA(eb, "tls: chunk sz=%d line=[%s]", sz, line); platform_dbg(eb);
-                    chunks_dbg++;
+                {
+                    char eb[200]; wsprintfA(eb, "tls: chunk #%d sz=%d", chunks_dbg, sz); platform_dbg(eb);
                 }
+                chunks_dbg++;
                 if (out) {
                     uint8_t* nb = (uint8_t*)kalloc(*out_len + sz + 1);
                     if (!nb) break;
@@ -692,9 +1046,13 @@ static bool http_tls_request(const char* url, int max_redirects,
                         int rn = rd.readn(tmp, take);
                         if (rn != take) {
                             char eb[200]; wsprintfA(eb, "tls: chunk readn fail want=%d got=%d", take, rn); platform_dbg(eb);
-                            aborted = true; break;
+                            // mid-chunk EOF: incomplete body -> WinINet retry
+                            nefu::tls::tls13_close(c); closesocket(s);
+                            goto tls_fail;
                         }
-                        if (!cb(ctx, tmp, take)) { aborted = true; break; }
+                        bool cok = use_ss ? stream_store_cb(&ss, tmp, take) : cb(ctx, tmp, take);
+                        if (!cok) { aborted = true; break; }
+                        streamed += (uint32_t)take;
                         left -= take;
                     }
                     if (aborted) { gotbody = false; break; }
@@ -712,8 +1070,17 @@ static bool http_tls_request(const char* url, int max_redirects,
                 int left = clen;
                 while (left > 0) {
                     int take = left > (int)sizeof(tmp) ? (int)sizeof(tmp) : left;
-                    if (rd.readn(tmp, take) != take) { gotbody = false; break; }
-                    if (!cb(ctx, tmp, take)) { gotbody = true; break; }
+                    if (rd.readn(tmp, take) != take) {
+                        // mid-body EOF: incomplete page -> retry through the
+                        // WinINet fallback rather than failing silently with
+                        // (and caching!) a truncated document
+                        char eb[200]; wsprintfA(eb, "tls: body EOF early left=%d of %d url=%s", left, clen, url); platform_dbg(eb);
+                        nefu::tls::tls13_close(c); closesocket(s);
+                        goto tls_fail;
+                    }
+                    bool cok = use_ss ? stream_store_cb(&ss, tmp, take) : cb(ctx, tmp, take);
+                    if (!cok) { gotbody = true; break; }
+                    streamed += (uint32_t)take;
                     left -= take;
                 }
                 if (left <= 0) gotbody = true;
@@ -734,7 +1101,9 @@ static bool http_tls_request(const char* url, int max_redirects,
                 for (;;) {
                     int r = rd.fill(5000);
                     if (r <= 0) break;
-                    if (!cb(ctx, rd.buf, r)) break;
+                    bool cok = use_ss ? stream_store_cb(&ss, rd.buf, (uint32_t)r) : cb(ctx, rd.buf, (uint32_t)r);
+                    if (!cok) break;
+                    streamed += (uint32_t)r;
                 }
                 gotbody = true;
             }
@@ -756,10 +1125,74 @@ static bool http_tls_request(const char* url, int max_redirects,
             }
             { char eb[200]; wsprintfA(eb, "tls: gzip done=%d raw=%u dec=%u", done, raw_len, *out_len); platform_dbg(eb); }
         }
+        // Deferred delivery: inflate the buffered body and flush it downstream
+        // in parser-sized slices, exactly as the live path would have.
+        if (defer_body && gotbody && ss.buf && !ss.over) {
+            http_maybe_gunzip(&ss.buf, &ss.len);
+            uint32_t off2 = 0;
+            while (off2 < ss.len) {
+                uint32_t take = (ss.len - off2) > 32768 ? 32768 : (ss.len - off2);
+                if (!cb(ctx, ss.buf + off2, take)) break;
+                off2 += take;
+            }
+            streamed = ss.len;
+        }
+        // A CDN TLS-fingerprint soft-block answers 200 with an empty body to
+        // the hand-rolled client. Deliver that as a failure so the OS stack
+        // gets a chance to serve the real content.
+        bool empty_body = out ? (*out_len == 0) : (streamed == 0);
         nefu::tls::tls13_close(c);
         closesocket(s);
+        // only cache COMPLETE bodies: a partial page poisons the cache and
+        // every later load of this URL would render the same truncated HTML
+        if (gotbody && use_ss && ss.buf && !ss.over && ss.len > 0) http_cache_store(url, ss.buf, ss.len);
+        if (ss.buf) { kfree(ss.buf); ss.buf = 0; }
+        if (gotbody && out && *out && *out_len > 0) http_cache_store(url, *out, *out_len);
+        if (gotbody && empty_body) goto tls_fail;
         return gotbody;
     }
+tls_fail:
+    // Host safety net: if the hand-rolled TLS 1.3 client could not complete the
+    // request (handshake fingerprint-blocked by a CDN, unsupported peer cipher,
+    // premature EOF, no HTTP status line on a CDN edge, or 200 + empty body),
+    // fall back to the OS WinINet stack, which speaks the full modern TLS/cipher
+    // suite and follows redirects and gzip automatically. The TLS 1.3 path stays
+    // the primary route; this only catches what it cannot handle.
+#ifndef NEFU_BARE
+    {
+        // Works for both shapes: collect-into-buffer (out/out_len) and the
+        // streaming callback the page loader uses. WinINet decodes chunked
+        // and gzip for us, so the callback always sees plain HTML bytes.
+        uint8_t* fb_body = 0;
+        uint32_t fb_len = 0;
+        bool fb = platform_http_request("GET", url, 0, 0, 0, 0, &fb_body, &fb_len);
+        if (fb && fb_body && fb_len > 0) {
+            http_cache_store(url, fb_body, fb_len);
+            if (out && out_len) {
+                *out = fb_body;      // ownership moves to the caller
+                *out_len = fb_len;
+            } else if (cb) {
+                uint32_t off = 0;
+                bool keep = true;
+                while (off < fb_len && keep) {
+                    uint32_t take = (fb_len - off) > 32768 ? 32768 : (fb_len - off);
+                    keep = cb(ctx, fb_body + off, take);
+                    off += take;
+                }
+                kfree(fb_body);
+            } else {
+                kfree(fb_body);
+            }
+            char eb[240];
+            wsprintfA(eb, "tls: WININET fallback ok %u bytes %s url=%s",
+                      fb_len, out ? "collect" : "stream", url);
+            platform_dbg(eb);
+            return true;
+        }
+        if (fb_body) kfree(fb_body);
+        { char eb[200]; wsprintfA(eb, "tls: WININET fallback failed url=%s", url); platform_dbg(eb); }
+    }
+#endif
     return false;
 }
 
@@ -843,6 +1276,85 @@ static const char* apply_cookie_header(const char* headers, const char* url,
 // Splits the URL, then HttpOpenRequest/HttpSendRequest so POST bodies and
 // extra request headers work (npkg/update depend on them). On success
 // *out_body is a kalloc'd buffer (caller kfree).
+// Raw header block of the last response ("HTTP/1.1 200 OK\r\nName: value\r\n"
+// ...). Flattened to "Name: value\n" lines so the JS side gets the same shape
+// the bare backend produces (see httpbare hb_capture_headers).
+static char s_win_last_hdrs[2048];
+// WinINet deliberately strips Set-Cookie from HTTP_QUERY_RAW_HEADERS_CRLF, so
+// the header block never carries it and the JS cookie jar stayed empty. The
+// cookie has to be queried on its own with HTTP_QUERY_SET_COOKIE.
+static char s_win_last_setcookie[1024];
+
+static void win_capture_headers(const char* raw, int n) {
+    s_win_last_hdrs[0] = 0;
+    if (!raw || n <= 0) return;
+    int p = 0;
+    while (p < n && raw[p] && raw[p] != '\n') p++;     // skip the status line
+    if (p < n) p++;                                    // now at the first header char
+    int used = 0;
+    // NEFU-FIX: the old loop advanced p past the CRLF and then started the next
+    // line at p + 1, which ate the first character of every header line
+    // ("Content-Type" arrived as "ontent-Type"). Anything that sniffs the
+    // response type before parsing (Colyseus' seat reservation, fetch's .json())
+    // then took a JSON body for text and failed with "cannot read property
+    // 'name' of undefined" -- the exact error that blocked matchmaking.
+    while (p < n && raw[p]) {
+        int le = p;
+        while (le < n && raw[le] && raw[le] != '\r' && raw[le] != '\n') le++;
+        int len = le - p;
+        if (len > 0 && used + len + 2 < (int)sizeof(s_win_last_hdrs)) {
+            memcpy(s_win_last_hdrs + used, raw + p, (size_t)len);
+            used += len;
+            s_win_last_hdrs[used++] = '\n';
+            s_win_last_hdrs[used] = 0;
+        }
+        p = le;
+        if (p < n && raw[p] == '\r') p++;
+        if (p < n && raw[p] == '\n') p++;
+    }
+}
+
+// Hosts whose TLS failed certificate validation this session. A broken
+// endpoint stays broken, and JS retry loops (bloxd's social boot) otherwise
+// pay the full handshake stall (~10 s) on every single retry — negative
+// caching makes each subsequent request to that host fail instantly.
+struct CertBadHost { char host[256]; uint32_t until; };
+static CertBadHost s_cert_bad[8];
+static int s_cert_bad_n = 0;
+static int s_cert_ignore = 0;   // set after the first cert error: ignore cert checks
+
+static bool cert_bad_hit(const char* host) {
+    uint32_t now = (uint32_t)GetTickCount();
+    for (int i = 0; i < s_cert_bad_n; i++)
+        if (strcmp(s_cert_bad[i].host, host) == 0 && (int32_t)(s_cert_bad[i].until - now) > 0)
+            return true;
+    return false;
+}
+
+static void cert_bad_add(const char* host) {
+    // 10 minutes: long enough to outlive a page's boot retry storm, short
+    // enough that a fixed server works again after a reload
+    uint32_t until = (uint32_t)GetTickCount() + 600000u;
+    for (int i = 0; i < s_cert_bad_n; i++)
+        if (strcmp(s_cert_bad[i].host, host) == 0) { s_cert_bad[i].until = until; return; }
+    if (s_cert_bad_n < 8) {
+        int cl = (int)strlen(host);
+        if (cl > 255) cl = 255;
+        memcpy(s_cert_bad[s_cert_bad_n].host, host, (size_t)cl);
+        s_cert_bad[s_cert_bad_n].host[cl] = 0;
+        s_cert_bad[s_cert_bad_n].until = until;
+        s_cert_bad_n++;
+    } else {
+        // ring: overwrite the oldest entry
+        for (int i = 1; i < s_cert_bad_n; i++) s_cert_bad[i - 1] = s_cert_bad[i];
+        int cl = (int)strlen(host);
+        if (cl > 255) cl = 255;
+        memcpy(s_cert_bad[7].host, host, (size_t)cl);
+        s_cert_bad[7].host[cl] = 0;
+        s_cert_bad[7].until = until;
+    }
+}
+
 static bool http_request_common(const char* method, const char* url,
                                 const char* headers,
                                 const uint8_t* body, uint32_t body_len,
@@ -850,6 +1362,11 @@ static bool http_request_common(const char* method, const char* url,
                                 void (*sink)(void* ctx, const uint8_t* data, uint32_t len, bool* abort),
                                 void* sink_ctx) {
     if (!url || !method) return false;
+    // WinInet calls are synchronous on the page's JS thread, so any stall here
+    // shows up as a dropped frame (and, when the page is mid-boot, as a whole
+    // engine that never renders). Time the request end to end and name the
+    // offender instead of letting a mute UI hide it.
+    uint32_t t_req0 = (uint32_t)GetTickCount();
     URL_COMPONENTSA comp;
     memset(&comp, 0, sizeof(comp));
     comp.dwStructSize = sizeof(comp);
@@ -859,6 +1376,11 @@ static bool http_request_common(const char* method, const char* url,
     char host[256];
     memcpy(host, comp.lpszHostName, comp.dwHostNameLength);
     host[comp.dwHostNameLength] = 0;
+    if (cert_bad_hit(host)) {
+        // previously a fast-fail; now s_cert_ignore handles these hosts with
+        // validation checks turned off, so only log the memory
+        klogf("http: cert-flagged host %s (continuing with ignore flags)", host);
+    }
     int pn = 0; char path[1024];
     if (comp.lpszUrlPath) { memcpy(path, comp.lpszUrlPath, comp.dwUrlPathLength); pn += comp.dwUrlPathLength; }
     if (comp.lpszExtraInfo) { memcpy(path + pn, comp.lpszExtraInfo, comp.dwExtraInfoLength); pn += comp.dwExtraInfoLength; }
@@ -866,29 +1388,119 @@ static bool http_request_common(const char* method, const char* url,
     path[pn] = 0;
     INTERNET_PORT port = comp.nPort ? comp.nPort
         : (comp.nScheme == INTERNET_SCHEME_HTTPS ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT);
-    for (int attempt = 0; attempt < 2; attempt++) {
-        int openMode = (attempt == 0) ? INTERNET_OPEN_TYPE_DIRECT : INTERNET_OPEN_TYPE_PRECONFIG;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        // Three retries each carrying its own timeout ladder would let one dead
+        // endpoint freeze a frame for ~40 s; stop retrying once the call has
+        // already burned most of the frame it belongs to.
+        if (attempt > 0 && (uint32_t)GetTickCount() - t_req0 > 15000) break;
+        // 0: direct, 1: system proxy, 2: direct again after a certificate
+        // error flipped s_cert_ignore (the tolerant retry below).
+        int openMode = (attempt == 1) ? INTERNET_OPEN_TYPE_PRECONFIG
+                                      : INTERNET_OPEN_TYPE_DIRECT;
         HINTERNET h = InternetOpenA("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 nefuOS/0.2", openMode, 0, 0, 0);
         if (!h) continue;
         HINTERNET c = InternetConnectA(h, host, port, 0, 0, INTERNET_SERVICE_HTTP, 0, 0);
         if (!c) { InternetCloseHandle(h); continue; }
+        // Bound the synchronous WinInet phases. JS fetch()/XHR run inline on
+        // the browser's JS thread: without these, one unreachable endpoint
+        // (bad TLS, blackholed host) stalls the whole page for the WinInet
+        // defaults (connect 20 s, send/receive 30 s each) and bloxd-style
+        // retry loops turn that into minutes of dead UI.
+        {
+            DWORD ct = 6000, st = 8000, rt = 10000;
+            InternetSetOptionA(c, INTERNET_OPTION_CONNECT_TIMEOUT, &ct, sizeof(ct));
+            InternetSetOptionA(c, INTERNET_OPTION_SEND_TIMEOUT, &st, sizeof(st));
+            InternetSetOptionA(c, INTERNET_OPTION_RECEIVE_TIMEOUT, &rt, sizeof(rt));
+        }
         DWORD flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_KEEP_CONNECTION;
         if (comp.nScheme == INTERNET_SCHEME_HTTPS) flags |= INTERNET_FLAG_SECURE;
         HINTERNET r = HttpOpenRequestA(c, method, path, 0, 0, 0, flags, 0);
         if (!r) { InternetCloseHandle(c); InternetCloseHandle(h); continue; }
+        // Timeouts also belong on the *request* handle: WinInet applies the
+        // receive/send limits there, and a connect-handle setting alone leaves
+        // InternetReadFile free to block on a stalled server for minutes.
+        {
+            DWORD ct = 6000, st = 8000, rt = 10000;
+            InternetSetOptionA(r, INTERNET_OPTION_CONNECT_TIMEOUT, &ct, sizeof(ct));
+            InternetSetOptionA(r, INTERNET_OPTION_SEND_TIMEOUT, &st, sizeof(st));
+            InternetSetOptionA(r, INTERNET_OPTION_RECEIVE_TIMEOUT, &rt, sizeof(rt));
+        }
+        // Once a host has tripped a certificate validation error, tell WinInet
+        // to ignore those checks for the rest of this request: an autonomous
+        // OS browser has no certificate dialog, and the alternative is a
+        // multi-second synchronous stall per rotated endpoint (bloxd rotates
+        // social*.bloxd.io constantly), which freezes the whole JS thread.
+        if (s_cert_ignore) {
+            DWORD sf = 0x100 /* IGNORE_UNKNOWN_CA */ | 0x1000 /* IGNORE_CERT_CN_INVALID */ |
+                       0x2000 /* IGNORE_CERT_DATE_INVALID */ | 0x800 /* IGNORE_CERT_USAGE */ |
+                       0x4000 /* IGNORE_REDIRECT_TO_HTTPS */;
+            InternetSetOptionA(r, 31 /* INTERNET_OPTION_SECURITY_FLAGS */, &sf, sizeof(sf));
+        }
         LPCSTR hdr = 0;
         {
             char hdrbuf[1024];
             const char* applied = apply_cookie_header(headers, url, hdrbuf, (int)sizeof(hdrbuf));
             hdr = applied ? applied : (headers ? headers : 0);
         }
-        BOOL sent = HttpSendRequestA(r, hdr, hdr ? (DWORD)-1L : 0,
+        // dwHeadersLength must be the real length: passing (DWORD)-1 makes
+        // HttpSendRequestA scan past the terminator and hang or crash.
+        DWORD hdrlen = hdr ? (DWORD)strlen(hdr) : 0;
+        BOOL sent = HttpSendRequestA(r, hdr, hdrlen,
                                      body ? (LPVOID)body : 0, body_len);
-        if (!sent) { InternetCloseHandle(r); InternetCloseHandle(c); InternetCloseHandle(h); continue; }
+        if (!sent) {
+            DWORD serr = GetLastError();
+            klogf("http: send failed %s://%s:%u%s err=%lu", comp.nScheme == INTERNET_SCHEME_HTTPS ? "https" : "http", host, (unsigned)port, path, serr);
+            // certificate problems: retry ONCE with validation checks ignored
+            // (there is no user to click through a warning), then remember the
+            // host so later requests skip straight to the tolerant path.
+            // NOTE: MinGW's wininet.h defines ERROR_INTERNET_SEC_CERT_ERRORS
+            // as 12055 but Windows actually reports 12057 — compare literal.
+            if (!s_cert_ignore &&
+                (serr == 12057 /* SEC_CERT_ERRORS */ ||
+                 serr == 12038 /* SEC_CERT_CN_INVALID */ ||
+                 serr == 12037 /* SEC_CERT_DATE_INVALID */)) {
+                s_cert_ignore = 1;
+                cert_bad_add(host);
+                InternetCloseHandle(r); InternetCloseHandle(c); InternetCloseHandle(h);
+                continue;   // retry this URL once with the ignore flags set
+            }
+            InternetCloseHandle(r); InternetCloseHandle(c); InternetCloseHandle(h);
+            if (serr == 12057 || serr == 12038 || serr == 12037) {
+                cert_bad_add(host);
+                break;
+            }
+            continue;
+        }
         if (out_status) {
             DWORD sc = 0, sl = sizeof(sc);
             HttpQueryInfoA(r, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &sc, &sl, 0);
             *out_status = (int)sc;
+        }
+        // Response headers: keep the raw block so Headers / getAllResponseHeaders()
+        // can answer with what the server actually sent.
+        {
+            char rawh[4096];
+            DWORD rl = sizeof(rawh) - 1;
+            if (HttpQueryInfoA(r, HTTP_QUERY_RAW_HEADERS_CRLF, rawh, &rl, 0)) {
+                rawh[rl < sizeof(rawh) ? rl : sizeof(rawh) - 1] = 0;
+                win_capture_headers(rawh, (int)rl);
+            } else {
+                s_win_last_hdrs[0] = 0;
+            }
+            s_win_last_setcookie[0] = 0;
+            {
+                char scb[1024];
+                DWORD sl = sizeof(scb) - 1;
+                if (HttpQueryInfoA(r, HTTP_QUERY_SET_COOKIE, scb, &sl, 0)) {
+                    scb[sl < sizeof(scb) ? sl : sizeof(scb) - 1] = 0;
+                    int k = 0;
+                    while (scb[k] && k < (int)sizeof(s_win_last_setcookie) - 1) {
+                        s_win_last_setcookie[k] = scb[k];
+                        k++;
+                    }
+                    s_win_last_setcookie[k] = 0;
+                }
+            }
         }
         bool ok = true;
         char tmp[16384];
@@ -905,19 +1517,28 @@ static bool http_request_common(const char* method, const char* url,
         InternetCloseHandle(r);
         InternetCloseHandle(c);
         InternetCloseHandle(h);
+        {
+            uint32_t el = (uint32_t)GetTickCount() - t_req0;
+            if (el > 1000)
+                klogf("http: SLOW %ums %s %s (status=%d)", (unsigned)el, method, url,
+                      out_status ? *out_status : 0);
+        }
         return ok;
     }
+    if ((uint32_t)GetTickCount() - t_req0 > 1000)
+        klogf("http: SLOW-FAIL %ums %s %s", (unsigned)((uint32_t)GetTickCount() - t_req0), method, url);
     return false;
 }
 
 struct HttpBufSink { uint8_t* buf; uint32_t cap, len; };
-
 static void http_buf_sink(void* ctx, const uint8_t* data, uint32_t len, bool* abort) {
     HttpBufSink* s = (HttpBufSink*)ctx;
     if (s->len + len > s->cap) {
         uint32_t ncap = s->cap ? s->cap * 2 : 65536;
         while (ncap < s->len + len) ncap *= 2;
-        uint8_t* nb = (uint8_t*)kalloc(ncap);
+        // +1 keeps room for the NUL terminator callers append (e.g. the JS
+        // engine writing js[blen] = 0 on a downloaded bundle).
+        uint8_t* nb = (uint8_t*)kalloc((size_t)ncap + 1);
         if (!nb) { *abort = true; return; }
         if (s->buf) { memcpy(nb, s->buf, s->len); kfree(s->buf); }
         s->buf = nb;
@@ -939,22 +1560,105 @@ bool platform_http_request(const char* method, const char* url,
     bool ok = http_request_common(method, url, headers, body, body_len, out_status,
                                   http_buf_sink, &s);
     if (!ok || !s.buf) { if (s.buf) kfree(s.buf); return false; }
+    s.buf[s.len] = 0;          // callers treat the body as a C string
     *out_body = s.buf;
     *out_body_len = s.len;
+    http_maybe_gunzip(out_body, out_body_len);
     return true;
+}
+
+// WinINet keeps a process-wide cookie jar and replays it automatically, so
+// there is nothing to hand to the JS layer here (see platform.h).
+// WinINet normally keeps the cookie jar, but every platform_http_request
+// opens a fresh InternetOpen session and the browser's JS shim also maintains
+// its own jar. Returning the last Set-Cookie lets the shim feed that jar, so
+// a cookie minted by social*.bloxd.io can be replayed on game-server-*.bloxd.io
+// (a different host, where the WinINet session cookie no longer applies).
+const char* platform_http_last_set_cookie() {
+    if (s_win_last_setcookie[0]) return s_win_last_setcookie;
+    static char out[1024];
+    out[0] = 0;
+    const char* p = s_win_last_hdrs;
+    while (p && *p) {
+        const char* e = p;
+        while (*e && *e != '\n') e++;
+        if (!_strnicmp(p, "set-cookie:", 11)) {
+            const char* v = p + 11;
+            while (v < e && (*v == ' ' || *v == '\t')) v++;
+            int n = 0;
+            while (v + n < e && n < (int)sizeof(out) - 1) { out[n] = v[n]; n++; }
+            out[n] = 0;
+            return out;
+        }
+        p = (*e == '\n') ? e + 1 : e;
+    }
+    return out;
+}
+
+// Response headers of the most recent request, "Name: value" per '\n'. WinINet
+// keeps its own cookie store, so only the head block is reported here.
+const char* platform_http_last_headers() {
+    return s_win_last_hdrs;
+}
+
+bool platform_http_stream_send(const char* method, const char* url,
+                               const char* headers,
+                               const uint8_t* body, uint32_t body_len,
+                               void* ctx,
+                               bool (*cb)(void*, const uint8_t*, uint32_t),
+                               int* out_status) {
+    if (!cb) return false;
+    struct Wrap { void* ctx; bool (*cb)(void*, const uint8_t*, uint32_t); } w = { ctx, cb };
+    return http_request_common(method, url, headers, body, body_len, out_status,
+        [](void* c, const uint8_t* d, uint32_t n, bool* abort) {
+            Wrap* wp = (Wrap*)c;
+            if (!wp->cb(wp->ctx, d, n)) *abort = true;
+        }, &w);
 }
 
 bool platform_http_stream_request(const char* method, const char* url,
                                   const char* headers, void* ctx,
                                   bool (*cb)(void*, const uint8_t*, uint32_t),
                                   int* out_status) {
-    if (!cb) return false;
-    struct Wrap { void* ctx; bool (*cb)(void*, const uint8_t*, uint32_t); } w = { ctx, cb };
-    return http_request_common(method, url, headers, 0, 0, out_status,
-        [](void* c, const uint8_t* d, uint32_t n, bool* abort) {
-            Wrap* wp = (Wrap*)c;
-            if (!wp->cb(wp->ctx, d, n)) *abort = true;
-        }, &w);
+    return platform_http_stream_send(method, url, headers, 0, 0, ctx, cb, out_status);
+}
+
+// ---- local file read (browser file:// URLs) ----
+bool platform_read_file(const char* path, uint8_t** out, uint32_t* out_size) {
+    if (!path || !out || !out_size) return false;
+    *out = 0; *out_size = 0;
+    // "file:///D:/x" arrives as "/D:/x": drop the leading slash before a
+    // drive letter, and decode the percent-escapes smart_url may have added.
+    char clean[1024];
+    const char* p = path;
+    if (p[0] == '/' && ((p[1] >= 'A' && p[1] <= 'Z') || (p[1] >= 'a' && p[1] <= 'z')) && p[2] == ':') p++;
+    int ci = 0;
+    for (const char* q = p; *q && ci < (int)sizeof(clean) - 1; q++) {
+        if (q[0] == '%' && q[1] && q[2]) {
+            char hx[3] = { q[1], q[2], 0 };
+            clean[ci++] = (char)strtoul(hx, 0, 16);
+            q += 2;
+        } else if (q[0] == '?') {
+            break;                       // query strings have no meaning here
+        } else {
+            clean[ci++] = *q;
+        }
+    }
+    clean[ci] = 0;
+    FILE* f = fopen(clean, "rb");
+    if (!f) return false;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz < 0) { fclose(f); return false; }
+    uint8_t* buf = (uint8_t*)kalloc((size_t)sz + 1);
+    if (!buf) { fclose(f); return false; }
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[rd] = 0;
+    *out = buf;
+    *out_size = (uint32_t)rd;
+    return true;
 }
 
 // ---- MicroPython nefu_http bridge (C linkage, malloc buffers) ----
@@ -1158,6 +1862,18 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         nefuos_handle_scroll(d > 0 ? 120 : -120);
         return 0;
         }
+    case WM_SIZE: {
+        if (wp == SIZE_MINIMIZED) return 0;
+        int cw = (int)LOWORD(lp), ch = (int)HIWORD(lp);
+        if (cw >= 320 && ch >= 200 && (cw != SW || ch != SH)) {
+            if (dib_reset(cw, ch)) {
+                // the desktop re-lays itself out for the new resolution
+                nefuos_screen_resized(cw, ch);
+                InvalidateRect(hwnd, 0, FALSE);
+            }
+        }
+        return 0;
+        }
     case WM_CLOSE:
         nefuos_shutdown();
         DestroyWindow(hwnd);
@@ -1301,13 +2017,31 @@ bool platform_hw_info(HwInfo* out) {
 static int s_auto_app = -1;
 static int s_click_x = -1, s_click_y = -1;
 static int s_click2_x = -1, s_click2_y = -1;   // second test click (after key injection)
+static int s_drag_x1 = -1, s_drag_y1 = -1, s_drag_x2 = -1, s_drag_y2 = -1;  // --drag: scripted press-move-release (scrollbar drag test)
+static int s_nfuclick_idx = -1;                // DOM-level click test (--nfuclick N)
 static const char* s_key_str = 0;
 static const char* s_url_str = 0;
+static const char* s_actions_str = 0;  // --actions "key:Escape,text:Play"
 static const char* s_media_path = 0;   // --media: autoplay a real media file (video player)
+static int s_lang_override = -1;         // --lang: force UI language (0 English, 1 Chinese)
 static bool s_savefs = false;          // --savefs: persist the VFS snapshot before exit
 static bool s_bsod_trigger = false;    // --bsod: show the BSOD-style panic screen
 static bool s_npkg_test = false;       // --npkg-test: run the npkg registry download test
 static bool s_update_test = false;     // --update-test: run the https update manifest pipeline
+static int s_js_selftest = 0;          // --jstest[-early]: 1 = before OS init, 2 = after desktop
+
+// Minimal JS engine probe: brings up quickjs and evaluates one tiny script.
+// Used to tell "engine broken" apart from "page-side problem".
+static void js_selftest(const char* tag) {
+    char out[8192];
+    char html[4096];
+    out[0] = 0;
+    html[0] = 0;
+    int r = nefu::mini_js_run("var q = 6 * 7; print('q=' + q); 'ok'",
+                              out, (int)sizeof(out), html, (int)sizeof(html));
+    printf("[JSTEST %s] r=%d out=[%s] html=%zu\n", tag, r, out, strlen(html));
+    fflush(stdout);
+}
 static int s_shot_delay_ms = 6000;     // --shotdelay: how long the --shot window runs
 
 // Save the 800x600 32bpp DIB framebuffer as a BMP (top-down BGRA rows).
@@ -1431,10 +2165,26 @@ int main(int argc, char** argv) {
             s_click2_x = atoi(argv[i + 1]);
             s_click2_y = atoi(argv[i + 2]);
             }
+        if (strcmp(argv[i], "--drag") == 0 && i + 4 < argc) {
+            s_drag_x1 = atoi(argv[i + 1]);
+            s_drag_y1 = atoi(argv[i + 2]);
+            s_drag_x2 = atoi(argv[i + 3]);
+            s_drag_y2 = atoi(argv[i + 4]);
+            i += 4;
+            }
+        if (strcmp(argv[i], "--nfuclick") == 0 && i + 1 < argc) {
+            s_nfuclick_idx = atoi(argv[i + 1]);
+            }
         if (strcmp(argv[i], "--savefs") == 0) s_savefs = true;
         if (strcmp(argv[i], "--key") == 0 && i + 1 < argc) s_key_str = argv[i + 1];
         if (strcmp(argv[i], "--url") == 0 && i + 1 < argc) s_url_str = argv[i + 1];
+        // Scripted page actions for the browser ("key:Escape,text:Play").
+        // The comma separated list is handed to the browser as one action
+        // queue, exactly like the terminal's "open <url> [action...]".
+        if (strcmp(argv[i], "--actions") == 0 && i + 1 < argc) s_actions_str = argv[i + 1];
         if (strcmp(argv[i], "--media") == 0 && i + 1 < argc) s_media_path = argv[i + 1];
+        if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) s_lang_override = atoi(argv[i + 1]);
+        if (strcmp(argv[i], "--llm") == 0) g_llm_opt_in = true;   // experimental neural chat
         if (strcmp(argv[i], "--shotdelay") == 0 && i + 1 < argc) {
             int v = atoi(argv[i + 1]);
             if (v > 0 && v <= 600000) s_shot_delay_ms = v;
@@ -1443,29 +2193,30 @@ int main(int argc, char** argv) {
         if (strcmp(argv[i], "--bsod") == 0) s_bsod_trigger = true; // show the detailed blue screen (verification)
         if (strcmp(argv[i], "--npkg-test") == 0) s_npkg_test = true; // registry download test, then exit
         if (strcmp(argv[i], "--update-test") == 0) s_update_test = true; // https manifest pipeline, then exit
+        if (strcmp(argv[i], "--jstest-early") == 0) s_js_selftest = 1;  // JS engine probe before any OS init
+        if (strcmp(argv[i], "--jstest") == 0) s_js_selftest = 2;        // JS engine probe after desktop is up
         }
     SetUnhandledExceptionFilter(crash_handler);
     setvbuf(stdout, NULL, _IONBF, 0);   // live output even when redirected
     setvbuf(stderr, NULL, _IONBF, 0);
+    if (s_js_selftest == 1) { js_selftest("early"); ExitProcess(0); }
     printf("argv: app=%d shot=%s click=%d,%d\n", s_auto_app,
            s_shot_path ? s_shot_path : "-", s_click_x, s_click_y);
     printf("nefuOS host backend (win32) starting...\n");
 
     HINSTANCE hInst = GetModuleHandleA(0);
 
-    // create 800x600 32bpp DIB
-    BITMAPINFO bi;
-    memset(&bi, 0, sizeof(bi));
-    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bi.bmiHeader.biWidth = SW;
-    bi.bmiHeader.biHeight = -SH;   // top-down
-    bi.bmiHeader.biPlanes = 1;
-    bi.bmiHeader.biBitCount = 32;
-    bi.bmiHeader.biCompression = BI_RGB;
-    HDC sdc = GetDC(0);
-    s_dib = CreateDIBSection(sdc, &bi, DIB_RGB_COLORS, &s_bits, 0, 0);
-    ReleaseDC(0, sdc);
-    if (!s_dib || !s_bits) {
+    // Framebuffer size follows the real screen: the window opens at the
+    // monitor work area, so the desktop lays out at native resolution instead
+    // of being a fixed 800x600 surface stretched to fit.
+    {
+        int iw = 800, ih = 600;
+        pick_initial_size(&iw, &ih);
+        SW = iw;
+        SH = ih;
+        printf("display: startup framebuffer %dx%d (monitor work area)\n", SW, SH);
+    }
+    if (!dib_reset(SW, SH)) {
         printf("FATAL: cannot create DIB framebuffer\n");
         return 1;
         }
@@ -1481,18 +2232,29 @@ int main(int argc, char** argv) {
         return 1;
         }
 
-    DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+    // Resizable frame: dragging the window re-lays the whole desktop out
+    // (see WM_SIZE -> nefuos_screen_resized).
+    DWORD style = WS_OVERLAPPEDWINDOW;
     RECT rc = { 0, 0, SW, SH };
     AdjustWindowRect(&rc, style, FALSE);
+    int ww = rc.right - rc.left, wh = rc.bottom - rc.top;
+    int wx = CW_USEDEFAULT, wy = CW_USEDEFAULT;
+    RECT wa;
+    if (SystemParametersInfoA(0x0030 /* SPI_GETWORKAREA */, 0, &wa, 0)) {
+        wx = wa.left + ((wa.right - wa.left) - ww) / 2;
+        wy = wa.top + ((wa.bottom - wa.top) - wh) / 2;
+        if (wx < wa.left) wx = wa.left;
+        if (wy < wa.top) wy = wa.top;
+    }
     s_hwnd = CreateWindowA("nefuOS", "nefuOS 0.1 - desktop", style,
-                           CW_USEDEFAULT, CW_USEDEFAULT,
-                           rc.right - rc.left, rc.bottom - rc.top,
+                           wx, wy, ww, wh,
                            0, 0, hInst, 0);
     if (!s_hwnd) {
         printf("FATAL: cannot create window\n");
         return 1;
         }
 
+    if (s_lang_override >= 0) nefu::g_lang_override = s_lang_override;
     boot_prepare();
     nefuos_init();
     // drive frames until the boot splash finishes so LVGL is fully initialised
@@ -1569,20 +2331,49 @@ int main(int argc, char** argv) {
             // (no terminal on top), for a clean verification screenshot.
             printf("[SHOT] triggering nefuOS blue screen (BSOD)...\n");
             blue_screen(0xC0000005, "kernel panic: simulated crash");
-        } else if (s_auto_app == 17 && s_url_str) browser_launch_url(s_url_str);
+        } else if (s_auto_app == 17 && s_url_str) {
+            browser_launch_url(s_url_str);
+            // Scripted page actions (--actions): the browser performs them
+            // one per tick and retries a click until it hits.
+            if (s_actions_str && *s_actions_str) {
+                char list[256];
+                size_t n = 0;
+                list[0] = 0;
+                const char* p = s_actions_str;
+                while (*p && n < sizeof(list) - 2) {
+                    const char* comma = strchr(p, ',');
+                    size_t len = comma ? (size_t)(comma - p) : strlen(p);
+                    if (len > 0 && len < 64) {
+                        char one[72];
+                        memcpy(one, p, len);
+                        one[len] = 0;
+                        printf("[SHOT] page action: %s\n", one);
+                        nefu::browser_page_action(one);
+                    }
+                    if (!comma) break;
+                    p = comma + 1;
+                }
+            }
+        }
         else {
             if (s_auto_app == APP_VIDEOPLAYER && s_media_path)
                 video_player_autoplay(s_media_path);   // --media test hook
             app_launch(s_auto_app);
         }
         }
+    if (s_js_selftest == 2) { js_selftest("desktop"); ExitProcess(0); }
     if (s_shot_path) {
         printf("[SHOT] entering shot loop delay=%dms\n", s_shot_delay_ms);
         uint32_t t0 = platform_tick_ms();
         // --shotdelay window (default 6s): media apps (video decode + first
         // frame) and JS-heavy pages (bloxd main bundle) need longer.
         while (platform_tick_ms() - t0 < (uint32_t)s_shot_delay_ms) {
-            if (s_click_x >= 0 && platform_tick_ms() - t0 > 1000) {
+            // fire the test click just before the screenshot: JS-heavy pages
+            // (bloxd) mount their UI tens of seconds after boot, so a click at
+            // t0+1s would land on the empty page and never hit the target
+            uint32_t click_at = (uint32_t)s_shot_delay_ms > 12000
+                ? (uint32_t)s_shot_delay_ms - 5000 : 1000;
+            if (s_click_x >= 0 && platform_tick_ms() - t0 > click_at) {
                 int cx = s_click_x, cy = s_click_y;
                 nefuos_handle_mouse(cx, cy, 0x01);
                 // Keep the frame loop running while the press is held so LVGL
@@ -1593,7 +2384,30 @@ int main(int argc, char** argv) {
                 s_click_x = -1;
                 printf("clicked %d,%d\n", cx, cy);
             }
-            if (s_key_str && platform_tick_ms() - t0 > 1400) {
+            if (s_drag_x1 >= 0 && platform_tick_ms() - t0 > click_at) {
+                // Scripted press -> move -> release. Used to verify the
+                // browser's draggable scrollbar end to end: press on the
+                // thumb, walk the pointer down the track, let go.
+                nefuos_handle_mouse(s_drag_x1, s_drag_y1, 0x01);
+                for (int f = 0; f < 3; f++) { nefuos_tick(); nefuos_frame(); Sleep(16); }
+                const int steps = 24;
+                for (int k = 1; k <= steps; k++) {
+                    int x = s_drag_x1 + (s_drag_x2 - s_drag_x1) * k / steps;
+                    int y = s_drag_y1 + (s_drag_y2 - s_drag_y1) * k / steps;
+                    nefuos_handle_mouse(x, y, 0x01);
+                    nefuos_tick(); nefuos_frame(); Sleep(8);
+                }
+                nefuos_handle_mouse(s_drag_x2, s_drag_y2, 0);
+                nefuos_tick(); nefuos_frame();
+                printf("dragged %d,%d -> %d,%d\n", s_drag_x1, s_drag_y1,
+                       s_drag_x2, s_drag_y2);
+                s_drag_x1 = -1;
+            }
+            // late key injection, same rationale as the late click: React
+            // pages mount tens of seconds after boot
+            uint32_t key_at = (uint32_t)s_shot_delay_ms > 12000
+                ? (uint32_t)s_shot_delay_ms - 6500 : 1400;
+            if (s_key_str && platform_tick_ms() - t0 > key_at) {
                 // inject key sequence (password) then Enter
                 for (const char* p = s_key_str; *p; p++) {
                     char c = *p;
@@ -1636,7 +2450,16 @@ int main(int argc, char** argv) {
                 printf("keys injected: %s\n", s_key_str);
                 s_key_str = 0;
             }
-            if (s_click2_x >= 0 && platform_tick_ms() - t0 > 3000) {
+            uint32_t click2_at = (uint32_t)s_shot_delay_ms > 12000
+                ? (uint32_t)s_shot_delay_ms - 2500 : 3000;
+            // DOM-level click test: fire before click2 and the screenshot
+            if (s_nfuclick_idx >= 0 &&
+                platform_tick_ms() - t0 > (uint32_t)(s_shot_delay_ms > 12000 ? s_shot_delay_ms - 4000 : 2000)) {
+                nefu::browser_debug_nfu_click(s_nfuclick_idx);
+                printf("nfuclick %d dispatched\n", s_nfuclick_idx);
+                s_nfuclick_idx = -1;
+            }
+            if (s_click2_x >= 0 && platform_tick_ms() - t0 > click2_at) {
                 // optional second click (e.g. click "Save" after typing)
                 int cx = s_click2_x, cy = s_click2_y;
                 nefuos_handle_mouse(cx, cy, 0x01);
@@ -1674,3 +2497,4 @@ int main(int argc, char** argv) {
     printf("nefuOS host exit\n");
     return 0;
 }
+
