@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // textlib standalone self-test host
 #include "textlib/text_all.h"
 #include <cstdio>
@@ -13,3 +18,4 @@ int main() {
     printf("TOTAL=%d\n", nefu::text::text_all_self_test());
     return 0;
 }
+

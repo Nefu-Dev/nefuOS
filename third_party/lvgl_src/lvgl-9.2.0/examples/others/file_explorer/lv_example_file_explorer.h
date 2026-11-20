@@ -38,3 +38,4 @@ void lv_example_file_explorer_3(void);
 #endif
 
 #endif /*LV_EX_FILE_EXPLORER_H*/
+

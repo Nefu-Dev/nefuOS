@@ -255,3 +255,4 @@ void FREERTOS_TASK_DELETE_HOOK(void *tcb) {
 }
 
 #endif // MICROPY_PY_THREAD
+

@@ -17,3 +17,4 @@ double nearbyint(double x)
 #endif
 	return x;
 }
+

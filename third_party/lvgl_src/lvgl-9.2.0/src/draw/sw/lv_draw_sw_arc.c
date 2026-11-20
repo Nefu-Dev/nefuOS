@@ -314,3 +314,4 @@ void lv_draw_sw_arc(lv_draw_unit_t * draw_unit, const lv_draw_arc_dsc_t * dsc, c
 
 #endif /*LV_DRAW_SW_COMPLEX*/
 #endif /*LV_USE_DRAW_SW*/
+

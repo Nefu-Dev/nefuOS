@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 传染病传播模型 epidemic
 // 教学版：SIR 经典流行病学模型（易感 S / 感染 I / 恢复 R）。
 // 支持按人群离散模拟与按微分方程连续模拟两种视角，中文注释。
@@ -54,3 +59,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS hash & encoding library
 // md5, sha1, crc32, adler32, base64, hex — portable, no STL.
 #pragma once
@@ -48,3 +53,4 @@ int  hex_decode(const char* in, uint8_t* out, size_t out_cap);
 
 } // namespace hash
 } // namespace nefu
+

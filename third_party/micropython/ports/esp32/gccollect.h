@@ -40,3 +40,4 @@ extern uint32_t _heap_start;
 extern uint32_t _heap_end;
 
 void gc_collect(void);
+

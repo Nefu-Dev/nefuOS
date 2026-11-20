@@ -414,3 +414,4 @@ bool __attribute__((optimize("Os"))) sdram_test(bool exhaustive) {
 #endif
 
 #endif // FMC_SDRAM_BANK
+

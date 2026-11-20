@@ -691,3 +691,4 @@ void BOARD_BootClockRUN(void) {
     SystemCoreClock = CLOCK_GetRootClockFreq(kCLOCK_Root_M4);
     #endif
 }
+

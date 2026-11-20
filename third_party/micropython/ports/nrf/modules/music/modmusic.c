@@ -513,3 +513,4 @@ MP_REGISTER_MODULE(MP_QSTR_music, music_module);
 MP_REGISTER_ROOT_POINTER(struct _music_data_t *modmusic_music_data);
 
 #endif // MICROPY_PY_MUSIC
+

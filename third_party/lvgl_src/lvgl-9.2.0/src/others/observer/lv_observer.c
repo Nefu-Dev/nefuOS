@@ -723,3 +723,4 @@ static void dropdown_value_observer_cb(lv_observer_t * observer, lv_subject_t * 
 #endif /*LV_USE_DROPDOWN*/
 
 #endif /*LV_USE_OBSERVER*/
+

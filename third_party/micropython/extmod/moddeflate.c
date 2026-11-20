@@ -413,3 +413,4 @@ MP_REGISTER_MODULE(MP_QSTR_deflate, mp_module_deflate);
 #endif
 
 #endif // MICROPY_PY_DEFLATE
+

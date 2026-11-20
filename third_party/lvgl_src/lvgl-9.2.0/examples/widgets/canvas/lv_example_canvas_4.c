@@ -37,3 +37,4 @@ void lv_example_canvas_4(void)
 
 }
 #endif
+

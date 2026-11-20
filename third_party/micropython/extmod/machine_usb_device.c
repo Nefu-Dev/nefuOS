@@ -339,3 +339,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 MP_REGISTER_ROOT_POINTER(mp_obj_t usbd);
 
 #endif
+

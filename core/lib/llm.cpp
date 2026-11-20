@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuLLM -- freestanding int8 GPT-Neo inference engine (Q16.16, no FPU/no libc)
 // ---------------------------------------------------------------------------
 // Integer-only transformer inference for the NEFL blob produced by
@@ -713,4 +718,5 @@ int llm_debug_topk(Model* m, const char* prompt, uint32_t* topids, int32_t* topv
 
 } // namespace llm
 } // namespace nefu
+
 

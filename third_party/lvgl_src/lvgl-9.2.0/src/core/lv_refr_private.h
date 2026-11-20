@@ -73,3 +73,4 @@ void lv_display_refr_timer(lv_timer_t * timer);
 #endif
 
 #endif /*LV_REFR_PRIVATE_H*/
+

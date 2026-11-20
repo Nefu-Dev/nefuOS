@@ -1,4 +1,9 @@
-﻿// gedemo.cpp —— 2D 游戏引擎演示窗口
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// gedemo.cpp —— 2D 游戏引擎演示窗口
 //
 // 演示：瓦片地图背景 + 物理刚体（左右移动的箱子，重力/碰撞地板）
 //       + 粒子发射器（跟随箱子）+ UI（血条/按钮/菜单）+ 输入映射。
@@ -213,7 +218,7 @@ static void demo_close(Window* w) {
 void gedemo_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("GameEngine Demo", x, y, DEMO_W, DEMO_H);
+    Window* w = g_wm->create_window(T("游戏引擎演示", "GameEngine Demo"), x, y, DEMO_W, DEMO_H);
     if (!w) return;
     GeDemo* d = new GeDemo();
     w->userdata = d;
@@ -224,3 +229,4 @@ void gedemo_launch() {
 }
 
 } // namespace nefu
+

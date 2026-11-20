@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 包络 env（ADSR）
 // 教学版：Attack-Decay-Sustain-Release 包络发生器，控制音量随时间变化。
 // 用于乐器音色的起音/衰减/保持/释音阶段。class / 中文注释。
@@ -32,3 +37,4 @@ public:
 
 } // namespace audx
 } // namespace nefu
+

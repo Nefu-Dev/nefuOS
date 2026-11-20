@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_canvas.c
  *
  */
@@ -433,3 +433,4 @@ static void lv_canvas_destructor(const lv_obj_class_t * class_p, lv_obj_t * obj)
 }
 
 #endif
+

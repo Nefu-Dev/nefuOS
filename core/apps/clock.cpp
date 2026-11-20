@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS analog clock - LVGL GUI (canvas-based, integer math only)
 #include "apps.h"
 #include "../gui/wm.h"
@@ -63,7 +68,7 @@ static void clock_wm_paint(Window* win) {
 void clock_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Clock", x, y, 260, 320);
+    Window* w = g_wm->create_window(T("时钟", "Clock"), x, y, 260, 320);
     if (!w) return;
     ClockLvState* st = new ClockLvState();
     st->w = w->content_w;

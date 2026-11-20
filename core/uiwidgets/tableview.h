@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— TableView 表格组件
 // 行列管理、单元格文字、表头、选择(单元格/行/列)、排序、滚动、列宽拖拽、虚拟滚动
 #pragma once
@@ -79,3 +84,4 @@ int tableview_self_test();
 
 } // namespace ui
 } // namespace nefu
+

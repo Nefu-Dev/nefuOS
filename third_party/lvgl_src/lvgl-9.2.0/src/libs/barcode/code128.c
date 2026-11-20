@@ -580,3 +580,4 @@ size_t code128_encode_gs1(const char * s, char * out, size_t maxlength)
 }
 
 #endif /*LV_USE_BARCODE*/
+

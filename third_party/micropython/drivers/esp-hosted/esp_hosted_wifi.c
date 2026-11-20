@@ -699,3 +699,4 @@ int esp_hosted_wifi_scan(esp_hosted_scan_callback_t scan_callback, void *arg, ui
     return 0;
 }
 #endif // MICROPY_PY_NETWORK_ESP_HOSTED
+

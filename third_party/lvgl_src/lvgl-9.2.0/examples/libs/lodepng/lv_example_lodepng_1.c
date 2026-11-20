@@ -21,3 +21,4 @@ void lv_example_lodepng_1(void)
 }
 
 #endif
+

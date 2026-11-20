@@ -199,3 +199,4 @@ extern void InitSharpYuvSSE2(void);
 void InitSharpYuvSSE2(void) {}
 
 #endif  // WEBP_USE_SSE2
+

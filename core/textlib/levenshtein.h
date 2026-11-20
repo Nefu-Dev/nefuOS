@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — edit distance (Levenshtein)
 // 编辑距离：把字符串 A 变成字符串 B 所需的最少单字符操作次数
 // （插入 / 删除 / 替换各计 1 次）。经典动态规划：dp[i][j] 表示
@@ -25,3 +30,4 @@ int levenshtein_self_test();
 
 } // namespace text
 } // namespace nefu
+

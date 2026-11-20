@@ -48,3 +48,4 @@ void lv_demo_music_album_next(bool next);
 #endif
 
 #endif /*LV_DEMO_MUSIC_MAIN_H*/
+

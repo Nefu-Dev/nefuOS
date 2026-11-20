@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nvfs_test stubs: minimal host-side implementations of the platform entry
 // points that klib / vfs.cpp / nvfs.cpp touch in the logic paths.
 #include <cstdlib>
@@ -39,3 +44,4 @@ void nefuos_tick() {}
 void nefuos_frame() {}
 
 } // namespace nefu
+

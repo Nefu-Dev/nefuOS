@@ -97,3 +97,4 @@ WEBP_NODISCARD static WEBP_INLINE int WebPDataCopy(const WebPData* src,
 #endif
 
 #endif  // WEBP_WEBP_MUX_TYPES_H_
+

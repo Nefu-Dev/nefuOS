@@ -131,3 +131,4 @@ uint32_t lv_roller_get_option_count(const lv_obj_t * obj);
 #endif
 
 #endif /*LV_ROLLER_H*/
+

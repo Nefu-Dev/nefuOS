@@ -609,3 +609,4 @@ const lpm_instance_t g_lpm0 =
 void g_hal_init(void) {
     g_common_init();
 }
+

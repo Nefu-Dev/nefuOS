@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— INI 配置 ini
 // 教学版：INI 配置文件的读取与写入（[section] key=value，支持注释 ; #）。
 #pragma once
@@ -53,3 +58,4 @@ private:
 
 } // namespace dbx
 } // namespace nefu
+

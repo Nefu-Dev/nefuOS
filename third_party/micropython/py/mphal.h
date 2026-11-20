@@ -112,3 +112,4 @@ uint64_t mp_hal_time_ns(void);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_MPHAL_H
+

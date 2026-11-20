@@ -616,3 +616,4 @@ const uint8_t cc256x_init_script[] = {
 const uint32_t cc256x_init_script_size = 6771;
 
 #endif
+

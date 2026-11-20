@@ -42,3 +42,4 @@ Q(MSC+HID)
 Q(VCP+MSC)
 Q(VCP+HID)
 #endif
+

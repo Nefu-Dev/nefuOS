@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 聚合头
 // 一次性引入全部系统工具模块，并提供统一的汇总自检入口。
 //
@@ -40,3 +45,4 @@ inline int sysutil_self_test() {
 
 // 聚合头结束。使用方只需 #include <sysutil/sysutil_all.h> 即可获得全部模块。
 // nefu::sysutil 扩展库 v0.1.0
+

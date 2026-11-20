@@ -24,3 +24,4 @@ void lv_example_flex_6(void)
     }
 }
 #endif
+

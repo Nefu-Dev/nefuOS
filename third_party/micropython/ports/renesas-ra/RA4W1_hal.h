@@ -106,3 +106,4 @@ typedef enum {
 #endif
 
 #endif /* PORTS_RA_RA4W1_HAL_H_ */
+

@@ -73,3 +73,4 @@ struct lv_textarea_t {
 #endif
 
 #endif /*LV_TEXTAREA_PRIVATE_H*/
+

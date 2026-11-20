@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // gameengine_test_main.cpp —— 2D 游戏引擎宿主机独立自测
 //
 // 编译命令（在 nefuOS 根目录）：
@@ -49,3 +54,4 @@ int main() {
     printf("gameengine self test: %d failures\n", f);
     return f != 0;
 }
+

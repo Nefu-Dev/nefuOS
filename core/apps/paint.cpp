@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS paint - WM window (surface back + direct blit), palette, clear, save to VFS
 #include "apps.h"
 #include "../gui/wm.h"
@@ -107,7 +112,7 @@ static void paint_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
 void paint_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Paint", x, y, 500, 440);
+    Window* w = g_wm->create_window(T("画图", "Paint"), x, y, 500, 440);
     if (!w) return;
     PaintLvState* st = new PaintLvState();
     st->w = w->content_w - 16;
@@ -125,3 +130,4 @@ void paint_launch() {
     g_wm->raise(w);
 }
 } // namespace nefu
+

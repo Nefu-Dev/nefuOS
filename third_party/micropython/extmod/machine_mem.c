@@ -114,3 +114,4 @@ const machine_mem_obj_t machine_mem16_obj = {{&machine_mem_type}, 2};
 const machine_mem_obj_t machine_mem32_obj = {{&machine_mem_type}, 4};
 
 #endif // MICROPY_PY_MACHINE_MEMX
+

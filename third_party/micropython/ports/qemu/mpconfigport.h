@@ -78,3 +78,4 @@ typedef long mp_off_t;
 #define MP_NEED_LOG2 (1)
 
 #define MP_STATE_PORT MP_STATE_VM
+

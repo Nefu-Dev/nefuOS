@@ -537,3 +537,4 @@ void VP8ParseProba(VP8BitReader* const br, VP8Decoder* const dec) {
     dec->skip_p_ = VP8GetValue(br, 8, "global-header");
   }
 }
+

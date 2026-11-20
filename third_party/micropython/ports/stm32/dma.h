@@ -203,3 +203,4 @@ inline static void dma_unprotect_rx_region(void *dest, size_t len) {
 #endif // __DCACHE_PRESENT
 
 #endif // MICROPY_INCLUDED_STM32_DMA_H
+

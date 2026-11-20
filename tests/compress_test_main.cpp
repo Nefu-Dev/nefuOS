@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— 独立编译自测主程序
 //
 // 用指定命令编译：
@@ -27,3 +32,4 @@ int main() {
     printf("compress library self_test: %d failures\n", f);
     return f != 0;
 }
+

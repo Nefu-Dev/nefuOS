@@ -95,3 +95,4 @@ void mod_network_lwip_poll_wrapper(uint32_t ticks_ms) {
 }
 
 #endif // MICROPY_PY_LWIP
+

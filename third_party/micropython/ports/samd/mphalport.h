@@ -175,3 +175,4 @@ static inline void mp_hal_pin_od_high(mp_hal_pin_obj_t pin) {
 }
 
 #endif // MICROPY_INCLUDED_SAMD_MPHALPORT_H
+

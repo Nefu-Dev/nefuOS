@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // 直接用 debug 版本重测：在 decode 循环中定位
 #include <cstdio>
 #include <cstring>
@@ -16,3 +21,4 @@ int main() {
     printf("dl=%d match=%d\n", dl, dl == n && memcmp(dec, txt, n) == 0);
     return 0;
 }
+

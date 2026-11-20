@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — MD5 (md5)
 // MD5：经典 128 位散列。流程：填充（0x80 + 长度）→ 512 位分块 →
 // 每块 64 轮（4 轮 × 16 步，含非线性函数 F/G/H/I 与常数表）。
@@ -18,3 +23,4 @@ int md5_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

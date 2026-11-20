@@ -87,3 +87,4 @@ mp_obj_t mpy_init(mp_obj_fun_bc_t *self, size_t n_args, size_t n_kw, mp_obj_t *a
     // This must be last, it restores the globals dict
     MP_DYNRUNTIME_INIT_EXIT
 }
+

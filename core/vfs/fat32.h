@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS FAT32 Driver - Minimal read-only support
 // Based on FAT32 specification (Microsoft)
 // Supports: BPB parsing, root directory, file reading, cluster chain traversal
@@ -248,3 +253,4 @@ extern FAT32FS g_fat32;
 
 } // namespace fat32
 } // namespace nefu
+

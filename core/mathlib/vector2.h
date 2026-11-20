@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 二维向量 vector2
 // 教学版：几何向量，点积/叉积(标量)/长度/夹角/旋转。
 #pragma once
@@ -32,3 +37,4 @@ int vector2_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

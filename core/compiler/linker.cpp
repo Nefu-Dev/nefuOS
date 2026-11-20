@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefu::compiler —— 迷你链接器实现（linker.cpp）
 // ============================================================================
@@ -174,3 +179,4 @@ int linker_self_test() {
 
 } // namespace compiler
 } // namespace nefu
+

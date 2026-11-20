@@ -1,4 +1,9 @@
-﻿// ============================================================================
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ============================================================================
 // nefuOS 音频DSP库 —— 效果器模块实现 (effect.cpp)
 // ============================================================================
 #include "effect.h"
@@ -336,5 +341,6 @@ int effect_self_test() {
 
 } // namespace audsp
 } // namespace nefu
+
 
 

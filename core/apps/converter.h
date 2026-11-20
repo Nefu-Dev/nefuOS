@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Unit Converter
 // Convert between different units (length, weight, temperature, etc.)
 #pragma once
@@ -319,3 +324,4 @@ static void converter_launch() {
 }
 
 }} // namespace
+

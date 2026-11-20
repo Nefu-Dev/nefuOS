@@ -83,3 +83,4 @@ void lv_gif_resume(lv_obj_t * obj);
 #endif
 
 #endif /*LV_GIF_H*/
+

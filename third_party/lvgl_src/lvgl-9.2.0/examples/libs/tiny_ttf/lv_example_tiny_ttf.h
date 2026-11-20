@@ -38,3 +38,4 @@ void lv_example_tiny_ttf_3(void);
 #endif
 
 #endif /*LV_EXAMPLE_TINY_TTF_H*/
+

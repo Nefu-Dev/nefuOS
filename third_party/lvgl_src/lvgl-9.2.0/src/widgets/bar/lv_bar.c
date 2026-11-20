@@ -696,3 +696,4 @@ static void lv_bar_init_anim(lv_obj_t * obj, lv_bar_anim_t * bar_anim)
 }
 
 #endif
+

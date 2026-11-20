@@ -8177,6 +8177,66 @@ fail:
     return b->line_num;
 }
 
+/* --- nfuOS debug: name the bytecode function the JS thread is inside -----
+   A page can spin inside one bytecode loop that never reaches a poll point
+   (no backward jump, no call), so the interrupt handler never runs and the
+   only observable is the C stack, which names nothing. Recording the
+   innermost function at call entry costs one hash probe and lets the
+   watchdog print "which JS function" instead of "somewhere in the
+   interpreter". Read-only readers below are safe to call while the JS
+   thread is suspended: they never allocate. */
+volatile void *nfu_dbg_fun = NULL;
+volatile uint32_t nfu_dbg_pc = 0;
+
+#define NFU_DBG_SLOTS 4096
+typedef struct {
+    void *b;
+    char text[64];
+} NfuDbgEnt;
+static NfuDbgEnt nfu_dbg_tab[NFU_DBG_SLOTS];
+
+static void nfu_dbg_note_fun(JSContext *ctx, JSFunctionBytecode *b)
+{
+    unsigned h;
+    nfu_dbg_fun = b;
+    nfu_dbg_pc = 0;
+    h = (unsigned)((((uintptr_t)b) >> 4) % NFU_DBG_SLOTS);
+    if (nfu_dbg_tab[h].b != b) {
+        const char *nm = JS_AtomToCString(ctx, b->func_name);
+        const char *fn = JS_AtomToCString(ctx, b->filename);
+        const char *tail = fn ? fn : "?";
+        if (fn) {
+            size_t L = strlen(fn);
+            if (L > 34) tail = fn + (L - 34);
+        }
+        snprintf(nfu_dbg_tab[h].text, sizeof(nfu_dbg_tab[h].text), "%s @ %s",
+                 nm && *nm ? nm : "(anon)", tail);
+        if (nm) JS_FreeCString(ctx, nm);
+        if (fn) JS_FreeCString(ctx, fn);
+        nfu_dbg_tab[h].b = b;
+    }
+}
+
+const char *nfu_js_dbg_name(void)
+{
+    void *b = nfu_dbg_fun;
+    unsigned h;
+    if (!b) return "?";
+    h = (unsigned)((((uintptr_t)b) >> 4) % NFU_DBG_SLOTS);
+    if (nfu_dbg_tab[h].b == b) return nfu_dbg_tab[h].text;
+    return "?";
+}
+
+int nfu_js_dbg_line(JSContext *ctx)
+{
+    JSFunctionBytecode *b = (JSFunctionBytecode *)nfu_dbg_fun;
+    unsigned pc = nfu_dbg_pc;
+    int col = 0;
+    if (!b) return 0;
+    if (pc > (unsigned)b->byte_code_len) pc = 0;
+    return find_line_num(ctx, b, pc, &col);
+}
+
 /* in order to avoid executing arbitrary code during the stack trace
    generation, we only look at simple 'name' properties containing a
    string. */
@@ -18217,6 +18277,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
     sf->prev_frame = rt->current_stack_frame;
     rt->current_stack_frame = sf;
     ctx = b->realm; /* set the current realm */
+    nfu_dbg_note_fun(ctx, b);
 
 #ifdef ENABLE_DUMPS // JS_DUMP_BYTECODE_STEP
     if (check_dump_flag(ctx->rt, JS_DUMP_BYTECODE_STEP))
@@ -19205,16 +19266,19 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_goto):
             pc += (int32_t)get_u32(pc);
+            nfu_dbg_pc = (uint32_t)(pc - b->byte_code_buf);
             if (unlikely(js_poll_interrupts(ctx)))
                 goto exception;
             BREAK;
         CASE(OP_goto16):
             pc += (int16_t)get_u16(pc);
+            nfu_dbg_pc = (uint32_t)(pc - b->byte_code_buf);
             if (unlikely(js_poll_interrupts(ctx)))
                 goto exception;
             BREAK;
         CASE(OP_goto8):
             pc += (int8_t)pc[0];
+            nfu_dbg_pc = (uint32_t)(pc - b->byte_code_buf);
             if (unlikely(js_poll_interrupts(ctx)))
                 goto exception;
             BREAK;
@@ -65052,3 +65116,4 @@ uintptr_t js_std_cmd(int cmd, ...) {
 #undef malloc
 #undef free
 #undef realloc
+

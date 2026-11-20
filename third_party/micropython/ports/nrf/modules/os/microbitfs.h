@@ -51,3 +51,4 @@ MP_DECLARE_CONST_FUN_OBJ_1(os_mbfs_remove_obj);
 MP_DECLARE_CONST_FUN_OBJ_1(os_mbfs_stat_obj);
 
 #endif // __MICROPY_INCLUDED_FILESYSTEM_H__
+

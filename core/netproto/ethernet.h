@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 以太网（Ethernet II，RFC 894 / IEEE 802.3）
 //
 // 帧结构（不含 NIC 剥离的 4 字节 FCS）：
@@ -91,3 +96,4 @@ int ethernet_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

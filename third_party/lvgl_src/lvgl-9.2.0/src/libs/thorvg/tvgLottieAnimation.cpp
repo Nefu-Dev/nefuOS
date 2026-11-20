@@ -96,3 +96,4 @@ unique_ptr<LottieAnimation> LottieAnimation::gen() noexcept
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

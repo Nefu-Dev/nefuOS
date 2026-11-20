@@ -67,3 +67,4 @@ enum {
 };
 
 typedef NRF_GPIO_Type pin_gpio_t;
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // firewall.cpp - 简单包过滤防火墙实现
 #include "firewall.h"
 #include "netproto_common.h"
@@ -162,3 +167,4 @@ int firewall_self_test() {
 
 } // namespace netproto
 } // namespace nefu
+

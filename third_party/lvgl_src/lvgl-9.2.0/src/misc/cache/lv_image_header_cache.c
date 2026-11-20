@@ -131,3 +131,4 @@ static void image_header_cache_free_cb(lv_image_header_cache_data_t * entry, voi
 
     if(entry->src_type == LV_IMAGE_SRC_FILE) lv_free((void *)entry->src);
 }
+

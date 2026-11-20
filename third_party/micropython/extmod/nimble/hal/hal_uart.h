@@ -46,3 +46,4 @@ int hal_uart_close(uint32_t port);
 void mp_bluetooth_nimble_hci_uart_process(bool run_events);
 
 #endif // MICROPY_INCLUDED_EXTMOD_NIMBLE_HAL_HAL_UART_H
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— IPv4 实现
 #include "ip.h"
 #include "netproto_common.h"
@@ -574,3 +579,4 @@ int ip_self_test() {
 
 } // namespace netproto
 } // namespace nefu
+

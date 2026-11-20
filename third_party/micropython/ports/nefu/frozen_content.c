@@ -21,3 +21,4 @@ const char mp_frozen_str_content[] = {
 };
 
 const char mp_frozen_names[] = { MP_FROZEN_STR_NAMES "\0"};
+

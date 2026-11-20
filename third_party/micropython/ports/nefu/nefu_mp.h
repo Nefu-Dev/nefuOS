@@ -64,3 +64,4 @@ void nefu_mp_set_vfs(const nefu_vfs_t *vfs);
 #endif
 
 #endif /* NEFU_MP_H */
+

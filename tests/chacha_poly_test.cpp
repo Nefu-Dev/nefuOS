@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // tests/chacha_poly_test.cpp - RFC 8439 verification of the nefuOS ChaCha20 /
 // Poly1305 / ChaCha20-Poly1305 primitives used by the bare-metal TLS 1.3
 // client. The in-tree mac_self_test only checks determinism, so this test
@@ -147,3 +152,4 @@ int main() {
     printf(fail ? "RESULT: FAIL (%d)\n" : "RESULT: PASS\n", fail);
     return fail ? 1 : 0;
 }
+

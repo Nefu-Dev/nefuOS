@@ -55,3 +55,4 @@ void mp_cstack_check(void) {
 }
 
 #endif // MICROPY_STACK_CHECK
+

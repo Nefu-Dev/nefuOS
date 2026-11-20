@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for STM32F722, STM32F723, STM32F732, STM32F733
 */
 
@@ -33,3 +38,4 @@ _micropy_hw_internal_flash_storage_ram_cache_start = ORIGIN(DTCM);
 _micropy_hw_internal_flash_storage_ram_cache_end = ORIGIN(DTCM) + LENGTH(DTCM);
 _micropy_hw_internal_flash_storage_start = ORIGIN(FLASH_FS);
 _micropy_hw_internal_flash_storage_end = ORIGIN(FLASH_FS) + LENGTH(FLASH_FS);
+

@@ -428,3 +428,4 @@ void rtc_carry_isr(void) {
     R_BSP_IrqStatusClear(irq);
 }
 #endif
+

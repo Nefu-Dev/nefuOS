@@ -42,3 +42,4 @@ void test_render_to_argb8888(void)
 }
 
 #endif
+

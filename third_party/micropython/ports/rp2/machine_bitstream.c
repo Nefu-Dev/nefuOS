@@ -118,3 +118,4 @@ void __time_critical_func(machine_bitstream_high_low)(mp_hal_pin_obj_t pin, uint
 }
 
 #endif // MICROPY_PY_MACHINE_BITSTREAM
+

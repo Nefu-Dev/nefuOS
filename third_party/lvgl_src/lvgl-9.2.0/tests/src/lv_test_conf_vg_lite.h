@@ -42,3 +42,4 @@
 #define LV_DRAW_TRANSFORM_USE_MATRIX            1
 
 #endif /* LV_TEST_CONF_VG_LITE_H */
+

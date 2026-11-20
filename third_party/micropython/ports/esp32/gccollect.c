@@ -86,3 +86,4 @@ size_t gc_get_max_new_split(void) {
 }
 
 #endif
+

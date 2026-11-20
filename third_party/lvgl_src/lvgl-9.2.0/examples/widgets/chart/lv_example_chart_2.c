@@ -54,3 +54,4 @@ void lv_example_chart_2(void)
 }
 
 #endif
+

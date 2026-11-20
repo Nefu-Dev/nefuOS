@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 音频DSP库 —— 振荡器模块 (osc.h)
 // ----------------------------------------------------------------------------
@@ -144,3 +149,4 @@ int osc_self_test();
 
 } // namespace audsp
 } // namespace nefu
+

@@ -208,3 +208,4 @@
   [temp17]"=&r"(temp17), [temp18]"=&r"(temp18)
 
 #endif  // WEBP_DSP_MIPS_MACRO_H_
+

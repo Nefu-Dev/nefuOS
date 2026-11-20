@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS shared math expression parser/evaluator.
 // Built on top of the fx fixed-point library (core/lib/softmath.h, Q16.16),
 // so it runs on both the Windows host and the bare-metal kernel (no FPU).
@@ -385,3 +390,4 @@ inline void fix_to_str(char* out, size_t n, fx::fix v, int min_dec, int max_dec)
 
 } // namespace fxexpr
 } // namespace nefu
+

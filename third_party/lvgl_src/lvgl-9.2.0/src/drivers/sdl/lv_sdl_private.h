@@ -47,3 +47,4 @@ lv_display_t * lv_sdl_get_disp_from_win_id(uint32_t win_id);
 #endif
 
 #endif /* LV_SDL_PRIVATE_H */
+

@@ -25,3 +25,4 @@ void lv_example_rlottie_1(void)
 
 #endif
 #endif
+

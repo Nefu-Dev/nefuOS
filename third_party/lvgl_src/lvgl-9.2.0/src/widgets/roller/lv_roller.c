@@ -855,3 +855,4 @@ static void transform_vect_recursive(lv_obj_t * roller, lv_point_t * vect)
 }
 
 #endif
+

@@ -278,3 +278,4 @@ static void mp_machine_idle(void) {
     taskYIELD();
     MP_THREAD_GIL_ENTER();
 }
+

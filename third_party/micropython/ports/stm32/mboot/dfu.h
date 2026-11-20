@@ -117,3 +117,4 @@ typedef struct _dfu_state_t {
 extern dfu_context_t dfu_context;
 
 #endif // MICROPY_INCLUDED_STM32_MBOOT_DFU_H
+

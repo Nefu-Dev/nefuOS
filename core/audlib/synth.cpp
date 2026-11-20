@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 波形合成器实现 + 自测
 #include "audlib/synth.h"
 #include <cmath>
@@ -148,3 +153,4 @@ int Synth::self_test() {
 
 } // namespace audx
 } // namespace nefu
+

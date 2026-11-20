@@ -187,3 +187,4 @@ const lv_image_dsc_t img_demo_vector_avatar = {
     .data = img_demo_vector_avatar_map,
     .data_size = sizeof(img_demo_vector_avatar_map),
 };
+

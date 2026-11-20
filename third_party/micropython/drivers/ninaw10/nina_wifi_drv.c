@@ -908,3 +908,4 @@ int nina_socket_getsockopt(int fd, uint32_t level, uint32_t optname, void *optva
 }
 
 #endif // MICROPY_PY_NINAW10
+

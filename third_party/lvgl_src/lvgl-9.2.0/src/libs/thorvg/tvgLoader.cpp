@@ -439,3 +439,4 @@ LoadModule* LoaderMgr::loader(const uint32_t *data, uint32_t w, uint32_t h, bool
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

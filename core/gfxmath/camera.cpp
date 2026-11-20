@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 相机实现 + 自测
 #include "gfxmath/camera.h"
 #include <cstdio>
@@ -110,3 +115,4 @@ int Camera::self_test() {
 
 } // namespace gfx
 } // namespace nefu
+

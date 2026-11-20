@@ -1382,3 +1382,4 @@ void mp_parse_tree_clear(mp_parse_tree_t *tree) {
 }
 
 #endif // MICROPY_ENABLE_COMPILER
+

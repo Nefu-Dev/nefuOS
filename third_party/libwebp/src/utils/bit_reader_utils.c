@@ -298,3 +298,4 @@ void BitTrace(const struct VP8BitReader* const br, const char label[]) {
 #endif  // BITTRACE > 0
 
 //------------------------------------------------------------------------------
+

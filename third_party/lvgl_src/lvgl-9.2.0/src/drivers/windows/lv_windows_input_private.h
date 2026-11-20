@@ -63,3 +63,4 @@ bool lv_windows_encoder_device_window_message_handler(
 #endif
 
 #endif /*LV_WINDOWS_INPUT_PRIVATE_H*/
+

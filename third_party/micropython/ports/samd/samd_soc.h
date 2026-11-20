@@ -53,3 +53,4 @@ void samd_get_unique_id(samd_unique_id_t *id);
 #define SERCOM_IRQ_TYPE_I2C   (2)
 
 #endif // MICROPY_INCLUDED_SAMD_SAMD_SOC_H
+

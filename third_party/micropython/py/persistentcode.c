@@ -668,3 +668,4 @@ void mp_raw_code_save_file(mp_compiled_module_t *cm, qstr filename) {
 #endif // MICROPY_PERSISTENT_CODE_SAVE_FILE
 
 #endif // MICROPY_PERSISTENT_CODE_SAVE
+

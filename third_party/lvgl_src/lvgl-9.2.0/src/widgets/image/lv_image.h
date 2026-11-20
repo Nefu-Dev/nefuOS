@@ -308,3 +308,4 @@ const lv_image_dsc_t * lv_image_get_bitmap_map_src(lv_obj_t * obj);
 #endif
 
 #endif /*LV_IMAGE_H*/
+

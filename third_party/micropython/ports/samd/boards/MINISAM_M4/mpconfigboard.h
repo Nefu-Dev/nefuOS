@@ -4,3 +4,4 @@
 #define MICROPY_HW_DFLL_USB_SYNC    (1)
 
 #define MICROPY_HW_QSPIFLASH   GD25Q16C
+

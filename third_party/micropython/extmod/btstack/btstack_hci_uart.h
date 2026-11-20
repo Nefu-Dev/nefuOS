@@ -37,3 +37,4 @@ extern const btstack_uart_block_t mp_bluetooth_btstack_hci_uart_block;
 void mp_bluetooth_btstack_hci_uart_process(void);
 
 #endif // MICROPY_INCLUDED_EXTMOD_BTSTACK_MODBLUETOOTH_BTSTACK_H
+

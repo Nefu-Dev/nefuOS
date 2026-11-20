@@ -263,3 +263,4 @@ WEBP_DSP_INIT_FUNC(VP8FiltersInit) {
   assert(WebPFilters[WEBP_FILTER_VERTICAL] != NULL);
   assert(WebPFilters[WEBP_FILTER_GRADIENT] != NULL);
 }
+

@@ -673,3 +673,4 @@ void shapeDelStrokeFill(SwShape* shape)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

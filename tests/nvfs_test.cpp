@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nvfs_test.cpp - headless functional tests for the nefuOS NVFS layer
 // (core/vfs/nvfs.cpp). Exercises format/mount, directory + file ops,
 // journaling with crash recovery, journal sync, unlink/rmdir, and the
@@ -172,3 +177,4 @@ int main() {
     printf("== NVFS test: %d checks, %d failures ==\n", s_checks, s_fails);
     return s_fails ? 1 : 0;
 }
+

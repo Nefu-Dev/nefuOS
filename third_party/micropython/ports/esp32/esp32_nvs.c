@@ -149,3 +149,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     print, esp32_nvs_print,
     locals_dict, &esp32_nvs_locals_dict
     );
+

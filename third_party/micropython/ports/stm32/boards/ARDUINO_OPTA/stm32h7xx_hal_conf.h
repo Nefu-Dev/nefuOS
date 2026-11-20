@@ -47,3 +47,4 @@
 #include "boards/stm32h7xx_hal_conf_base.h"
 
 #endif // MICROPY_INCLUDED_STM32H7XX_HAL_CONF_H
+

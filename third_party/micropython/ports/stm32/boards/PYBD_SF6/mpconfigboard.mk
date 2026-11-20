@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # MCU settings
 MCU_SERIES = f7
 CMSIS_MCU = STM32F767xx
@@ -18,3 +23,4 @@ MICROPY_VFS_LFS2 = 1
 
 # PYBD-specific frozen modules
 FROZEN_MANIFEST ?= boards/PYBD_SF2/manifest.py
+

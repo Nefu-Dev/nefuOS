@@ -387,3 +387,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     print, esp32_rmt_print,
     locals_dict, &esp32_rmt_locals_dict
     );
+

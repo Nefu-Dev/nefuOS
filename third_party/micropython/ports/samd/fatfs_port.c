@@ -35,3 +35,4 @@ extern uint32_t time_offset;
 MP_WEAK DWORD get_fattime(void) {
     return (RTC->MODE2.CLOCK.reg >> 1) + (20 << 25);
 }
+

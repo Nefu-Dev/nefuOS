@@ -69,3 +69,4 @@ size_t mp_parse_num_base(const char *str, size_t len, int *base) {
     }
     return p - (const byte *)str;
 }
+

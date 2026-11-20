@@ -37,3 +37,4 @@ void mp_virtual_pin_write(mp_obj_t pin, int value) {
     mp_pin_p_t *pin_p = (mp_pin_p_t *)MP_OBJ_TYPE_GET_SLOT(s->type, protocol);
     pin_p->ioctl(pin, MP_PIN_WRITE, value, NULL);
 }
+

@@ -556,3 +556,4 @@ static lv_cache_compare_res_t tiny_ttf_draw_data_cache_compare_cb(const tiny_ttf
 }
 
 #endif
+

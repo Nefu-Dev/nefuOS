@@ -131,3 +131,4 @@ int ringbuf_get_bytes(ringbuf_t *r, uint8_t *data, size_t data_len);
 int ringbuf_put_bytes(ringbuf_t *r, const uint8_t *data, size_t data_len);
 
 #endif // MICROPY_INCLUDED_PY_RINGBUF_H
+

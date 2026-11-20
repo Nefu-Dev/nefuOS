@@ -130,3 +130,4 @@ static inline void cyw43_delay_ms(uint32_t ms) {
 #define CYW43_EVENT_POLL_HOOK mp_event_handle_nowait()
 
 #endif // MICROPY_INCLUDED_RP2_CYW43_CONFIGPORT_H
+

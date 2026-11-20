@@ -70,3 +70,4 @@ void lv_example_gridnav_1(void)
 }
 
 #endif
+

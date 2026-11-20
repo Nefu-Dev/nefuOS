@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #include "gfxlib/raster.h"
 #include <cstdio>
 
@@ -12,3 +17,4 @@ int main() {
     std::printf("post center=%08x\n", (unsigned)buf[10 * 16 + 8]);
     return 0;
 }
+

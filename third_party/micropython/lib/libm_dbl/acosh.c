@@ -22,3 +22,4 @@ double acosh(double x)
 	/* |x| >= 0x1p26 or nan */
 	return log(x) + 0.693147180559945309417232121458176568;
 }
+

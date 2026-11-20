@@ -120,3 +120,4 @@ static void apply_theme_recursion(lv_theme_t * th, lv_obj_t * obj)
 
     apply_theme(th, obj);
 }
+

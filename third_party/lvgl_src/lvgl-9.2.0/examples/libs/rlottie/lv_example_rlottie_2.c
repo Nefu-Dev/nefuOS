@@ -26,3 +26,4 @@ void lv_example_rlottie_2(void)
 
 #endif
 #endif
+

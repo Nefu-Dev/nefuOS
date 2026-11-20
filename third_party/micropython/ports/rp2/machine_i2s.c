@@ -606,3 +606,4 @@ static void mp_machine_i2s_irq_update(machine_i2s_obj_t *self) {
 }
 
 MP_REGISTER_ROOT_POINTER(void *machine_i2s_obj[2]);
+

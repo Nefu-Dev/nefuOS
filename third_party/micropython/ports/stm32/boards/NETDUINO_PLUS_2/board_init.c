@@ -22,3 +22,4 @@ void NETDUINO_PLUS_2_board_early_init(void) {
     HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 }
+

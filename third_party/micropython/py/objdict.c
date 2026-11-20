@@ -669,3 +669,4 @@ mp_obj_t mp_obj_dict_delete(mp_obj_t self_in, mp_obj_t key) {
     dict_get_helper(2, args, MP_MAP_LOOKUP_REMOVE_IF_FOUND);
     return self_in;
 }
+

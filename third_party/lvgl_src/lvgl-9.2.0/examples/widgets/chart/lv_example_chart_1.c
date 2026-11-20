@@ -31,3 +31,4 @@ void lv_example_chart_1(void)
 }
 
 #endif
+

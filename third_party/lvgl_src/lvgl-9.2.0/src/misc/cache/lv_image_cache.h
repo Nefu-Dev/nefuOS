@@ -69,3 +69,4 @@ bool lv_image_cache_is_enabled(void);
 #endif
 
 #endif /*LV_IMAGE_CACHE_H*/
+

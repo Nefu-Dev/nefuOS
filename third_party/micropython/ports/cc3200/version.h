@@ -29,3 +29,4 @@
 #define WIPY_SW_VERSION_NUMBER                              "1.2.0"
 
 #endif // MICROPY_INCLUDED_CC3200_VERSION_H
+

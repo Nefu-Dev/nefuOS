@@ -50,3 +50,4 @@ void powerctrl_enter_stop_mode(void);
 NORETURN void powerctrl_enter_standby_mode(void);
 
 #endif // MICROPY_INCLUDED_STM32_POWERCTRL_H
+

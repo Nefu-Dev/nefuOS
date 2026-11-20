@@ -220,3 +220,4 @@ void * lv_array_back(const lv_array_t * array)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

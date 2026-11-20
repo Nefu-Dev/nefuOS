@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // tictactoe.cpp —— nefuOS 井字棋（人机对战，minimax AI）
 //
 // 玩法：
@@ -158,7 +163,7 @@ static void ttt_close(Window* w) {
 void tictactoe_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Tic-Tac-Toe", x, y, GW, GH);
+    Window* w = g_wm->create_window(T("井字棋", "Tic-Tac-Toe"), x, y, GW, GH);
     if (!w) return;
     TicTacToe* g = new TicTacToe();
     g->reset();
@@ -171,3 +176,4 @@ void tictactoe_launch() {
 }
 
 } // namespace nefu
+

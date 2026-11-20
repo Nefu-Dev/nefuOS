@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 包围盒 aabb 与球 sphere
 // 教学版：轴对齐包围盒（AABB）与包围球，用于碰撞检测与空间裁剪。
 #pragma once
@@ -91,3 +96,4 @@ struct Sphere {
 
 } // namespace gfx
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 嵌入式数据库 —— 键值存储(KV Store)
 //
 // 两层结构:
@@ -105,3 +110,4 @@ int kvstore_self_test();
 
 } // namespace database
 } // namespace nefu
+

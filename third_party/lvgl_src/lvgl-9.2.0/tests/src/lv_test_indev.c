@@ -133,3 +133,4 @@ void lv_test_indev_wait(uint32_t ms)
 }
 
 #endif
+

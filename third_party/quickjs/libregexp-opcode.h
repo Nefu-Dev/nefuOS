@@ -71,3 +71,4 @@ DEF(check_advance, 2) /* check that the register is different from the character
 DEF(prev, 1) /* go to the previous char */
 
 #endif /* DEF */
+

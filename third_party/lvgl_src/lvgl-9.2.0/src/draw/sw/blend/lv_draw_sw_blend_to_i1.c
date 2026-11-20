@@ -1115,3 +1115,4 @@ static inline uint8_t LV_ATTRIBUTE_FAST_MEM get_bit(const uint8_t * buf, int32_t
 }
 
 #endif
+

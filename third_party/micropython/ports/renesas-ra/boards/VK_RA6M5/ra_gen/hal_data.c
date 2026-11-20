@@ -772,3 +772,4 @@ const uart_instance_t g_uart6 = { .p_ctrl = &g_uart6_ctrl,
 void g_hal_init(void) {
     g_common_init();
 }
+

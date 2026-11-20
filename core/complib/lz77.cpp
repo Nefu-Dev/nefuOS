@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — LZ77 implementation
 #include "lz77.h"
 #include <stdio.h>
@@ -128,3 +133,4 @@ int lz77_self_test() {
 
 } // namespace comp
 } // namespace nefu
+

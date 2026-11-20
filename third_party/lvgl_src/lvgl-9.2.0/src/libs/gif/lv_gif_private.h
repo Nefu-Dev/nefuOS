@@ -55,3 +55,4 @@ struct lv_gif_t {
 #endif
 
 #endif /*LV_GIF_PRIVATE_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Task Manager / System Monitor enhanced
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -55,7 +60,9 @@ static void taskmgr_paint(Window* win) {
             gfx::text(s, 180, y, procs[i][1], 0xcdd6f4, 0);
             gfx::text(s, 220, y, procs[i][2], 0xa6e3a1, 0);
             gfx::text(s, 280, y, procs[i][3], 0xf9e2af, 0);
-            y += 18;
+            // Chinese glyphs are a full 16px tall: give the rows a little more
+            // air so translated entries never touch each other.
+            y += (g_settings.lang == 1) ? 21 : 18;
         }
     } else if (st->tab == 1) {
         // Performance tab
@@ -113,7 +120,7 @@ static void taskmgr_on_key(Window* win, const KeyEvent* e) {
 void app_taskmgr_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Task Manager", x, y, 450, 320);
+    Window* w = g_wm->create_window(T("任务管理器", "Task Manager"), x, y, 450, 320);
     if (!w) return;
     TaskMgrState* st = new TaskMgrState();
     st->w = w->content_w;
@@ -126,3 +133,4 @@ void app_taskmgr_launch() {
 }
 
 } // namespace nefu
+

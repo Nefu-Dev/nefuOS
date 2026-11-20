@@ -110,3 +110,4 @@ uint32_t lv_nuttx_get_idle(void);
 #endif
 
 #endif /* LV_NUTTX_ENTRY_H */
+

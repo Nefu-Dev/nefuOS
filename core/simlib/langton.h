@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— Langton 蚂蚁 langton
 // 教学版：经典二维元胞自动机"朗顿蚂蚁"。
 // 规则：黑格 -> 右转 90 度并翻白；白格 -> 左转 90 度并翻黑。
@@ -51,3 +56,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

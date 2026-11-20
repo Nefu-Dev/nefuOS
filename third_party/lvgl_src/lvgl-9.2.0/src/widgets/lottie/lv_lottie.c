@@ -235,3 +235,4 @@ static void lottie_update(lv_lottie_t * lottie, int32_t v)
 }
 
 #endif /*LV_USE_LOTTIE*/
+

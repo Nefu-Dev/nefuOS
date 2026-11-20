@@ -68,3 +68,4 @@ inline void PutN(MemoryBuffer& memoryBuffer, char c, size_t n) {
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_MEMORYBUFFER_H_
+

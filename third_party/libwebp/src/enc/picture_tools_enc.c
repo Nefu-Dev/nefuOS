@@ -272,3 +272,4 @@ void WebPBlendAlpha(WebPPicture* picture, uint32_t background_rgb) {
 #undef BLEND_10BIT
 
 //------------------------------------------------------------------------------
+

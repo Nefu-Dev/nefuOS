@@ -486,3 +486,4 @@ static void _pxp_render_thread_cb(void * ptr)
 #endif
 
 #endif /*LV_USE_DRAW_PXP*/
+

@@ -110,3 +110,4 @@ static void generic_switch_event_cb(lv_event_t * e)
 }
 
 #endif
+

@@ -228,3 +228,4 @@ const char * lv_cache_get_name(lv_cache_t * cache);
 #endif
 
 #endif /* LV_CACHE_H */
+

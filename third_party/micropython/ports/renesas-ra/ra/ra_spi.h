@@ -51,3 +51,4 @@ void ra_spi_init(uint32_t ch, uint32_t mosi, uint32_t miso, uint32_t sck, uint32
 void ra_spi_deinit(uint32_t ch, uint32_t cs);
 
 #endif /* RA_RA_SPI_H_ */
+

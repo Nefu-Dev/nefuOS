@@ -51,3 +51,4 @@ const BOOT_DATA_T boot_data = {
     0xFFFFFFFF                            /* empty - extra data word */
 };
 #endif
+

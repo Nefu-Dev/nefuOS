@@ -67,3 +67,4 @@ bool lv_vg_lite_draw_grad_helper(
 #endif
 
 #endif /*LV_VG_LITE_GRAD_H*/
+

@@ -508,3 +508,4 @@ void mp_decompress_rom_string(byte *dst, const mp_rom_error_text_t src_chr) {
 }
 
 #endif // MICROPY_ROM_TEXT_COMPRESSION
+

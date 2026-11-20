@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 非对称密码实现（RSA / DH）
 // 复用 bignum::BigInt 的 big_mod_pow / big_is_prime / big_gcd。
 #include "pubkey.h"

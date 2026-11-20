@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据序列化与编解码库 —— 图像格式模块实现
 #include "imagec.h"
 #include <cstdio>
@@ -1231,3 +1236,4 @@ int imagec_self_test() {
 }
 } // namespace serialize
 } // namespace nefu
+

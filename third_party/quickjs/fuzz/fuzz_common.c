@@ -56,3 +56,4 @@ void test_one_input_init(JSRuntime *rt, JSContext *ctx) {
     std_val = js_std_await(ctx, std_val);
     JS_FreeValue(ctx, std_val);
 }
+

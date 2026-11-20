@@ -49,3 +49,4 @@ struct _fs_user_mount_t;
 void sdcard_init_vfs(struct _fs_user_mount_t *vfs, int part);
 
 #endif // MICROPY_INCLUDED_STM32_SDCARD_H
+

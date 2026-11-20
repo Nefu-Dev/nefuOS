@@ -185,3 +185,4 @@ mp_uint_t mp_hal_ticks_us(void) {
     // and is the same thing as (counter * 1000) / (load + 1)
     return milliseconds * 1000 + (counter * 1000) / (load + 1);
 }
+

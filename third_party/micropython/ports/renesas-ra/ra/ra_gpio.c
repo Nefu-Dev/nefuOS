@@ -183,3 +183,4 @@ uint32_t ra_gpio_get_drive(uint32_t pin) {
     }
     return drive;
 }
+

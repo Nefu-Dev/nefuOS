@@ -76,3 +76,4 @@ uint32_t uzlib_adler32(const void *data, unsigned int length, uint32_t prev_sum 
 
    return (s2 << 16) | s1;
 }
+

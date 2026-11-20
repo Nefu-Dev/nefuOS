@@ -63,3 +63,4 @@ struct lv_spangroup_t {
 #endif
 
 #endif /*LV_SPAN_PRIVATE_H*/
+

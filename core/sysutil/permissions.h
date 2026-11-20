@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 权限管理模块
 // 用户 / 组 / 权限位(rwx) / 访问控制列表(ACL) / sudo(模拟)。
 // 全部为软件模拟，不依赖真实 Linux VFS；用于 sysmon 展示与权限策略自检。
@@ -135,3 +140,4 @@ extern PermissionManager g_perms;
 
 } // namespace sysutil
 } // namespace nefu
+

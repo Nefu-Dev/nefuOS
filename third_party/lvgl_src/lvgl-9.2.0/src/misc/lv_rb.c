@@ -554,3 +554,4 @@ static void rb_delete_color(lv_rb_t * tree, lv_rb_node_t * node1, lv_rb_node_t *
     if(node1 != NULL)
         node1->color = LV_RB_COLOR_BLACK;
 }
+

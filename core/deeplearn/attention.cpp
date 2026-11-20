@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 注意力机制实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 注意力机制实现
 // 缩放点积注意力 + 多头 + 位置编码 + Transformer Block。因果掩码用于自回归。
 // 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
@@ -260,3 +265,4 @@ Tensor cross_attention(const Tensor& Q, const Tensor& K, const Tensor& V) {
 }
 } // namespace deeplearn
 } // namespace nefu
+

@@ -277,3 +277,4 @@ static lv_fragment_managed_states_t * fragment_attach(lv_fragment_manager_t * ma
 }
 
 #endif /*LV_USE_FRAGMENT*/
+

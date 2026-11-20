@@ -50,3 +50,4 @@ struct lv_qrcode_t {
 #endif
 
 #endif /*LV_QRCODE_PRIVATE_H*/
+

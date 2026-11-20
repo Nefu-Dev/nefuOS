@@ -379,3 +379,4 @@ static const uint8_t kImgAlphaData[] = {
 };
 
 #endif  // WEBP_TESTS_FUZZER_IMG_ALPHA_H_
+

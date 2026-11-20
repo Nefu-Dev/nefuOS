@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // 独立宿主测试主程序：运行 core/serialize 所有模块的 self_test。
 // 编译见任务说明（见 tests/build 说明）。这里只提供 kalloc/kfree/platform_dbg 桩。
 #include "../core/serialize/serialize_all.h"

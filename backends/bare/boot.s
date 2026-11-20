@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # nefuOS bare boot sector (El Torito no-emulation, DL=0xE0 real ATAPI CD)
 # Duties: load the 2-sector multi-boot picker (menu.bin @ LBA 24) to 0x10000
 # and jump to it; the picker detects a second bootable OS on the hard disk
@@ -284,3 +289,4 @@ m_retry:
 
 .org 0x1FE
     .word 0xAA55
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — lightweight regex implementation
 // 分两阶段：①把模式编译成 token 序列（原子 + 量词标记）；②带回溯的
 // 匹配循环（贪婪优先，失败回溯）。支持 . [abc] [^abc] 转义类 \d \w \s
@@ -235,3 +240,4 @@ int regex_self_test() {
 
 } // namespace text
 } // namespace nefu
+

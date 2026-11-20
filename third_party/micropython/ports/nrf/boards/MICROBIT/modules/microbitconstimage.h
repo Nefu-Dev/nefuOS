@@ -107,3 +107,4 @@ extern const struct _monochrome_5by5_t microbit_const_image_umbrella_obj;
 extern const struct _monochrome_5by5_t microbit_const_image_snake_obj;
 
 #endif // __MICROPY_INCLUDED_MICROBIT_CONSTIMAGE_H__
+

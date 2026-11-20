@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_blend.c
  *
  */
@@ -1062,3 +1062,4 @@ static inline void * LV_ATTRIBUTE_FAST_MEM drawbuf_next_row(const void * buf, ui
 #endif
 
 #endif
+

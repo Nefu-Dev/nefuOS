@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # nefuOS kernel entry — link base 0x100000 (GNU as AT&T syntax)
 # dual boot paths:
 #   A) legacy ISO (El Torito, BIOS): boot.s loads the compressed payload, the stub decompresses the kernel to 0x100000 and ljmps,
@@ -292,8 +297,8 @@ common_init:
     outb %al, %dx
     # ---- enable SSE + x87: the QuickJS engine and bare_libc libm need them.
     # CR0.EM/TS must be clear and MP set; CR4.OSFXSR|OSXMMEXCPT expose SSE1/2.
-    # (The kernel image must stay below 0xB00000 (staging base) -- enforced by
-    #  the build's memmap check.  Stub staging runs at 0xB00000+ while the
+    # (The kernel image must stay below 0x1400000 (staging base) -- enforced by
+    #  the build's memmap check.  Stub staging runs at 0x1400000+ while the
     #  kernel is being inflated, then the kernel runs with its stack at
     #  0x2000000 and the kalloc arena growing up from 0x2020000.)
     # In long mode mov to/from CR0/CR4 only accepts 64-bit operands.
@@ -352,3 +357,4 @@ gdt64_ptr:
 .globl ___chkstk_ms
 ___chkstk_ms:
     ret
+

@@ -87,3 +87,4 @@ void lv_example_buttonmatrix_2(void)
 }
 
 #endif
+

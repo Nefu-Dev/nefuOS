@@ -2122,3 +2122,4 @@ int unicode_sequence_prop(const char *prop_name, UnicodeSequencePropCB *cb, void
         return -2;
     return unicode_sequence_prop1(seq_prop_idx, cb, opaque, cr);
 }
+

@@ -128,3 +128,4 @@ void VP8LOptimizeSampling(uint32_t* const image, int full_width,
 #endif
 
 #endif  // WEBP_ENC_VP8LI_ENC_H_
+

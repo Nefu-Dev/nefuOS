@@ -780,3 +780,4 @@ void GetAnimatedImageVersions(int* const decoder_version,
   *decoder_version = WebPGetDecoderVersion();
   *demux_version = WebPGetDemuxVersion();
 }
+

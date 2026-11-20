@@ -141,3 +141,4 @@ const lv_img_dsc_t img_benchmark_cogwheel_alpha256 = {
 };
 
 #endif
+

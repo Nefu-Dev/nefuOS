@@ -69,3 +69,4 @@ inline uint32_t clzll(uint64_t x) {
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_CLZLL_H_
+

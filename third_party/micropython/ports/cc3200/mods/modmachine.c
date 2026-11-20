@@ -177,3 +177,4 @@ static mp_obj_t machine_wake_reason (void) {
 static MP_DEFINE_CONST_FUN_OBJ_0(machine_wake_reason_obj, machine_wake_reason);
 
 MP_REGISTER_ROOT_POINTER(mp_obj_t machine_config_main);
+

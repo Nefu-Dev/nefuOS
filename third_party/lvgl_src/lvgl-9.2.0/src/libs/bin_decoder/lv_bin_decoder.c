@@ -1155,3 +1155,4 @@ static lv_result_t decompress_image(lv_image_decoder_dsc_t * dsc, const lv_image
     decoder_data->decompressed = decompressed; /*Free on decoder close*/
     return LV_RESULT_OK;
 }
+

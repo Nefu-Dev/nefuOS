@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  textcmd.h —— 文本处理命令: grep/sed/awk/sort/uniq/wc/head/tail/rev/cat
 // -----------------------------------------------------------------------------
@@ -41,3 +46,4 @@ int textcmd_self_test();
 
 } // namespace termcmds
 } // namespace nefu
+

@@ -451,3 +451,4 @@ void lv_draw_sw_vector(lv_draw_unit_t * draw_unit, const lv_draw_vector_task_dsc
  **********************/
 
 #endif /*LV_USE_DRAW_SW*/
+

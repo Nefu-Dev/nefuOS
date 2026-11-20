@@ -304,3 +304,4 @@ NORETURN void powerctrl_enter_standby_mode(void) {
 
     powerctrl_mcu_reset();
 }
+

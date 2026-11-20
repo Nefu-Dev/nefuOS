@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = f4
 CMSIS_MCU = STM32F429xx
 AF_FILE = boards/stm32f429_af.csv
@@ -12,3 +17,4 @@ MICROPY_SSL_MBEDTLS = 1
 MICROPY_HW_ENABLE_ISR_UART_FLASH_FUNCS_IN_RAM = 1
 
 FROZEN_MANIFEST = $(BOARD_DIR)/manifest.py
+

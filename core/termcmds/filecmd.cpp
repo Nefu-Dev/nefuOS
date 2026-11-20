@@ -1,4 +1,9 @@
-﻿// =============================================================================
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// =============================================================================
 //  filecmd.cpp —— 文件操作命令 + 迷你内存 VFS 实现
 // =============================================================================
 #include "filecmd.h"
@@ -564,3 +569,4 @@ int filecmd_self_test() {
 
 } // namespace termcmds
 } // namespace nefu
+

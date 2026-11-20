@@ -194,3 +194,4 @@ static inline int lre_js_is_ident_next(uint32_t c) {
 }
 
 #endif /* LIBUNICODE_H */
+

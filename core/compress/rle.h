@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— 游程编码（RLE）模块
 //
 // 本模块实现四类最基础的"消除重复"编码器，全部教学友好、逐字节可逆：
@@ -80,3 +85,4 @@ int rle_self_test();
 
 } // namespace compress
 } // namespace nefu
+

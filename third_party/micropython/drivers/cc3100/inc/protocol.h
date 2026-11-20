@@ -1180,3 +1180,4 @@ typedef _BasicResponse_t _FsWriteResponse_t;
 #define SL_IPV6_ADDRESS_SIZE 			(4 * sizeof(_u32))
 
 #endif /*  _SL_PROTOCOL_TYPES_H_  */
+

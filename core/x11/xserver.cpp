@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/x11/xserver.cpp
 //
 // Embedded X11 protocol server (core subset) — see xserver.h for the design.
@@ -969,3 +974,4 @@ void xs_send_setup_reply() {
 
 } // namespace x11
 } // namespace nefu
+

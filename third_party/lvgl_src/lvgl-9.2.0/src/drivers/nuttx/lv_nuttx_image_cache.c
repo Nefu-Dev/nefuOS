@@ -174,3 +174,4 @@ static void free_cb(void * draw_buf)
 }
 
 #endif /* LV_USE_NUTTX */
+

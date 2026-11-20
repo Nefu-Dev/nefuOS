@@ -30,3 +30,4 @@ WEBP_FILTER_TYPE WebPEstimateBestFilter(const uint8_t* data,
 #endif
 
 #endif  // WEBP_UTILS_FILTERS_UTILS_H_
+

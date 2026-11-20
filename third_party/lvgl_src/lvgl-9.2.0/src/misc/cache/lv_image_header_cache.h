@@ -70,3 +70,4 @@ bool lv_image_header_cache_is_enabled(void);
 #endif
 
 #endif /*LV_IMAGE_HEADER_CACHE_H*/
+

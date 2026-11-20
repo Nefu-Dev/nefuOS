@@ -52,3 +52,4 @@ void gc_collect(void) {
     // end the GC
     gc_collect_end();
 }
+

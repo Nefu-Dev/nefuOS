@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 聚合头
 //   #include "crypto/crypto_all.h"
 // 暴露 nefu::crypto 下所有子模块，并汇总 crypto_self_test()。
@@ -29,3 +34,4 @@ inline int crypto_self_test() {
 }
 
 }} // namespace
+

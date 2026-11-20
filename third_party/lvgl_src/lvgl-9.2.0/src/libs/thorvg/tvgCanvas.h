@@ -163,3 +163,4 @@ struct Canvas::Impl
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

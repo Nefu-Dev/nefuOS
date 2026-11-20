@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS JSON Viewer — parse and browse JSON documents
 #include "apps.h"
 #include "../gui/wm.h"
@@ -97,7 +102,7 @@ void jv_close(Window* w) {
 void jsonview_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("JSON Viewer", x, y, 460, 400);
+    Window* w = g_wm->create_window(T("JSON 查看器", "JSON Viewer"), x, y, 460, 400);
     if (!w) return;
     JsonView* g = new JsonView();
     g->w = w->content_w;
@@ -129,3 +134,4 @@ void jsonview_launch() {
 }
 
 } // namespace nefu
+

@@ -35,3 +35,4 @@ extern "C" {
 #endif
 
 #endif /*LV_TEMPL_H*/
+

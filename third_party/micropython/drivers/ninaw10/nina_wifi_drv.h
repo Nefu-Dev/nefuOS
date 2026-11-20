@@ -141,3 +141,4 @@ int nina_socket_setsockopt(int fd, uint32_t level, uint32_t opt, const void *opt
 int nina_socket_getsockopt(int fd, uint32_t level, uint32_t opt, void *optval, uint16_t optlen);
 int nina_socket_getpeername(int fd, uint8_t *ip, uint16_t *port);
 #endif // MICROPY_INCLUDED_DRIVERS_NINAW10_NINA_WIFI_DRV_H
+

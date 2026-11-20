@@ -357,3 +357,4 @@ int main(int argc, const char* argv[]) {
   WebPPictureFree(&pic2);
   FREE_WARGV_AND_RETURN(ret);
 }
+

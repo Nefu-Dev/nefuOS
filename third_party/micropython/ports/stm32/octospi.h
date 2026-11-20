@@ -31,3 +31,4 @@
 extern const mp_qspi_proto_t octospi_proto;
 
 #endif // MICROPY_INCLUDED_STM32_OCTOSPI_H
+

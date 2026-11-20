@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* This linker script fragment is intended to be included in SECTIONS. */
 
 /* Zeroed-out data section */
@@ -30,3 +35,4 @@
 /* _bl_state symbol is used by MICROPY_HW_ENTER_BOOTLOADER_VIA_RESET, this is
    the end of stack address but is accessed as a different type. */
 _bl_state = _estack;
+

@@ -139,3 +139,4 @@ static void lv_templ_event(const lv_obj_class_t * class_p, lv_event_t * e)
 /*This dummy typedef exists purely to silence -Wpedantic.*/
 typedef int keep_pedantic_happy;
 #endif
+

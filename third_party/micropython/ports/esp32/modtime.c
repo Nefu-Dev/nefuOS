@@ -56,3 +56,4 @@ static mp_obj_t mp_time_time_get(void) {
     gettimeofday(&tv, NULL);
     return mp_obj_new_int(tv.tv_sec);
 }
+

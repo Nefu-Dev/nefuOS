@@ -86,3 +86,4 @@ const machine_pin_af_obj_t *machine_pin_find_alt(const machine_pin_obj_t *pin, u
 const machine_pin_af_obj_t *machine_pin_find_alt_by_index(const machine_pin_obj_t *pin, mp_uint_t af_idx);
 
 #endif // MICROPY_INCLUDED_RP2_MACHINE_PIN_H
+

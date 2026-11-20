@@ -663,3 +663,4 @@ static uint32_t count_tracks(const int32_t * templ)
 }
 
 #endif /*LV_USE_GRID*/
+

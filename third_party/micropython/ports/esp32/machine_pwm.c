@@ -715,3 +715,4 @@ static mp_obj_t mp_machine_pwm_duty_get_ns(machine_pwm_obj_t *self) {
 static void mp_machine_pwm_duty_set_ns(machine_pwm_obj_t *self, mp_int_t duty_ns) {
     set_duty_ns(self, duty_ns);
 }
+

@@ -343,3 +343,4 @@ mp_obj_base_t *mp_hal_get_spi_obj(mp_obj_t o) {
         mp_raise_TypeError(MP_ERROR_TEXT("expecting an SPI object"));
     }
 }
+

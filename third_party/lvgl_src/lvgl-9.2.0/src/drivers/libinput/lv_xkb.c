@@ -178,3 +178,4 @@ static bool _set_keymap(lv_xkb_t * dsc, struct xkb_rule_names names)
 }
 
 #endif /* defined(LV_LIBINPUT_XKB) && LV_LIBINPUT_XKB */
+

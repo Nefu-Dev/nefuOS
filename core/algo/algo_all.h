@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS algorithm library — master header (STL-style single include)
 //   #include "algo/algo_all.h"
 // Exposes nefu::algo (sort/search/graph/ds) and nefu::num (numeric).
@@ -26,3 +31,4 @@ inline int algo_all_self_test() {
     return f;
 }
 } }
+

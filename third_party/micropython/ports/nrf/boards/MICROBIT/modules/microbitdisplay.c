@@ -567,3 +567,4 @@ void microbit_display_init(void) {
 }
 
 MP_REGISTER_ROOT_POINTER(void *async_data[2]);
+

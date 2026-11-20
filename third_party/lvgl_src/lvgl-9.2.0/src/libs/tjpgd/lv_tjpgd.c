@@ -299,3 +299,4 @@ static int is_jpg(const uint8_t * raw_data, size_t len)
 }
 
 #endif /*LV_USE_TJPGD*/
+

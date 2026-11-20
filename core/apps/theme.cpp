@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Theme Settings
 // Change accent color and UI theme
 #include "apps.h"
@@ -26,7 +31,7 @@ static ThemeOption themes[] = {
 };
 
 void theme_launch() {
-    Window* w = g_wm->create_window("Theme Settings", 100, 100, 480, 360);
+    Window* w = g_wm->create_window(T("主题设置", "Theme Settings"), 100, 100, 480, 360);
     if (!w) return;
     
     // Header
@@ -94,3 +99,4 @@ void theme_launch() {
 }
 
 } // namespace nefu
+

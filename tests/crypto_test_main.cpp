@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库独立编译测试
 // 编译：g++ -std=c++17 -fno-exceptions -fno-rtti -O2 -I core -I core\crypto
 //       tests\crypto_test_main.cpp core\crypto\*.cpp core\lib\bigint.cpp core\lib\hash.cpp
@@ -37,3 +42,4 @@ int main() {
     printf("\n=== RESULT: %s (total failures=%d) ===\n", total==0?"ALL PASS":"SOME FAILURES", total);
     return total==0 ? 0 : 1;
 }
+

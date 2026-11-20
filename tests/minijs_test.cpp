@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // quick host test for minijs (+ klib stubs)
 #include "minijs.h"
 #include <cstdio>
@@ -34,3 +39,4 @@ int main() {
     printf("pass=%d fail=%d\n", pass, fail);
     return fail ? 1 : 0;
 }
+

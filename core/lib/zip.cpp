@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS minimal ZIP reader for .nefud Linux .deb payloads.
 // Implementation (see zip.h). Pure C++, depends only on deflate.h.
 #include "zip.h"
@@ -122,3 +127,4 @@ long read(const uint8_t* d, size_t n, const Entry& e, uint8_t* dst, size_t cap) 
 
 } // namespace zip
 } // namespace nefu
+

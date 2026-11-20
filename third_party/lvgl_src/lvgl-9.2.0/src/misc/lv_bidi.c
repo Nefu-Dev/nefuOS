@@ -661,3 +661,4 @@ static lv_base_dir_t bracket_process(lv_bidi_ctx_t * ctx, const char * txt, uint
 }
 
 #endif /*LV_USE_BIDI*/
+

@@ -65,3 +65,4 @@ struct _fs_user_mount_t;
 void pyb_flash_init_vfs(struct _fs_user_mount_t *vfs);
 
 #endif // MICROPY_INCLUDED_RA_STORAGE_H
+

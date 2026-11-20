@@ -918,3 +918,4 @@ int WebPISetIOHooks(WebPIDecoder* const idec,
 
   return 1;
 }
+

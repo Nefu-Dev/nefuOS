@@ -110,3 +110,4 @@ static inline mp_obj_t mp_obj_new_fun_asm(size_t n_args, const void *fun_data, m
 #endif
 
 #endif // MICROPY_INCLUDED_PY_OBJFUN_H
+

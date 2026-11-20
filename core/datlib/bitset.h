@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — dynamic bitset
 // 动态位集：以 64 位字为基本单元存储比特位，支持置位/清零/翻转/
 // 查询/位运算（与/或/异或/取反）/区间统计。适用于布隆过滤器、状态
@@ -128,3 +133,4 @@ int bitset_self_test();
 
 } // namespace dt
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx — <utility>
 #pragma once
 #include "_core.h"
@@ -43,3 +48,4 @@ inline T exchange(T& obj, U&& new_value) { T old = obj; obj = new_value; return 
 
 } // namespace stdx
 } // namespace nefu
+

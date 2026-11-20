@@ -73,3 +73,4 @@ void lv_group_deinit(void);
 #endif
 
 #endif /*LV_GROUP_PRIVATE_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 复数 complex
 // 教学版：a + bi，四则运算 + 共轭 + 模 + 极坐标，用 cmath 求 sin/cos。
 #pragma once
@@ -36,3 +41,4 @@ int complex_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

@@ -259,3 +259,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &zephyr_flash_area_locals_dict
     );
 #endif // CONFIG_FLASH_MAP
+

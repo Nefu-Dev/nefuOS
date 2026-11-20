@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 聚合头
 // 一次性引入全部数学扩展模块，并提供统一的汇总自检入口。
 #pragma once
@@ -27,3 +32,4 @@ inline int mathext_self_test() {
 
 } // namespace mathext
 } // namespace nefu
+

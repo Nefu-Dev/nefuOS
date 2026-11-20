@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 扩展欧几里得 gcd
 // 教学版：gcd/lcm/扩展欧几里得（求 ax+by=gcd）、同余方程、快速幂取模。
 #pragma once
@@ -25,3 +30,4 @@ int gcd_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

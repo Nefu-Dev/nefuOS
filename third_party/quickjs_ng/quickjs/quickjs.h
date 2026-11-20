@@ -1470,3 +1470,4 @@ JS_EXTERN uintptr_t js_std_cmd(int cmd, ...);
 #endif
 
 #endif /* QUICKJS_H */
+

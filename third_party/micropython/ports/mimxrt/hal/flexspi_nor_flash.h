@@ -52,3 +52,4 @@ status_t flexspi_nor_flash_erase_block(FLEXSPI_Type *base, uint32_t address);
 status_t flexspi_nor_flash_page_program(FLEXSPI_Type *base, uint32_t address, const uint32_t *src, uint32_t size);
 
 #endif // MICROPY_INCLUDED_MIMXRT_HAL_FLEXSPI_NOR_FLASH_H
+

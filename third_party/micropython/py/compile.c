@@ -3676,3 +3676,4 @@ mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, bool is_repl)
 }
 
 #endif // MICROPY_ENABLE_COMPILER
+

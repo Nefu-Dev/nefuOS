@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS LVGL Desktop - LVGL 9.2.0 (MIT) drives a full desktop environment:
 // wallpaper, app-icon grid, taskbar with live uptime clock and a start menu.
 // Clicking an icon closes the LVGL desktop and launches the native app, so
@@ -7,6 +12,7 @@
 // LV_USE_OS=LV_OS_NONE, LV_USE_FLOAT=0, built-in stdlib - no libc needed).
 #include "apps.h"
 #include "../gui/gfx.h"
+#include "../gui/i18n_zh.h"
 #include "../gui/widgets.h"
 #include "../gui/wm.h"
 #include "../platform.h"
@@ -15,6 +21,13 @@
 // LVGL 9 font symbols are guarded by LV_FONT_MONTSERRAT_16 in lv_font.h;
 // declare explicitly so the widget code always sees them.
 LV_FONT_DECLARE(lv_font_montserrat_16);
+
+// CJK-capable 16px font (simhei ASCII+CJK): installed as the screen's default
+// font so labels that never set a font explicitly can still show Chinese.
+// It lives in namespace nefu (core/gui/lv_cjk_font.cpp), so include the header
+// instead of LV_FONT_DECLARE, which would declare an unmangled global that
+// never exists.
+#include "../gui/lv_cjk_font.h"
 
 namespace nefu {
 
@@ -118,7 +131,7 @@ static void lv_wallpaper(lv_obj_t* scr, int w, int h) {
     lv_obj_set_style_text_letter_space(title, 6, 0);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 24, 18);
     lv_obj_t* sub = lv_label_create(scr);
-    lv_label_set_text(sub, "LVGL 9.2.0 desktop  /  C++ + stb_truetype");
+    lv_label_set_text(sub, nefu::zh_ui("LVGL 9.2.0 desktop  /  C++ + stb_truetype"));
     lv_obj_set_style_text_color(sub, lv_color_hex(0x6C7086), 0);
     lv_obj_align(sub, LV_ALIGN_TOP_LEFT, 26, 40);
 }
@@ -305,7 +318,7 @@ static void lv_close(Window* w) {
 void lvgl_desktop_launch() {
     lv_init();
     const int DW = 1000, DH = 740;
-    Window* w = g_wm->create_window("LVGL Desktop", 0, 0, DW, DH);
+    Window* w = g_wm->create_window(T("LVGL 桌面", "LVGL Desktop"), 0, 0, DW, DH);
     if (!w) return;
     LvDesktop* st = new LvDesktop();
     st->win = w;
@@ -335,6 +348,9 @@ void lvgl_desktop_launch() {
     g_ld = st;
 
     lv_obj_t* scr = lv_screen_active();
+    // Chinese UI needs a CJK-capable default font: children inherit it, so every
+    // app label created without an explicit font still renders Chinese glyphs.
+    lv_obj_set_style_text_font(scr, &nefu::lv_font_cjk_16, LV_PART_MAIN);
     lv_wallpaper(scr, DW, DH);
     // icon grid: 5 columns
     const int GW = 104, GH = 96;
@@ -353,3 +369,4 @@ void lvgl_desktop_launch() {
 }
 
 } // namespace nefu
+

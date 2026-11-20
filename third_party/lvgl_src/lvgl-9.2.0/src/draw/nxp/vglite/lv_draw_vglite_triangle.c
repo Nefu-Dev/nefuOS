@@ -180,3 +180,4 @@ static void _vglite_draw_triangle(const lv_area_t * coords, const lv_area_t * cl
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

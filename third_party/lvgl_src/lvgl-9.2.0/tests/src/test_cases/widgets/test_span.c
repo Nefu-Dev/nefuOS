@@ -376,3 +376,4 @@ void test_spangroup_style_text_letter_space(void)
 }
 
 #endif
+

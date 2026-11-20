@@ -25,3 +25,4 @@ void lv_example_barcode_1(void)
 }
 
 #endif
+

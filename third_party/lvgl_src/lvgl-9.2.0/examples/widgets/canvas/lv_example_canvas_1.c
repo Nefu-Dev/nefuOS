@@ -76,3 +76,4 @@ void lv_example_canvas_1(void)
 }
 
 #endif
+

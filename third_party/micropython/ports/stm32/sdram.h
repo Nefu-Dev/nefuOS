@@ -16,3 +16,4 @@ void sdram_leave_low_power(void);
 void sdram_enter_power_down(void);
 bool sdram_test(bool exhaustive);
 #endif // __SDRAM_H__
+

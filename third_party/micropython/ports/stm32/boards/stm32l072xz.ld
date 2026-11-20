@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for STM32F072xZ
 */
 
@@ -25,3 +30,4 @@ _sstack = _estack - 4K;
 /* RAM extents for the main heap */
 _heap_start = _ebss;
 _heap_end = _sstack;
+

@@ -39,3 +39,4 @@ void lv_nuttx_cache_deinit(void);
 #endif
 
 #endif /*LV_NUTTX_CACHE_H*/
+

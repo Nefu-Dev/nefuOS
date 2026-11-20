@@ -414,3 +414,4 @@ void GIFCopyPixels(const struct WebPPicture* const src,
 #endif  // WEBP_HAVE_GIF
 
 // -----------------------------------------------------------------------------
+

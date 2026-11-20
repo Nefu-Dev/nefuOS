@@ -476,3 +476,4 @@ void rp2_dma_deinit(void) {
 }
 
 MP_REGISTER_ROOT_POINTER(void *rp2_dma_irq_obj[NUM_DMA_CHANNELS]);
+

@@ -28,3 +28,4 @@
 #define DEBUG_CH    0
 
 #endif /* RA6M2_EK_CONF_H */
+

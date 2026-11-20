@@ -690,3 +690,4 @@ unsigned long ADCFIFORead(unsigned long ulBase, unsigned long ulChannel)
 //! @}
 //
 //*****************************************************************************
+

@@ -66,3 +66,4 @@ lv_color_t lv_palette_darken(lv_palette_t p, uint8_t lvl);
 #endif
 
 #endif /*LV_PALETTE_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Linux static-ELF runtime (elfrun).
 //
 // Loads a statically-linked x86_64 ELF64, maps its PT_LOAD segments into a
@@ -85,3 +90,4 @@ int  execute(Guest& g, SysCtx& ctx);
 
 } // namespace elf
 } // namespace nefu
+

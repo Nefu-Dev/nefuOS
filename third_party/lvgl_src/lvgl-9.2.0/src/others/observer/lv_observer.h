@@ -404,3 +404,4 @@ lv_observer_t * lv_dropdown_bind_value(lv_obj_t * obj, lv_subject_t * subject);
 #endif
 
 #endif /*LV_OBSERVER_H*/
+

@@ -42,3 +42,4 @@ void mp_bluetooth_btstack_port_init_usb(void);
 #endif
 
 #endif // MICROPY_INCLUDED_UNIX_BTSTACK_PORT_H
+

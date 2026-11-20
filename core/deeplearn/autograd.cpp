@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 自动微分磁带实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 自动微分磁带实现
 // 磁带：nefu::List<FnNode*> 全局 g_tape。
 // backward 逆序遍历：loss->grad=1，然后每个节点 apply() 把上游梯度按链式法则累加到输入。
 // tape_reset 释放全部节点（delete），但不释放张量数据/梯度。
@@ -122,3 +127,4 @@ int autograd_self_test() {
 
 } // namespace deeplearn
 } // namespace nefu
+

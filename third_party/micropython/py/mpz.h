@@ -153,3 +153,4 @@ mp_float_t mpz_as_float(const mpz_t *z);
 size_t mpz_as_str_inpl(const mpz_t *z, unsigned int base, const char *prefix, char base_char, char comma, char *str);
 
 #endif // MICROPY_INCLUDED_PY_MPZ_H
+

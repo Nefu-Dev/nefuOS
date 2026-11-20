@@ -553,3 +553,4 @@ static int unicode_list_compare(const void * ref, const void * element)
 {
     return (*(uint16_t *)ref) - (*(uint16_t *)element);
 }
+

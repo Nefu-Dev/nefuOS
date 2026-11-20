@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  update.cpp — nefuOS OTA update: manifest fetch, streaming download with
 //  HTTP-302 + resume (Range) + SHA-256 verify, user-space backup, install,
@@ -9,6 +14,7 @@
 //  thread never blocks on I/O.
 // =============================================================================
 #include "update.h"
+#include "../sys/settings.h"
 #include "../klib/klib.h"
 #include "../vfs/vfs.h"
 #include "../platform.h"
@@ -658,7 +664,7 @@ static void prog_win_close(Window* w) {
     g_prog.abort = true;   // closing the window cancels the download
 }
 static void prog_win_launch() {
-    Window* w = g_wm->create_window("nefuOS Update", 120, 90, 360, 150);
+    Window* w = g_wm->create_window(T("nefuOS 更新", "nefuOS Update"), 120, 90, 360, 150);
     if (!w) return;
     ProgWinState* st = new ProgWinState();
     st->w = w;

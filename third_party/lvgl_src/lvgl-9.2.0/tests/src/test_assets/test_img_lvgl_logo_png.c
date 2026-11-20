@@ -455,3 +455,4 @@ const lv_image_dsc_t test_img_lvgl_logo_png = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

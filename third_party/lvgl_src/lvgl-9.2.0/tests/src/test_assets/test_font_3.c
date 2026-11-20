@@ -945,3 +945,4 @@ lv_font_t test_font_3 = {
 
 #endif /*#if FONT_3*/
 #endif
+

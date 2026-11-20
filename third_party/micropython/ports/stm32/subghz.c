@@ -137,3 +137,4 @@ MP_DEFINE_CONST_FUN_OBJ_0(subghz_is_busy_obj, subghz_is_busy);
 MP_REGISTER_ROOT_POINTER(mp_obj_t subghz_callback);
 
 #endif // STM32WL
+

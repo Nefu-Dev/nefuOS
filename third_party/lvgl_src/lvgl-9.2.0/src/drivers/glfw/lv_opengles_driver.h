@@ -80,3 +80,4 @@ void lv_opengles_viewport(int32_t x, int32_t y, int32_t w, int32_t h);
 #endif
 
 #endif /* LV_OPENGLES_DRIVER_H */
+

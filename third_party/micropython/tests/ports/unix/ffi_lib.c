@@ -39,3 +39,4 @@ long fli(long x) {
 unsigned long flu(unsigned long x) {
     return x ^ 1;
 }
+

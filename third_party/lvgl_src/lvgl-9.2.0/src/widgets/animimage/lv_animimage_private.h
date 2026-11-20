@@ -53,3 +53,4 @@ struct lv_animimg_t {
 #endif
 
 #endif /*LV_ANIMIMAGE_PRIVATE_H*/
+

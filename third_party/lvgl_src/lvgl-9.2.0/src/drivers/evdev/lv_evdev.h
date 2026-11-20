@@ -62,3 +62,4 @@ void lv_evdev_delete(lv_indev_t * indev);
 #endif
 
 #endif /*LV_EVDEV_H*/
+

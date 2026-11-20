@@ -74,3 +74,4 @@ WEBP_FILTER_TYPE WebPEstimateBestFilter(const uint8_t* data,
 #undef SDIFF
 
 //------------------------------------------------------------------------------
+

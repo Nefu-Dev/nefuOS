@@ -199,3 +199,4 @@ bool IsImageTooBig(const uint8_t* data, size_t size);
 }  // namespace fuzz_utils
 
 #endif  // WEBP_TESTS_FUZZER_FUZZ_UTILS_H_
+

@@ -338,3 +338,4 @@ static void lv_nuttx_uv_input_deinit(lv_nuttx_uv_ctx_t * uv_ctx)
 #endif /*LV_USE_NUTTX_LIBUV*/
 
 #endif /*LV_USE_NUTTX*/
+

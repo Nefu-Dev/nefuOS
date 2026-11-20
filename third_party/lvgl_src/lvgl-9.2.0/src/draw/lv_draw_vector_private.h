@@ -107,3 +107,4 @@ void lv_vector_for_each_destroy_tasks(lv_ll_t * task_list, vector_draw_task_cb c
 #endif
 
 #endif /*LV_DRAW_VECTOR_PRIVATE_H*/
+

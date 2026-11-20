@@ -147,3 +147,4 @@ const lv_font_t * lv_font_default(void)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

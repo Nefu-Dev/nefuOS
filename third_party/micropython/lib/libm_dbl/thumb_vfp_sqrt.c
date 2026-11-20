@@ -8,3 +8,4 @@ double sqrt(double x) {
             : "w"  (x));
     return ret;
 }
+

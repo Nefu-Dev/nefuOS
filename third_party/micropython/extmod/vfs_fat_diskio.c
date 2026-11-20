@@ -168,3 +168,4 @@ DRESULT disk_ioctl(
 }
 
 #endif // MICROPY_VFS && MICROPY_VFS_FAT
+

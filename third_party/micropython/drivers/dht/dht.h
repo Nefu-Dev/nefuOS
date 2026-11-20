@@ -6,3 +6,4 @@
 MP_DECLARE_CONST_FUN_OBJ_2(dht_readinto_obj);
 
 #endif // MICROPY_INCLUDED_DRIVERS_DHT_DHT_H
+

@@ -895,3 +895,4 @@ void eth_low_power_mode(eth_t *self, bool enable) {
     }
 }
 #endif // defined(MICROPY_HW_ETH_MDC)
+

@@ -72,3 +72,4 @@ void sys_irq_disable(unsigned int vector);
 void sys_irq_restore_enable(unsigned int flags);
 unsigned int sys_irq_save_disable(void);
 #endif // MICROPY_INCLUDED_METAL_MICROPYTHON_H
+

@@ -182,3 +182,4 @@ WEBP_EXTERN int VP8LGetInfo(
 #endif
 
 #endif  // WEBP_DEC_VP8_DEC_H_
+

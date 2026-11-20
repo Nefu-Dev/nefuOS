@@ -137,3 +137,4 @@ int WebPAvoidSlowMemory(const WebPDecBuffer* const output,
 #endif
 
 #endif  // WEBP_DEC_WEBPI_DEC_H_
+

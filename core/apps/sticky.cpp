@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Sticky Notes
 #include "apps.h"
 #include "../gui/wm.h"
@@ -133,7 +138,7 @@ static void sticky_on_key(Window* win, const KeyEvent* e) {
 void sticky_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Sticky Note", x, y, 220, 180);
+    Window* w = g_wm->create_window(T("便签", "Sticky Note"), x, y, 220, 180);
     if (!w) return;
     StickyState* st = new StickyState();
     st->w = w->content_w;
@@ -147,3 +152,4 @@ void sticky_launch() {
 }
 
 } // namespace nefu
+

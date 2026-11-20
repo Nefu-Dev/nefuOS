@@ -40,3 +40,4 @@ const mp_obj_module_t mp_module_mimxrt = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_mimxrt, mp_module_mimxrt);
+

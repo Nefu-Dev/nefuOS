@@ -29,3 +29,4 @@ void lv_example_style_1(void)
 }
 
 #endif
+

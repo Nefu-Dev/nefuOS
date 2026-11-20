@@ -981,3 +981,4 @@ static bool lv_arc_angle_within_bg_bounds(lv_obj_t * obj, const lv_value_precise
 }
 
 #endif
+

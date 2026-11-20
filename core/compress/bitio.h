@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— 内部公共头（不对外暴露）
 // 本头文件只给 core/compress/ 内部各模块使用：
 //   1) 提供 bfill/bcopy/bcmp 三个不可被编译器误优化的内存助手。
@@ -134,3 +139,4 @@ inline uint32_t get_u32_le(const uint8_t* p) {
 
 } // namespace compress
 } // namespace nefu
+

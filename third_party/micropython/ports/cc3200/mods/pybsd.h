@@ -42,3 +42,4 @@ extern pybsd_obj_t pybsd_obj;
 extern const mp_obj_type_t pyb_sd_type;
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBSD_H
+

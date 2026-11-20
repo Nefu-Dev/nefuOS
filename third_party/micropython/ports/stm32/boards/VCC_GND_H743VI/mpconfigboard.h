@@ -108,3 +108,4 @@
 #define MICROPY_HW_SDCARD_DETECT_PRESENT    (GPIO_PIN_RESET)
 
 void VCC_GND_STM32H743VI_board_early_init(void);
+

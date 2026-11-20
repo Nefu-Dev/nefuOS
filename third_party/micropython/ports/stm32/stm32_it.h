@@ -80,3 +80,4 @@ void OTG_FS_IRQHandler(void);
 void OTG_HS_IRQHandler(void);
 
 #endif // MICROPY_INCLUDED_STM32_STM32_IT_H
+

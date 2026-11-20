@@ -3698,3 +3698,4 @@ LV_EXPORT_CONST_INT(LV_DRAW_BUF_ALIGN);
 #endif  /*defined(LV_CONF_SKIP)*/
 
 #endif  /*LV_CONF_INTERNAL_H*/
+

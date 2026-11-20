@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — AES-128 (aes)
 // AES：高级加密标准（Rijndael），128 位分组、128/192/256 位密钥。
 // 本实现为 AES-128 + ECB 模式（教学版；真实项目务必用 CBC/GCM +
@@ -27,3 +32,4 @@ int aes_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

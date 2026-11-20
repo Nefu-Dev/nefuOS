@@ -398,3 +398,4 @@ static int32_t get_y_center(lv_obj_t * obj)
 }
 
 #endif /*LV_USE_GRIDNAV*/
+

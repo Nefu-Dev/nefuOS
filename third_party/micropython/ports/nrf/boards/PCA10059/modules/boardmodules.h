@@ -32,3 +32,4 @@
 void board_modules_init0(void);
 
 #endif // MICROPY_INCLUDED_NRF_BOARD_PCA10059_BOARD_MODULES_H
+

@@ -77,3 +77,4 @@ uint32_t rng_generate_random_word(void) {
 }
 
 #endif // MICROPY_HW_ENABLE_RNG
+

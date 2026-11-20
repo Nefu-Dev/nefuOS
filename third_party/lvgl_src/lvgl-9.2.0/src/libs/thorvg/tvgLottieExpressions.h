@@ -169,3 +169,4 @@ struct LottieExpressions
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 编辑距离与序列相似性(实现)
 // 见 editdist.h 的 API 契约与复杂度说明。
 // 本文件所有动态缓冲都用 new[]/delete[] 管理，new[] 底层路由到 kalloc。
@@ -526,3 +531,4 @@ int editdist_self_test() {
 
 } // namespace textproc
 } // namespace nefu
+

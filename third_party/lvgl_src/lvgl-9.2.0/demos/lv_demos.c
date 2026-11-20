@@ -138,3 +138,4 @@ void lv_demos_show_help(void)
         LV_LOG("     %s \n", demos_entry_info[i].name);
     }
 }
+

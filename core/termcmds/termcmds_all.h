@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  termcmds_all.h — nefuOS 终端命令扩展库聚合头
 // -----------------------------------------------------------------------------
@@ -210,3 +215,4 @@ extern uint32_t (*g_term_now_sec)();
 
 } // namespace termcmds
 } // namespace nefu
+

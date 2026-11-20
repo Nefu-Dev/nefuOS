@@ -123,3 +123,4 @@ static inline status_t MDIO_Read(mdio_handle_t *handle, uint32_t phyAddr, uint32
 #endif
 
 #endif
+

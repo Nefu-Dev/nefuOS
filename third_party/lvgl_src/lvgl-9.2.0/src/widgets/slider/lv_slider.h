@@ -147,3 +147,4 @@ bool lv_slider_is_symmetrical(lv_obj_t * obj);
 #endif
 
 #endif /*LV_SLIDER_H*/
+

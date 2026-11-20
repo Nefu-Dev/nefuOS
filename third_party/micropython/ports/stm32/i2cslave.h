@@ -78,3 +78,4 @@ uint8_t i2c_slave_process_tx_byte(i2c_slave_t *i2c);
 void i2c_slave_process_tx_end(i2c_slave_t *i2c);
 
 #endif // MICROPY_INCLUDED_STM32_I2CSLAVE_H
+

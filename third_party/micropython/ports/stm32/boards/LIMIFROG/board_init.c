@@ -144,3 +144,4 @@ static void LBF_DFU_If_Needed(void) {
 
     }
 }
+

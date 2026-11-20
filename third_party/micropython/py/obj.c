@@ -595,3 +595,4 @@ bool mp_get_buffer(mp_obj_t obj, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     }
     return false;
 }
+

@@ -94,3 +94,4 @@
 #define MICROPY_HW_USB_MAIN_DEV     (USB_PHY_FS_ID)
 #define MICROPY_HW_USB_MSC          (0)
 #define MICROPY_HW_USB_HID          (0)
+

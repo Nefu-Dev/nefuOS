@@ -17,3 +17,4 @@
 #include "boards/stm32f4xx_hal_conf_base.h"
 
 #endif // MICROPY_INCLUDED_STM32F4XX_HAL_CONF_H
+

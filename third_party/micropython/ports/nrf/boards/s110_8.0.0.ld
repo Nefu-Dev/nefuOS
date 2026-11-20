@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 
 /* GNU linker script for s110 SoftDevice version 8.0.0 */
 
@@ -7,3 +12,4 @@ _fs_size = DEFINED(_fs_size) ? _fs_size : 20K;
 
 _stack_size = _ram_size > 16K ? 4K : 2K;
 _minimum_heap_size = 4K;
+

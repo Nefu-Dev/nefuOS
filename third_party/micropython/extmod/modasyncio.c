@@ -334,3 +334,4 @@ const mp_obj_module_t mp_module_asyncio = {
 MP_REGISTER_MODULE(MP_QSTR__asyncio, mp_module_asyncio);
 
 #endif // MICROPY_PY_ASYNCIO
+

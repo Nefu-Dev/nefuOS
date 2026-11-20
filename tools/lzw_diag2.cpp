@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #include <cstdio>
 #include <cstring>
 #include "complib/lzw.h"
@@ -19,3 +24,4 @@ int main() {
     printf("big: dl=%d match=%d\n", dl, dl == 900 && memcmp(dec, in2, 900) == 0);
     return 0;
 }
+

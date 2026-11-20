@@ -29,3 +29,4 @@ void NULL(flash_callback_args_t *p_args);
 
 FSP_FOOTER
 #endif /* HAL_DATA_H_ */
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* GNU linker script for ESP8266 with 512K flash
 
    Flash layout:
@@ -16,3 +21,4 @@ MEMORY
 
 /* define common sections and symbols */
 INCLUDE boards/esp8266_common.ld
+

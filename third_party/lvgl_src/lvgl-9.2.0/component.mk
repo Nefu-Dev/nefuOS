@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # ESP-IDF component file for make based commands
 
 COMPONENT_SRCDIRS := . \
@@ -64,3 +69,4 @@ COMPONENT_SRCDIRS += src/extra/libs/thorvg
 endif
 
 COMPONENT_ADD_INCLUDEDIRS := $(COMPONENT_SRCDIRS) .
+

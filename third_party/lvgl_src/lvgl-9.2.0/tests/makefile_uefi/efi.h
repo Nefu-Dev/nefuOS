@@ -158,3 +158,4 @@ _Static_assert(sizeof(ptrdiff_t) == sizeof(void *), "Size check for 'ptrdiff_t' 
 _Static_assert(sizeof(uintptr_t) == sizeof(void *), "Size check for 'uintptr_t' failed.");
 
 #endif
+

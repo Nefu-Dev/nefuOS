@@ -343,3 +343,4 @@ extern struct _spi_bdev_t spi_bdev;
 #define MICROPY_HW_USB_INTERFACE_HS_STRING      "Portenta Interface"
 #define MICROPY_HW_USB_CONFIGURATION_FS_STRING  "Portenta Config"
 #define MICROPY_HW_USB_CONFIGURATION_HS_STRING  "Portenta Config"
+

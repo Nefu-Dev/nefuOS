@@ -280,3 +280,4 @@ bool vglite_src_buf_aligned(const void * buf, uint32_t stride, lv_color_format_t
  **********************/
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

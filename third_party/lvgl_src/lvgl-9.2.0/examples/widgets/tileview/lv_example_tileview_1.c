@@ -46,3 +46,4 @@ void lv_example_tileview_1(void)
 }
 
 #endif
+

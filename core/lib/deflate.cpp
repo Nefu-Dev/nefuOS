@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS DEFLATE / zlib library — implementation
 #include "deflate.h"
 #include "hash.h"
@@ -43,90 +48,90 @@ struct BitReader {
     }
 
     void align_byte() { bitcnt = 0; bitbuf = 0; }
+
+    // byte-aligned read (callers must align_byte() first)
+    int read_byte() {
+        bitcnt = 0;
+        bitbuf = 0;
+        if (pos >= size) return -1;
+        return p[pos++];
+    }
 };
 
 // Huffman decoder trie (canonical codes, MSB-first traversal)
-struct HuffTrie {
-    int* left;
-    int* right;
-    int* sym;
-    int cap;
-    int nodes;
+// Canonical Huffman decoder (RFC 1951 3.2.2). Codes are handed out in
+// shortlex order and transmitted MSB-first, so decoding only needs the
+// per-length population counts plus the symbol list sorted by code -- no
+// trie, no per-node allocation, and no limit on how large a block's code
+// set is. A trie-based decoder silently mis-decodes the rare 280+ symbol
+// dynamic trees that CDNs emit for multi-megabyte bundles.
+struct Huff {
+    uint16_t count[16];    // number of codes of each length
+    uint16_t symbol[288];  // symbols ordered by code
+    bool ok;
 
-    HuffTrie() : left(0), right(0), sym(0), cap(0), nodes(0) {}
-    ~HuffTrie() { if (left) delete[] left; if (right) delete[] right; if (sym) delete[] sym; }
+    void clear() {
+        for (int i = 0; i < 16; i++) count[i] = 0;
+        ok = true;
+    }
 
-    void reset() { nodes = 1; left[0] = right[0] = -1; sym[0] = -1; }
-
-    bool alloc(int max_nodes) {
-        cap = max_nodes;
-        left = new int[cap];
-        right = new int[cap];
-        sym = new int[cap];
-        if (!left || !right || !sym) return false;
-        reset();
+    bool build(const uint8_t* lengths, int n) {
+        clear();
+        if (n > 288) return false;
+        for (int i = 0; i < n; i++) {
+            if (lengths[i] > 15) { ok = false; return false; }
+            count[lengths[i]]++;
+        }
+        if (count[0] == n) return true;          // empty tree: any code fails
+        int left = 1;
+        for (int len = 1; len < 16; len++) {
+            left <<= 1;
+            left -= count[len];
+            if (left < 0) { ok = false; return false; }   // over-subscribed
+        }
+        uint16_t offs[16];
+        offs[1] = 0;
+        for (int len = 1; len < 15; len++) offs[len + 1] = (uint16_t)(offs[len] + count[len]);
+        for (int i = 0; i < n; i++)
+            if (lengths[i]) symbol[offs[lengths[i]]++] = (uint16_t)i;
         return true;
     }
 
-    // insert symbol with canonical code 'code' of 'len' bits
-    void insert(int code, int len, int symbol) {
-        int node = 0;
-        for (int i = len - 1; i >= 0; i--) {
-            int bit = (code >> i) & 1;
-            int& child = bit ? right[node] : left[node];
-            if (child < 0) {
-                if (nodes >= cap) return;
-                child = nodes++;
-                left[child] = right[child] = -1;
-                sym[child] = -1;
-            }
-            node = child;
-        }
-        sym[node] = symbol;
-    }
-
     int decode(BitReader& br) const {
-        int node = 0;
-        for (int i = 0; i < 15; i++) {
-            int b = br.read_bit();
-            if (b < 0) return -1;
-            node = b ? right[node] : left[node];
-            if (node < 0) return -1;
-            if (sym[node] >= 0) return sym[node];
+        int code = 0, first = 0, index = 0;
+        for (int len = 1; len < 16; len++) {
+            int bit = br.read_bit();
+            if (bit < 0) return -1;
+            code |= bit;
+            int cnt = count[len];
+            if (code - first < cnt) {
+                int s = symbol[index + (code - first)];
+                return s;
+            }
+            index += cnt;
+            first = (first + cnt) << 1;
+            code <<= 1;
         }
         return -1;
     }
 };
 
-// build canonical trie from code lengths (nsyms entries). Returns true if ok.
-bool build_trie(HuffTrie& trie, const uint8_t* lengths, int nsyms) {
-    int count[16];
-    for (int i = 0; i < 16; i++) count[i] = 0;
-    int maxlen = 0;
-    for (int i = 0; i < nsyms; i++) {
-        int l = lengths[i];
-        if (l > 0) {
-            if (l > maxlen) maxlen = l;
-            if (l < 16) count[l]++;
-        }
-    }
-    if (maxlen > 15) return false;
-    int next[16];
-    int code = 0;
-    for (int l = 1; l < 16; l++) {
-        code = (code + count[l - 1]) << 1;
-        next[l] = code;
-    }
-    trie.reset();
-    for (int i = 0; i < nsyms; i++) {
-        int l = lengths[i];
-        if (l > 0) trie.insert(next[l]++, l, i);
-    }
+// fixed-huffman tables (RFC 1951 3.2.6), built once per call site
+bool build_fixed(Huff& ll, Huff& dist) {
+    uint8_t ll_len[288];
+    uint8_t dist_len[30];
+    for (int i = 0; i < 144; i++) ll_len[i] = 8;
+    for (int i = 144; i < 256; i++) ll_len[i] = 9;
+    for (int i = 256; i < 280; i++) ll_len[i] = 7;
+    for (int i = 280; i < 288; i++) ll_len[i] = 8;
+    for (int i = 0; i < 30; i++) dist_len[i] = 5;
+    if (!ll.build(ll_len, 288)) return false;
+    if (!dist.build(dist_len, 30)) return false;
     return true;
 }
 
 // decode code-length stream (dynamic huffman), producing 'n' lengths
-bool decode_lengths(BitReader& br, const HuffTrie& cl_trie, uint8_t* out, int n) {
+bool decode_lengths(BitReader& br, const Huff& cl_trie, uint8_t* out, int n) {
     int i = 0;
     while (i < n) {
         int sym = cl_trie.decode(br);
@@ -188,37 +193,33 @@ int inflate_block(BitReader& br, uint8_t* dst, size_t dst_cap, size_t& out_len) 
         int btype = br.read_bits(2);
         if (bfinal < 0 || btype < 0) return -1;
         if (btype == 0) {
-            // stored block
+            // stored block: byte-align, then LEN/NLEN little-endian + raw bytes
             br.align_byte();
-            int len = br.read_bits(16);
-            int nlen = br.read_bits(16);
-            if (len < 0 || nlen < 0) return -1;
-            if (((len ^ 0xFFFF) & 0xFFFF) != (nlen & 0xFFFF)) return -1;
-            for (int i = 0; i < len; i++) {
-                int b = br.read_bit();
-                if (b < 0) return -1;
-                // read remaining 7 bits of the byte
-                int v = b;
-                for (int k = 1; k < 8; k++) {
-                    int bb = br.read_bit();
-                    if (bb < 0) return -1;
-                    v |= (bb << k);
-                }
+            int l0 = br.read_byte();
+            int l1 = br.read_byte();
+            int n0 = br.read_byte();
+            int n1 = br.read_byte();
+            if (l0 < 0 || l1 < 0 || n0 < 0 || n1 < 0) return -1;
+            unsigned len = (unsigned)l0 | ((unsigned)l1 << 8);
+            unsigned nlen = (unsigned)n0 | ((unsigned)n1 << 8);
+            if (((len ^ 0xFFFFu) & 0xFFFFu) != nlen) return -1;
+            for (unsigned i = 0; i < len; i++) {
+                int v = br.read_byte();
+                if (v < 0) return -1;
                 if (out_len >= dst_cap) return -1;
                 dst[out_len++] = (uint8_t)v;
             }
         } else if (btype == 1 || btype == 2) {
-            HuffTrie ll, dist;
+            Huff ll, dist;
             if (btype == 1) {
-                if (!ll.alloc(288 * 2 + 8)) return -1;
-                if (!dist.alloc(30 * 2 + 8)) return -1;
-                build_trie(ll, FIXED_LL, 288);
-                build_trie(dist, FIXED_DIST, 30);
+                if (!build_fixed(ll, dist)) return -1;
             } else {
-                int hlit = br.read_bits(5) + 257;
-                int hdist = br.read_bits(5) + 1;
-                int hclen = br.read_bits(4) + 4;
+                int hlit = br.read_bits(5);
+                int hdist = br.read_bits(5);
+                int hclen = br.read_bits(4);
                 if (hlit < 0 || hdist < 0 || hclen < 0) return -1;
+                hlit += 257; hdist += 1; hclen += 4;
+                if (hlit > 288 || hdist > 32) return -1;
                 static const uint8_t CL_ORDER[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
                 uint8_t cl_lengths[19];
                 for (int i = 0; i < 19; i++) cl_lengths[i] = 0;
@@ -227,20 +228,18 @@ int inflate_block(BitReader& br, uint8_t* dst, size_t dst_cap, size_t& out_len) 
                     if (v < 0) return -1;
                     cl_lengths[CL_ORDER[i]] = (uint8_t)v;
                 }
-                HuffTrie cl;
-                if (!cl.alloc(19 * 2 + 8)) return -1;
-                if (!build_trie(cl, cl_lengths, 19)) return -1;
-                if (hlit > 288 || hdist > 32) return -1;
+                Huff cl;
+                if (!cl.build(cl_lengths, 19)) return -1;
                 uint8_t ll_lengths[288];
                 uint8_t dist_lengths[32];
+                for (int i = 0; i < 288; i++) ll_lengths[i] = 0;
+                for (int i = 0; i < 32; i++) dist_lengths[i] = 0;
                 if (!decode_lengths(br, cl, ll_lengths, hlit)) return -1;
                 if (!decode_lengths(br, cl, dist_lengths, hdist)) return -1;
-                if (!ll.alloc(hlit * 2 + 8)) return -1;
-                if (!dist.alloc(hdist * 2 + 8)) return -1;
-                if (!build_trie(ll, ll_lengths, hlit)) return -1;
-                if (!build_trie(dist, dist_lengths, hdist)) return -1;
+                if (!ll.build(ll_lengths, hlit)) return -1;
+                if (!dist.build(dist_lengths, hdist)) return -1;
             }
-            // decode symbols
+            // decode symbols until end-of-block
             for (;;) {
                 int sym = ll.decode(br);
                 if (sym < 0) return -1;
@@ -248,26 +247,29 @@ int inflate_block(BitReader& br, uint8_t* dst, size_t dst_cap, size_t& out_len) 
                     if (out_len >= dst_cap) return -1;
                     dst[out_len++] = (uint8_t)sym;
                 } else if (sym == 256) {
-                    break; // end of block
+                    break;
                 } else if (sym <= 285) {
                     int li = sym - 257;
-                    int len = LEN_BASE[li] + br.read_bits(LEN_EXTRA[li]);
+                    int extra = br.read_bits(LEN_EXTRA[li]);
+                    if (extra < 0) return -1;
+                    int len = LEN_BASE[li] + extra;
                     int dsym = dist.decode(br);
                     if (dsym < 0 || dsym > 29) return -1;
-                    int dbase = DIST_BASE[dsym] + br.read_bits(DIST_EXTRA[dsym]);
-                    if (len < 0 || dbase < 0) return -1;
-                    if ((size_t)dbase > out_len) return -1;
+                    int dextra = br.read_bits(DIST_EXTRA[dsym]);
+                    if (dextra < 0) return -1;
+                    size_t dbase = (size_t)DIST_BASE[dsym] + (size_t)dextra;
+                    if (dbase > out_len) return -1;
+                    if (out_len + (size_t)len > dst_cap) return -1;
                     for (int i = 0; i < len; i++) {
-                        if (out_len >= dst_cap) return -1;
                         dst[out_len] = dst[out_len - dbase];
                         out_len++;
                     }
                 } else {
-                    return -1;
+                    return -1;   // 286/287 are invalid
                 }
             }
         } else {
-            return -1; // reserved block type
+            return -1;           // reserved block type
         }
         if (bfinal) break;
     }
@@ -536,3 +538,4 @@ int zlib_compress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_c
 
 } // namespace deflate
 } // namespace nefu
+

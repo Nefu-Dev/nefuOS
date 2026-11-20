@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     Linker script for PYBD with STM32F767
 
     Memory layout for mboot configuration (this here describes the app part):
@@ -38,3 +43,4 @@ _heap_start = _ebss; /* heap starts just after statically allocated memory */
 _heap_end = _sstack;
 
 INCLUDE common_bl.ld
+

@@ -36,3 +36,4 @@ extern const mp_obj_type_t machine_dac_type;
 void rtc_gettime(timeutils_struct_time_t *tm);
 
 #endif // MICROPY_INCLUDED_SAMD_MODMACHINE_H
+

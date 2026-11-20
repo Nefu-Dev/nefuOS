@@ -102,3 +102,4 @@ static WEBP_INLINE int32x4x4_t Transpose4x4_NEON(const int32x4x4_t rows) {
 
 #endif  // WEBP_USE_NEON
 #endif  // WEBP_DSP_NEON_H_
+

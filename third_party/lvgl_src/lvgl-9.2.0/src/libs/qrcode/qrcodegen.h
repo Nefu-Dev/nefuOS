@@ -322,3 +322,4 @@ int qrcodegen_getMinFitVersion(enum qrcodegen_Ecc ecl, size_t dataLen);
 #endif
 
 #endif
+

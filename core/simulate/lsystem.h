@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— L-系统 (Lindenmayer System)
 // 包含：
 //   - 公理 / 产生式规则 / 迭代字符串生成
@@ -106,3 +111,4 @@ int lsystem_self_test();
 
 } // namespace simulate
 } // namespace nefu
+

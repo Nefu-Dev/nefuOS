@@ -70,3 +70,4 @@ const mp_obj_module_t mp_module_ubluepy = {
 MP_REGISTER_MODULE(MP_QSTR_ubluepy, mp_module_ubluepy);
 
 #endif // MICROPY_PY_UBLUEPY
+

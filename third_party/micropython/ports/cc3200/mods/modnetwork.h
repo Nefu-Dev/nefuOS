@@ -67,3 +67,4 @@ extern const mp_obj_type_t mod_network_nic_type_wlan;
 void mod_network_init0(void);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_MODNETWORK_H
+

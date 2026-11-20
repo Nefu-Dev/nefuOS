@@ -60,3 +60,4 @@ void lv_example_grid_2(void)
 }
 
 #endif
+

@@ -55,3 +55,4 @@ void lv_example_canvas_8(void)
 #endif /*LV_USE_VECTOR_GRAPHIC*/
 
 #endif
+

@@ -70,3 +70,4 @@ pybsleep_reset_cause_t pyb_sleep_get_reset_cause (void);
 pybsleep_wake_reason_t pyb_sleep_get_wake_reason (void);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBSLEEP_H
+

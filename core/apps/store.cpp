@@ -1,7 +1,13 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS app store - LVGL GUI (catalog + npkg online registry, install/open)
 #include "apps.h"
 #include "npkg.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/i18n_zh.h"
 
 namespace nefu {
 
@@ -193,7 +199,7 @@ static void store_fetch_online(StoreLvState* st) {
         lv_obj_set_style_bg_color(b, lv_color_hex(0x3D4B66), 0);
         lv_obj_add_event_cb(b, store_lv_btn, LV_EVENT_CLICKED, k);
         lv_obj_t* lbl = lv_label_create(b);
-        lv_label_set_text(lbl, "Install");
+        lv_label_set_text(lbl, nefu::zh_ui("Install"));
         lv_obj_center(lbl);
         lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
     }
@@ -283,7 +289,7 @@ static lv_obj_t* card_label(lv_obj_t* parent, const char* text, int x, int y, ui
 void store_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Software Store", x, y, 520, 360);
+    LvglWin* lw = lvgl_win_create(T("软件商店", "Software Store"), x, y, 520, 360);
     if (!lw) return;
     StoreLvState* st = new StoreLvState();
     st->lw = lw;
@@ -369,3 +375,4 @@ void store_launch() {
     card_label(lw->content, "Built-in apps install instantly; 'npkg Online' fetches the full remote registry.", 12, 350, 0x5588CC);
 }
 } // namespace nefu
+

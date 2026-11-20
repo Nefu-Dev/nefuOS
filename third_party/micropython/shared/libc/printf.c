@@ -129,3 +129,4 @@ int snprintf(char *str, size_t size, const char *fmt, ...) {
 }
 
 #endif // MICROPY_USE_INTERNAL_PRINTF
+

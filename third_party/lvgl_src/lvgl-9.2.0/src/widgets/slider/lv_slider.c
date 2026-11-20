@@ -554,3 +554,4 @@ static void update_knob_pos(lv_obj_t * obj, bool check_drag)
 }
 
 #endif
+

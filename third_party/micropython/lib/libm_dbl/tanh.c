@@ -10,3 +10,4 @@ double tanh(double x) {
     x = x / (x + 2);
     return sign ? x : -x;
 }
+

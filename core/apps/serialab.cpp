@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 格式转换台（Serialab）—— 数据序列化库的可视化前端
 //
 // 一个窗口应用：选择源格式 / 目标格式，对内置样例做往返转换，并在窗口里预览结果。
@@ -265,7 +270,7 @@ static void sa_close(Window* w) {
 void serialab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Serialab", x, y, SA_W, SA_H);
+    Window* w = g_wm->create_window(T("串口实验室", "Serialab"), x, y, SA_W, SA_H);
     if (!w) return;
     Serialab* sa = new Serialab();
     w->userdata = sa;

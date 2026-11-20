@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = MIMXRT1176
 MCU_VARIANT = MIMXRT1176DVMAA
 MCU_CORE = _cm7
@@ -24,3 +29,4 @@ CFLAGS += -DCPU_MIMXRT1176DVMAA_cm7 \
 		-DCPU_HEADER_H='<$(MCU_SERIES)$(MCU_CORE).h>' \
 		-DUSB1_BASE=USB_OTG1_BASE \
 		-DUSB2_BASE=USB_OTG2_BASE
+

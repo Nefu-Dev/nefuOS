@@ -579,3 +579,4 @@ void        USBH_AUDIO_FrequencySet(USBH_HandleTypeDef *phost);
   */ 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 
+

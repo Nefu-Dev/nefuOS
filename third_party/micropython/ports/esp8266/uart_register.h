@@ -126,3 +126,4 @@
 #define UART_DATE(i)                          (REG_UART_BASE(i) + 0x78)
 #define UART_ID(i)                            (REG_UART_BASE(i) + 0x7C)
 #endif // UART_REGISTER_H_INCLUDED
+

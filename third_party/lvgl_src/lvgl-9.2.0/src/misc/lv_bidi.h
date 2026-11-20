@@ -81,3 +81,4 @@ static inline void lv_bidi_calculate_align(lv_text_align_t * align, lv_base_dir_
 #endif
 
 #endif /*LV_BIDI_H*/
+

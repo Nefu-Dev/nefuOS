@@ -1,4 +1,9 @@
-﻿// ============================================================================
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ============================================================================
 // nefu::minilang —— 树遍历解释器（eval.h）
 // ----------------------------------------------------------------------------
 // 直接遍历 AST 求值。EvalCtx 持有全局环境指针与错误/返回信号。函数调用
@@ -49,5 +54,6 @@ int eval_self_test();
 
 } // namespace minilang
 } // namespace nefu
+
 
 

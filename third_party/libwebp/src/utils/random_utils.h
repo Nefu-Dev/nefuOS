@@ -61,3 +61,4 @@ static WEBP_INLINE int VP8RandomBits(VP8Random* const rg, int num_bits) {
 #endif
 
 #endif  // WEBP_UTILS_RANDOM_UTILS_H_
+

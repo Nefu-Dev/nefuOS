@@ -55,3 +55,4 @@ void lv_example_scroll_2(void)
 }
 
 #endif
+

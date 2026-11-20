@@ -316,3 +316,4 @@ extern void lwip_lock_release(void);
 #ifndef MICROPY_BOARD_END_SOFT_RESET
 #define MICROPY_BOARD_END_SOFT_RESET()
 #endif
+

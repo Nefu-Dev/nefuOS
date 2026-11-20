@@ -1,4 +1,9 @@
-﻿// ge_math.h —— 2D 游戏引擎数学库（Q16.16 定点）
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ge_math.h —— 2D 游戏引擎数学库（Q16.16 定点）
 //
 // 设计约束：bare 模式无 FPU，全部使用 nefu::fx Q16.16 定点运算。
 // 本头文件提供：
@@ -498,3 +503,4 @@ int ge_math_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

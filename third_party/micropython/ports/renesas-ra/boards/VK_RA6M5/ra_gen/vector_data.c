@@ -71,3 +71,4 @@ const bsp_interrupt_event_t g_interrupt_event_link_select[BSP_ICU_VECTOR_MAX_ENT
     [30] = BSP_PRV_IELS_ENUM(EVENT_SDHIMMC0_DMA_REQ),         /* SDHIMMC0 DMA REQ (DMA transfer request) */
 };
 #endif
+

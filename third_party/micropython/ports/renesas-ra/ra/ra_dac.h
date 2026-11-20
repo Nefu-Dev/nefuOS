@@ -39,3 +39,4 @@ void ra_dac_deinit(uint32_t dac_pin, uint8_t ch);
 bool ra_dac_is_dac_pin(uint32_t pin);
 
 #endif /* RA_RA_DAC_H_ */
+

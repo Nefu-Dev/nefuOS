@@ -55,3 +55,4 @@ static void font_size_observer_cb(lv_observer_t * observer, lv_subject_t * subje
     lv_obj_report_style_change(style);
 }
 #endif
+

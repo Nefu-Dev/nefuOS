@@ -32,3 +32,4 @@ uint32_t lfs2_crc(uint32_t crc, const void *buffer, size_t size) {
 
 
 #endif
+

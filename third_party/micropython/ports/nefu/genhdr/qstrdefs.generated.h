@@ -578,3 +578,4 @@ QDEF1(MP_QSTR_version, 54207, 7, "version")
 QDEF1(MP_QSTR_version_info, 2670, 12, "version_info")
 QDEF1(MP_QSTR_vline, 63005, 5, "vline")
 QDEF1(MP_QSTR__brace_open__colon__hash_b_brace_close_, 14168, 5, "{:#b}")
+

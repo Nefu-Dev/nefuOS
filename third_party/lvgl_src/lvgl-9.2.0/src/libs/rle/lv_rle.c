@@ -110,3 +110,4 @@ uint32_t lv_rle_decompress(const uint8_t * input,
  **********************/
 
 #endif /*LV_USE_RLE*/
+

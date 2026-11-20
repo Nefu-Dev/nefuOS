@@ -43,3 +43,4 @@ bool uart_tx_char(pyb_uart_obj_t *self, int c);
 bool uart_tx_strn(pyb_uart_obj_t *uart_obj, const char *str, uint len);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBUART_H
+

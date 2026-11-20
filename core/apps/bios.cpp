@@ -1,6 +1,12 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS LVGL BIOS/UEFI Configuration Utility (uses existing project LVGL wrappers)
 #include "apps.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/i18n_zh.h"
 #include "../sys/settings.h"
 #include "../sys/power.h"
 #include "../platform.h"
@@ -48,18 +54,18 @@ void bios_launch() {
     if (s_bios_win) return;
     int x, y;
     cascade_pos(&x, &y);
-    s_bios_win = lvgl_win_create("nefuOS BIOS/UEFI Setup", x, y, 480, 520);
+    s_bios_win = lvgl_win_create(T("nefuOS BIOS/UEFI 设置", "nefuOS BIOS/UEFI Setup"), x, y, 480, 520);
     lv_obj_t* cont = s_bios_win->content;
     lv_obj_t* lbl;
 
     // Main settings section
     lbl = lv_label_create(cont);
-    lv_label_set_text(lbl, "=== BIOS/UEFI Configuration ===");
+    lv_label_set_text(lbl, nefu::zh_ui("=== BIOS/UEFI Configuration ==="));
     lv_obj_set_pos(lbl, 20, 10);
     lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
 
     lbl = lv_label_create(cont);
-    lv_label_set_text(lbl, "System Username:");
+    lv_label_set_text(lbl, nefu::zh_ui("System Username:"));
     lv_obj_set_pos(lbl, 20, 50);
     s_user_input = lv_textarea_create(cont);
     lv_textarea_set_text(s_user_input, g_uefi.username);
@@ -67,7 +73,7 @@ void bios_launch() {
     lv_obj_set_pos(s_user_input, 150, 45);
 
     lbl = lv_label_create(cont);
-    lv_label_set_text(lbl, "New Password:");
+    lv_label_set_text(lbl, nefu::zh_ui("New Password:"));
     lv_obj_set_pos(lbl, 20, 100);
     s_new_pwd = lv_textarea_create(cont);
     lv_textarea_set_password_mode(s_new_pwd, true);
@@ -76,7 +82,7 @@ void bios_launch() {
 
     // Hardware info section
     lbl = lv_label_create(cont);
-    lv_label_set_text(lbl, "--- Hardware Info ---");
+    lv_label_set_text(lbl, nefu::zh_ui("--- Hardware Info ---"));
     lv_obj_set_pos(lbl, 20, 155);
     HwInfo hw;
     platform_hw_info(&hw);
@@ -104,3 +110,4 @@ void bios_launch() {
 }
 
 }
+

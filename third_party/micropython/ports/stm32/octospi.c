@@ -374,3 +374,4 @@ const mp_qspi_proto_t octospi_proto = {
 };
 
 #endif // defined(MICROPY_HW_OSPIFLASH_SIZE_BITS_LOG2)
+

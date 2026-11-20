@@ -43,3 +43,4 @@ extern uint32_t _estack;
 void gc_collect(void);
 
 #endif // MICROPY_INCLUDED_CC3200_UTIL_GCCOLLECT_H
+

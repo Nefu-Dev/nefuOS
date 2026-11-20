@@ -4,3 +4,4 @@
 #define MICROPY_HW_XOSC32K          (1)
 
 #define MICROPY_HW_QSPIFLASH        W25Q32JV_IQ
+

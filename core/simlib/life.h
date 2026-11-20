@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 康威生命游戏 life
 // 教学版：二维网格细胞自动机，邻居计数 + 生死规则，class / STL / 中文注释。
 #pragma once
@@ -51,3 +56,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

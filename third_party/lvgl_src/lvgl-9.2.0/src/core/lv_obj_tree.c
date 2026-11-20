@@ -660,3 +660,4 @@ static lv_obj_t * lv_obj_get_first_not_deleting_child(lv_obj_t * obj)
 
     return NULL;
 }
+

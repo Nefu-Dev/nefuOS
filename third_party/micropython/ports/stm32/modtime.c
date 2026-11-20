@@ -61,3 +61,4 @@ static mp_obj_t mp_time_time_get(void) {
     HAL_RTC_GetDate(&RTCHandle, &date, RTC_FORMAT_BIN);
     return mp_obj_new_int(timeutils_seconds_since_epoch(2000 + date.Year, date.Month, date.Date, time.Hours, time.Minutes, time.Seconds));
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — PBKDF2 (pbkdf2)
 // PBKDF2：基于密码的密钥派生函数（RFC 2898）。对密码 + 盐做
 // HMAC 迭代（iterations 次），输出任意长度派生密钥。暴力破解成本
@@ -20,3 +25,4 @@ int pbkdf2_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

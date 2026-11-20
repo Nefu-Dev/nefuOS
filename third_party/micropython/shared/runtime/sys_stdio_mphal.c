@@ -163,3 +163,4 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const sys_stdio_obj_t stdio_buffer_obj = {{&stdio_buffer_obj_type}, .fd = 0}; // fd unused
 #endif
+

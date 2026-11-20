@@ -108,3 +108,4 @@ void lv_example_table_2(void)
 }
 
 #endif
+

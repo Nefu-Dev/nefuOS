@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = m0
 MCU_VARIANT = nrf51
 MCU_SUB_VARIANT = nrf51822
@@ -11,3 +16,4 @@ FROZEN_MANIFEST ?=
 else
 MICROPY_VFS_LFS2 = 1
 endif
+

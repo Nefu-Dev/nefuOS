@@ -1,4 +1,9 @@
-﻿// sprite.cpp —— 精灵系统纯逻辑：动画状态机推进 + 自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// sprite.cpp —— 精灵系统纯逻辑：动画状态机推进 + 自测
 #include "sprite.h"
 #include <cstdio>
 
@@ -235,4 +240,5 @@ int sprite_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+
 

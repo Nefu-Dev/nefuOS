@@ -64,3 +64,4 @@ void test_clip_corner_1(void)
 }
 
 #endif
+

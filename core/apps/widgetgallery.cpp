@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— 组件展示画廊
 // 标签页切换(控件 / 表格 / 图表 / 对话框),展示 uiwidgets 全部组件交互。
 // 所有组件渲染到一块 gfxlib 离屏 Buffer,再 blit 到窗口 Surface。
@@ -231,7 +236,7 @@ static void gal_close(Window* w) {
 void widgetgallery_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Widget Gallery", x, y, GW, GH);
+    Window* w = g_wm->create_window(T("控件画廊", "Widget Gallery"), x, y, GW, GH);
     if (!w) return;
     Gallery* g = new Gallery();
     g->buf = new uint32_t[(size_t)GW * GH];
@@ -248,3 +253,4 @@ void widgetgallery_launch() {
 }
 
 } // namespace nefu
+

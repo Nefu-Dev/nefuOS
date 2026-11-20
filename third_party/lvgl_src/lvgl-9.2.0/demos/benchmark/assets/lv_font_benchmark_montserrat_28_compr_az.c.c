@@ -506,3 +506,4 @@ lv_font_t lv_font_benchmark_montserrat_28_compr_az = {
 
 #endif
 
+

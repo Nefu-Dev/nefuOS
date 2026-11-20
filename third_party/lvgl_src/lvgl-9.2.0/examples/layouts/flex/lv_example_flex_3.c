@@ -28,3 +28,4 @@ void lv_example_flex_3(void)
 }
 
 #endif
+

@@ -204,10 +204,10 @@ $hostLinkArgs = @("-std=c++17", "-O2", "-gdwarf-4", "-fno-exceptions", "-fno-rtt
                   "-Wall", "-Wextra", "-Wno-sized-deallocation", "-I", "core", "-I", "third_party",
                   "-DNEFU_LVGL_DEMO") +
                 $lvglInclude + @("-o", $hostExe) +
-                $coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp") +
+                $coreSrc + @("backends\win32\win32.cpp", "backends\win32\ws_win32.cpp", "backends\win32\media_win32.cpp") +
                 $lvglHostObjs +
                 @("-lgdi32", "-luser32", "-lgdiplus", "-lole32", "-lws2_32", "-liphlpapi",
-                  "-lwlanapi", "-lwininet", "-lwinmm", "-lmfplat", "-lmfreadwrite", "-lmf",
+                  "-lwlanapi", "-lwininet -lwinhttp", "-lwinmm", "-lmfplat", "-lmfreadwrite", "-lmf",
                   "-lmfuuid", "-lcomdlg32")
 $hostLinkArgs | ForEach-Object { $_ -replace '\\', '/' } |
     ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } } |
@@ -483,7 +483,7 @@ $stubLd = "D:\CLion\bin\mingw\bin\ld.exe"
 $stubGcc = "D:\CLion\bin\mingw\bin\gcc.exe"
 & $stubAs --32 "backends\bare\stub.s" -o "$bareOut\stub.o"
 if ($LASTEXITCODE -ne 0) { throw "stub.s failed" }
-& $g -m32 -ffreestanding -fno-builtin -Os -c "backends\bare\inflate.cpp" -o "$bareOut\inflate32.o"
+& $g -m32 -ffreestanding -fno-builtin -Os -c "core\net\inflate.cpp" -o "$bareOut\inflate32.o"
 if ($LASTEXITCODE -ne 0) { throw "inflate.c (m32) failed" }
 & $stubLd -mi386pe --image-base 0 -T "backends\bare\stub.ld" "$bareOut\stub.o" "$bareOut\inflate32.o" -o "$bareOut\stub.exe"
 if ($LASTEXITCODE -ne 0) { throw "stub link failed" }

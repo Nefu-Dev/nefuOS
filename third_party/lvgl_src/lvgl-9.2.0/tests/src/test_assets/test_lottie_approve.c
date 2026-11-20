@@ -27,3 +27,4 @@ const uint8_t test_lottie_approve[] = {
 };
 
 const size_t test_lottie_approve_size = sizeof(test_lottie_approve);
+

@@ -210,3 +210,4 @@ static void PREDICTOR_ADD(const uint32_t* in, const uint32_t* upper,     \
 #endif
 
 #endif  // WEBP_DSP_LOSSLESS_COMMON_H_
+

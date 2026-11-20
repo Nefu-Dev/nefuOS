@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 快速傅里叶变换 fft
 // 教学版：迭代基-2 FFT（蝶形运算），复数数组，长度必须为 2 的幂。
 #pragma once
@@ -24,3 +29,4 @@ int fft_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

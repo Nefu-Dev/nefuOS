@@ -623,3 +623,4 @@ void lv_vg_lite_path_append_path(lv_vg_lite_path_t * dest, const lv_vg_lite_path
  **********************/
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

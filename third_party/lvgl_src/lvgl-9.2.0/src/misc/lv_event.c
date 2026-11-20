@@ -222,3 +222,4 @@ void lv_event_mark_deleted(void * target)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

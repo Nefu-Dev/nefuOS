@@ -69,3 +69,4 @@ void _SlDrvFlowContDeinit(void)
     OSI_RET_OK_CHECK(sl_SyncObjDelete(&g_pCB->FlowContCB.TxSyncObj));
 }
 
+

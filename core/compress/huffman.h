@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— Huffman 编码模块
 //
 // 实现三种经典 Huffman：
@@ -37,3 +42,4 @@ int huffman_self_test();
 
 } // namespace compress
 } // namespace nefu
+

@@ -225,3 +225,4 @@ MP_WEAK void free(void *ptr) {
 }
 
 #endif // MICROPY_PY_NETWORK_NINAW10
+

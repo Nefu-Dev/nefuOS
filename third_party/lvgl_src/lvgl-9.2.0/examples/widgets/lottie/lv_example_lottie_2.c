@@ -39,3 +39,4 @@ void lv_example_lottie_2(void)
 #endif /*LV_USE_LOTTIE*/
 
 #endif /*LV_BUILD_EXAMPLES*/
+

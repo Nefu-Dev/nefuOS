@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for NRF51 AC
 */
 SEARCH_DIR(.)
@@ -10,3 +15,4 @@ _ram_size = 32K;
 /* Default stack size when there is no SoftDevice */
 _stack_size        = 4K;
 _minimum_heap_size = 24K;
+

@@ -93,3 +93,4 @@ void lv_gridnav_set_focused(lv_obj_t * cont, lv_obj_t * to_focus, lv_anim_enable
 #endif
 
 #endif /* LV_GRIDNAV_H */
+

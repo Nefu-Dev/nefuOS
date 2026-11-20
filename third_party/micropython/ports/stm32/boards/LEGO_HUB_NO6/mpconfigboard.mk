@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = f4
 CMSIS_MCU = STM32F413xx
 AF_FILE = boards/stm32f413_af.csv
@@ -46,3 +51,4 @@ restore-hub-firmware:
 	$(Q)$(DFU_UTIL) -a 0 \
 		-d $(BOOTLOADER_DFU_USB_VID):$(BOOTLOADER_DFU_USB_PID) \
 		-D $(HUB_FIRMWARE)
+

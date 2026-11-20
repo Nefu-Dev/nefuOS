@@ -330,3 +330,4 @@ void uart_task_init() {
     system_os_task(uart_task_handler, UART_TASK_ID, uart_evt_queue, sizeof(uart_evt_queue) / sizeof(*uart_evt_queue));
 }
 #endif
+

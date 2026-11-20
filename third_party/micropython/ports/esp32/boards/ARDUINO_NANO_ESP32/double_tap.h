@@ -35,3 +35,4 @@ void double_tap_invalidate(void);
 bool double_tap_check_match(void);
 
 #endif /* MICROPY_INCLUDED_ESP32_DOUBLE_TAP_H */
+

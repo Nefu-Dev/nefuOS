@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— 菜单组件
 // 菜单栏(水平菜单)、上下文菜单(右键弹出)、菜单项(文字/快捷键/分隔线/子菜单)、快捷键绑定
 #pragma once
@@ -66,3 +71,4 @@ int menu_self_test();
 
 } // namespace ui
 } // namespace nefu
+

@@ -78,3 +78,4 @@ bool pxp_buf_aligned(const void * buf, uint32_t stride);
 #endif
 
 #endif /*LV_PXP_UTILS_H*/
+

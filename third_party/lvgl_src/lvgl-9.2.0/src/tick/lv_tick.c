@@ -111,3 +111,4 @@ void lv_delay_set_cb(lv_delay_cb_t cb)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

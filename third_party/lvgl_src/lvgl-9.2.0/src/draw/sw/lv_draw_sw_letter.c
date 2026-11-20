@@ -126,3 +126,4 @@ static void LV_ATTRIBUTE_FAST_MEM draw_letter_cb(lv_draw_unit_t * draw_unit, lv_
 }
 
 #endif /*LV_USE_DRAW_SW*/
+

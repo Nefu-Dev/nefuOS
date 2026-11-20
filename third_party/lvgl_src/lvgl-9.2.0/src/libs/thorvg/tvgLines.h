@@ -64,3 +64,4 @@ float bezAtApprox(const Bezier& bz, float at, float length);
 #endif //_TVG_LINES_H_
 
 #endif /* LV_USE_THORVG_INTERNAL */
+

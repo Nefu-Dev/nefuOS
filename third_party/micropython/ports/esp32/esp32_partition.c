@@ -292,3 +292,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     print, esp32_partition_print,
     locals_dict, &esp32_partition_locals_dict
     );
+

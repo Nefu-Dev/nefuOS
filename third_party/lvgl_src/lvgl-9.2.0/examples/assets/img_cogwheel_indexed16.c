@@ -140,3 +140,4 @@ const lv_image_dsc_t img_cogwheel_indexed16 = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

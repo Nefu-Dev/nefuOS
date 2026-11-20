@@ -159,3 +159,4 @@ int mp_openamp_remoteproc_shutdown(struct remoteproc *rproc) {
     }
     return 0;
 }
+

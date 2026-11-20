@@ -52,3 +52,4 @@ MP_DECLARE_CONST_FUN_OBJ_1(pyb_set_repl_info_obj);
 #endif
 
 #endif // MICROPY_INCLUDED_LIB_UTILS_PYEXEC_H
+

@@ -318,3 +318,4 @@ extern struct _spi_bdev_t spi_bdev;
 #define MICROPY_HW_USB_INTERFACE_HS_STRING      "Giga Interface"
 #define MICROPY_HW_USB_CONFIGURATION_FS_STRING  "Giga Config"
 #define MICROPY_HW_USB_CONFIGURATION_HS_STRING  "Giga Config"
+

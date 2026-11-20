@@ -38,3 +38,4 @@ int sdio_transfer(uint32_t cmd, uint32_t arg, uint32_t *resp);
 int sdio_transfer_cmd53(bool write, uint32_t block_size, uint32_t arg, size_t len, uint8_t *buf);
 
 #endif // MICROPY_INCLUDED_MIMXRT_SDIO_H
+

@@ -794,3 +794,4 @@ static void f_gif_close(gd_GIF * gif)
 }
 
 #endif /*LV_USE_GIF*/
+

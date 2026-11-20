@@ -1,4 +1,9 @@
-﻿// ge_math.cpp —— 引擎数学实现：缓动函数 + 自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ge_math.cpp —— 引擎数学实现：缓动函数 + 自测
 #include "ge_math.h"
 
 
@@ -353,3 +358,4 @@ int ge_math_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

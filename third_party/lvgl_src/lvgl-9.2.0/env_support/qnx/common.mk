@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 ifndef QCONFIG
 QCONFIG=qconfig.mk
 endif
@@ -121,3 +126,4 @@ $(PROJECT_ROOT)/lv_conf.h: $(PROJECT_ROOT)/../../lv_conf_template.h
 	sed -i -e "s/#define LV_COLOR_DEPTH 16/#define LV_COLOR_DEPTH 32/" $@
 	sed -i -e "s/#define LV_USE_QNX.*/#define LV_USE_QNX 1/" $@
 	sed -i -e "s/#define LV_QNX_BUF_COUNT.*/#define LV_QNX_BUF_COUNT 2/" $@
+

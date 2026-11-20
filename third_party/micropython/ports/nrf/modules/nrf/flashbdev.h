@@ -37,3 +37,4 @@ extern struct _nrf_flash_obj_t nrf_flash_obj;
 void flashbdev_init(void);
 
 #endif // MICROPY_INCLUDED_NRF_FLASHBDEV_H
+

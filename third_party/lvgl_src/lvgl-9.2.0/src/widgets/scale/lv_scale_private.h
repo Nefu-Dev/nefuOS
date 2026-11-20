@@ -80,3 +80,4 @@ struct lv_scale_t {
 #endif
 
 #endif /*LV_SCALE_PRIVATE_H*/
+

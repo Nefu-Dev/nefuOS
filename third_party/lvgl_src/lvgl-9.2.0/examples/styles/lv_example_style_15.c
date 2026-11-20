@@ -46,3 +46,4 @@ void lv_example_style_15(void)
 }
 
 #endif
+

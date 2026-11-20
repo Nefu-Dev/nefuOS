@@ -91,3 +91,4 @@ void lv_st7796_send_cmd_list(lv_display_t * disp, const uint8_t * cmd_list);
 #endif /*LV_USE_ST7796*/
 
 #endif /* LV_ST7796_H */
+

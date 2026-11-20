@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— 元胞自动机(Cellular Automata)
 // 包含：
 //   - Conway's Game of Life (2D 方形网格，环形/固定边界)
@@ -209,3 +214,4 @@ int ca_self_test();
 
 } // namespace simulate
 } // namespace nefu
+

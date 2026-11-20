@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 事件日志模块实现
 #include "eventlog.h"
 #include "../klib/klib.h"
@@ -516,3 +521,4 @@ int EventLog::self_test() {
 
 } // namespace sysutil
 } // namespace nefu
+

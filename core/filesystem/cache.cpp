@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— 缓冲区缓存实现
 #include "cache.h"
 #include "../klib/klib.h"
@@ -221,3 +226,4 @@ int cache_self_test() {
 
 } // namespace filesystem
 } // namespace nefu
+

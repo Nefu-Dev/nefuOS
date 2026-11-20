@@ -1919,3 +1919,4 @@ lv_font_t font_multilang_large = {
 };
 
 #endif /*#if FONT_MULTILANG_LARGE*/
+

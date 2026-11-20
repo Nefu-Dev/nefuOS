@@ -166,3 +166,4 @@ void ra_dac_deinit(uint32_t dac_pin, uint8_t ch) {
         ra_mstpcrd_stop(R_MSTP_MSTPCRD_MSTPD20_Msk);
     }
 }
+

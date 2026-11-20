@@ -1,4 +1,9 @@
-﻿// sprite.h —— 精灵系统：精灵表 / 动画帧 / 动画状态机 / 翻转旋转缩放 / 混合模式
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// sprite.h —— 精灵系统：精灵表 / 动画帧 / 动画状态机 / 翻转旋转缩放 / 混合模式
 //
 // 设计：
 //   - 纯逻辑（动画状态推进、帧解析、源矩形计算）放在 sprite.cpp，可独立自测；
@@ -338,4 +343,5 @@ int sprite_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+
 

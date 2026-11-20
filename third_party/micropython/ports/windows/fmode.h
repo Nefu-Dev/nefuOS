@@ -35,3 +35,4 @@ void set_fmode_binary(void);
 void set_fmode_text(void);
 
 #endif // MICROPY_INCLUDED_WINDOWS_FMODE_H
+

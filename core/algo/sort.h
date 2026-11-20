@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS sorting algorithm library
 // A complete, teaching-oriented collection of comparison sorts plus the
 // classic non-comparison sorts, all written from scratch with no STL.
@@ -95,3 +100,4 @@ int sort_self_test();
 
 } // namespace algo
 } // namespace nefu
+

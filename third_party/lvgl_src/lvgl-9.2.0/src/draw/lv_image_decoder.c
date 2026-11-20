@@ -413,3 +413,4 @@ static lv_result_t try_cache(lv_image_decoder_dsc_t * dsc)
 
     return LV_RESULT_INVALID;
 }
+

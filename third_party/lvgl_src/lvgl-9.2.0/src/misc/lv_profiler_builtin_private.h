@@ -54,3 +54,4 @@ struct lv_profiler_builtin_config_t {
 #endif
 
 #endif /*LV_PROFILER_BUILTIN_PRIVATE_H*/
+

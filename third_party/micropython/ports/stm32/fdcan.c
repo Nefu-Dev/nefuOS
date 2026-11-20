@@ -470,3 +470,4 @@ void FDCAN2_IT1_IRQHandler(void) {
 #endif
 
 #endif // MICROPY_HW_ENABLE_CAN && MICROPY_HW_ENABLE_FDCAN
+

@@ -36,3 +36,4 @@ static mp_obj_t mp_time_time_get(void) {
      */
     return mp_obj_new_int(k_uptime_get() / 1000);
 }
+

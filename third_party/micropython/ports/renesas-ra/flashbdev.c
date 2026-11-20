@@ -295,3 +295,4 @@ int flash_bdev_writeblocks_ext(const uint8_t *src, uint32_t block, uint32_t offs
 }
 
 #endif // MICROPY_HW_ENABLE_INTERNAL_FLASH_STORAGE
+

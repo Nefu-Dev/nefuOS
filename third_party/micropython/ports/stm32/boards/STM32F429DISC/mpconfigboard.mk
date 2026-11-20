@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = f4
 CMSIS_MCU = STM32F429xx
 AF_FILE = boards/stm32f429_af.csv
@@ -6,3 +11,4 @@ TEXT0_ADDR = 0x08000000
 TEXT1_ADDR = 0x08020000
 
 MICROPY_HW_ENABLE_ISR_UART_FLASH_FUNCS_IN_RAM = 1
+

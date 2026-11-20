@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_conf.h
  * Configuration file for v9.2.0
  */
@@ -1111,3 +1111,4 @@
 #endif /*LV_CONF_H*/
 
 #endif /*End of "Content enable"*/
+

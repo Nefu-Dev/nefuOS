@@ -21,3 +21,4 @@ void lv_example_label_1(void)
 }
 
 #endif
+

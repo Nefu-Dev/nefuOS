@@ -122,3 +122,4 @@ MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_heapq, mp_module_heapq);
 #endif
 
 #endif // MICROPY_PY_HEAPQ
+

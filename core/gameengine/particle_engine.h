@@ -1,4 +1,9 @@
-﻿// particle_engine.h —— 粒子系统：发射器、生命周期、颜色/大小/速度渐变、重力/风场、环形/锥形/点发射器
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// particle_engine.h —— 粒子系统：发射器、生命周期、颜色/大小/速度渐变、重力/风场、环形/锥形/点发射器
 //
 // 纯逻辑在 .cpp；渲染 inline 在头文件（未调用不产生符号）。
 #pragma once
@@ -190,3 +195,4 @@ int particle_engine_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

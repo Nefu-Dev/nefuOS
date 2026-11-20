@@ -1250,3 +1250,4 @@ lv_font_t test_font_montserrat_ascii_2bpp = {
 #endif /*#if TEST_FONT_MONTSERRAT_ASCII_2BPP*/
 
 #endif /*LV_BUILD_TEST*/
+

@@ -105,3 +105,4 @@ const mp_obj_module_t ble_module = {
 MP_REGISTER_MODULE(MP_QSTR_ble, ble_module);
 
 #endif // MICROPY_PY_BLE
+

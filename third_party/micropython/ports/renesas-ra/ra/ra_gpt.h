@@ -41,3 +41,4 @@ void ra_gpt_timer_deinit(uint32_t pwm_pin, uint32_t ch, uint8_t id);
 bool ra_gpt_timer_is_pwm_pin(uint32_t pin);
 
 #endif /* RA_RA_GPT_H_ */
+

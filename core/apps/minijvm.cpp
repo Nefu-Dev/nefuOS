@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mini JVM - bytecode interpreter and public entry point.
 // Built-in class dispatch lives in minijvm_builtin.cpp, helpers in
 // minijvm_core.cpp, soft double math in minijvm_math.h.
@@ -846,3 +851,4 @@ void minijvm_stats(MiniJvmStats* out) {
 }
 
 } // namespace nefu
+

@@ -112,3 +112,4 @@ void lv_cache_entry_delete(lv_cache_entry_t * entry);
 #endif
 
 #endif /*LV_CACHE_ENTRY_H*/
+

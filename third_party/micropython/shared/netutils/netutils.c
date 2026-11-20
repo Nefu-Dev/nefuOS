@@ -98,3 +98,4 @@ mp_uint_t netutils_parse_inet_addr(mp_obj_t addr_in, uint8_t *out_ip, netutils_e
     netutils_parse_ipv4_addr(addr_items[0], out_ip, endian);
     return mp_obj_get_int(addr_items[1]);
 }
+

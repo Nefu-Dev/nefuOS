@@ -44,3 +44,4 @@ void lv_linux_drm_set_file(lv_display_t * disp, const char * file, int64_t conne
 #endif
 
 #endif /* LV_LINUX_DRM_H */
+

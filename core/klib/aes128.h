@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // aes128.h - minimal AES-128 (CBC decrypt) for nefuOS (no STL).
 // Used by npkg to pass the InfinityFree JS anti-bot cookie challenge.
 #pragma once
@@ -11,3 +16,4 @@ void aes128_cbc_decrypt(const uint8_t key[16], const uint8_t iv[16],
                         const uint8_t* in, uint32_t len, uint8_t* out);
 
 } // namespace nefu
+

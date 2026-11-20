@@ -203,3 +203,4 @@ void flashbdev_init(void) {
 }
 
 #endif // MICROPY_PY_NRF && MICROPY_HW_ENABLE_INTERNAL_FLASH_STORAGE
+

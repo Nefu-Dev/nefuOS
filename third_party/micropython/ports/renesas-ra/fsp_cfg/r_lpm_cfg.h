@@ -12,3 +12,4 @@ extern "C" {
 }
 #endif
 #endif /* R_LPM_CFG_H_ */
+

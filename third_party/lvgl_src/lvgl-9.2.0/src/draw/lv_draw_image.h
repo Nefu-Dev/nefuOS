@@ -127,3 +127,4 @@ lv_image_src_t lv_image_src_get_type(const void * src);
 #endif
 
 #endif /*LV_DRAW_IMAGE_H*/
+

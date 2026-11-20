@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/apps/x11_selftest.cpp
 //
 // Boot-time check of the nefuOS embedded X11 server + guest socket mapping on
@@ -152,6 +157,11 @@ extern "C" void nefu_x11_selftest(void) {
         xb_puts(" px="); xb_puthex(ewin_px);
         xb_puts("\r\n");
         xb_puts(ewin_px ? "[XREQ] ELECTRON PASS\r\n" : "[XREQ] ELECTRON FAIL\r\n");
+        // The self test is headless - its verdict goes to the serial log. The
+        // window it opened was only needed to read the rendered pixels, so
+        // close it again: left open it covers the whole screen and hides
+        // every app the user opens afterwards.
+        if (ew) g_wm->close_window(ew);
     }
     if (g.mem) kfree(g.mem);
 }
@@ -159,3 +169,4 @@ extern "C" void nefu_x11_selftest(void) {
 } // namespace x11
 } // namespace nefu
 #endif // NEFU_BARE
+

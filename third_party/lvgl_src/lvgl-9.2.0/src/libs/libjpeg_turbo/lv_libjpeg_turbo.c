@@ -596,3 +596,4 @@ static void error_exit(j_common_ptr cinfo)
 }
 
 #endif /*LV_USE_LIBJPEG_TURBO*/
+

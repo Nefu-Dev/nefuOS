@@ -57,3 +57,4 @@ static inline void enable_irq(uint32_t irq_state) {
 }
 
 #endif // MICROPY_INCLUDED_ESP8266_XTIRQ_H
+

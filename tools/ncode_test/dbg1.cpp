@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // dbg1.cpp — run a single .ncode script from a UTF-8 file, print PASS/FAIL + output
 #include "apps/ncode.h"
 #include "vfs/vfs.h"
@@ -65,3 +70,4 @@ int main(int argc, char** argv) {
     printf("---- output ----\n%s\n---- end ----\n", to.buf.c_str());
     return ok ? 0 : 1;
 }
+

@@ -53,3 +53,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 #if !MICROPY_OBJ_IMMEDIATE_OBJS
 const mp_obj_none_t mp_const_none_obj = {{&mp_type_NoneType}};
 #endif
+

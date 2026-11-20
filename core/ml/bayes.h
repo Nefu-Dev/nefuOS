@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 朴素贝叶斯分类
 // 高斯模型：连续特征，按类估计均值/方差，预测用对数高斯似然。
 // 多项式模型：计数特征（如词袋），带拉普拉斯平滑。
@@ -58,3 +63,4 @@ int bayes_self_test();
 
 } // namespace ml
 } // namespace nefu
+

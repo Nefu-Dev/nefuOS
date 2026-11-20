@@ -68,3 +68,4 @@ void ExUtilDeleteCommandLineArguments(CommandLineArguments* const args);
 #endif
 
 #endif  // WEBP_EXAMPLES_EXAMPLE_UTIL_H_
+

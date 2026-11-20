@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 网格 mesh
 // 教学版：三角形网格（顶点 + 法线 + 索引），支持生成基本体与法线计算。
 // 用于 3D 渲染的几何数据容器。class / STL / 中文注释。
@@ -64,3 +69,4 @@ private:
 
 } // namespace gfx
 } // namespace nefu
+

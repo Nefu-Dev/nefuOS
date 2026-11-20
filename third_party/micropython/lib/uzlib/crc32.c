@@ -61,3 +61,4 @@ uint32_t uzlib_crc32(const void *data, unsigned int length, uint32_t crc)
    // return value suitable for passing in next time, for final value invert it
    return crc/* ^ 0xffffffff*/;
 }
+

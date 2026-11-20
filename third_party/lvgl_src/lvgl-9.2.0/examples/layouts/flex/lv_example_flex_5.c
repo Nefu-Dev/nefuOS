@@ -49,3 +49,4 @@ void lv_example_flex_5(void)
 }
 
 #endif
+

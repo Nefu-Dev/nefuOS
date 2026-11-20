@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— 缓冲区缓存(Buffer Cache)
 //
 // 在块设备之上加一层 LRU 缓存,减少磁盘 I/O:
@@ -82,3 +87,4 @@ int cache_self_test();
 
 } // namespace filesystem
 } // namespace nefu
+

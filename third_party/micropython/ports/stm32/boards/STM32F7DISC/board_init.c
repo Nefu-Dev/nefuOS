@@ -13,3 +13,4 @@ void STM32F7DISC_board_early_init(void) {
     HAL_GPIO_Init(GPIOK, &GPIO_InitStructure);
     HAL_GPIO_WritePin(GPIOK, GPIO_PIN_3, GPIO_PIN_RESET);
 }
+

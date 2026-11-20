@@ -481,3 +481,4 @@ int VP8EncAnalyze(VP8Encoder* const enc) {
   return ok;
 }
 
+

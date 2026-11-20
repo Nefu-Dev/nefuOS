@@ -87,3 +87,4 @@ int mp_spiflash_cached_write(mp_spiflash_t *self, uint32_t addr, size_t len, con
 #endif
 
 #endif // MICROPY_INCLUDED_DRIVERS_MEMORY_SPIFLASH_H
+

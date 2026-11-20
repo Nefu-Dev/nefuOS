@@ -34,3 +34,4 @@ void lv_example_libpng_1(void)
 #endif
 
 #endif
+

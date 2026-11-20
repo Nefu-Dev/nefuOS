@@ -1869,3 +1869,4 @@ MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_socket, mp_module_lwip);
 MP_REGISTER_ROOT_POINTER(mp_obj_t lwip_slip_stream);
 
 #endif // MICROPY_PY_LWIP
+

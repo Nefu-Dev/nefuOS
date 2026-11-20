@@ -202,3 +202,4 @@ void mp_lexer_free(mp_lexer_t *lex);
 void mp_lexer_to_next(mp_lexer_t *lex);
 
 #endif // MICROPY_INCLUDED_PY_LEXER_H
+

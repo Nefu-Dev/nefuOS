@@ -392,3 +392,4 @@ long unsigned int rng_generate_random_word(void);
 #ifndef MICROPY_BOARD_EARLY_INIT
 #define MICROPY_BOARD_EARLY_INIT()
 #endif
+

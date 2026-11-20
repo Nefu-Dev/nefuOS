@@ -186,3 +186,4 @@ static lv_cache_compare_res_t freetype_image_compare_cb(const lv_freetype_image_
 }
 
 #endif /*LV_USE_FREETYPE*/
+

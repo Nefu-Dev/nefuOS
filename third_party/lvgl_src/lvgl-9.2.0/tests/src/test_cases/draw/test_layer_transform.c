@@ -60,3 +60,4 @@ void test_update_layer_type_on_state_change(void)
 }
 
 #endif
+

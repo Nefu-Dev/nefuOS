@@ -121,3 +121,4 @@ const stream_methods_t vfs_fat_stream_methods = {
 };
 
 #endif // MBOOT_FSLOAD && MBOOT_VFS_FAT
+

@@ -271,3 +271,4 @@ void ra_int_init(void) {
     irq_to_ch[VECTOR_NUMBER_ICU_IRQ15] = 15;
     #endif
 }
+

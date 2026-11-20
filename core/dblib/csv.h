@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— CSV 读写器 csv
 // 教学版：CSV（逗号分隔值）解析与写出，支持引号字段、转义、换行。
 // 用 std::string / std::vector / do-while / switch，中文注释。
@@ -56,3 +61,4 @@ std::string csv_escape(const std::string& field, char delim = ',');
 
 } // namespace dbx
 } // namespace nefu
+

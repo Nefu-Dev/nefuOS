@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— Perlin 噪声 perlin
 // 教学版：Ken Perlin 经典梯度噪声，用于程序化地形/纹理/动画。
 // 实现要点：晶格梯度 + 平滑插值（fade 曲线）+ 多倍频叠加（fractal）。
@@ -41,3 +46,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

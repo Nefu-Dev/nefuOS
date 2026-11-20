@@ -438,3 +438,4 @@ unsigned char const test_font_1_buf[6876] = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

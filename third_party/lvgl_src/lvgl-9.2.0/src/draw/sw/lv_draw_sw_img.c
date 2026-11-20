@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_img.c
  *
  */
@@ -463,3 +463,4 @@ static void img_draw_core(lv_draw_unit_t * draw_unit, const lv_draw_image_dsc_t 
 }
 
 #endif /*LV_USE_DRAW_SW*/
+

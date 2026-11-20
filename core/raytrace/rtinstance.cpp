@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 光线追踪引擎 —— rtinstance 实现（Q16.16 定点）
 // ============================================================================
@@ -86,3 +91,4 @@ int rtinstance_self_test() {
 
 } // namespace raytrace
 } // namespace nefu
+

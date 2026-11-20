@@ -167,3 +167,4 @@ lv_result_t lv_thread_sync_signal_isr(lv_thread_sync_t * sync)
  **********************/
 
 #endif /*LV_USE_OS == LV_OS_MQX*/
+

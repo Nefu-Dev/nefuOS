@@ -51,3 +51,4 @@ typedef osEventFlagsId_t lv_thread_sync_t;
 #endif
 
 #endif /*LV_OS_CMSIS_RTOS2*/
+

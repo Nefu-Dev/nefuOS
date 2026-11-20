@@ -207,3 +207,4 @@ WEBP_EXTERN int WebPGetColorPalette(const struct WebPPicture* const pic,
 #endif
 
 #endif  // WEBP_UTILS_UTILS_H_
+

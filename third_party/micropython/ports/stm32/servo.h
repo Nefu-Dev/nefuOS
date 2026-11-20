@@ -35,3 +35,4 @@ MP_DECLARE_CONST_FUN_OBJ_2(pyb_servo_set_obj);
 MP_DECLARE_CONST_FUN_OBJ_2(pyb_pwm_set_obj);
 
 #endif // MICROPY_INCLUDED_STM32_SERVO_H
+

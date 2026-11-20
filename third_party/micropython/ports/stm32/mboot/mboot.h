@@ -240,3 +240,4 @@ static inline void mboot_state_change(mboot_state_t state, uint32_t arg) {
 }
 
 #endif // MICROPY_INCLUDED_STM32_MBOOT_MBOOT_H
+

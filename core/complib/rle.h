@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — 游程编码 (rle)
 // RLE：把连续重复字节压缩为"计数 + 值"。适合黑白位图、传真、
 // 简单图形数据。本实现为字节级变体：
@@ -19,3 +24,4 @@ int rle_self_test();
 
 } // namespace comp
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Pomodoro Timer — focus timer with work/break cycles
 #include "apps.h"
 #include "../gui/wm.h"
@@ -125,7 +130,7 @@ void pom_close(Window* w) {
 void pomodoro_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Pomodoro Timer", x, y, 340, 300);
+    Window* w = g_wm->create_window(T("番茄钟", "Pomodoro Timer"), x, y, 340, 300);
     if (!w) return;
     Pomodoro* g = new Pomodoro();
     g->w = w->content_w;
@@ -145,3 +150,4 @@ void pomodoro_launch() {
 }
 
 } // namespace nefu
+

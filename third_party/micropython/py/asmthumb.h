@@ -434,3 +434,4 @@ void asm_thumb_b_rel12(asm_thumb_t *as, int rel);
 #endif // GENERIC_ASM_API
 
 #endif // MICROPY_INCLUDED_PY_ASMTHUMB_H
+

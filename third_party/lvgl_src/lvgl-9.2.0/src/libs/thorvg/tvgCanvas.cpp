@@ -97,3 +97,4 @@ Result Canvas::sync() noexcept
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

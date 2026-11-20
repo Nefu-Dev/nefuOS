@@ -178,3 +178,4 @@ void PORTENTA_board_low_power(int mode) {
     }
     #endif
 }
+

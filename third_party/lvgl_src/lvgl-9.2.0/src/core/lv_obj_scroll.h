@@ -288,3 +288,4 @@ void lv_obj_readjust_scroll(lv_obj_t * obj, lv_anim_enable_t anim_en);
 #endif
 
 #endif /*LV_OBJ_SCROLL_H*/
+

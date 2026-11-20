@@ -863,3 +863,4 @@ const emit_inline_asm_method_table_t emit_inline_thumb_method_table = {
 };
 
 #endif // MICROPY_EMIT_INLINE_THUMB
+

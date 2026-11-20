@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #include "gfxlib/transform.h"
 #include "gfxlib/noise.h"
 #include "gfxlib/color.h"
@@ -72,3 +77,4 @@ int main() {
     std::printf("cmyk red c=%d m=%d y=%d k=%d\n", k.c, k.m, k.y, k.k);
     return 0;
 }
+

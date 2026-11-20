@@ -33,3 +33,4 @@ void lv_example_arc_2(void)
 }
 
 #endif
+

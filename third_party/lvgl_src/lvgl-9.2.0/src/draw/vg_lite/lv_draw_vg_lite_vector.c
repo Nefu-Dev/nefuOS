@@ -425,3 +425,4 @@ static vg_lite_fill_t lv_fill_to_vg(lv_vector_fill_t fill_rule)
 }
 
 #endif /*LV_USE_DRAW_VG_LITE && LV_USE_VECTOR_GRAPHIC*/
+

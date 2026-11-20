@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— 简易 JSON 存储 jsonstore
 // 教学版：JSON 值与序列化/反序列化（对象/数组/数字/字符串/bool/null）。
 #pragma once
@@ -80,3 +85,4 @@ Json json_parse(const std::string& text);   // 失败返回 null
 
 } // namespace dbx
 } // namespace nefu
+

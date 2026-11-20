@@ -120,3 +120,4 @@ const lv_image_dsc_t img_render_arc_bg = {
     .data = img_render_arc_bg_map,
     .data_size = sizeof(img_render_arc_bg_map),
 };
+

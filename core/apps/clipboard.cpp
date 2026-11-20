@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Clipboard Manager
 // Manages clipboard history and allows pasting previous items
 #include "apps.h"
@@ -44,7 +49,7 @@ int clipboard_count() {
 }
 
 void clipboard_launch() {
-    Window* w = g_wm->create_window("Clipboard Manager", 80, 80, 480, 360);
+    Window* w = g_wm->create_window(T("剪贴板管理器", "Clipboard Manager"), 80, 80, 480, 360);
     if (!w) return;
     
     // Title
@@ -86,3 +91,4 @@ void clipboard_launch() {
 }
 
 } // namespace nefu
+

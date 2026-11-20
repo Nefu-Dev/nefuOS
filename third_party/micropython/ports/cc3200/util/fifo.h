@@ -47,3 +47,4 @@ extern bool FIFO_IsFull (FIFO_t *fifo);
 extern void FIFO_Flush (FIFO_t *fifo);
 
 #endif // MICROPY_INCLUDED_CC3200_UTIL_FIFO_H
+

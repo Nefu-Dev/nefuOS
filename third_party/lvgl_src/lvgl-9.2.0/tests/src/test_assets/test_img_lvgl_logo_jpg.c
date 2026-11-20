@@ -204,3 +204,4 @@ const lv_image_dsc_t test_img_lvgl_logo_jpg = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

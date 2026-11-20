@@ -406,3 +406,4 @@ static void LV_ATTRIBUTE_FAST_MEM draw_line_skew(lv_draw_unit_t * draw_unit, con
 }
 
 #endif /*LV_USE_DRAW_SW*/
+

@@ -216,3 +216,4 @@ void asm_x86_call_ind(asm_x86_t *as, size_t fun_id, mp_uint_t n_args, int temp_r
 #endif // GENERIC_ASM_API
 
 #endif // MICROPY_INCLUDED_PY_ASMX86_H
+

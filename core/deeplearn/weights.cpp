@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 参数序列化实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 参数序列化实现
 // 参数打包/解包为连续字节缓冲，小端 int32。
 // 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
@@ -111,3 +116,4 @@ int weights_self_test() {
 
 } // namespace deeplearn
 } // namespace nefu
+

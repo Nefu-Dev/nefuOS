@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mini JVM - built-in class dispatch (java.lang.* / java.util.* /
 // java.io.* core methods implemented natively).  Returns 1 when handled,
 // 0 when the owner is unknown to the VM.  Part 1: helpers + String +
@@ -1376,3 +1381,4 @@ int invoke_builtin(VM* vm, const char* owner, const char* name, const char* desc
 }
 
 } // namespace nefu
+

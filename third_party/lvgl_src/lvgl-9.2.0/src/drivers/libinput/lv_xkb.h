@@ -61,3 +61,4 @@ uint32_t lv_xkb_process_key(lv_xkb_t * dsc, uint32_t scancode, bool down);
 #endif
 
 #endif /* defined(LV_LIBINPUT_XKB) && LV_LIBINPUT_XKB */
+

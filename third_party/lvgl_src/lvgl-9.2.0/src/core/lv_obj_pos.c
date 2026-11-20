@@ -1181,3 +1181,4 @@ static void transform_point_array(const lv_obj_t * obj, lv_point_t * p, size_t p
 
     lv_point_array_transform(p, p_count, angle, scale_x, scale_y, &pivot, !inv);
 }
+

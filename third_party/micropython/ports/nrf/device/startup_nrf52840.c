@@ -182,3 +182,4 @@ const func __Vectors[] __attribute__ ((section(".isr_vector"),used)) = {
     0,
     SPIM3_IRQHandler,
 };
+

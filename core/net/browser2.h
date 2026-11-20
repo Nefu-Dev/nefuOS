@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Browser Engine v2.0 - based on Ladybird/Hubbub design (MIT/BSD)
 // Complete rewrite of browser rendering engine
 #pragma once
@@ -339,3 +344,4 @@ public:
 
 } // namespace browser2
 } // namespace nefu
+

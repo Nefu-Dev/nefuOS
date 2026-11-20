@@ -274,3 +274,4 @@ WEBP_DSP_INIT_STUB(WebPInitYUV444ConvertersSSE2)
 #if !(defined(FANCY_UPSAMPLING) && defined(WEBP_USE_SSE2))
 WEBP_DSP_INIT_STUB(WebPInitUpsamplersSSE2)
 #endif
+

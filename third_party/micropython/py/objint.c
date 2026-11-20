@@ -487,3 +487,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     binary_op, mp_obj_int_binary_op,
     locals_dict, &int_locals_dict
     );
+

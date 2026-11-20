@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS float expression parser/evaluator.
 // Same grammar as core/lib/fxexpr.h but evaluates with single-precision
 // `float` via the soft-float library (core/lib/softfloat.h), so it runs on
@@ -294,3 +299,4 @@ inline bool sfexpr_eval_no_x(const char* s, float* out, bool* domain_err, int mo
 
 } // namespace sfexpr
 } // namespace nefu
+

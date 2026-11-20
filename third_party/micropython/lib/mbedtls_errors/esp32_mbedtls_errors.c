@@ -643,3 +643,4 @@ void mbedtls_strerror( int ret, char *buf, size_t buflen )
 #endif /* MBEDTLS_ERROR_STRERROR_DUMMY */
 
 #endif /* MBEDTLS_ERROR_C */
+

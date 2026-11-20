@@ -114,3 +114,4 @@ static void mp_machine_wdt_timeout_ms_set(machine_wdt_obj_t *self, mp_int_t time
     (void)self;
     set_timeout(timeout_ms);
 }
+

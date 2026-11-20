@@ -407,3 +407,4 @@ static void lv_opengles_render_draw(void)
 }
 
 #endif /* LV_USE_OPENGLES */
+

@@ -35,3 +35,4 @@ extern void CRYPTOHASH_SHAMD5Update (uint8_t *data, uint32_t datalen);
 extern void CRYPTOHASH_SHAMD5Read (uint8_t *hash);
 
 #endif // MICROPY_INCLUDED_CC3200_UTIL_CRYPTOHASH_H
+

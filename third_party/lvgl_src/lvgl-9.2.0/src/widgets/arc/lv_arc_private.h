@@ -62,3 +62,4 @@ struct lv_arc_t {
 #endif
 
 #endif /*LV_ARC_PRIVATE_H*/
+

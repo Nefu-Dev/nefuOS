@@ -39,3 +39,4 @@ void mp_usbd_port_get_serial_number(char *serial_buf) {
 }
 
 #endif
+

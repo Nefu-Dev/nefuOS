@@ -8,3 +8,4 @@ enum {
 };
 
 #endif // MICROPY_INCLUDED_EXTMOD_MODWEBSOCKET_H
+

@@ -111,3 +111,4 @@ int uart_rx_any(uint8 uart);
 int uart_tx_any_room(uint8 uart);
 
 #endif // MICROPY_INCLUDED_ESP8266_UART_H
+

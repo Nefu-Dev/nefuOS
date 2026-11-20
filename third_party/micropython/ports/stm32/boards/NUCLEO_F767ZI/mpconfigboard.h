@@ -92,3 +92,4 @@ void NUCLEO_F767ZI_board_early_init(void);
 #define MICROPY_HW_ETH_RMII_TX_EN   (pin_G11)
 #define MICROPY_HW_ETH_RMII_TXD0    (pin_G13)
 #define MICROPY_HW_ETH_RMII_TXD1    (pin_B13)
+

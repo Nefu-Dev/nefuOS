@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — generic dynamic array (vec)
 // 泛型动态数组：自动扩容的连续存储容器，是 C++ 里最常用的数据结构之一。
 // 与 STL 的 std::vector 功能对应，但完全从零实现（不依赖 STL），
@@ -156,3 +161,4 @@ int vec_self_test();
 
 } // namespace dt
 } // namespace nefu
+

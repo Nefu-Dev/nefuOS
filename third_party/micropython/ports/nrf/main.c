@@ -369,3 +369,4 @@ void MP_WEAK __assert_func(const char *file, int line, const char *func, const c
     printf("Assertion '%s' failed, at file %s:%d\n", expr, file, line);
     __fatal_error("Assertion failed");
 }
+

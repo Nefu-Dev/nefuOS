@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— Painter 实现
 #include "painter.h"
 #include "widget.h"
@@ -160,3 +165,4 @@ int painter_self_test() {
 
 } // namespace ui
 } // namespace nefu
+

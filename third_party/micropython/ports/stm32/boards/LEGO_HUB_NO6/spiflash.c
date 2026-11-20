@@ -164,3 +164,4 @@ const mp_obj_module_t spiflash_module = {
 MP_REGISTER_MODULE(MP_QSTR_spiflash, spiflash_module);
 
 #endif
+

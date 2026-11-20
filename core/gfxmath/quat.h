@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 四元数 quat
 // 教学版：旋转的四元数表示，用于避免欧拉角万向锁。
 // 支持构造、乘法、旋转向量、球面插值（slerp）。
@@ -47,3 +52,4 @@ struct Quat {
 
 } // namespace gfx
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = MIMXRT1011
 MCU_VARIANT = MIMXRT1011DAE5A
 
@@ -10,3 +15,4 @@ CFLAGS += -DMICROPY_HW_FLASH_DQS=kFlexSPIReadSampleClk_LoopbackInternally
 
 SRC_C += \
 	hal/flexspi_nor_flash.c \
+

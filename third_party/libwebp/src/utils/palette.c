@@ -411,3 +411,4 @@ int PaletteSort(PaletteSorting method, const struct WebPPicture* const pic,
   assert(0);
   return 0;
 }
+

@@ -22,3 +22,4 @@ void lv_example_observer_1(void)
 }
 
 #endif
+

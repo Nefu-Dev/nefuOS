@@ -148,3 +148,4 @@ const flexspi_nor_config_t qspiflash_config = {
     // .ipcmdSerialClkFreq = kFlexSpiSerialClk_30MHz,
 };
 #endif /* XIP_BOOT_HEADER_ENABLE */
+

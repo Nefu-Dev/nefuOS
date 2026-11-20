@@ -307,3 +307,4 @@ void test_image_formats(void)
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS browser engine header
 // Lightweight HTML/CSS rendering core inspired by LibHubbub, LibCSS, and Ladybird
 #ifndef NEFU_BROWSER_ENGINE_H
@@ -48,3 +53,4 @@ void parse_html_to_dom(const char* html, int len, DOMNode*& out_root);
 } // namespace nefu
 
 #endif // NEFU_BROWSER_ENGINE_H
+

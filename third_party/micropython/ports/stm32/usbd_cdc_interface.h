@@ -82,3 +82,4 @@ int usbd_cdc_rx(usbd_cdc_itf_t *cdc, uint8_t *buf, uint32_t len, uint32_t timeou
 void usbd_cdc_rx_event_callback(usbd_cdc_itf_t *cdc);
 
 #endif // MICROPY_INCLUDED_STM32_USBD_CDC_INTERFACE_H
+

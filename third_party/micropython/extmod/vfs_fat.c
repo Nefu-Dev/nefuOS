@@ -445,3 +445,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 #endif // MICROPY_VFS_FAT
+

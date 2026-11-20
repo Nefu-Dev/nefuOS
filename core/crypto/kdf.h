@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 密钥派生函数 (KDF) 模块
 // 覆盖：PBKDF2-HMAC-SHA256、HKDF-SHA256、scrypt（简化但真实 ROMix）、bcrypt（简化版）。
 #pragma once
@@ -37,3 +42,4 @@ int kdf_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

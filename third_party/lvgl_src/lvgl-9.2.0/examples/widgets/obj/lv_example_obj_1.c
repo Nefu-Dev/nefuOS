@@ -20,3 +20,4 @@ void lv_example_obj_1(void)
     lv_obj_align(obj2, LV_ALIGN_CENTER, 60, 30);
 }
 #endif
+

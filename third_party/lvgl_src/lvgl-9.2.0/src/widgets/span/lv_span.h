@@ -235,3 +235,4 @@ void lv_spangroup_refr_mode(lv_obj_t * obj);
 #endif
 
 #endif /*LV_SPAN_H*/
+

@@ -11,3 +11,4 @@ int *__errno(void)
 {
     return &embed_errno;
 }
+

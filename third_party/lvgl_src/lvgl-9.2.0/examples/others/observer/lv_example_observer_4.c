@@ -203,3 +203,4 @@ static void indicator_observer_cb(lv_observer_t * observer, lv_subject_t * subje
 }
 
 #endif
+

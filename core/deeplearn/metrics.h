@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 评估指标
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 评估指标
 // 典型用法：
 //   acc = accuracy(pred, labels, N);  // 0..1
 //   f1  = f1_score(tp, fp, fn);
@@ -35,3 +40,4 @@ int metrics_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

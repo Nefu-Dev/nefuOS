@@ -257,3 +257,4 @@ void mboot_state_change_default(mboot_state_t state, uint32_t arg) {
 }
 
 #endif // MBOOT_ENABLE_DEFAULT_UI
+

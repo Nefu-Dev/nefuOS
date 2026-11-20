@@ -138,3 +138,4 @@ uint8_t pin_find_peripheral_type (const mp_obj_t pin, uint8_t fn, uint8_t unit);
 int8_t pin_find_af_index (const pin_obj_t* pin, uint8_t fn, uint8_t unit, uint8_t type);;
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBPIN_H
+

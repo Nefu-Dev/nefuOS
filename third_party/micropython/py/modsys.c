@@ -374,3 +374,4 @@ MP_REGISTER_MODULE_DELEGATION(mp_module_sys, mp_module_sys_attr);
 #endif
 
 #endif // MICROPY_PY_SYS
+

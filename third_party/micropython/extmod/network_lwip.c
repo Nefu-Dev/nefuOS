@@ -392,3 +392,4 @@ mp_obj_t mod_network_nic_ipconfig(struct netif *netif, size_t n_args, const mp_o
 #endif // LWIP_VERSION_MAJOR >= 2
 
 #endif  // MICROPY_PY_NETWORK && MICROPY_PY_LWIP
+

@@ -16,3 +16,4 @@ void lv_example_tjpgd_1(void)
 }
 
 #endif
+

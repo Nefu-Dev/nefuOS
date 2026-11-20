@@ -119,3 +119,4 @@ static bool imgfont_get_glyph_dsc(const lv_font_t * font, lv_font_glyph_dsc_t * 
 }
 
 #endif /*LV_USE_IMGFONT*/
+

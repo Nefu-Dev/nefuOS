@@ -295,3 +295,4 @@ void lv_fragment_recreate_obj(lv_fragment_t * fragment);
 #endif
 
 #endif /*LV_FRAGMENT_H*/
+

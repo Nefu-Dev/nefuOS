@@ -74,3 +74,4 @@ void firmware_start(void) {
 
     asm ("j call_user_start");
 }
+

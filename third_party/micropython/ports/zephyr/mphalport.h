@@ -35,3 +35,4 @@ static inline uint64_t mp_hal_time_ns(void) {
 }
 
 #define mp_hal_delay_us_fast(us)   (mp_hal_delay_us(us))
+

@@ -1043,3 +1043,4 @@ static bool has_popovers_in_top_row(lv_obj_t * obj)
 }
 
 #endif
+

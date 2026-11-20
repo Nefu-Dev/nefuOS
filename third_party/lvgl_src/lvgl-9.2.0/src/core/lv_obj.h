@@ -484,3 +484,4 @@ void lv_objid_builtin_destroy(void);
 #endif
 
 #endif /*LV_OBJ_H*/
+

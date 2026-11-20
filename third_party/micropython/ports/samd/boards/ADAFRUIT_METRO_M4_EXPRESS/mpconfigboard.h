@@ -28,3 +28,4 @@
 
 #define MICROPY_HW_NINA_RTS                 (12)
 #define MICROPY_HW_NINA_CTS                 (36)
+

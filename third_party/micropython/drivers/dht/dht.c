@@ -97,3 +97,4 @@ timeout:
 MP_DEFINE_CONST_FUN_OBJ_2(dht_readinto_obj, dht_readinto);
 
 #endif // MICROPY_PY_MACHINE_PULSE
+

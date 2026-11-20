@@ -99,3 +99,4 @@ uint32_t rng_get(void) {
 }
 
 #endif // MICROPY_HW_ENABLE_RNG
+

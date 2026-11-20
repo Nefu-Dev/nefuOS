@@ -74,3 +74,4 @@ static GifFileType* DGifOpenFileUnicode(const W_CHAR* file_name, int* error) {
 #endif  // defined(WEBP_HAVE_GIF)
 
 #endif  // WEBP_EXAMPLES_UNICODE_GIF_H_
+

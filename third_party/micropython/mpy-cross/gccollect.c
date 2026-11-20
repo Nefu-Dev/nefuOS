@@ -40,3 +40,4 @@ void gc_collect(void) {
 }
 
 #endif // MICROPY_ENABLE_GC
+

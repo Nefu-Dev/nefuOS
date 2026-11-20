@@ -16,3 +16,4 @@ void lv_example_monkey_1(void)
 }
 
 #endif
+

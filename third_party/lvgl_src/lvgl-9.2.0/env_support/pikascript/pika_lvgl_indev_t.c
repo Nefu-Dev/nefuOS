@@ -16,3 +16,4 @@ void pika_lvgl_indev_t_get_vect(PikaObj* self, PikaObj* point) {
     obj_setInt(point, "y", lv_point->y);
 }
 #endif
+

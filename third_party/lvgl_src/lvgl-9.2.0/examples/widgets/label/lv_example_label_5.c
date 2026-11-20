@@ -28,3 +28,4 @@ void lv_example_label_5(void)
 }
 
 #endif
+

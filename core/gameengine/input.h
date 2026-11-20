@@ -1,4 +1,9 @@
-﻿// input.h —— 输入系统：键盘状态、鼠标、虚拟轴/按钮、输入映射、连击检测、触摸模拟
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// input.h —— 输入系统：键盘状态、鼠标、虚拟轴/按钮、输入映射、连击检测、触摸模拟
 //
 // 纯逻辑：由外层（窗口 on_key/on_mouse）把事件喂进来，引擎内部维护状态与抽象映射。
 #pragma once
@@ -292,3 +297,4 @@ int input_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

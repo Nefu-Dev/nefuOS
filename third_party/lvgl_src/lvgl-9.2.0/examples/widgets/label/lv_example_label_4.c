@@ -53,3 +53,4 @@ void lv_example_label_4(void)
 }
 
 #endif
+

@@ -215,3 +215,4 @@ void vglite_create_rect_path_data(int32_t * path_data, uint32_t * path_data_size
  **********************/
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

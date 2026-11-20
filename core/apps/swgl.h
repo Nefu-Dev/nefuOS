@@ -1,9 +1,18 @@
-// nefuOS software WebGL2 engine — bare-metal renderer + shared protocol helpers.
-// The browser's JS bridge encodes every GL call as "\x01gl<cmd>|cid|args"
-// control lines; on the Win32 host they run on a real desktop GL context (WGL,
-// iGPU hardware acceleration), on bare metal they are decoded here and rendered
-// by a self-contained software rasterizer (framebuffer + depth, GLSL ES 3.00
-// subset interpreter, textures, blending, culling, scissor, instancing).
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS software GLES 2.0 (WebGL1) engine — bare-metal renderer + shared
+// protocol helpers. The browser's JS bridge encodes every GL call as
+// "\x01gl<cmd>|cid|args" control lines; on the Win32 host they run on a real
+// desktop GL context (WGL, iGPU hardware acceleration), on bare metal they
+// are decoded here and rendered by a self-contained software rasterizer
+// (framebuffer + depth, GLSL ES 1.00 / GLES 2.0 shader interpreter with
+// attribute/varying/gl_FragColor, textures, blending, culling, scissor).
+// The context is deliberately presented as WebGL1: engines that probe for
+// 'webgl2' get null and take their GLES 2.0 code path, which is the surface
+// this interpreter covers completely.
 //
 // Constraints (bare kernel): compiled with -mgeneral-regs-only, so ONLY single
 // precision float arithmetic is available (kernel soft-float library). Never
@@ -111,6 +120,19 @@ const uint8_t* swgl_frame(const char* cid, int* w, int* h);
 // Resize a canvas (also called by the JS canvas.width/height setter).
 void swgl_resize(const char* cid, int w, int h);
 
+// Upload pixel bytes for the texture bound to the active unit. The wire
+// protocol carries only size/format for "texim" (a base64 image would be a
+// multi-megabyte line), so the browser passes the buffer in-process instead.
+// Call right after the matching "texim" command, on the UI thread.
+void swgl_tex_image(const char* cid, int w, int h, int format, int type,
+                    const uint8_t* px, int len);
+
+// Write pixel bytes into a sub-rectangle of the texture bound to the active
+// unit (texSubImage2D). Like swgl_tex_image it takes raw bytes (no base64),
+// so the browser passes the buffer in-process from the pending upload slot.
+void swgl_tex_sub_image(const char* cid, int x, int y, int w, int h,
+                        int format, int type, const uint8_t* px, int len);
+
 // Release all software GL canvases (browser shutdown).
 void swgl_shutdown();
 
@@ -118,3 +140,4 @@ void swgl_shutdown();
 bool swgl_active();
 
 } // namespace nefu
+

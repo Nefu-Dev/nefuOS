@@ -44,3 +44,4 @@ lv_indev_t * lv_sdl_keyboard_create(void);
 #endif
 
 #endif /* LV_SDL_KEYBOARD_H */
+

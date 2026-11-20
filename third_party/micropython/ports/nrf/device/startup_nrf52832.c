@@ -165,3 +165,4 @@ const func __Vectors[] __attribute__ ((section(".isr_vector"),used)) = {
     RTC2_IRQHandler,
     I2S_IRQHandler
 };
+

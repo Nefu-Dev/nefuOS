@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 // nefuOS 机器学习库 —— PCA 实现（Q16.16）
 #include "pca.h"
@@ -152,3 +157,4 @@ int pca_self_test() {
 
 } // namespace ml
 } // namespace nefu
+

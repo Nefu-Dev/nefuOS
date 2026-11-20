@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS download manager - public API
 // SPDX-License-Identifier: MIT
 
@@ -36,3 +41,4 @@ void download_clear_completed();
 void download_list_launch();
 
 } // namespace nefu
+

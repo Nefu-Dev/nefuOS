@@ -288,3 +288,4 @@
 
 // Pin definition header file
 #define MICROPY_PIN_DEFS_PORT_H "pin_defs_ra.h"
+

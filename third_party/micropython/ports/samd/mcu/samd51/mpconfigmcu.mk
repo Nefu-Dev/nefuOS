@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 CFLAGS_MCU += -mtune=cortex-m4 -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
 CFLAGS_MCU += -DCFG_TUSB_MCU=OPT_MCU_SAMD51
@@ -16,3 +21,4 @@ SRC_C += \
 	fatfs_port.c \
 
 UF2CONV_FLAGS += -f 0x55114460
+

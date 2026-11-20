@@ -255,3 +255,4 @@ void mp_module_generic_attr(qstr attr, mp_obj_t *dest, const uint16_t *keys, mp_
         }
     }
 }
+

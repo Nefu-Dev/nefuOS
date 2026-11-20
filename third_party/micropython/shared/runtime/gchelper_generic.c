@@ -213,3 +213,4 @@ MP_NOINLINE void gc_helper_collect_regs_and_stack(void) {
 }
 
 #endif // MICROPY_ENABLE_GC
+

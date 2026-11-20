@@ -1,4 +1,4 @@
-﻿/* nefuOS nanosvg (SVG parser + rasterizer) implementation unit.
+/* nefuOS nanosvg (SVG parser + rasterizer) implementation unit.
  * Compiled as C so the bare build never pulls C++ <math.h> hosted templates.
  * Bare: malloc/free/realloc route through nefu kalloc hooks defined in
  * stb_image_wrap.cpp (NEFU_BARE). Host: CRT as usual. */
@@ -15,3 +15,4 @@ void* realloc(void* p, unsigned long long sz) { return nefu_krealloc_x(p, sz); }
 #include "nanosvg.h"
 #define NANOSVGRAST_IMPLEMENTATION
 #include "nanosvg_rast.h"
+

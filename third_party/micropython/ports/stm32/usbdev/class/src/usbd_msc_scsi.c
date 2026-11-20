@@ -788,3 +788,4 @@ static int8_t SCSI_ProcessWrite (USBD_HandleTypeDef  *pdev, uint8_t lun)
 #endif // MICROPY_HW_USB_MSC
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

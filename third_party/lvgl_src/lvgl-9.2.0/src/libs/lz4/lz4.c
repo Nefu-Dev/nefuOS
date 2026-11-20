@@ -2759,3 +2759,4 @@ char* LZ4_slideInputBuffer (void* state)
 
 #endif /* LV_USE_LZ4_INTERNAL */
 
+

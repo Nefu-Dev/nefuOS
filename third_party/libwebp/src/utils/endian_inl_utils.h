@@ -91,3 +91,4 @@ static WEBP_INLINE uint64_t BSwap64(uint64_t x) {
 }
 
 #endif  // WEBP_UTILS_ENDIAN_INL_UTILS_H_
+

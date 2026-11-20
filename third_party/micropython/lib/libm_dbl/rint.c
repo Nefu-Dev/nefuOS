@@ -26,3 +26,4 @@ double rint(double x)
 		return s ? -0.0 : 0;
 	return y;
 }
+

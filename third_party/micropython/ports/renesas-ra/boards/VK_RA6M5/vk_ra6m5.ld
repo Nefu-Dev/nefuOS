@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
                   Linker File for RA6M5 MCU
 */
 
@@ -306,3 +311,4 @@ _micropy_hw_internal_flash_storage_end   = ORIGIN(FLASH_FS) + LENGTH(FLASH_FS);
 
 _micropy_hw_external_flash_storage_start = ORIGIN(QSPI_FLASH);
 _micropy_hw_external_flash_storage_end   = ORIGIN(QSPI_FLASH) + LENGTH(QSPI_FLASH);
+

@@ -335,3 +335,4 @@ const lv_image_dsc_t test_arc_bg = {
     .data = test_arc_bg_map,
 };
 #endif /*LV_BUILD_TEST*/
+

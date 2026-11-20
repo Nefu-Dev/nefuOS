@@ -56,3 +56,4 @@ const flash_cfg_t g_flash0_cfg =
 /* Instance structure to use this module. */
 const flash_instance_t g_flash0 =
 { .p_ctrl = &g_flash0_ctrl, .p_cfg = &g_flash0_cfg, .p_api = &g_flash_on_flash_hp };
+

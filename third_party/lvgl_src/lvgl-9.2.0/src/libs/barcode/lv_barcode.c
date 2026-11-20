@@ -298,3 +298,4 @@ static void lv_barcode_clear(lv_obj_t * obj)
 }
 
 #endif /*LV_USE_BARCODE*/
+

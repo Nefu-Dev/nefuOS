@@ -202,3 +202,4 @@ void lv_sdl_mouse_handler(SDL_Event * event)
 }
 
 #endif /*LV_USE_SDL*/
+

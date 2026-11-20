@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 事件日志模块
 // 分级日志写入 / 查询 / 过滤 / 环形轮转 / 二进制持久化。
 // 日志存放于固定容量的环形缓冲，写满后丢弃最旧记录（轮转），避免无界增长。
@@ -122,3 +127,4 @@ int  log_query(const LogFilter* f, LogEntry* out, int max);
 
 } // namespace sysutil
 } // namespace nefu
+

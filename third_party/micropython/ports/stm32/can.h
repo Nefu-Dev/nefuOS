@@ -90,3 +90,4 @@ void pyb_can_handle_callback(pyb_can_obj_t *self, uint fifo_id, mp_obj_t callbac
 #endif // MICROPY_HW_ENABLE_CAN
 
 #endif // MICROPY_INCLUDED_STM32_CAN_H
+

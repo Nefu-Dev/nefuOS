@@ -34,3 +34,4 @@ extern void updater_finnish (void);
 extern bool updater_verify (uint8_t *rbuff, uint8_t *hasbuff);
 
 #endif // MICROPY_INCLUDED_CC3200_FTP_UPDATER_H
+

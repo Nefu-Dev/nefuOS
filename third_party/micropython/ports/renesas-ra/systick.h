@@ -58,3 +58,4 @@ void systick_wait_at_least(uint32_t stc, uint32_t delay_ms);
 bool systick_has_passed(uint32_t stc, uint32_t delay_ms);
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_SYSTICK_H
+

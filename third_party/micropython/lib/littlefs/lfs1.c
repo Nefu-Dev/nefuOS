@@ -2581,3 +2581,4 @@ int lfs1_deorphan(lfs1_t *lfs1) {
     // filesystem... So something must be horribly wrong
     return LFS1_ERR_CORRUPT;
 }
+

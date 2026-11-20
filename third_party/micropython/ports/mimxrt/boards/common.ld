@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
 ** ###################################################################
 ** Linker script inspired by NXP linker script for MIMXRT10xx
 **
@@ -276,4 +281,5 @@ SECTIONS
 
   ASSERT(__StackLimit >= __HeapLimit, "region m_dtcm overflowed with stack and heap")
 }
+
 

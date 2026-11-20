@@ -113,3 +113,4 @@ typedef struct __attribute__((packed)) {
 
 uint16_t esp_hosted_checksum(esp_header_t *esp_header);
 #endif // MICROPY_INCLUDED_DRIVERS_ESP_HOSTED_INTERNAL_H
+

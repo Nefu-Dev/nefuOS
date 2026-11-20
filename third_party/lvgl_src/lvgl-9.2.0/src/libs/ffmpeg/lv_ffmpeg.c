@@ -866,3 +866,4 @@ static void lv_ffmpeg_player_destructor(const lv_obj_class_t * class_p,
 }
 
 #endif /*LV_USE_FFMPEG*/
+

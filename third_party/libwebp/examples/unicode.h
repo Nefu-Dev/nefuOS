@@ -114,3 +114,4 @@
   } while (0)
 
 #endif  // WEBP_EXAMPLES_UNICODE_H_
+

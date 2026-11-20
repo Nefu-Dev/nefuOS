@@ -169,3 +169,4 @@ void machine_pin_config(const machine_pin_obj_t *self, uint8_t mode,
 uint32_t pin_generate_config(const uint32_t pull, const uint32_t mode, const uint32_t drive, uint32_t config_register);
 
 #endif // MICROPY_INCLUDED_MIMXRT_PIN_H
+

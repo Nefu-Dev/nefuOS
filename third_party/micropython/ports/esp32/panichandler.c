@@ -66,3 +66,4 @@ void MICROPY_WRAP_PANICHANDLER_FUN(__wrap_esp_panic_handler)(void *info) {
 
     __real_esp_panic_handler(info);
 }
+

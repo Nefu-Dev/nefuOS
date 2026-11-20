@@ -89,3 +89,4 @@ void lv_sysmon_hide_memory(lv_display_t * disp);
 #endif
 
 #endif /*LV_SYSMON_H*/
+

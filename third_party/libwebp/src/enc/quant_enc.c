@@ -1398,3 +1398,4 @@ int VP8Decimate(VP8EncIterator* WEBP_RESTRICT const it,
   VP8SetSkip(it, is_skipped);
   return is_skipped;
 }
+

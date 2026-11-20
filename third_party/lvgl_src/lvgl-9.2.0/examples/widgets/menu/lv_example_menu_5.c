@@ -199,3 +199,4 @@ static lv_obj_t * create_switch(lv_obj_t * parent, const char * icon, const char
 }
 
 #endif
+

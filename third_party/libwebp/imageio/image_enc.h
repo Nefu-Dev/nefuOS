@@ -94,3 +94,4 @@ int WebPWrite16bAsPGM(FILE* fout, const struct WebPDecBuffer* const buffer);
 #endif
 
 #endif  // WEBP_IMAGEIO_IMAGE_ENC_H_
+

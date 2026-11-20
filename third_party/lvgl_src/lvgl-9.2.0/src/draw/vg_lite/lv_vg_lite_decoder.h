@@ -45,3 +45,4 @@ void lv_vg_lite_decoder_deinit(void);
 #endif
 
 #endif /*LV_VG_LITE_DECODER_H*/
+

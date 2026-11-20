@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # nefuOS hard-disk boot sector (FAT32 reader, loaded via Windows BCD
 # BOOTSECTOR entry at 0x7C00 with DL = boot disk).
 # Finds first FAT32 partition, scans root dir first sector for KERNEL.BIN,
@@ -235,3 +240,4 @@ wbsy:
 
 .org 0x1FE
     .word 0xAA55
+

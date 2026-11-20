@@ -348,3 +348,4 @@ const USBD_StorageTypeDef usbd_msc_fops = {
 };
 
 #endif // MICROPY_HW_USB_MSC
+

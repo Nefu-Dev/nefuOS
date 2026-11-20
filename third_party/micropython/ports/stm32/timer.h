@@ -40,3 +40,4 @@ void timer_irq_handler(uint tim_id);
 TIM_HandleTypeDef *pyb_timer_get_handle(mp_obj_t timer);
 
 #endif // MICROPY_INCLUDED_STM32_TIMER_H
+

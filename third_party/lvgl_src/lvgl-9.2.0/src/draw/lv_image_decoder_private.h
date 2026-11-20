@@ -140,3 +140,4 @@ void lv_image_decoder_deinit(void);
 #endif
 
 #endif /*LV_IMAGE_DECODER_PRIVATE_H*/
+

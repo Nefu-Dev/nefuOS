@@ -34,3 +34,4 @@ BSP_CMSE_NONSECURE_ENTRY void template_nonsecure_callable() {
 }
 
 #endif
+

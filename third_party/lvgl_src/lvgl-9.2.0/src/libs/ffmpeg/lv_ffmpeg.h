@@ -95,3 +95,4 @@ void lv_ffmpeg_player_set_auto_restart(lv_obj_t * obj, bool en);
 #endif
 
 #endif /*LV_FFMPEG_H*/
+

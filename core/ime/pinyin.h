@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS built-in Pinyin IME (Chinese input method)
 // A self-contained pinyin -> hanzi input engine with a built-in common-word
 // dictionary. Toggle with Ctrl+Space. Works in the editor, the terminal and
@@ -28,3 +33,4 @@ void paint(struct Surface& fb);
 
 } // namespace ime
 } // namespace nefu
+

@@ -133,3 +133,4 @@ mp_import_stat_t mp_find_frozen_module(const char *str, int *frozen_type, void *
 }
 
 #endif // MICROPY_MODULE_FROZEN
+

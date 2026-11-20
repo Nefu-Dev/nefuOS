@@ -192,3 +192,4 @@ static inline const char * lv_version_info(void)
 #endif
 
 #endif /*LVGL_H*/
+

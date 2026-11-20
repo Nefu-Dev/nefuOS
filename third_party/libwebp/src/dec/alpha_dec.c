@@ -237,3 +237,4 @@ WEBP_NODISCARD const uint8_t* VP8DecompressAlphaRows(VP8Decoder* const dec,
   WebPDeallocateAlphaMemory(dec);
   return NULL;
 }
+

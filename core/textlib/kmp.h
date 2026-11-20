@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — string search (KMP, Boyer-Moore-Horspool)
 // KMP：预处理模式串的 next 表，O(n+m) 单遍扫描。
 // BMH：坏字符启发式，平均最快的最简单工程实现。
@@ -23,3 +28,4 @@ int search_self_test();
 
 } // namespace text
 } // namespace nefu
+

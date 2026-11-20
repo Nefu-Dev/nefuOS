@@ -385,3 +385,4 @@ static status_t PHY_RTL8211F_MMD_Write(phy_handle_t *handle, uint8_t device, uin
     }
     return result;
 }
+

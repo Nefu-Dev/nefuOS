@@ -371,3 +371,4 @@ static lv_result_t outline_delete(lv_freetype_context_t * ctx, lv_freetype_outli
 }
 
 #endif /*LV_USE_FREETYPE*/
+

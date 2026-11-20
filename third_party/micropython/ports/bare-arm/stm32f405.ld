@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* GNU linker script for STM32F405 */
 
 MEMORY
@@ -56,3 +61,4 @@ SECTIONS
         _heap_start = .;
     } >RAM
 }
+

@@ -797,3 +797,4 @@ static void scroll_area_into_view(const lv_area_t * area, lv_obj_t * child, lv_p
     scroll_value->y += anim_en == LV_ANIM_OFF ? 0 : y_scroll;
     lv_obj_scroll_by(parent, x_scroll, y_scroll, anim_en);
 }
+

@@ -1,118 +1,120 @@
-// LVGL-compatible CJK font wrapper.
-// Wraps our built-in 8x16 ASCII + 16x16 CJK bitmap fonts into lv_font_t format
-// so LVGL labels can render Chinese characters without showing tofu boxes.
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// LVGL 9 glyph source for the built-in CJK bitmap font.
+//
+// The desktop is bilingual (T("中文","English") in the UI code), but LVGL's
+// bundled Montserrat fonts only carry Latin glyphs: as soon as g_settings.lang
+// switched to Chinese every label turned into tofu boxes and, because the
+// placeholder cell is wider than the icon card, the text appeared to vanish.
+//
+// This file exposes lv_font_cjk_16: a 16px font whose CJK glyphs come from the
+// complete GB2312 table in core/apps/cjk_font.h (7445 code points, 16x16 1bpp)
+// and whose ASCII glyphs are delegated to Montserrat through the LVGL fallback
+// chain, so English keeps the same look it had before.
+//
+// Metrics are deliberately identical to lv_font_montserrat_16 so Chinese and
+// Latin share one baseline inside the same line:
+//   line_height = 18, base_line = 3, box 16x16, ofs_y = 0  ->  the cell fills
+//   y = pos-1 .. pos+14 with the baseline at pos+15, i.e. CJK and Latin share a line.
 #include "lvgl.h"
-// External declarations (avoid multiple definition from font.h)
+#include "lv_cjk_font.h"
+#include "../apps/cjk_font.h"   // g_cjk_count / g_cjk_uni[] / g_cjk_bits[]
+
+LV_FONT_DECLARE(lv_font_montserrat_16);
+
+// optional diagnostics: build with -DNEFU_CJK_TRACE to log unresolved code
+// points (symbols like U+F00D come from the Montserrat fallback on purpose).
+#ifdef NEFU_CJK_TRACE
+#include <cstdio>
+#define CJK_TRACE(...) fprintf(stderr, "[cjk] " __VA_ARGS__)
+#else
+#define CJK_TRACE(...) do {} while (0)
+#endif
+
 namespace nefu {
-extern const unsigned char font8x16[96][16];
+
+// glyph cell geometry (see the comment block above)
+static const int CJK_CELL = 16;
+static const int CJK_OFS_Y = 0;      // see letter_coords.y1 in lv_draw_label.c:405
+
+// g_cjk_uni is ascending, so a plain binary search is enough.
+static int cjk_index(uint32_t uc) {
+    int lo = 0, hi = g_cjk_count - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) >> 1;
+        uint32_t v = (uint32_t)g_cjk_uni[mid];
+        if (v == uc) return mid;
+        if (v < uc) lo = mid + 1; else hi = mid - 1;
+    }
+    return -1;
 }
-#include "../gui/gfx.h"
-
-namespace nefu {
-
-// Forward declarations from gfx.cpp
-uint32_t utf8_next(const char*& p);
-const uint8_t* glyph16(uint32_t uc);
 
 static bool lv_cjk_get_glyph_dsc(const lv_font_t* font, lv_font_glyph_dsc_t* dsc_out,
-                                  uint32_t letter, uint32_t letter_next) {
-    (void)font; (void)letter_next;
-    memset(dsc_out, 0, sizeof(*dsc_out));
+                                 uint32_t letter, uint32_t letter_next) {
+    (void)letter_next;
+    // ASCII and control codes: let the Montserrat fallback render them.
+    if (letter < 0x80) return false;
+    int idx = cjk_index(letter);
+    if (idx < 0) return false;          // unknown -> Montserrat fallback / placeholder
 
-    if (letter < 0x80) {
-        // ASCII: 8x16
-        dsc_out->box_w = 8;
-        dsc_out->box_h = 16;
-        dsc_out->adv_w = 8;
-        dsc_out->ofs_x = 0;
-        dsc_out->ofs_y = 0;
-        dsc_out->format = LV_FONT_GLYPH_FORMAT_A8;
-        dsc_out->gid.index = letter;
-    } else {
-        // CJK: 16x16
-        const uint8_t* d = gfx::glyph16(letter);
-        if (!d) {
-            // Not found: return placeholder
-            dsc_out->box_w = 16;
-            dsc_out->box_h = 16;
-            dsc_out->adv_w = 16;
-            dsc_out->is_placeholder = 1;
-            return true;
-        }
-        dsc_out->box_w = 16;
-        dsc_out->box_h = 16;
-        dsc_out->adv_w = 16;
-        dsc_out->ofs_x = 0;
-        dsc_out->ofs_y = 0;
-        dsc_out->format = LV_FONT_GLYPH_FORMAT_A8;
-        dsc_out->gid.index = letter;
-    }
+    dsc_out->box_w = (uint16_t)CJK_CELL;
+    dsc_out->box_h = (uint16_t)CJK_CELL;
+    dsc_out->adv_w = (uint16_t)CJK_CELL;
+    dsc_out->ofs_x = 0;
+    dsc_out->ofs_y = (int16_t)CJK_OFS_Y;
+    dsc_out->format = LV_FONT_GLYPH_FORMAT_A1;
+    dsc_out->is_placeholder = 0;
+    dsc_out->gid.index = (uint32_t)idx;
     dsc_out->resolved_font = font;
     return true;
 }
 
+// LVGL 9 bitmap-font contract (src/draw/sw/lv_draw_sw_letter.c:94): the value
+// returned here is cast back to lv_draw_buf_t*, and the mask is read from
+// draw_buf->data with draw_buf->header.stride. So we must unpack the A1 rows
+// into the caller's A8 scratch buffer and hand back the buffer itself - NOT a
+// pointer into the packed rodata (doing that used to dereference a fake header
+// and fault the process).
 static const void* lv_cjk_get_glyph_bitmap(lv_font_glyph_dsc_t* dsc, lv_draw_buf_t* draw_buf) {
-    (void)draw_buf;
-    // For simplicity, we render on-the-fly. But LVGL expects a bitmap pointer.
-    // This is a simplified approach: we use a static buffer (not thread-safe but OK for single-core).
-    static uint8_t s_bitmap[16 * 16]; // max glyph size
-
-    uint32_t letter = dsc->gid.index;
-    memset(s_bitmap, 0, sizeof(s_bitmap));
-
-    if (letter < 0x80) {
-        // ASCII 8x16
-        int idx = ((unsigned char)letter >= 32 && (unsigned char)letter <= 127)
-                  ? (int)letter - 32 : 0;
-        for (int row = 0; row < 16; row++) {
-            unsigned char b = nefu::font8x16[idx][row];
-            for (int col = 0; col < 8; col++) {
-                if (b & (0x80 >> col)) {
-                    s_bitmap[row * 8 + col] = 0xFF;
-                }
-            }
-        }
-    } else {
-        // CJK 16x16
-        const uint8_t* d = gfx::glyph16(letter);
-        if (d) {
-            for (int row = 0; row < 16; row++) {
-                unsigned short b = (unsigned short)((d[row * 2] << 8) | d[row * 2 + 1]);
-                for (int col = 0; col < 16; col++) {
-                    if (b & (0x8000 >> col)) {
-                        s_bitmap[row * 16 + col] = 0xFF;
-                    }
-                }
-            }
-        }
+    uint32_t idx = dsc->gid.index;
+    if (draw_buf == NULL || (int)idx >= g_cjk_count) return NULL;
+    uint8_t* out = draw_buf->data;
+    uint32_t stride = draw_buf->header.stride;
+    const uint8_t* src = &g_cjk_bits[(size_t)idx * 32u];   // 16 rows x 2 bytes, MSB left
+    for (int y = 0; y < CJK_CELL; y++) {
+        const uint8_t* row = src + (size_t)y * 2u;
+        uint8_t* dst = out + (size_t)y * stride;
+        for (int x = 0; x < CJK_CELL; x++)
+            dst[x] = (row[x >> 3] & (uint8_t)(0x80u >> (x & 7))) ? 0xFF : 0x00;
     }
-    return s_bitmap;
+    return draw_buf;
 }
 
 static void lv_cjk_release_glyph(const lv_font_t* font, lv_font_glyph_dsc_t* dsc) {
-    (void)font; (void)dsc;
-    // Nothing to release (static buffer)
+    (void)font; (void)dsc;   // static rodata: nothing to release
 }
 
-// The CJK-enabled font object
 lv_font_t lv_font_cjk_16 = {
     .get_glyph_dsc = lv_cjk_get_glyph_dsc,
     .get_glyph_bitmap = lv_cjk_get_glyph_bitmap,
     .release_glyph = lv_cjk_release_glyph,
-    .line_height = 16,
-    .base_line = 16,
+    .line_height = 18,          // same as montserrat_16
+    .base_line = 3,             // same as montserrat_16
     .subpx = LV_FONT_SUBPX_NONE,
-    .kerning = 0,
-    .underline_position = 0,
-    .underline_thickness = 0,
+    .kerning = LV_FONT_KERNING_NORMAL,
+    .underline_position = -1,
+    .underline_thickness = 1,
     .dsc = NULL,
-    .fallback = NULL, // Will be set to Montserrat for Latin chars
+    .fallback = &lv_font_montserrat_16,   // Latin + missing code points
     .user_data = NULL,
 };
 
-// Initialize: set fallback to Montserrat
+// Kept for callers that used to inject the fallback at runtime.
 void lv_cjk_font_init(lv_font_t* fallback) {
-    lv_font_cjk_16.fallback = fallback;
+    if (fallback) lv_font_cjk_16.fallback = fallback;
 }
 
 } // namespace nefu

@@ -172,3 +172,4 @@ int nimble_sprintf(char *str, const char *fmt, ...);
 #define MYNEWT_VAL_NEWT_FEATURE_LOGCFG (1)
 
 #endif // MICROPY_INCLUDED_EXTMOD_NIMBLE_SYSCFG_H
+

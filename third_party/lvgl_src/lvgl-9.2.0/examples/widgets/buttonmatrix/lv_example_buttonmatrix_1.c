@@ -30,3 +30,4 @@ void lv_example_buttonmatrix_1(void)
 }
 
 #endif
+

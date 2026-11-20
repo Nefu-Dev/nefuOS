@@ -25,3 +25,4 @@ static inline int usbd_hid_rx_num(usbd_hid_itf_t *hid) {
 int usbd_hid_rx(usbd_hid_itf_t *hid, size_t len, uint8_t *buf, uint32_t timeout_ms);
 
 #endif // MICROPY_INCLUDED_STM32_USBD_HID_INTERFACE_H
+

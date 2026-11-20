@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 服务管理模块
 // 服务注册 / 启动 / 停止 / 状态 / 依赖管理 / 看门狗。
 // 服务是后台守护进程的抽象：这里只维护状态机与依赖图，真正的服务体由
@@ -95,3 +100,4 @@ extern ServiceManager g_svcmgr;
 
 } // namespace sysutil
 } // namespace nefu
+

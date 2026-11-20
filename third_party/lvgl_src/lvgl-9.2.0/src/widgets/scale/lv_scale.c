@@ -1502,3 +1502,4 @@ static void scale_free_line_needle_points_cb(lv_event_t * e)
 }
 
 #endif
+

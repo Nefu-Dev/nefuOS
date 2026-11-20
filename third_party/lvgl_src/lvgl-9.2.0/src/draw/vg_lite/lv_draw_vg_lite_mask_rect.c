@@ -147,3 +147,4 @@ void lv_draw_vg_lite_mask_rect(lv_draw_unit_t * draw_unit, const lv_draw_mask_re
  **********************/
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

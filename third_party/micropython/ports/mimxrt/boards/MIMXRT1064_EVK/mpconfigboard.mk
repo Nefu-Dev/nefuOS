@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = MIMXRT1064
 MCU_VARIANT = MIMXRT1064DVL6A
 
@@ -18,3 +23,4 @@ JLINK_PATH ?= /media/RT1064-EVK/
 
 deploy: $(BUILD)/firmware.bin
 	cp $< $(JLINK_PATH)
+

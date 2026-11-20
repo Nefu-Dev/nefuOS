@@ -129,3 +129,4 @@ void machine_pin_ext_config(machine_pin_obj_t *self, int mode, int value) {
 }
 
 #endif // defined(MICROPY_PY_NETWORK_NINAW10) && defined(MICROPY_HW_PIN_EXT_COUNT)
+

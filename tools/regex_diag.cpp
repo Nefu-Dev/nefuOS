@@ -1,4 +1,9 @@
-﻿#include "textlib/regexlite.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "textlib/regexlite.h"
 #include <cstdio>
 int main() {
     printf("rx-star=%d\n", nefu::text::regex_match("ab*c", "ac"));
@@ -9,3 +14,4 @@ int main() {
     printf("rx-email=%d\n", nefu::text::regex_match("\\w+@\\w+\\.\\w+", "a@b.com"));
     return 0;
 }
+

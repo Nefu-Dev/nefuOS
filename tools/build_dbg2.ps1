@@ -278,9 +278,9 @@ foreach ($m in $mpSrc) {
 }
 # Write response file to avoid Windows 32K command-line limit
 $respFile = Join-Path $bareOut "host_sources.rsp"
-$allSrc = $coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp") + $lvglHostObjs
+$allSrc = $coreSrc + @("backends\win32\win32.cpp", "backends\win32\ws_win32.cpp", "backends\win32\media_win32.cpp") + $lvglHostObjs
 $respContent = ($allSrc | ForEach-Object { '"' + $_ + '"' }) -join "`r`n"
 [IO.File]::WriteAllText($respFile, $respContent, (New-Object Text.UTF8Encoding $false))
-& $g -std=c++17 -O0 -g -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -DNEFU_DUMP_REC -I core -I third_party @lvglInclude "-Wl,--stack,16777216" -o $hostExe "@$respFile" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32
+& $g -std=c++17 -O0 -g -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -DNEFU_DUMP_REC -I core -I third_party @lvglInclude "-Wl,--stack,16777216" -o $hostExe "@$respFile" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinhttp -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32
 if ($LASTEXITCODE -ne 0) { throw "host build failed" }
 Write-Output "host exe OK: $((Get-Item $hostExe).Length) bytes -> $hostExe"

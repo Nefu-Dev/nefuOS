@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习实验室 —— 窗口应用
 // 参考 algoviz.cpp 模式：create_window + on_paint/on_key/on_close。
 // 展示内容：合成二维数据集上的 K-Means 聚类可视化（散点按簇着色，质心画十字）。
@@ -105,7 +110,7 @@ static void mllab_close(Window* w) {
 void mllab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("ML Lab", x, y, mlapp::W, mlapp::H);
+    Window* w = g_wm->create_window(T("机器学习实验室", "ML Lab"), x, y, mlapp::W, mlapp::H);
     if (!w) return;
     mlapp::MlLab* m = new mlapp::MlLab();
     m->k = 3;
@@ -118,3 +123,4 @@ void mllab_launch() {
 }
 
 } // namespace nefu
+

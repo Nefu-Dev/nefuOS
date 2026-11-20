@@ -1,4 +1,9 @@
-﻿// ui.h —— 游戏 UI：按钮、进度条、血条、对话框、菜单、文本渲染、9 宫格面板
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ui.h —— 游戏 UI：按钮、进度条、血条、对话框、菜单、文本渲染、9 宫格面板
 //
 // 纯逻辑在 .cpp（布局/命中测试/状态机）；渲染 inline 在头文件。
 #pragma once
@@ -393,3 +398,4 @@ int ui_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

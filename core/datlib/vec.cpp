@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — vec self test & extra helpers
 // 本文件提供 vec 的宿主自测（在宿主环境实例化 int/指针 两种模板），
 // 以及若干便捷工具函数（仅 int 特化版，避免模板膨胀）。
@@ -150,3 +155,4 @@ int vec_self_test() {
 
 } // namespace dt
 } // namespace nefu
+

@@ -358,3 +358,4 @@ int main(int argc, const char* argv[]) {
   ExUtilDeleteCommandLineArguments(&cmd_args);
   FREE_WARGV_AND_RETURN(ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
+

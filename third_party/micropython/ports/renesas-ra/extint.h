@@ -45,3 +45,4 @@ void extint_trigger_mode(uint line, uint32_t mode);
 extern const mp_obj_type_t extint_type;
 
 #endif // MICROPY_INCLUDED_RA_EXTINT_H
+

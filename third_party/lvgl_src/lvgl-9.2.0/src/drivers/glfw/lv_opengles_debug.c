@@ -56,3 +56,4 @@ bool GLLogCall(const char * function, const char * file, int line)
  **********************/
 
 #endif /* LV_USE_OPENGLES */
+

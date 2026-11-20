@@ -233,3 +233,4 @@ void TaskScheduler::async(bool on)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

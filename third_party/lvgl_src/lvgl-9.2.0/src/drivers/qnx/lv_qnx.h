@@ -84,3 +84,4 @@ int lv_qnx_event_loop(lv_display_t * disp);
 #endif
 
 #endif /* LV_QNX_H */
+

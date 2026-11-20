@@ -529,3 +529,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     print, pyb_i2c_print,
     locals_dict, &pyb_i2c_locals_dict
     );
+

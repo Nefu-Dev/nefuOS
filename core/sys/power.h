@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS power management, lock screen, and autostart subsystem (LVGL based)
 #pragma once
 #include "../platform.h"
@@ -56,3 +61,4 @@ void bsod_handle_mouse(int x, int y, uint8_t buttons);   // Reboot / Recovery hi
 void system_recovery();              // rebuild standard dirs + core files (idempotent)
 
 }
+

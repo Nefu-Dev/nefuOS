@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
     .syntax unified
     .cpu cortex-m4
     .thumb
@@ -17,3 +22,4 @@ bootmgr_run_app:
     @ jump to the entry code
     ldr    r1, [r0]
     bx     r1
+

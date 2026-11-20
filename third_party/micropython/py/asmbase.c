@@ -117,3 +117,4 @@ void mp_asm_base_data(mp_asm_base_t *as, unsigned int bytesize, uintptr_t val) {
 }
 
 #endif // MICROPY_EMIT_MACHINE_CODE
+

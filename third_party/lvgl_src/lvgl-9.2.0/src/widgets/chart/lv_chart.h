@@ -356,3 +356,4 @@ int32_t lv_chart_get_first_point_center_offset(lv_obj_t * obj);
 #endif
 
 #endif /*LV_CHART_H*/
+

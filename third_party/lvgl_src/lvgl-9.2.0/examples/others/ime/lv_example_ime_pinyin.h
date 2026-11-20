@@ -37,3 +37,4 @@ void lv_example_ime_pinyin_2(void);
 #endif
 
 #endif /*LV_EX_IME_PINYIN_H*/
+

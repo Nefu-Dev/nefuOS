@@ -32,3 +32,4 @@ void factory_reset_make_files(FATFS *fatfs);
 int factory_reset_create_filesystem(void);
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_FACTORYRESET_H
+

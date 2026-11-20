@@ -161,3 +161,4 @@ pwm_config_t get_pwm_config(int pin_id, int wanted_dev, uint8_t device_status[])
 }
 
 #endif
+

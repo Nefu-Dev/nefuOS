@@ -67,3 +67,4 @@ mp_lexer_t *mp_lexer_new_from_str32(qstr src_name, const char *str, mp_uint_t le
 }
 
 #endif // MICROPY_ENABLE_COMPILER
+

@@ -312,3 +312,4 @@ static void img_decode_and_draw(lv_draw_unit_t * draw_unit, const lv_draw_image_
         }
     }
 }
+

@@ -560,3 +560,4 @@ void mp_bytecode_print2(const mp_print_t *print, const byte *ip, size_t len, mp_
 }
 
 #endif // MICROPY_DEBUG_PRINTERS
+

@@ -178,3 +178,4 @@ static void _vglite_draw_letter(const lv_area_t * mask_area, lv_color_t color, l
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

@@ -37,3 +37,4 @@ void lv_demo_scroll(void);
 #endif
 
 #endif /*LV_DEMO_SCROLL_H*/
+

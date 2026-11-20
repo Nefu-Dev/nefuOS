@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 3D 图形库 —— 聚合头
 //   #include "gfx3d/gfx3d_all.h"
@@ -40,3 +45,4 @@ inline int gfx3d_self_test() {
 }
 
 }} // namespace
+

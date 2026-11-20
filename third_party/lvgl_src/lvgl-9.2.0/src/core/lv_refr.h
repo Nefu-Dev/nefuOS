@@ -66,3 +66,4 @@ void lv_obj_redraw(lv_layer_t * layer, lv_obj_t * obj);
 #endif
 
 #endif /*LV_REFR_H*/
+

@@ -170,3 +170,4 @@ NORETURN void mp_machine_bootloader(size_t n_args, const mp_obj_t *args) {
         ;
     }
 }
+

@@ -77,3 +77,4 @@ void lv_layout_apply(lv_obj_t * obj)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

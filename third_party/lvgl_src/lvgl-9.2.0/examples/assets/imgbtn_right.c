@@ -75,3 +75,4 @@ const lv_image_dsc_t imagebutton_right = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

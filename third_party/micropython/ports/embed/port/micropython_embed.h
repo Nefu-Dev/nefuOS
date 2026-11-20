@@ -39,3 +39,4 @@ void mp_embed_exec_str(const char *src);
 void mp_embed_exec_mpy(const uint8_t *mpy, size_t len);
 
 #endif // MICROPY_INCLUDED_MICROPYTHON_EMBED_H
+

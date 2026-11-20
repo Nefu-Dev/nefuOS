@@ -1,4 +1,9 @@
-﻿// scene.h —— 场景管理：场景/节点/组件、父子变换、场景切换、暂停/恢复
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// scene.h —— 场景管理：场景/节点/组件、父子变换、场景切换、暂停/恢复
 //
 // 纯逻辑，不依赖 gfxlib。节点树以 List 持有子节点指针。
 #pragma once
@@ -339,3 +344,4 @@ int scene_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

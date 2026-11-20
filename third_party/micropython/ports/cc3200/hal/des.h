@@ -141,3 +141,4 @@ extern void DESDataLengthSet(uint32_t ui32Base, uint32_t ui32Length);
 #endif
 
 #endif //  __DRIVERLIB_DES_H__
+

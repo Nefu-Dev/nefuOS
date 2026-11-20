@@ -77,3 +77,4 @@ extern int mp_interrupt_char;
 int mp_hal_get_interrupt_char(void) {
     return mp_interrupt_char;
 }
+

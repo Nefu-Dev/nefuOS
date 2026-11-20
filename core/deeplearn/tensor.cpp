@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 多维张量实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 多维张量实现
 // 见 tensor.h 说明。
 // 反向节点约定：输入张量以裸指针引用（调用方命名局部，生命期覆盖 backward）；
 // 输出的上游梯度只存堆缓冲指针 go（Tensor move 后堆地址不变），形状标量在前向时捕获。
@@ -1139,3 +1144,4 @@ Tensor t_l2_normalize_rows(const Tensor& x) {
 }
 } // namespace deeplearn
 } // namespace nefu
+

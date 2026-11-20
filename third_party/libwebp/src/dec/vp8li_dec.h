@@ -143,3 +143,4 @@ WEBP_NODISCARD int ReadHuffmanCodesHelper(
 #endif
 
 #endif  // WEBP_DEC_VP8LI_DEC_H_
+

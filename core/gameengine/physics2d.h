@@ -1,4 +1,9 @@
-﻿// physics2d.h —— 2D 刚体物理：AABB/圆/多边形碰撞、解算、重力、摩擦、restitution、关节、射线
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// physics2d.h —— 2D 刚体物理：AABB/圆/多边形碰撞、解算、重力、摩擦、restitution、关节、射线
 //
 // 纯逻辑，不依赖 gfxlib，可独立自测。全部定点 Q16.16。
 #pragma once
@@ -273,3 +278,4 @@ int physics2d_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

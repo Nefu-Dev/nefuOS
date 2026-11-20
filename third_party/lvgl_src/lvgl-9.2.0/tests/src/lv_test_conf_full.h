@@ -157,3 +157,4 @@
 #define LV_USE_DRAW_SW_COMPLEX_GRADIENTS    1
 
 #endif /* LV_TEST_CONF_FULL_H */
+

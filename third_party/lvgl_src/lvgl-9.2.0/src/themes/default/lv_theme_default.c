@@ -1226,3 +1226,4 @@ static void style_init_reset(lv_style_t * style)
 }
 
 #endif
+

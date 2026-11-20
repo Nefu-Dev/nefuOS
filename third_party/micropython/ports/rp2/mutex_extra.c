@@ -52,3 +52,4 @@ void __time_critical_func(recursive_mutex_nowait_exit)(recursive_mutex_nowait_t 
     }
     spin_unlock(mtx->core.spin_lock, save);
 }
+

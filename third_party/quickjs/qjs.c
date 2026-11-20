@@ -566,3 +566,4 @@ int main(int argc, char **argv)
     JS_FreeRuntime(rt);
     return 1;
 }
+

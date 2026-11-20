@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Test payload for boot_hd verification: prints 'P' to debugcon, then halts.
 .code32
 .org 0
@@ -12,3 +17,4 @@ _start:
 
 .org 0xBB8
     .fill 1, 1, 0
+

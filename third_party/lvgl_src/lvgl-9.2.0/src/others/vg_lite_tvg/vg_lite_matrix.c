@@ -160,3 +160,4 @@ vg_lite_error_t vg_lite_rotate(vg_lite_float_t degrees, vg_lite_matrix_t * matri
  **********************/
 
 #endif /*LV_USE_VG_LITE_THORVG*/
+

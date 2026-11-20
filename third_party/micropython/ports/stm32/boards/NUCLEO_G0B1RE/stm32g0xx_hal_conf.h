@@ -20,3 +20,4 @@
 #include "boards/stm32g0xx_hal_conf_base.h"
 
 #endif // MICROPY_INCLUDED_STM32G0XX_HAL_CONF_H
+

@@ -207,3 +207,4 @@ lv_prop_id_t lv_style_property_get_id(const char * name);
 #endif
 
 #endif /*LV_OBJ_PROPERTY_H*/
+

@@ -1495,3 +1495,4 @@ static inline bool is_valid_but_non_printable_char(const uint32_t letter)
 }
 
 #endif
+

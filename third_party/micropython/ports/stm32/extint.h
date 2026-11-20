@@ -83,3 +83,4 @@ void Handle_EXTI_Irq(uint32_t line);
 extern const mp_obj_type_t extint_type;
 
 #endif // MICROPY_INCLUDED_STM32_EXTINT_H
+

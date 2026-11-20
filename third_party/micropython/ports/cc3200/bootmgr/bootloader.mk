@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 BUILD = bootmgr/build/$(BOARD)/$(BTYPE)
 
 BOOT_INC  = -Ibootmgr
@@ -138,3 +143,4 @@ $(HEADER_BUILD)/moduledefs.h: | $(HEADER_BUILD)
 # Create an empty "root_pointers.h" needed by py/mkrules.mk
 $(HEADER_BUILD)/root_pointers.h: | $(HEADER_BUILD)
 	touch $@
+

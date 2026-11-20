@@ -104,3 +104,4 @@ MEMZIP_RESULT memzip_stat(const char *path, MEMZIP_FILE_INFO *info) {
 
     return MZ_OK;
 }
+

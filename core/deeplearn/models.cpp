@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 高阶模型包装实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 高阶模型包装实现
 // MLP/TinyCNN 高阶包装。注意跨函数 forward 后不要直接 backward。
 // 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
@@ -138,3 +143,4 @@ int models_self_test() {
 
 } // namespace deeplearn
 } // namespace nefu
+

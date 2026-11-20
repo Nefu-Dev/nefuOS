@@ -287,3 +287,4 @@ void test_tabview_update_on_external_scroll(void)
 }
 
 #endif
+

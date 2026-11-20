@@ -51,3 +51,4 @@ void PORTENTA_C33_board_enter_bootloader(void) {
     R_SYSTEM->PRCR = (uint16_t)BSP_PRV_PRCR_LOCK;
     NVIC_SystemReset();
 }
+

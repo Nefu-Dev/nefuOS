@@ -271,3 +271,4 @@ static void lv_mem_walker(void * ptr, size_t size, int used, void * user)
     }
 }
 #endif /*LV_STDLIB_BUILTIN*/
+

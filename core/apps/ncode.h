@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  ncode.h — nefuOS ".ncode" scripting language (nefu) runtime interface
 // -----------------------------------------------------------------------------
@@ -46,3 +51,4 @@ bool ncode_run_file(NCOut* out, FSNode* f, const char** args, int argc);
 int ncode_self_test();
 
 } // namespace nefu
+

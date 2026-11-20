@@ -34,3 +34,4 @@ int QuantizeLevels(uint8_t* const data, int width, int height, int num_levels,
 #endif
 
 #endif  // WEBP_UTILS_QUANT_LEVELS_UTILS_H_
+

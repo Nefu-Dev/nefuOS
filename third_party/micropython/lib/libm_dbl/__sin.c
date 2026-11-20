@@ -62,3 +62,4 @@ double __sin(double x, double y, int iy)
 	else
 		return x - ((z*(0.5*y - v*r) - y) - v*S1);
 }
+

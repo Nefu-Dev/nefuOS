@@ -6,3 +6,4 @@
 
 #define MICROPY_HW_I2C0_SCL      (1)
 #define MICROPY_HW_I2C0_SDA      (2)
+

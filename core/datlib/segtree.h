@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — segment tree (segtree)
 // 线段树：把区间分解为 O(log n) 个节点，支持区间查询（和/最值）
 // 与单点更新。经典"分治数据结构"，用于 RMQ、区间和、区间最值等。
@@ -57,3 +62,4 @@ int segtree_self_test();
 
 } // namespace dt
 } // namespace nefu
+

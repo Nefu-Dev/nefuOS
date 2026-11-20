@@ -153,3 +153,4 @@ static void cb_delete_assertion(lv_event_t * event)
 }
 
 #endif /*LV_USE_FRAGMENT*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 // nefuOS 数学扩展库 —— 复数模块实现
 #include "complex.h"
@@ -231,3 +236,4 @@ int complex_self_test() {
 
 } // namespace mathext
 } // namespace nefu
+

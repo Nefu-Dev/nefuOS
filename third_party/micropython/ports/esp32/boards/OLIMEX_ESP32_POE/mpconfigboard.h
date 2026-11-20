@@ -1,2 +1,3 @@
 #define MICROPY_HW_BOARD_NAME "Olimex ESP32 ETH"
 #define MICROPY_HW_MCU_NAME "ESP32"
+

@@ -159,3 +159,4 @@ void mp_thread_finish(void) {
 }
 
 #endif // MICROPY_PY_THREAD
+

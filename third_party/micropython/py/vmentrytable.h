@@ -126,3 +126,4 @@ static const void *const entry_table[256] = {
 #if __GNUC__ >= 5
 #pragma GCC diagnostic pop
 #endif // __GNUC__ >= 5
+

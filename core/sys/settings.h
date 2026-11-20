@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS primary color / wallpaper / configuration, persisted to /etc/settings.conf
 #pragma once
 #include "../vfs/vfs.h"
@@ -16,13 +21,21 @@ struct SysSettings {
     bool boot_splash;     // Show boot splash screen during startup
     int  idle_lock_sec;   // Idle timeout in seconds to auto-lock, 0 = disabled
     int  browser_engine;  // 0 = mini JS engine, 1 = noscript (HTML only)
+    int  tz_offset_min;   // minutes east of UTC (480 = CST-8); see platform.h
+    bool rtc_is_utc;      // what the CMOS clock stores: false = local, true = UTC
     char autostart_apps[256]; // Semicolon-separated list of apps to launch on boot
     SysSettings() : accent(0), wallpaper(0), wallpaper_lock(0), wallpaper_boot(0),
-        show_clock(true), show_taskbar(true), lang(0),
-        lock_on_suspend(true), boot_splash(true), idle_lock_sec(0), browser_engine(0), autostart_apps("") {}
+        show_clock(true), show_taskbar(true), lang(0),   // default UI language: English
+        lock_on_suspend(true), boot_splash(true), idle_lock_sec(0), browser_engine(0),
+        tz_offset_min(480), rtc_is_utc(false), autostart_apps("") {}
 };
 
 extern SysSettings g_settings;
+
+// -1 = use the persisted /etc/settings.conf value, 0/1 = force English or
+// Chinese (host CLI --lang N). Applied after settings_load(), before the UI
+// labels are created.
+extern int g_lang_override;
 
 void settings_load();   // from /etc/settings.conf read
 void settings_save();   // /etc/settings.conf
@@ -41,3 +54,4 @@ inline const char* T(const char* zh, const char* en) {
 }
 
 } // namespace nefu
+

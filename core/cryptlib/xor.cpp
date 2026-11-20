@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — XOR/ROT13/Vigenère implementation
 #include "xor.h"
 #include <stdio.h>
@@ -102,3 +107,4 @@ int xor_self_test() {
 
 } // namespace crypt
 } // namespace nefu
+

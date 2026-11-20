@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/elf/elfrun_selfcheck.cpp
 //
 // Boot-time check of the Linux static-ELF runtime on the bare-metal backend,
@@ -96,3 +101,4 @@ extern "C" void nefu_elf_selfcheck(void) {
 } // namespace elf
 } // namespace nefu
 #endif // NEFU_BARE
+

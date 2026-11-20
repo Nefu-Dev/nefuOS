@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 聚合头
 // 包含本库全部模块，并提供统一的汇总自测入口 netproto_self_test()。
 //
@@ -16,6 +21,7 @@
 #include "dns.h"
 #include "http.h"
 #include "websocket.h"
+#include "colyseus.h"
 #include "mqtt.h"
 #include "dhcp.h"
 #include "socket.h"
@@ -35,3 +41,4 @@ int netproto_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

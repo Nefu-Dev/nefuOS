@@ -705,3 +705,4 @@ static bool is_end_with(const char * str1, const char * str2)
 }
 
 #endif  /*LV_USE_FILE_EXPLORER*/
+

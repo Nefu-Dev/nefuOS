@@ -245,3 +245,4 @@ int mp_semihosting_elapsed(mp_semihosting_elapsed_ticks_t *ticks);
 int mp_semihosting_tickfreq(void);
 
 #endif // MICROPY_INCLUDED_SHARED_SEMIHOSTING_RUNTIME_RV32_H
+

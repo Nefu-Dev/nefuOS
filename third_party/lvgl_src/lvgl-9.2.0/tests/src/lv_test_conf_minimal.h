@@ -24,3 +24,4 @@
 #define  LV_USE_QRCODE                  1
 
 #endif /* LV_TEST_CONF_MINIMAL_H */
+

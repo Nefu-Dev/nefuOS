@@ -39,3 +39,4 @@ void mperror_enable_heartbeat (bool enable);
 bool mperror_is_heartbeat_enabled (void);
 
 #endif // MICROPY_INCLUDED_CC3200_MISC_MPERROR_H
+

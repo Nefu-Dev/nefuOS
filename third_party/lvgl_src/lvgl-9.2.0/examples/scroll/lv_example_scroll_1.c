@@ -41,3 +41,4 @@ void lv_example_scroll_1(void)
 }
 
 #endif
+

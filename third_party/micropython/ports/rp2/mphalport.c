@@ -278,3 +278,4 @@ void mp_wfe_or_timeout(uint32_t timeout_ms) {
     // Clean up the timer node if it's not already
     soft_timer_remove(&timer);
 }
+

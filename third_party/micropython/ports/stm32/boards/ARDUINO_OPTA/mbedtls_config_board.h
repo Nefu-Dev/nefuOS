@@ -6,3 +6,4 @@
 #include "ports/stm32/mbedtls/mbedtls_config_port.h"
 
 #endif /* MICROPY_INCLUDED_MBEDTLS_CONFIG_BOARD_H */
+

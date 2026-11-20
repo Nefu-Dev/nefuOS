@@ -392,3 +392,4 @@ lv_display_t * lv_x11_window_create(char const * title, int32_t hor_res, int32_t
 }
 
 #endif /*LV_USE_X11*/
+

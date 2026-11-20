@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/klib/stdio_bare.cpp
 //
 // Bare-kernel stdio shims for the C FILE APIs.  The host build's debugging
@@ -115,3 +120,4 @@ void* __imp_IsDebuggerPresent = (void*)(uintptr_t)&stub_ul_0;
 } // extern "C"
 
 #endif // NEFU_BARE
+

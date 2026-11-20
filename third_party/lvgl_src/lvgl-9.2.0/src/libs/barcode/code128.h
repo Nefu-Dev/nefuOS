@@ -45,3 +45,4 @@ size_t code128_encode_raw(const char * s, char * out, size_t maxlength);
 #endif
 
 #endif // CODE128_H
+

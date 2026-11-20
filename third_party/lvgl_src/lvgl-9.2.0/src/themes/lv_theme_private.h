@@ -51,3 +51,4 @@ struct lv_theme_t {
 #endif
 
 #endif /*LV_THEME_PRIVATE_H*/
+

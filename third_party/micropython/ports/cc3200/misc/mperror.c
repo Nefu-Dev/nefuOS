@@ -208,3 +208,4 @@ void mperror_enable_heartbeat (bool enable) {
 bool mperror_is_heartbeat_enabled (void) {
     return mperror_heart_beat.enabled;
 }
+

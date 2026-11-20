@@ -62,3 +62,4 @@ static mp_obj_t mp_time_time_get(void) {
         & (t.year < 2000 ? 0xffffffff : 0xffffffffffff)
         );
 }
+

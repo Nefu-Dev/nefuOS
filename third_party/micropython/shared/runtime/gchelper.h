@@ -50,3 +50,4 @@ typedef uintptr_t gc_helper_regs_t[12]; // S0-S11
 void gc_helper_collect_regs_and_stack(void);
 
 #endif // MICROPY_INCLUDED_LIB_UTILS_GCHELPER_H
+

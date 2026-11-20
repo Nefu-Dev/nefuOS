@@ -336,3 +336,4 @@ static inline size_t mp_bytecode_get_source_line(const byte *line_info, const by
 }
 
 #endif // MICROPY_INCLUDED_PY_BC_H
+

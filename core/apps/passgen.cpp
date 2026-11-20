@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Password Generator
 #include "apps.h"
 #include "../gui/wm.h"
@@ -84,7 +89,7 @@ static void passgen_mouse(Window* w, int mx, int my, uint8_t buttons) {
 void passgen_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Password Generator", x, y, 280, 240);
+    Window* w = g_wm->create_window(T("密码生成器", "Password Generator"), x, y, 280, 240);
     if (!w) return;
     PassGenState* st = new PassGenState();
     st->w = w->content_w;
@@ -99,3 +104,4 @@ void passgen_launch() {
 }
 
 } // namespace nefu
+

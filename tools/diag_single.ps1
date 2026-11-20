@@ -1,4 +1,4 @@
-﻿# ： File Manager， stdout
+# ： File Manager， stdout
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

@@ -408,3 +408,4 @@ int WebPEncode(const WebPConfig* config, WebPPicture* pic) {
 
   return ok;
 }
+

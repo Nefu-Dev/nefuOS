@@ -591,3 +591,4 @@ int i2c_find_peripheral(mp_obj_t id) {
 }
 
 #endif // MICROPY_HW_ENABLE_HW_I2C
+

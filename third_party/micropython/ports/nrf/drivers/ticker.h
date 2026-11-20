@@ -60,3 +60,4 @@ void ticker_register_low_pri_callback(callback_ptr callback);
 #define MILLISECONDS_PER_MACRO_TICK 6
 
 #endif // __MICROPY_INCLUDED_LIB_TICKER_H__
+

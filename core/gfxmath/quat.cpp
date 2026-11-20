@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 四元数实现 + 自测
 #include "gfxmath/quat.h"
 #include <cstdio>
@@ -119,3 +124,4 @@ int Quat::self_test() {
 
 } // namespace gfx
 } // namespace nefu
+

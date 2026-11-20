@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— 物理仿真 (Physics)
 // 包含：
 //   - 刚体 (位置/速度/角速度/质量/转动惯量)
@@ -140,3 +145,4 @@ int physics_self_test();
 
 } // namespace simulate
 } // namespace nefu
+

@@ -56,3 +56,4 @@ void lv_example_snapshot_1(void)
 }
 
 #endif
+

@@ -698,3 +698,4 @@ static mp_obj_t os_mbfs_stat(mp_obj_t filename) {
 MP_DEFINE_CONST_FUN_OBJ_1(os_mbfs_stat_obj, os_mbfs_stat);
 
 #endif // MICROPY_MBFS
+

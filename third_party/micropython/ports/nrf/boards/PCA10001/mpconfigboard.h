@@ -53,3 +53,4 @@
 #define MICROPY_HW_UART1_HWFC       (0)
 
 #define HELP_TEXT_BOARD_LED         "1,2"
+

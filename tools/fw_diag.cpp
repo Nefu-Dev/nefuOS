@@ -1,4 +1,9 @@
-﻿#include "datlib/fenwick.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "datlib/fenwick.h"
 #include <cstdio>
 int main() {
     int a[] = {3, 1, 4, 1, 5, 9, 2, 6};
@@ -19,3 +24,4 @@ int main() {
     printf("DONE\n");
     return 0;
 }
+

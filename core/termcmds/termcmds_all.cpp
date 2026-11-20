@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  termcmds_all.cpp —— 聚合头的实现: 微型格式化器 / glob / 全局状态 / 汇总测试
 // =============================================================================
@@ -161,3 +166,4 @@ int termcmds_self_test() {
 
 } // namespace termcmds
 } // namespace nefu
+

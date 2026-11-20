@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // minesweeper2.cpp —— nefuOS 高级扫雷
 //
 // 玩法：
@@ -286,7 +291,7 @@ void minesweeper2_launch() {
     // 窗口尺寸按难度算
     int pw = g->w * CELL;
     int ph = g->h * CELL + 40;
-    Window* w = g_wm->create_window("Minesweeper Pro", x, y, pw, ph);
+    Window* w = g_wm->create_window(T("扫雷专业版", "Minesweeper Pro"), x, y, pw, ph);
     if (!w) return;
     w->userdata = g;
     w->on_paint = ms_paint;
@@ -297,3 +302,4 @@ void minesweeper2_launch() {
 }
 
 } // namespace nefu
+

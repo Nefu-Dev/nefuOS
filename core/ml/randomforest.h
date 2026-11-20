@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 随机森林
 // 多棵决策树集成：每棵树用自助采样（bootstrap）训练，分裂时随机挑选特征子集。
 // 预测：分类多数表决；回归：平均。带 OOB（袋外）误差估计。
@@ -36,3 +41,4 @@ int randomforest_self_test();
 
 } // namespace ml
 } // namespace nefu
+

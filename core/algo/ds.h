@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data structure library
 // Classic containers implemented from scratch on plain arrays / nodes —
 // no STL, no heap fragmentation beyond explicit new/delete per node.
@@ -299,3 +304,4 @@ int ds_self_test();
 
 } // namespace algo
 } // namespace nefu
+

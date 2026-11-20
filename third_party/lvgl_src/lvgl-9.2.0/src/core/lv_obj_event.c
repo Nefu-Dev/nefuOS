@@ -417,3 +417,4 @@ static bool event_is_bubbled(lv_event_t * e)
             return true;
     }
 }
+

@@ -170,3 +170,4 @@ static inline int lre_is_space(uint32_t c) {
 #endif
 
 #endif /* LIBUNICODE_H */
+

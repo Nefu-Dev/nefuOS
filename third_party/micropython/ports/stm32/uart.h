@@ -112,3 +112,4 @@ static inline bool uart_tx_avail(machine_uart_obj_t *self) {
 }
 
 #endif // MICROPY_INCLUDED_STM32_UART_H
+

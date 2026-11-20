@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — PBKDF2 implementation
 #include "pbkdf2.h"
 #include "hmac.h"
@@ -94,3 +99,4 @@ int pbkdf2_self_test() {
 
 } // namespace crypt
 } // namespace nefu
+

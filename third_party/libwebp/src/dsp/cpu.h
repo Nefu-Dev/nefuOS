@@ -264,3 +264,4 @@ typedef enum {
 typedef int (*VP8CPUInfo)(CPUFeature feature);
 
 #endif  // WEBP_DSP_CPU_H_
+

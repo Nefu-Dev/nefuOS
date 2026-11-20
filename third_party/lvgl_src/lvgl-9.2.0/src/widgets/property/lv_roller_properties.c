@@ -23,3 +23,4 @@ const lv_property_name_t lv_roller_property_names[3] = {
 
 /* *INDENT-ON* */
 #endif
+

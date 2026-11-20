@@ -179,3 +179,4 @@ void uzlib_finish_block(uzlib_lz77_state_t *state)
     // Make sure all bits are flushed (0b0000000)
     outbits(state, 0, 14);
 }
+

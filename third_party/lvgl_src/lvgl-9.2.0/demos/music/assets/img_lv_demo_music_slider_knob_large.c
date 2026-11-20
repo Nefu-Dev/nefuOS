@@ -91,3 +91,4 @@ const lv_image_dsc_t img_lv_demo_music_slider_knob = {
 };
 
 #endif
+

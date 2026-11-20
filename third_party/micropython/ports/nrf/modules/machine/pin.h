@@ -97,3 +97,4 @@ const pin_af_obj_t *pin_find_af_by_index(const pin_obj_t *pin, mp_uint_t af_idx)
 const pin_af_obj_t *pin_find_af_by_name(const pin_obj_t *pin, const char *name);
 
 #endif // __MICROPY_INCLUDED_NRF5_PIN_H__
+

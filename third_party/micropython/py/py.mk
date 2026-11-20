@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # where py object files go (they have a name prefix to prevent filename clashes)
 PY_BUILD = $(BUILD)/py
 
@@ -278,3 +283,4 @@ $(PY_BUILD)/vm.o: CFLAGS += $(CSUPEROPT)
 # http://hg.python.org/cpython/file/b127046831e2/Python/ceval.c#l828
 # http://www.emulators.com/docs/nx25_nostradamus.htm
 #-fno-crossjumping
+

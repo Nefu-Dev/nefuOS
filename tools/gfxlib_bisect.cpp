@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // bisect which raster call blows the stack
 #include "gfxlib/raster.h"
 #include <cstdio>
@@ -44,3 +49,4 @@ int main() {
     std::printf("ALL DONE\n");
     return 0;
 }
+

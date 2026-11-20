@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS (x86_64, QEMU/)
 // platform implementation: LFB, PIT, PS/2 +, RTC, UART debug,
 #include <stdint.h>
@@ -7,6 +12,9 @@
 #include "../../core/gui/gfx.h"   // full Surface definition
 #include "../../core/audio/audio_engine.h"   // integer audio engine (PCI sound cards)
 #include "../../core/net/httpbare.h"   // bare-metal HTTP(S) client for npkg/update
+#include "../../core/net/tls13.h"       // native TLS 1.3 client (socket-agnostic)
+#include "../../core/netproto/websocket.h" // RFC 6455 framing helpers
+#include "../../core/drivers/display.h"    // GPU driver: PCI display probe + framebuffer backends
 
 namespace nefu {
 
@@ -51,6 +59,14 @@ static void uart_putc(char c) {
 #define BROWSER_ARENA_BASE 0x40000000u
 #define BROWSER_ARENA_SIZE (2048u * 1024u * 1024u)  // browser, 2 GB
 struct Blk { uint32_t size; Blk* next; };   // 8 bytes, 16
+// The top bit of Blk::size marks a block that is currently on a free list.
+// All real sizes are 16-byte aligned and far below 2 GB, so the bit is spare.
+// It replaces the old O(n) "is this block already on the free list?" walk in
+// kfree() -- QuickJS GC frees tens of thousands of small objects per cycle,
+// so scanning the whole list on every free made the kernel heap quadratic and
+// was the main reason a 3.36 MB bundle appeared to hang under QEMU TCG.
+#define BLK_FREE 0x80000000u
+static inline uint32_t blk_size(Blk* b) { return b->size & ~BLK_FREE; }
 static uint32_t s_arena_next = ARENA_BASE;
 static Blk* s_free = 0;
 // ---- browser arena (independent bump + free list) ----
@@ -78,15 +94,32 @@ static void* alloc_from_bump(uint32_t sz) {
     return (void*)(b + 1);
 }
 
+// A double free pushes the same block onto s_free twice; because kfree()
+// stores the next pointer *inside* the freed block, the second push makes
+// b->next point at b itself. kalloc() then either hands the same bytes to two
+// live owners (mid-stream data corruption) or walks that cycle forever when
+// the block is too small for the request (a silent hang with no log output).
+// Guard both ends so a corrupt list can never wedge the kernel.
+#define KHEAP_WALK_LIMIT 200000u
 void* kalloc(size_t sz) {
     if (sz == 0) sz = 8;
     uint32_t need = ((uint32_t)sz + 15) & ~15u;
 
     Blk** pp = &s_free;
+    uint32_t guard = 0;
     while (*pp) {
-        if ((*pp)->size >= need) {
+        if (++guard > KHEAP_WALK_LIMIT) {
+            static bool cyc_once = false;
+            if (!cyc_once) {
+                cyc_once = true;
+                klogf("KALLOC CYCLE need=0x%x (free list corrupt)\n", (unsigned)need);
+            }
+            break;   // fall back to bump allocation; never spin
+        }
+        if (blk_size(*pp) >= need) {
             Blk* b = *pp;
             *pp = b->next;
+            b->size = blk_size(b);        // clear the free marker
             return (void*)(b + 1);
         }
         pp = &(*pp)->next;
@@ -103,6 +136,19 @@ void* kalloc(size_t sz) {
 void kfree(void* p) {
     if (!p) return;
     Blk* b = (Blk*)p - 1;
+    // O(1) double-free detection: the marker is cleared again by kalloc().
+    // Previously this walked the entire free list, which is O(n) per free and
+    // O(n^2) for a QuickJS GC sweep.
+    if (b->size & BLK_FREE) {
+        static bool dbl_once = false;
+        if (!dbl_once) {
+            dbl_once = true;
+            klogf("KFREE DOUBLE p=0x%x size=%u (ignored)\n",
+                  (unsigned)(uintptr_t)p, (unsigned)blk_size(b));
+        }
+        return;
+    }
+    b->size |= BLK_FREE;
     b->next = s_free;
     s_free = b;
 }
@@ -112,9 +158,10 @@ void* balloc(size_t sz) {
     uint32_t need = ((uint32_t)sz + 15) & ~15u;
     Blk** pp = &s_bfree;
     while (*pp) {
-        if ((*pp)->size >= need) {
+        if (blk_size(*pp) >= need) {
             Blk* b = *pp;
             *pp = b->next;
+            b->size = blk_size(b);
             browser_mem_used_bytes += b->size;
             return (void*)(b + 1);
         }
@@ -128,7 +175,8 @@ void* balloc(size_t sz) {
 void bfree(void* p) {
     if (!p) return;
     Blk* b = (Blk*)p - 1;
-    if (browser_mem_used_bytes >= b->size) browser_mem_used_bytes -= b->size;
+    uint32_t sz = blk_size(b);
+    if (browser_mem_used_bytes >= sz) browser_mem_used_bytes -= sz;
     b->next = s_bfree;
     s_bfree = b;
 }
@@ -136,7 +184,7 @@ void bfree(void* p) {
 void* brealloc(void* p, size_t sz) {
     if (!p) return balloc(sz);
     Blk* b = (Blk*)p - 1;
-    uint32_t old = b->size;
+    uint32_t old = blk_size(b);
     if ((uint32_t)sz <= old) return p;
     void* np = balloc(sz);
     if (!np) return 0;
@@ -148,7 +196,7 @@ void* brealloc(void* p, size_t sz) {
 void* krealloc(void* p, size_t sz) {
     if (!p) return kalloc(sz);
     Blk* b = (Blk*)p - 1;
-    uint32_t old = b->size;
+    uint32_t old = blk_size(b);
     if ((uint32_t)sz <= old) return p;
     void* np = kalloc(sz);
     if (!np) return 0;
@@ -162,7 +210,12 @@ static Screen s_screen;
 static uint32_t s_lfb = 0;
 
 Screen* platform_screen() { return &s_screen; }
-void platform_present() {}
+void platform_present() {
+    // Dedicated GPU backends (virtio-gpu) need an explicit upload+flush so
+    // the emulated display shows the new pixels. Real hardware and the
+    // bochs-display BAR framebuffer are directly visible (no-op).
+    nefu::drivers::gpu_present();
+}
 
 // ===================== hour =====================
 static volatile uint32_t s_ticks = 0;   // 100Hz
@@ -212,13 +265,27 @@ static void pic_eoi(int irq) {
 }
 
 // /
-#define KQ_MAX 64
+// Keyboard event queue. Every keystroke produces two events (press and
+// release), and the queue is filled from the keyboard IRQ while the main
+// loop drains it once per frame. A 64 entry queue therefore overflowed after
+// roughly 30 fast characters and silently dropped the rest - typing a URL
+// into the shell lost everything past the first few letters. 512 entries
+// cover a fast typist with room to spare and cost only a few KB of .bss.
+#define KQ_MAX 512
 struct KEvent { int kc; char ascii; bool down; };
 static volatile int s_kq_head = 0, s_kq_tail = 0;
 static KEvent s_kq[KQ_MAX];
 static void kq_push(int kc, char ac, bool down) {
     int n = (s_kq_tail + 1) % KQ_MAX;
-    if (n == s_kq_head) return;
+    if (n == s_kq_head) {
+        // Queue overflow: report it once. Dropping the event silently makes
+        // fast typing lose characters, which is very hard to diagnose from
+        // the outside.
+        static int dropped = 0;
+        if (dropped == 0) outb(0xE9, '!');
+        dropped++;
+        return;
+    }
     s_kq[s_kq_tail].kc = kc;
     s_kq[s_kq_tail].ascii = ac;
     s_kq[s_kq_tail].down = down;
@@ -258,6 +325,11 @@ static const KeyRow KEYMAP[] = {
     { 0x3E, KEY_F4, 0, 0 }, { 0x3F, KEY_F5, 0, 0 }, { 0x40, KEY_F6, 0, 0 },
     { 0x41, KEY_F7, 0, 0 }, { 0x42, KEY_F8, 0, 0 }, { 0x43, KEY_F9, 0, 0 },
     { 0x44, KEY_F10, 0, 0 }, { 0x57, KEY_F11, 0, 0 }, { 0x58, KEY_F12, 0, 0 },
+    // Windows / Super keys. Without them the whole "Win + key" shortcut
+    // family is dead on the bare kernel: the desktop reads KEY_FAST for the
+    // modifier flag, but the key table had no entry that produced it, so
+    // Win+B (browser), Win+R (terminal) and friends never fired.
+    { 0x5B, KEY_FAST, 0, 0 }, { 0x5C, KEY_FAST, 0, 0 },
 
     { 0x02, 0, '1', '!' }, { 0x03, 0, '2', '@' }, { 0x04, 0, '3', '#' },
     { 0x05, 0, '4', '$' }, { 0x06, 0, '5', '%' }, { 0x07, 0, '6', '^' },
@@ -300,7 +372,14 @@ static void kbd_scancode(uint8_t sc) {
     for (size_t i = 0; i < sizeof(KEYMAP) / sizeof(KEYMAP[0]); i++) {
         if (KEYMAP[i].sc == code) {
             const KeyRow& r = KEYMAP[i];
-            if (r.kc != 0) { kq_push(r.kc, 0, down); return; }
+            if (r.kc != 0) {
+                // The space bar is a text key as well as an action key: give
+                // it an ascii character so that text fields (the shell, the
+                // browser address bar) accept it, while the keycode stays
+                // KEY_SPACE for the apps that use it as "activate".
+                kq_push(r.kc, r.kc == KEY_SPACE ? ' ' : 0, down);
+                return;
+            }
             if (down) {
                 char c;
                 bool upper = s_shift != s_caps;
@@ -422,57 +501,58 @@ static void ps2_init() {
 }
 
 // ===================== RTC =====================
+// CMOS port access stays here because the memory-size probe below also needs it.
+// The date/time decode does not: that single implementation lives in
+// bare_libc.cpp (nefu_rtc_read_civil).
 static uint8_t cmos_read(uint8_t reg) {
     outb(0x70, reg);
     return inb(0x71);
 }
-static uint8_t bcd2bin(uint8_t v) { return (uint8_t)((v & 0x0F) + (v >> 4) * 10); }
+// The CMOS decode itself lives in bare_libc.cpp (nefu_rtc_read_civil) so the
+// kernel UI and the C library can never disagree about what the chip said.
+// This file used to decode its own copy, one register off: 0x06 (weekday) as
+// the day, 0x07 (day) as the month, 0x08 (month) as the year. The month range
+// check then rejected everything past the 12th, so `date` reported "RTC
+// unavailable" for two thirds of every month.
+extern "C" {
+int  nefu_rtc_read_civil(int*, int*, int*, int*, int*, int*);
+long long nefu_now_utc(void);
+int  nefu_tz_offset_minutes(void);
+void nefu_set_tz_offset_minutes(int);
+int  nefu_rtc_is_utc(void);
+void nefu_set_rtc_is_utc(int);
+}
 
 uint32_t platform_seconds_of_day() {
-    uint8_t s = cmos_read(0x00);
-    uint8_t m = cmos_read(0x02);
-    uint8_t h = cmos_read(0x04);
-    uint8_t b = cmos_read(0x0B);
-    if (!(b & 0x04)) { s = bcd2bin(s); m = bcd2bin(m); h = bcd2bin(h); }
-    if (!(b & 0x02)) {            // 12
-        bool pm = (h & 0x80) != 0;
-        h &= 0x7F;
-        if (h >= 12) h = (uint8_t)(h - 12);
-        if (pm) h += 12;
-    }
-    return (uint32_t)h * 3600u + (uint32_t)m * 60u + (uint32_t)s;
+    // Local wall clock = true UTC + the zone offset, folded into one day. The
+    // taskbar, the clock app and the lock screen all draw this.
+    long long local = nefu_now_utc() + (long long)nefu_tz_offset_minutes() * 60;
+    long long sod = local % 86400;
+    if (sod < 0) sod += 86400;
+    return (uint32_t)sod;
 }
+
+int  platform_tz_offset_minutes() { return nefu_tz_offset_minutes(); }
+void platform_set_tz_offset_minutes(int minutes) { nefu_set_tz_offset_minutes(minutes); }
+bool platform_rtc_is_utc() { return nefu_rtc_is_utc() != 0; }
+void platform_set_rtc_is_utc(bool on) { nefu_set_rtc_is_utc(on ? 1 : 0); }
 
 bool platform_rtc_date(DateInfo* out) {
     if (!out) return false;
-    uint8_t s = cmos_read(0x00);
-    uint8_t m = cmos_read(0x02);
-    uint8_t h = cmos_read(0x04);
-    uint8_t d = cmos_read(0x06);
-    uint8_t mo = cmos_read(0x07);
-    uint8_t y = cmos_read(0x08);
-    uint8_t c = cmos_read(0x09);
-    uint8_t wd = cmos_read(0x0A);
-    uint8_t b = cmos_read(0x0B);
-    if (!(b & 0x04)) {
-        s = bcd2bin(s); m = bcd2bin(m); h = bcd2bin(h);
-        d = bcd2bin(d); mo = bcd2bin(mo); y = bcd2bin(y); c = bcd2bin(c);
-    }
-    if (!(b & 0x02)) {            // 12-hour mode
-        bool pm = (h & 0x80) != 0;
-        h &= 0x7F;
-        if (h >= 12) h = (uint8_t)(h - 12);
-        if (pm) h += 12;
-    }
-    if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
-    out->year = (int)c * 100 + (int)y;
-    out->month = (int)mo;
-    out->day = (int)d;
-    out->hour = (int)h;
-    out->min = (int)m;
-    out->sec = (int)s;
-    // CMOS day-of-week: 1 = Sunday .. 7 = Saturday -> 0 = Sunday
-    out->dow = (int)((wd == 0) ? 0 : (wd - 1) % 7);
+    int y, mo, d, h, mi, s;
+    if (!nefu_rtc_read_civil(&y, &mo, &d, &h, &mi, &s)) return false;
+    out->year = y;
+    out->month = mo;
+    out->day = d;
+    out->hour = h;
+    out->min = mi;
+    out->sec = s;
+    // weekday straight from the civil date (Sakamoto), 0 = Sunday; the chip's
+    // own weekday register is redundant and has been seen to disagree with the
+    // date after a firmware clock reset.
+    static const int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+    int yy = y - (mo < 3 ? 1 : 0);
+    out->dow = (yy + yy / 4 - yy / 100 + yy / 400 + t[mo - 1] + d) % 7;
     return true;
 }
 
@@ -593,6 +673,28 @@ extern "C" void nefuos_kernel_main(void* info) {
     if (s_screen.bpp != 24) s_screen.bpp = 32;
     __asm__ volatile("movw $0xE9, %%dx; movb $'2', %%al; outb %%al, %%dx" ::: "dx", "ax");
 
+    // GPU driver: probe the PCI display adapter and pick the best framebuffer
+    // backend. QEMU virtio-gpu gets a full scanout resource; bochs-display
+    // maps BAR0; real Intel/AMD/NVIDIA hardware keeps the boot GOP/VBE LFB.
+    nefu::drivers::gpu_log_adapters();
+    {
+        uint8_t* fb = s_screen.addr;
+        int w = s_screen.width, h = s_screen.height, pitch = s_screen.pitch, bpp = s_screen.bpp;
+        nefu::drivers::gpu_setup_framebuffer(&fb, &w, &h, &pitch, &bpp);
+        // pitch is part of the comparison: an iGPU takeover can keep the very
+        // same buffer and size while correcting a wrong boot pitch, and dropping
+        // that update would leave every drawing pass striding into the old one.
+        if (fb != s_screen.addr || w != s_screen.width || h != s_screen.height ||
+            pitch != s_screen.pitch || bpp != s_screen.bpp) {
+            s_lfb = (uint32_t)(uintptr_t)fb;
+            s_screen.addr = fb;
+            s_screen.width = w;
+            s_screen.height = h;
+            s_screen.pitch = pitch;
+            s_screen.bpp = bpp;
+        }
+    }
+
     uart_init();
     platform_dbg("\nnefuOS bare kernel: LFB=0x");
     {
@@ -706,12 +808,6 @@ bool platform_ping(uint32_t ip, int timeout_ms) {
     return net_ping(ip, timeout_ms);
 }
 
-bool platform_http_stream(const char* url, void* ctx,
-                          bool (*cb)(void*, const uint8_t*, uint32_t)) {
-    (void)url; (void)ctx; (void)cb;
-    return false;   // bare: HTTP fetch is not yet wired on bare metal
-}
-
 bool platform_http_get(const char* url, uint8_t** out, uint32_t* out_size) {
     // bare: in-house TCP stack + native TLS 1.3 via core/net/httpbare
     return nefu::net::httpbare_request("GET", url, 0, 0, 0, 0, out, out_size);
@@ -727,13 +823,417 @@ bool platform_http_request(const char* method, const char* url,
                                        out_status, out_body, out_body_len);
 }
 
-// Streaming HTTP request (bare): not implemented (see platform_http_request).
+// Cookies set by the most recent request. The bare stack has no shared cookie
+// store, so httpbare keeps the flattened Set-Cookie pairs of the last exchange
+// and the JS document jar adopts them right after the call returns.
+const char* platform_http_last_set_cookie() {
+    return nefu::net::httpbare_last_set_cookie();
+}
+
+// Response headers of the last exchange, flattened to "Name: value" lines.
+// The bare stack parses the header block itself, so it can report exactly what
+// the server sent - the JS Headers object and XHR getAllResponseHeaders() read
+// this instead of the placeholder they used to synthesise.
+const char* platform_http_last_headers() {
+    return nefu::net::httpbare_last_headers();
+}
+
+// Streaming HTTP request (bare).
+//
+// The bare stack has no background reader thread, so the response is fetched
+// with the regular client (which already handles chunked transfer, gzip
+// decompression and redirects) and then handed to the callback in one piece.
+// The callback contract is satisfied either way - the parser on the other
+// side is incremental - and this keeps a single implementation of the
+// wire format.
+bool platform_http_stream_send(const char* method, const char* url,
+                               const char* headers,
+                               const uint8_t* body, uint32_t body_len,
+                               void* ctx,
+                               bool (*cb)(void* ctx, const uint8_t* data, uint32_t len),
+                               int* out_status) {
+    if (!cb) return false;
+    uint8_t* rbody = 0;
+    uint32_t len = 0;
+    int status = 0;
+    if (!nefu::net::httpbare_fetch(method ? method : "GET", url, headers,
+                                   body, body_len, &status, &rbody, &len)) {
+        if (out_status) *out_status = status;
+        return false;
+    }
+    if (out_status) *out_status = status;
+    bool ok = true;
+    if (rbody && len > 0) ok = cb(ctx, rbody, len);
+    if (rbody) kfree(rbody);
+    return ok;
+}
+
 bool platform_http_stream_request(const char* method, const char* url,
                                   const char* headers, void* ctx,
                                   bool (*cb)(void* ctx, const uint8_t* data, uint32_t len),
                                   int* out_status) {
-    (void)method; (void)url; (void)headers; (void)ctx; (void)cb;
-    if (out_status) *out_status = 0;
+    return platform_http_stream_send(method, url, headers, 0, 0, ctx, cb, out_status);
+}
+
+// Chunked GET (bare): used by the browser to stream a page into the parser.
+bool platform_http_stream(const char* url, void* ctx,
+                          bool (*cb)(void* ctx, const uint8_t* data, uint32_t len)) {
+    return platform_http_stream_request("GET", url, 0, ctx, cb, 0);
+}
+
+// ===================== WebSocket client (bare) =====================
+// Reuses the in-house TCP stack + native TLS 1.3 client + nefu::netproto WS
+// framing. There is no background thread on bare metal, so the JS pump loop's
+// platform_ws_peek synchronously drives recv + frame reassembly. Messages are
+// queued so bursts arriving in one recv are never lost.
+namespace {
+struct WsBare {
+    bool     used;
+    int      state;          // 0 connecting, 1 open, 2 closed
+    bool     secure;
+    int      fd;             // tcp fd (-1 if none)
+    nefu::tls::Tls13Conn* tls;
+    uint32_t seed;           // masking LCG seed
+    uint8_t* rx;             // decrypted accumulator
+    uint32_t rx_len, rx_cap;
+    uint8_t* frag;           // current (fragmented) message accumulator
+    uint32_t frag_len, frag_cap;
+    bool     frag_bin;
+    static const int QN = 16;
+    uint8_t* qbuf[QN]; int qlen[QN]; bool qbin[QN];
+    int qn, qhead;           // queued message count + pop index
+    uint8_t* cur; int cur_len, cur_off; bool cur_valid; bool cur_bin;
+};
+static WsBare s_ws[8];
+static const int WS_MAX = (int)(sizeof(s_ws) / sizeof(s_ws[0]));
+
+static int ws_tls_recv(void* ctx, uint8_t* buf, int maxlen, int timeout_ms) {
+    WsBare* c = (WsBare*)ctx;
+    return tcp_recv(c->fd, buf, maxlen, timeout_ms);
+}
+static int ws_tls_send(void* ctx, const uint8_t* buf, int len) {
+    WsBare* c = (WsBare*)ctx;
+    return tcp_send(c->fd, buf, len);
+}
+
+// 16 random bytes -> 24-char base64 client key (RFC 6455).
+static void ws_make_key(char* out) {
+    static const char* a =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    uint8_t r[16];
+    uint32_t s = (uint32_t)platform_tick_ms() ^ 0x9E3779B9u;
+    for (int i = 0; i < 16; i++) {
+        s = s * 2654435761u + 40503u + (uint32_t)i;
+        r[i] = (uint8_t)(s >> 13);
+    }
+    int o = 0;
+    for (int i = 0; i < 16; i += 3) {
+        uint8_t b0 = r[i];
+        uint8_t b1 = (i + 1 < 16) ? r[i + 1] : 0;
+        uint8_t b2 = (i + 2 < 16) ? r[i + 2] : 0;
+        uint32_t n = ((uint32_t)b0 << 16) | ((uint32_t)b1 << 8) | b2;
+        out[o++] = a[(n >> 18) & 63]; out[o++] = a[(n >> 12) & 63];
+        out[o++] = (i + 1 < 16) ? a[(n >> 6) & 63] : '=';
+        out[o++] = (i + 2 < 16) ? a[n & 63] : '=';
+    }
+}
+
+static void ws_rx_append(WsBare* c, const uint8_t* d, uint32_t n) {
+    if (c->rx_len + n > c->rx_cap) {
+        uint32_t nc = c->rx_cap ? c->rx_cap : 4096;
+        while (nc < c->rx_len + n) nc *= 2;
+        uint8_t* np = (uint8_t*)kalloc(nc);
+        if (!np) return;
+        if (c->rx) { memcpy(np, c->rx, c->rx_len); kfree(c->rx); }
+        c->rx = np; c->rx_cap = nc;
+    }
+    memcpy(c->rx + c->rx_len, d, n);
+    c->rx_len += n;
+}
+
+static void ws_queue(WsBare* c, bool bin) {
+    if (c->qn >= WsBare::QN) return;             // drop on overflow
+    int idx = (c->qhead + c->qn) % WsBare::QN;
+    uint8_t* m = c->frag_len ? (uint8_t*)kalloc(c->frag_len) : 0;
+    if (c->frag_len) memcpy(m, c->frag, c->frag_len);
+    c->qbuf[idx] = m; c->qlen[idx] = (int)c->frag_len; c->qbin[idx] = bin;
+    c->qn++;
+    c->frag_len = 0;
+}
+
+// Drive recv + reassemble complete messages into the queue.
+static void ws_pump(WsBare* c) {
+    if (!c || c->state != 1) return;
+    uint8_t tmp[4096];
+    int r = c->tls ? nefu::tls::tls13_recv(c->tls, tmp, (int)sizeof(tmp), 150)
+                   : tcp_recv(c->fd, tmp, (int)sizeof(tmp), 150);
+    // Distinguish "nothing available yet" from "the peer closed the
+    // connection": a closed socket must retire the session instead of being
+    // polled forever. TLS reports EOF as 0 and a timeout as -1; the bare TCP
+    // layer uses the same convention.
+    if (r == 0) {
+        c->state = 2;            // closed by peer
+        c->used = false;
+        return;
+    }
+    if (r < 0) return;           // timeout (or error): retry on the next pump
+    ws_rx_append(c, tmp, (uint32_t)r);
+    for (;;) {
+        if (c->rx_len < 2) break;
+        uint8_t b1 = c->rx[1];
+        uint32_t pl = b1 & 0x7Fu;
+        int ho = 2;
+        if (pl == 126) {
+            if (c->rx_len < 4) break;
+            pl = ((uint32_t)c->rx[2] << 8) | c->rx[3]; ho = 4;
+        } else if (pl == 127) {
+            if (c->rx_len < 10) break;
+            pl = ((uint32_t)c->rx[6] << 24) | ((uint32_t)c->rx[7] << 16) |
+                 ((uint32_t)c->rx[8] << 8) | c->rx[9]; ho = 10;
+        }
+        if (b1 & 0x80) ho += 4;                   // mask
+        if (c->rx_len < (uint32_t)ho + pl) break; // incomplete frame
+        nefu::netproto::WsFrame f;
+        int hlen = nefu::netproto::ws_decode_frame(c->rx, (int)c->rx_len, f);
+        if (hlen < 0) { c->rx_len = 0; break; }   // malformed: drop stream
+        uint8_t op = f.opcode;
+        if (op == nefu::netproto::WS_OP_CLOSE) {
+            uint8_t cb[128];
+            int cn = nefu::netproto::ws_build_close(cb, 1000, "bye", true, &c->seed);
+            if (c->tls) nefu::tls::tls13_send(c->tls, cb, cn);
+            else        tcp_send(c->fd, cb, cn);
+            c->state = 2;
+            break;
+        } else if (op == nefu::netproto::WS_OP_PING) {
+            uint8_t pb[256];
+            int pn = nefu::netproto::ws_build_pong(pb, f.payload, (int)f.payload_len, true, &c->seed);
+            if (c->tls) nefu::tls::tls13_send(c->tls, pb, pn);
+            else        tcp_send(c->fd, pb, pn);
+        } else if (op == nefu::netproto::WS_OP_PONG) {
+            // ignore
+        } else {  // data: text(1) / binary(2) / continuation(0)
+            bool start = (op == nefu::netproto::WS_OP_TEXT ||
+                          op == nefu::netproto::WS_OP_BINARY);
+            if (start) { c->frag_bin = (op == nefu::netproto::WS_OP_BINARY); c->frag_len = 0; }
+            if (f.payload_len > 0) {
+                uint32_t need = c->frag_len + f.payload_len;
+                if (need > c->frag_cap) {
+                    uint32_t nc = c->frag_cap ? c->frag_cap : 4096;
+                    while (nc < need) nc *= 2;
+                    uint8_t* nf = (uint8_t*)kalloc(nc);
+                    if (!nf) { c->frag_len = 0; break; }
+                    if (c->frag) { memcpy(nf, c->frag, c->frag_len); kfree(c->frag); }
+                    c->frag = nf; c->frag_cap = nc;
+                }
+                memcpy(c->frag + c->frag_len, f.payload, f.payload_len);
+                c->frag_len += f.payload_len;
+            }
+            if (f.fin) ws_queue(c, c->frag_bin);
+        }
+        uint32_t total = (uint32_t)hlen + f.payload_len;
+        memmove(c->rx, c->rx + total, c->rx_len - total);
+        c->rx_len -= total;
+    }
+}
+
+} // namespace
+
+// The bare-metal TLS client has no header injection hook, so the richer
+// handshake falls back to the plain one (host backends supply the real
+// implementation).
+int platform_ws_open_hdr(const char* url, const char* extra_headers) {
+    (void)extra_headers;
+    return platform_ws_open(url);
+}
+
+int platform_ws_open(const char* url) {
+    if (!url || !url[0]) return -1;
+    bool secure = true;
+    const char* p = strstr(url, "://");
+    if (!p) return -1;
+    int sl = (int)(p - url);
+    if (sl == 2)      { if (strncmp(url, "ws", 2) != 0) return -1;  secure = false; }
+    else if (sl == 3) { if (strncmp(url, "wss", 3) != 0) return -1; secure = true; }
+    else return -1;
+    p += 3;
+    const char* slash  = strchr(p, '/');
+    const char* qmark  = strchr(p, '?');
+    const char* endh   = p + strlen(p);
+    if (slash && slash < endh) endh = slash;
+    if (qmark && qmark < endh) endh = qmark;
+    const char* colon = 0;
+    for (const char* q = p; q < endh; q++) if (*q == ':') { colon = q; break; }
+    int port = secure ? 443 : 80;
+    const char* he = colon ? colon : endh;
+    if (colon) {
+        int pl = 0; const char* pe = colon + 1;
+        while (pe[pl] >= '0' && pe[pl] <= '9') pl++;
+        if (pl > 0 && pl <= 5) {
+            int v = 0; for (int i = 0; i < pl; i++) v = v * 10 + (pe[i] - '0');
+            if (v > 0) port = v;
+        }
+        he = pe + pl;
+    }
+    int hl = (int)(he - p);
+    if (hl <= 0 || hl >= 128) return -1;
+    char host[128]; memcpy(host, p, hl); host[hl] = 0;
+    char path[1024];
+    if (slash)      { int pl = (int)strlen(slash); if (pl >= (int)sizeof(path)) pl = (int)sizeof(path) - 1; memcpy(path, slash, pl); path[pl] = 0; }
+    else if (qmark) { path[0] = '/'; int pl = (int)strlen(qmark); if (pl > (int)sizeof(path) - 2) pl = (int)sizeof(path) - 2; memcpy(path + 1, qmark, pl); path[1 + pl] = 0; }
+    else            { path[0] = '/'; path[1] = 0; }
+
+    uint32_t ip = dns_lookup(host);
+    if (!ip) { klogf("ws: dns fail %s\n", host); return -1; }
+
+    int slot = -1;
+    for (int i = 0; i < WS_MAX; i++) { if (!s_ws[i].used) { slot = i; break; } }
+    if (slot < 0) return -1;
+    WsBare* c = &s_ws[slot];
+    memset(c, 0, sizeof(WsBare));
+    c->used = true; c->state = 0; c->secure = secure; c->fd = -1;
+
+    c->fd = tcp_connect(ip, (uint16_t)port, 10000);
+    if (c->fd < 0) { c->used = false; return -1; }
+
+    if (secure) {
+        char terr[160];
+        c->tls = nefu::tls::tls13_connect(ws_tls_recv, ws_tls_send, c, host, terr, sizeof(terr));
+        if (!c->tls) {
+            klogf("ws: TLS fail %s: %s\n", host, terr);
+            tcp_close(c->fd); c->fd = -1; c->used = false; return -1;
+        }
+    }
+
+    char key[25]; ws_make_key(key); key[24] = 0;
+    String hs;
+    nefu::netproto::ws_build_client_handshake(host, path, key, hs);
+    int hs_len = hs.len();
+    int sent = c->tls ? nefu::tls::tls13_send(c->tls, (const uint8_t*)hs.c_str(), hs_len)
+                      : tcp_send(c->fd, (const uint8_t*)hs.c_str(), hs_len);
+    if (sent != hs_len) {
+        klogf("ws: handshake send fail %s (%d/%d)\n", host, sent, hs_len);
+        if (c->tls) { nefu::tls::tls13_close(c->tls); c->tls = 0; }
+        tcp_close(c->fd); c->fd = -1; c->used = false; return -1;
+    }
+
+    // read 101 response
+    uint8_t resp[4096]; int resp_len = 0;
+    uint8_t tmp[2048];
+    uint32_t start = platform_tick_ms();
+    bool got = false;
+    while (platform_tick_ms() - start < 15000) {
+        int r = c->tls ? nefu::tls::tls13_recv(c->tls, tmp, (int)sizeof(tmp), 800)
+                       : tcp_recv(c->fd, tmp, (int)sizeof(tmp), 800);
+        if (r <= 0) { if (r == 0) break; continue; }
+        if ((uint32_t)resp_len + r <= (uint32_t)sizeof(resp)) {
+            memcpy(resp + resp_len, tmp, (uint32_t)r); resp_len += r;
+        }
+        bool end = false;
+        for (int i = 0; i + 3 < resp_len; i++)
+            if (resp[i]=='\r'&&resp[i+1]=='\n'&&resp[i+2]=='\r'&&resp[i+3]=='\n') { end = true; break; }
+        if (!end) for (int i = 0; i + 1 < resp_len; i++)
+            if (resp[i]=='\n'&&resp[i+1]=='\n') { end = true; break; }
+        if (end) { got = true; break; }
+    }
+    if (!got) {
+        klogf("ws: no 101 from %s\n", host);
+        if (c->tls) { nefu::tls::tls13_close(c->tls); c->tls = 0; }
+        tcp_close(c->fd); c->fd = -1; c->used = false; return -1;
+    }
+    char accept[32];
+    if (nefu::netproto::ws_parse_server_handshake((const char*)resp, resp_len, accept, sizeof(accept)) != 0) {
+        klogf("ws: handshake rejected by %s\n", host);
+        if (c->tls) { nefu::tls::tls13_close(c->tls); c->tls = 0; }
+        tcp_close(c->fd); c->fd = -1; c->used = false; return -1;
+    }
+    c->seed = (uint32_t)platform_tick_ms() ^ (uint32_t)port;
+    c->state = 1;
+    klogf("ws: open %s://%s:%d%s\n", secure ? "wss" : "ws", host, port, path);
+    return slot;
+}
+
+int platform_ws_state(int h) {
+    if (h < 0 || h >= WS_MAX) return 2;
+    return s_ws[h].used ? s_ws[h].state : 2;
+}
+
+int platform_ws_send(int h, const uint8_t* data, int len, int binary) {
+    if (h < 0 || h >= WS_MAX) return -1;
+    WsBare* c = &s_ws[h];
+    if (!c->used || c->state != 1 || !data || len <= 0) return -1;
+    uint8_t* frame = (uint8_t*)kalloc((uint32_t)len + 16);
+    if (!frame) return -1;
+    uint8_t op = binary ? nefu::netproto::WS_OP_BINARY : nefu::netproto::WS_OP_TEXT;
+    int fn = nefu::netproto::ws_encode_frame(frame, op, true, data, len, true, &c->seed);
+    int rc = c->tls ? nefu::tls::tls13_send(c->tls, frame, fn)
+                    : tcp_send(c->fd, frame, fn);
+    kfree(frame);
+    return rc == fn ? len : -1;
+}
+
+int platform_ws_peek(int h, int* out_binary) {
+    if (h < 0 || h >= WS_MAX) return -1;
+    WsBare* c = &s_ws[h];
+    if (!c->used) return -1;
+    if (c->state == 2) {
+        if (c->cur_valid) { if (out_binary) *out_binary = c->cur_bin; return c->cur_len; }
+        return -1;
+    }
+    ws_pump(c);
+    if (!c->cur_valid && c->qn > 0) {
+        int idx = c->qhead;
+        c->cur = c->qbuf[idx]; c->cur_len = c->qlen[idx]; c->cur_bin = c->qbin[idx];
+        c->qhead = (c->qhead + 1) % WsBare::QN; c->qn--;
+        c->cur_off = 0; c->cur_valid = true;
+    }
+    if (c->cur_valid) { if (out_binary) *out_binary = c->cur_bin; return c->cur_len; }
+    return 0;
+}
+
+int platform_ws_read(int h, uint8_t* buf, int cap) {
+    if (h < 0 || h >= WS_MAX) return 0;
+    WsBare* c = &s_ws[h];
+    if (!c->used || !c->cur_valid || !buf || cap <= 0) return 0;
+    int n = c->cur_len - c->cur_off;
+    if (n > cap) n = cap;
+    if (n > 0) memcpy(buf, c->cur + c->cur_off, (uint32_t)n);
+    c->cur_off += n;
+    if (c->cur_off >= c->cur_len) {
+        if (c->cur) kfree(c->cur);
+        c->cur = 0; c->cur_len = c->cur_off = 0; c->cur_valid = false;
+    }
+    return n;
+}
+
+void platform_ws_close(int h) {
+    if (h < 0 || h >= WS_MAX) return;
+    WsBare* c = &s_ws[h];
+    if (!c->used) return;
+    if (c->state == 1) {
+        uint8_t cb[128];
+        int cn = nefu::netproto::ws_build_close(cb, 1000, "bye", true, &c->seed);
+        if (c->tls) nefu::tls::tls13_send(c->tls, cb, cn);
+        else        tcp_send(c->fd, cb, cn);
+    }
+    if (c->tls) { nefu::tls::tls13_close(c->tls); c->tls = 0; }
+    if (c->fd >= 0) { tcp_close(c->fd); c->fd = -1; }
+    for (int i = 0; i < c->qn; i++) {
+        int idx = (c->qhead + i) % WsBare::QN;
+        if (c->qbuf[idx]) kfree(c->qbuf[idx]);
+    }
+    c->qn = 0; c->qhead = 0;
+    if (c->cur) { kfree(c->cur); c->cur = 0; }
+    c->cur_valid = false; c->cur_len = c->cur_off = 0;
+    if (c->rx)    { kfree(c->rx);    c->rx = 0; } c->rx_len = c->rx_cap = 0;
+    if (c->frag)  { kfree(c->frag);  c->frag = 0; } c->frag_len = c->frag_cap = 0;
+    c->state = 2; c->used = false;
+}
+
+// Local file read (bare): only NVFS paths would make sense; not wired.
+bool platform_read_file(const char* path, uint8_t** out, uint32_t* out_size) {
+    (void)path;
+    if (out) *out = 0;
+    if (out_size) *out_size = 0;
     return false;
 }
 
@@ -849,8 +1349,12 @@ int platform_disk_scan(DiskInfo* list, int max) {
 // ===================== NVFS persistence (ATA PIO) =====================
 // PIO 28-bit LBA sector I/O used to persist the NVFS image so settings,
 // the firstboot marker and user files survive reboots (task: real save).
-#define FS_HEADER_LBA 1u
-#define FS_DATA_LBA   2u
+// Layout: the NVFS image starts at sector 0 and is as long as the drive itself
+// (capped at FS_MAX_IMAGE). No separate size sector is needed — the superblock
+// at offset 0 identifies a valid image, and NVFS is a fixed 4 MiB, which is
+// exactly what a 4 MiB drive holds. (An earlier "size word in sector 0, image
+// from sector 1" layout could never fit a 4 MiB image on a 4 MiB drive.)
+#define FS_IMAGE_LBA 0u
 #define FS_MAX_IMAGE  (64u * 1024u * 1024u)
 
 static uint16_t s_fs_base = 0;
@@ -913,6 +1417,8 @@ static bool ata_pio_write(uint16_t base, uint8_t devsel, uint32_t lba,
     return true;
 }
 
+static uint32_t s_fs_sectors = 0;   // capacity of the drive holding the image
+
 static bool fs_find_disk(uint16_t* base_out, uint8_t* dev_out) {
     static const uint16_t bases[2] = { 0x1F0, 0x170 };
     for (unsigned c = 0; c < 2; c++) {
@@ -924,7 +1430,11 @@ static bool fs_find_disk(uint16_t* base_out, uint8_t* dev_out) {
                              model, sizeof(model), &sectors, &rem)) {
                 if (rem || sectors < 1024) continue;   // skip CD-ROM / tiny disks
                 *base_out = bases[c];
-                *dev_out = (uint8_t)(sel ? 0xB0 : 0xA0);
+                // 0xE0/0xF0 select drive 0/1 *and* set the LBA bit (0x40).
+                // Without that bit the drive falls back to CHS addressing, and
+                // every request silently lands one sector early.
+                *dev_out = (uint8_t)(sel ? 0xF0 : 0xE0);
+                s_fs_sectors = (sectors > 0xFFFFFFFFull) ? 0xFFFFFFFFu : (uint32_t)sectors;
                 return true;
             }
         }
@@ -938,16 +1448,23 @@ bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
     *out_size = 0;
     uint16_t base;
     uint8_t dev;
-    if (!fs_find_disk(&base, &dev)) return false;
-    uint8_t hdr[512];
-    memset(hdr, 0, sizeof(hdr));
-    if (!ata_pio_read(base, dev, FS_HEADER_LBA, hdr, 1)) return false;
-    uint32_t size = (uint32_t)hdr[0] | ((uint32_t)hdr[1] << 8) |
-                    ((uint32_t)hdr[2] << 16) | ((uint32_t)hdr[3] << 24);
-    if (size == 0 || size > FS_MAX_IMAGE) return false;
-    uint32_t sectors = (size + 511u) / 512u;
+    if (!fs_find_disk(&base, &dev)) { klogf("nvfs: no ATA disk for image load\n"); return false; }
+    // Cheap "is there an image here?" check before allocating 4 MiB: read the
+    // first sector and compare the superblock magic (0x4E564653 little endian).
+    uint8_t first[512];
+    memset(first, 0, sizeof(first));
+    if (!ata_pio_read(base, dev, FS_IMAGE_LBA, first, 1)) { klogf("nvfs: image sector 0 read failed\n"); return false; }
+    static const uint8_t kMagic[4] = { 0x53, 0x46, 0x56, 0x4E };
+    if (first[0] != kMagic[0] || first[1] != kMagic[1] ||
+        first[2] != kMagic[2] || first[3] != kMagic[3]) return false;   // blank / foreign disk
+    uint32_t size = FS_MAX_IMAGE;
+    uint32_t sectors = size / 512u;
+    if (s_fs_sectors && sectors > s_fs_sectors) {
+        sectors = s_fs_sectors;              // drive smaller than the image
+        size = sectors * 512u;
+    }
     uint8_t* img = (uint8_t*)kalloc(size);
-    if (!img) return false;
+    if (!img) { klogf("nvfs: image alloc failed (%u bytes)\n", (unsigned)size); return false; }
     uint8_t* p = img;
     uint32_t done = 0;
     uint32_t left = sectors;
@@ -955,7 +1472,8 @@ bool platform_fs_load(uint8_t** out, uint32_t* out_size) {
         uint32_t n = left > 64 ? 64 : left;
         uint8_t* tmp = (uint8_t*)kalloc(n * 512u);
         if (!tmp) { kfree(img); return false; }
-        if (!ata_pio_read(base, dev, FS_DATA_LBA + (sectors - left), tmp, n)) {
+        if (!ata_pio_read(base, dev, FS_IMAGE_LBA + (sectors - left), tmp, n)) {
+            klogf("nvfs: image read failed at lba %u\n", (unsigned)(FS_IMAGE_LBA + (sectors - left)));
             kfree(tmp); kfree(img); return false;
         }
         uint32_t take = (n * 512u > size - done) ? (size - done) : n * 512u;
@@ -991,14 +1509,8 @@ void platform_fs_save(const uint8_t* data, uint32_t size) {
     } else if (!fs_find_disk(&base, &dev)) {
         return;
     }
-    uint8_t hdr[512];
-    memset(hdr, 0, sizeof(hdr));
-    hdr[0] = (uint8_t)(size & 0xFF);
-    hdr[1] = (uint8_t)((size >> 8) & 0xFF);
-    hdr[2] = (uint8_t)((size >> 16) & 0xFF);
-    hdr[3] = (uint8_t)((size >> 24) & 0xFF);
-    if (!ata_pio_write(base, dev, FS_HEADER_LBA, hdr, 1)) return;
     uint32_t sectors = (size + 511u) / 512u;
+    if (s_fs_sectors && sectors > s_fs_sectors) sectors = s_fs_sectors;
     const uint8_t* p = data;
     uint32_t left = sectors;
     uint32_t done = 0;
@@ -1009,7 +1521,7 @@ void platform_fs_save(const uint8_t* data, uint32_t size) {
         memset(tmp, 0, n * 512u);
         uint32_t take = (n * 512u > size - done) ? (size - done) : n * 512u;
         memcpy(tmp, p, take);
-        if (!ata_pio_write(base, dev, FS_DATA_LBA + (sectors - left), tmp, n)) {
+        if (!ata_pio_write(base, dev, FS_IMAGE_LBA + (sectors - left), tmp, n)) {
             kfree(tmp);
             return;
         }
@@ -1020,6 +1532,48 @@ void platform_fs_save(const uint8_t* data, uint32_t size) {
     }
     klogf("nvfs: saved %u bytes to ATA disk\n", (unsigned)size);
 }
+
+// Incremental write-back: four commits per second are only affordable because
+// just the blocks that actually changed are pushed to the disk. The image
+// lives at sector 0 with the superblock up front, so a block b of the image is
+// drive sector b; no header rewrite is required and nothing is lost if the
+// drive is exactly as large as the image.
+bool platform_fs_save_range(const uint8_t* data, uint32_t total_size,
+                            uint32_t first_block, uint32_t count) {
+    if (!data || total_size == 0 || total_size > FS_MAX_IMAGE || count == 0) return false;
+    uint16_t base;
+    uint8_t dev;
+    if (s_fs_base) {
+        base = s_fs_base;
+        dev = s_fs_dev;
+    } else if (!fs_find_disk(&base, &dev)) {
+        return false;
+    }
+    uint32_t off = first_block * 512u;
+    if (off >= total_size) return true;
+    uint32_t sectors = count;
+    uint32_t max_sectors = (total_size - off + 511u) / 512u;
+    if (sectors > max_sectors) sectors = max_sectors;
+    uint32_t lba = FS_IMAGE_LBA + first_block;
+    if (s_fs_sectors && lba + sectors > s_fs_sectors) {
+        if (lba >= s_fs_sectors) return false;
+        sectors = s_fs_sectors - lba;
+    }
+    const uint8_t* p = data + off;
+    while (sectors) {
+        uint32_t n = sectors > 64 ? 64 : sectors;
+        if (!ata_pio_write(base, dev, lba, p, n)) return false;
+        p += (size_t)n * 512u;
+        lba += n;
+        sectors -= n;
+    }
+    return true;
+}
+
+// Bare-metal cadence: four commits per second (250 ms). This is the whole
+// point of the incremental write-back - the image is tiny, the dirty set
+// usually is not.
+uint32_t platform_fs_flush_interval_ms() { return 250u; }
 
 
 // ---- threading (bare: cooperative, run synchronously) ----
@@ -1251,3 +1805,4 @@ bool platform_host_file_dialog(char* out_path, int max, const char* filter_desc,
 }
 
 } // namespace nefu
+

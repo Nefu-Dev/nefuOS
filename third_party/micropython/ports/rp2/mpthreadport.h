@@ -66,3 +66,4 @@ static inline void mp_thread_mutex_unlock(mp_thread_mutex_t *m) {
 }
 
 #endif // MICROPY_INCLUDED_RP2_MPTHREADPORT_H
+

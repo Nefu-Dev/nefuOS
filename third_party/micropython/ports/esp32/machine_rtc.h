@@ -43,3 +43,4 @@ typedef struct {
 extern machine_rtc_config_t machine_rtc_config;
 
 #endif
+

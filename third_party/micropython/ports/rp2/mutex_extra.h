@@ -56,3 +56,4 @@ void recursive_mutex_nowait_enter_blocking(recursive_mutex_nowait_t *mtx);
 void recursive_mutex_nowait_exit(recursive_mutex_nowait_t *mtx);
 
 #endif // MICROPY_INCLUDED_RP2_MUTEX_EXTRA_H
+

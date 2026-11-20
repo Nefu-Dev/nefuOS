@@ -326,3 +326,4 @@ static inline void lv_obj_move_background(lv_obj_t * obj)
 #endif
 
 #endif /*LV_API_MAP_V8_H*/
+

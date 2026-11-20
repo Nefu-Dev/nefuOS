@@ -268,3 +268,4 @@ void VP8LEncDspInit(void);
 #endif
 
 #endif  // WEBP_DSP_LOSSLESS_H_
+

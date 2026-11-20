@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  npkg.cpp — nefuOS npkg command-line package manager
 // -----------------------------------------------------------------------------
@@ -924,3 +929,4 @@ bool npkg_gui_install(const char* name, char* msg, int mcap) {
 }
 
 } // namespace nefu
+

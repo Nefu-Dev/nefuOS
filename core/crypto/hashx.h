@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 哈希/摘要模块
 // 从零实现现代与经典密码杂凑算法（不重复 lib/hash.h 已有的 MD5/SHA1/CRC32）：
 //   SHA-3 (Keccak) 224/256/384/512
@@ -127,3 +132,4 @@ int hashx_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

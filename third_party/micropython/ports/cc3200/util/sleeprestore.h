@@ -30,3 +30,4 @@ extern void sleep_store(void);
 extern void sleep_restore(void);
 
 #endif // MICROPY_INCLUDED_CC3200_UTIL_SLEEPRESTORE_H
+

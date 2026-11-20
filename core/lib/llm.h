@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuLLM -- freestanding int8 GPT-Neo inference engine (Q16.16, no FPU/no libc)
 // Loads a NEFL blob (see convert_model.py) and generates English text.
 // Integer-only: activations Q16.16, weights int8 + per-row Q16.16 scale.
@@ -68,3 +73,4 @@ void llm_unload(Model* m);
 
 } // namespace llm
 } // namespace nefu
+

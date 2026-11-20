@@ -112,3 +112,4 @@ const BOOT_DATA_T boot_data;
 extern const uint8_t dcd_data[];
 
 #endif /* __FLEXSPI_NOR_BOOT_H__ */
+

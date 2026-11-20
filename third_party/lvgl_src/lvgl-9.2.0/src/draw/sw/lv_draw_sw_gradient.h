@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_gradient.h
  *
  */
@@ -201,3 +201,4 @@ void /* LV_ATTRIBUTE_FAST_MEM */ lv_gradient_conical_get_line(lv_grad_dsc_t * ds
 #endif
 
 #endif /*LV_DRAW_GRADIENT_H*/
+

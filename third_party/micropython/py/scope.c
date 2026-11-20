@@ -152,3 +152,4 @@ void scope_check_to_close_over(scope_t *scope, id_info_t *id) {
 }
 
 #endif // MICROPY_ENABLE_COMPILER
+

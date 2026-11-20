@@ -1121,3 +1121,4 @@ static lv_style_res_t get_selector_style_prop(const lv_obj_t * obj, lv_style_sel
 
     return LV_STYLE_RES_NOT_FOUND;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  termcmds_test_main.cpp —— 终端命令扩展库独立单元测试入口
 // -----------------------------------------------------------------------------
@@ -66,3 +71,4 @@ int main() {
     else            std::printf("TOTAL FAILURES: %d\n", total);
     return total == 0 ? 0 : 1;
 }
+

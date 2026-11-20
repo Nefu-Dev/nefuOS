@@ -46,3 +46,4 @@ static mp_int_t mp_machine_reset_cause(void) {
 }
 
 #endif
+

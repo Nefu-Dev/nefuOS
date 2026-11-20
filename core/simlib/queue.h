@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 离散事件模拟器 queue
 // 教学版：按时间轴处理事件的队列（事件 = 触发时刻 + 回调 + 用户数据）。
 // 经典用途：排队系统、任务调度、网络包模拟。class / STL / 中文注释。
@@ -58,3 +63,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

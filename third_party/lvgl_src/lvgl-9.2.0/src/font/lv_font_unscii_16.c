@@ -639,3 +639,4 @@ lv_font_t lv_font_unscii_16 = {
 };
 
 #endif /*#if LV_FONT_UNSCII_16*/
+

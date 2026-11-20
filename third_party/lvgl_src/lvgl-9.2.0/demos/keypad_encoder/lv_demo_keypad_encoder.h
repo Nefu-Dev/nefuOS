@@ -37,3 +37,4 @@ void lv_demo_keypad_encoder(void);
 #endif
 
 #endif /*LV_DEMO_KEYPAD_ENCODER_H*/
+

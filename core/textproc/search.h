@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 多模式字符串搜索与回文/后缀结构
 // 从零实现经典串匹配算法，全部显式 new[]/delete[]，无 STL/异常/RTTI。
 //
@@ -84,3 +89,4 @@ int search_self_test();
 
 } // namespace textproc
 } // namespace nefu
+

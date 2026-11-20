@@ -267,3 +267,4 @@ void usbhs_d1fifo_handler(void) {
 #endif
 
 MP_REGISTER_ROOT_POINTER(struct _machine_uart_obj_t *pyb_stdio_uart);
+

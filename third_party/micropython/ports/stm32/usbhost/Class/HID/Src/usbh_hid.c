@@ -798,3 +798,4 @@ __weak void USBH_HID_EventCallback(USBH_HandleTypeDef *phost)
 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

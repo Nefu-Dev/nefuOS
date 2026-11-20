@@ -1299,3 +1299,4 @@ const mp_irq_methods_t uart_irq_methods = {
 };
 
 MP_REGISTER_ROOT_POINTER(struct _machine_uart_obj_t *machine_uart_obj_all[MICROPY_HW_MAX_UART + MICROPY_HW_MAX_LPUART]);
+

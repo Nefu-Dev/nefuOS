@@ -51,3 +51,4 @@
 #endif
 
 #endif // MICROPY_INCLUDED_STM32_PIN_STATIC_AF_H
+

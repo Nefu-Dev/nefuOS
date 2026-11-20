@@ -1763,3 +1763,4 @@ SWIGEXPORT jbyteArray JNICALL Java_com_google_webp_libwebpJNI_wrap_1WebPEncodeLo
 }
 #endif
 
+

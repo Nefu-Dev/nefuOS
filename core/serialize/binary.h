@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据序列化与编解码库 —— 二进制格式模块
 // binary.h: varint/zigzag / MessagePack / Bencode / UBJSON / CBOR / BSON(子集)
 //

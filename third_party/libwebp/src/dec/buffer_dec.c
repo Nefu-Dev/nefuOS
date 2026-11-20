@@ -308,3 +308,4 @@ int WebPAvoidSlowMemory(const WebPDecBuffer* const output,
 }
 
 //------------------------------------------------------------------------------
+

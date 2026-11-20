@@ -449,3 +449,4 @@ void test_bar_orientation(void)
 }
 
 #endif
+

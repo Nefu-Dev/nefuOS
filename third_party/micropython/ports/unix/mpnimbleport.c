@@ -72,3 +72,4 @@ void mp_bluetooth_nimble_hci_uart_wfi(void) {
 }
 
 #endif // MICROPY_PY_BLUETOOTH && MICROPY_BLUETOOTH_NIMBLE
+

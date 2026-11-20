@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 聚合头
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 聚合头
 // 包含全部子模块，并提供 deeplearn_self_test() 汇总。
 //
 // ==================== 使用指南（bare-metal，全定点 Q16.16） ====================
@@ -73,3 +78,4 @@ inline int deeplearn_self_test() {
 
 } // namespace deeplearn
 } // namespace nefu
+

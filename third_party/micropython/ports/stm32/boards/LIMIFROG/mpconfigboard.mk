@@ -1,4 +1,10 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = l4
 CMSIS_MCU = STM32L476xx
 AF_FILE = boards/stm32l476_af.csv
 LD_FILES = boards/stm32l476xe.ld boards/common_basic.ld
+

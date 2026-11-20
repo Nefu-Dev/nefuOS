@@ -179,3 +179,4 @@ extern void InitSharpYuvNEON(void);
 void InitSharpYuvNEON(void) {}
 
 #endif  // WEBP_USE_NEON
+

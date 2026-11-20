@@ -47,3 +47,4 @@ void readline_note_newline(const char *prompt);
 int readline_process_char(int c);
 
 #endif // MICROPY_INCLUDED_LIB_MP_READLINE_READLINE_H
+

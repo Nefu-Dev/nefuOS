@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 顶层协议栈对象
 // 把前面各子模块聚合成一个可驱动的协议栈：
 //   NetIf（本端地址）+ RouteTable + PktLog + UdpTable + TcpTable。
@@ -46,3 +51,4 @@ int netstack_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

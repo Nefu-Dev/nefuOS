@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Scratch - a tiny Scratch-style block programming app.
 //
 // A from-scratch, integer-only coding playground for nefuOS: a stage with one
@@ -379,7 +384,7 @@ void scratch_launch() {
     st->mouse_down = 0;
     st->rng = platform_tick_ms() * 2654435761u + 97u;
     st->step_delay = 0;
-    Window* w = g_wm->create_window("Scratch", 60, 60, 600, 470);
+    Window* w = g_wm->create_window(T("积木编程", "Scratch"), 60, 60, 600, 470);
     w->userdata = st;
     w->on_paint = scratch_paint;
     w->on_tick = scratch_tick_driver;
@@ -390,3 +395,4 @@ void scratch_launch() {
 }
 
 } // namespace nefu
+

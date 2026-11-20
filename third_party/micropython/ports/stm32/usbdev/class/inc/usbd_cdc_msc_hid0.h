@@ -61,3 +61,4 @@ typedef struct _USBD_HID_ModeInfoTypeDef {
 } USBD_HID_ModeInfoTypeDef;
 
 #endif // MICROPY_INCLUDED_STM32_USBDEV_CLASS_INC_USBD_CDC_MSC_HID0_H
+

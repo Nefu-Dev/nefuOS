@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Disable optimisations and enable assert() on coverage builds.
 DEBUG ?= 1
 
@@ -14,3 +19,4 @@ USER_C_MODULES = $(TOP)/examples/usercmodule
 
 SRC_C += coverage.c
 SRC_CXX += coveragecpp.cpp
+

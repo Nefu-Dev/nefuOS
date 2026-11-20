@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 USE_MBOOT = 0
 USE_PYDFU = 0
 # For dual core HAL drivers.
@@ -31,3 +36,4 @@ GIT_SUBMODULES += $(ARDUINO_LIB_DIR)
 FROZEN_MANIFEST = $(BOARD_DIR)/manifest.py
 MICROPY_MANIFEST_ARDUINO_LIB_DIR = $(TOP)/$(ARDUINO_LIB_DIR)
 MBEDTLS_CONFIG_FILE = '"$(BOARD_DIR)/mbedtls_config_board.h"'
+

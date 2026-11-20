@@ -39,3 +39,4 @@ static void ta_event_cb(lv_event_t * e)
 }
 
 #endif
+

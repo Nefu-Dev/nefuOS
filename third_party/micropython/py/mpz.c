@@ -1750,3 +1750,4 @@ size_t mpz_as_str_inpl(const mpz_t *i, unsigned int base, const char *prefix, ch
 }
 
 #endif // MICROPY_LONGINT_IMPL == MICROPY_LONGINT_IMPL_MPZ
+

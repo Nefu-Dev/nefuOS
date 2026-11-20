@@ -53,3 +53,4 @@ void lv_draw_dave2d_mask_rect(lv_draw_dave2d_unit_t * u, const lv_draw_mask_rect
 #endif
 }
 #endif //LV_USE_DRAW_DAVE2D
+

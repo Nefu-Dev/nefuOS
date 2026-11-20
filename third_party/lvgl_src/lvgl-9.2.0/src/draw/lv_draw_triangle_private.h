@@ -41,3 +41,4 @@ extern "C" {
 #endif
 
 #endif /*LV_DRAW_TRIANGLE_PRIVATE_H*/
+

@@ -49,3 +49,4 @@ void lv_demo_flex_layout(void)
  **********************/
 
 #endif
+

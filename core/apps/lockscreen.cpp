@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Lock Screen (screensaver / lock)
 // Full-screen wallpaper with time/date, click to unlock
 
@@ -119,7 +124,7 @@ void lockscreen_launch() {
     LockState* st = new LockState();
 
     // Create full-screen window
-    Window* w = g_wm->create_window("Lock Screen", 0, 0, 800, 600);
+    Window* w = g_wm->create_window(T("锁屏", "Lock Screen"), 0, 0, 800, 600);
     w->userdata = st;
     w->on_paint = lock_paint;
     w->on_mouse = lock_mouse;

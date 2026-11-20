@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #include "datlib/../cryptlib/aes.h"
 #include <cstdio>
 #include <cstring>
@@ -12,3 +17,4 @@ int main() {
     for (int i = 0; i < 16; i++) printf("%02x ", rt[i]); printf("\n");
     return 0;
 }
+

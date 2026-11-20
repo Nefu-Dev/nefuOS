@@ -63,3 +63,4 @@ SHARPYUV_EXTERN const SharpYuvConversionMatrix* SharpYuvGetConversionMatrix(
 #endif
 
 #endif  // WEBP_SHARPYUV_SHARPYUV_CSP_H_
+

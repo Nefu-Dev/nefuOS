@@ -803,3 +803,4 @@ const mp_spi_proto_t spi_proto = {
     .ioctl = spi_proto_ioctl,
     .transfer = spi_proto_transfer,
 };
+

@@ -70,3 +70,4 @@
 #define MICROPY_HW_PWM2_NAME        "PWM2"
 
 #define HELP_TEXT_BOARD_LED         "1,2,3"
+

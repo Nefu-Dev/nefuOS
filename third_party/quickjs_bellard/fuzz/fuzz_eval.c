@@ -47,3 +47,4 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     JS_FreeRuntime(rt);
     return 0;
 }
+

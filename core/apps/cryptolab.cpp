@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学实验室 —— 交互式加解密/哈希小工具
 // 窗口应用：参考 algoviz.cpp 的 create_window + userdata + 回调模式。
 //
@@ -279,7 +284,7 @@ static void lab_close(Window* w) {
 void cryptolab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Crypto Lab", x, y, LAB_W, LAB_H);
+    Window* w = g_wm->create_window(T("密码实验室", "Crypto Lab"), x, y, LAB_W, LAB_H);
     if (!w) return;
     CryptoLab* L = new CryptoLab();
     w->userdata = L;
@@ -290,3 +295,4 @@ void cryptolab_launch() {
 }
 
 } // namespace nefu
+

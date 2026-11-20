@@ -323,3 +323,4 @@ static void img_draw_core(lv_draw_unit_t * u_base, const lv_draw_image_dsc_t * d
 }
 
 #endif //LV_USE_DRAW_DAVE2D
+

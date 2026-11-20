@@ -70,3 +70,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     make_new, map_make_new,
     iter, map_iternext
     );
+

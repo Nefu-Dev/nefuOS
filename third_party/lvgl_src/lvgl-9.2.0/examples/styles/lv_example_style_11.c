@@ -48,3 +48,4 @@ void lv_example_style_11(void)
 }
 
 #endif
+

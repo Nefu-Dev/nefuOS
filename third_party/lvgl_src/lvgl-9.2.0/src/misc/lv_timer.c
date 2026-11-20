@@ -383,3 +383,4 @@ void lv_timer_handler_set_resume_cb(lv_timer_handler_resume_cb_t cb, void * data
     state.resume_cb = cb;
     state.resume_data = data;
 }
+

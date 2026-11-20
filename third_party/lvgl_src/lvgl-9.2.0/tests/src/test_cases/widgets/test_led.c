@@ -105,3 +105,4 @@ void test_led_get_brightness_works(void)
 }
 
 #endif
+

@@ -270,3 +270,4 @@ static void draw_to_canvas(lv_obj_t * canvas)
 }
 
 #endif
+

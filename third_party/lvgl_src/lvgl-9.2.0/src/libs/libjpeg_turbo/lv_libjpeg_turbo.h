@@ -46,3 +46,4 @@ void lv_libjpeg_turbo_deinit(void);
 #endif
 
 #endif /*LV_LIBJPEG_TURBO_H*/
+

@@ -212,3 +212,4 @@ void * lv_table_get_cell_user_data(lv_obj_t * obj, uint16_t row, uint16_t col);
 #endif
 
 #endif /*LV_TABLE_H*/
+

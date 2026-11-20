@@ -172,3 +172,4 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
 #endif
 
 #endif /*LV_DRAW_RECT_H*/
+

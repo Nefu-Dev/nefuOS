@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 计算几何模块
 // 点/线段/多边形基础运算：鞋带面积、Graham/Jarvis 凸包、线段相交、
 // 射线法点在多边形内、最近点对、极角排序、三角形外接/内切圆。
@@ -65,3 +70,4 @@ int geometry_self_test();
 
 } // namespace mathext
 } // namespace nefu
+

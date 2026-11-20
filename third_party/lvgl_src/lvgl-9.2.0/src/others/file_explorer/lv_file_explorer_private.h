@@ -67,3 +67,4 @@ struct lv_file_explorer_t {
 #endif
 
 #endif /*LV_FILE_EXPLORER_PRIVATE_H*/
+

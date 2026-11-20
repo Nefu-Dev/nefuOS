@@ -77,3 +77,4 @@ extern struct _spi_bdev_t spi_bdev;
 // USB config
 #define MICROPY_HW_USB_FS (1)
 // #define MICROPY_HW_USB_OTG_ID_PIN      (pin_C12) // This is not the official ID Pin which should be PA10
+

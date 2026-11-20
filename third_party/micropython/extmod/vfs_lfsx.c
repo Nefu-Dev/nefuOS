@@ -522,3 +522,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 #undef VFS_LFSx_QSTR
 
 #endif // defined(LFS_BUILD_VERSION)
+

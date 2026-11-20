@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 编码/解码 (codec) 模块
 // 覆盖各种二进制<->文本编码：Base32、Base36、Base58、Base62、
 // Base85(Ascii85/Z85)、Base91、hex、ROT13/ROT47、URL 编码、quoted-printable。
@@ -56,3 +61,4 @@ int codec_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // wasm_min.h — minimal WebAssembly MVP interpreter for the mini browser.
 // Lays the runtime foundation so modules such as Draco's decoder can later be
 // loaded. Supports: linear memory (with cross-call persistence via Instance),
@@ -799,3 +804,4 @@ static int run_module(Module& m, const char* fname, const uint64_t* args, uint64
 }
 
 } // namespace nefu_wasm
+

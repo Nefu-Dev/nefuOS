@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据库管理器 —— 窗口化 SQL 控制台
 //
 // 界面:
@@ -221,7 +226,7 @@ static void dbm_close(Window* w) {
 void dbmanager_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Database Manager", x, y, DBG_W, DBG_H);
+    Window* w = g_wm->create_window(T("数据库管理器", "Database Manager"), x, y, DBG_W, DBG_H);
     if (!w) return;
     DbMgr* m = new DbMgr();
     w->userdata = m;
@@ -233,3 +238,4 @@ void dbmanager_launch() {
 }
 
 } // namespace nefu
+

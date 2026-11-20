@@ -155,3 +155,4 @@ void lv_draw_vglite_layer(lv_draw_unit_t * draw_unit, const lv_draw_image_dsc_t 
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

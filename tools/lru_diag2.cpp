@@ -1,4 +1,9 @@
-﻿#include "datlib/lru.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "datlib/lru.h"
 #include <cstdio>
 int main(){
     nefu::dt::lru c(1);
@@ -16,3 +21,4 @@ int main(){
     printf("DONE\n");
     return 0;
 }
+

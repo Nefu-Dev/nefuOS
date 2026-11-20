@@ -257,3 +257,4 @@ void *esp_native_code_commit(void *buf, size_t len, void *reloc) {
     memcpy(p, buf, len);
     return p;
 }
+

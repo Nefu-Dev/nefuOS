@@ -134,3 +134,4 @@ uint32_t lv_anim_timeline_get_repeat_delay(lv_anim_timeline_t * at);
 #endif
 
 #endif /*LV_ANIM_TIMELINE_H*/
+

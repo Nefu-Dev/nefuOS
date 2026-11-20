@@ -74,3 +74,4 @@ void lv_draw_line(lv_layer_t * layer, const lv_draw_line_dsc_t * dsc);
 #endif
 
 #endif /*LV_DRAW_LINE_H*/
+

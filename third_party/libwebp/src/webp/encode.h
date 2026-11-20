@@ -556,3 +556,4 @@ WEBP_NODISCARD WEBP_EXTERN int WebPEncode(const WebPConfig* config,
 #endif
 
 #endif  // WEBP_WEBP_ENCODE_H_
+

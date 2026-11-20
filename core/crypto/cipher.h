@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 分组/流密码模块
 // 本模块从零实现常用对称密码算法，教学友好，全部使用裸数组，无 STL、无异常。
 // 覆盖：AES-128/192/256 (ECB/CBC/CTR)、DES、3DES、RC4、ChaCha20、Salsa20、
@@ -129,3 +134,4 @@ int cipher_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // pacman.cpp —— nefuOS 吃豆人（Pac-Man 简化版）
 //
 // 玩法：
@@ -391,7 +396,7 @@ static void pac_close(Window* w) {
 void pacman_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Pac-Man", x, y, PW, PH);
+    Window* w = g_wm->create_window(T("吃豆人", "Pac-Man"), x, y, PW, PH);
     if (!w) return;
     PacGame* g = new PacGame();
     g->reset();
@@ -404,3 +409,4 @@ void pacman_launch() {
 }
 
 } // namespace nefu
+

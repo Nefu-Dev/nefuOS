@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 古典密码实现
 #include "classic.h"
 #include <string.h>
@@ -459,3 +464,4 @@ int classic_self_test(){
 
 } // namespace crypto
 } // namespace nefu
+

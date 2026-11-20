@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS system settings persistence and load/save logic
 #include "settings.h"
 #include "../klib/klib.h"
@@ -42,6 +47,22 @@ static bool parse_int(const char* key, const char* line, int* out) {
     return true;
 }
 
+// Signed variant: timezone offsets west of UTC are negative (UTC-5 => tz=-300).
+static bool parse_sint(const char* key, const char* line, int* out) {
+    int k = 0;
+    while (key[k] && line[k] && key[k] == line[k]) k++;
+    if (key[k] != 0) return false;
+    while (line[k] == ' ' || line[k] == '=' || line[k] == '\t') k++;
+    int sign = 1;
+    if (line[k] == '-') { sign = -1; k++; }
+    else if (line[k] == '+') { k++; }
+    if (!line[k]) return false;
+    int v = 0;
+    while (line[k] >= '0' && line[k] <= '9') { v = v * 10 + (line[k] - '0'); k++; }
+    *out = sign * v;
+    return true;
+}
+
 void settings_load() {
     // The bare kernel never runs C++ static ctors, so g_settings starts
     // all-zero in .bss. Re-apply the defaults before reading the config so
@@ -52,11 +73,13 @@ void settings_load() {
     g_settings.wallpaper_boot = 0;
     g_settings.show_clock = true;
     g_settings.show_taskbar = true;
-    g_settings.lang = 0;
+    g_settings.lang = 0;            // English by default; Settings switches to Chinese
     g_settings.lock_on_suspend = true;
     g_settings.boot_splash = true;
     g_settings.idle_lock_sec = 0;
     g_settings.browser_engine = 0;
+    g_settings.tz_offset_min = 480;      // CST-8 (Asia/Shanghai); config overrides
+    g_settings.rtc_is_utc = false;       // Windows dual-boot writes local time
     g_settings.autostart_apps[0] = 0;
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f || f->is_dir || f->size == 0) return;
@@ -80,6 +103,8 @@ void settings_load() {
             else if (parse_int("boot_splash", line, &v)) g_settings.boot_splash = (v != 0);
             else if (parse_int("idle_lock", line, &v)) g_settings.idle_lock_sec = v;
             else if (parse_int("browser_engine", line, &v)) g_settings.browser_engine = v;
+            else if (parse_sint("tz", line, &v)) g_settings.tz_offset_min = v;
+            else if (parse_int("rtc_utc", line, &v)) g_settings.rtc_is_utc = (v != 0);
             else if (strncmp(line, "autostart=", 10) == 0) {
                 strncpy(g_settings.autostart_apps, line + 10, sizeof(g_settings.autostart_apps)-1);
                 g_settings.autostart_apps[sizeof(g_settings.autostart_apps)-1] = 0;
@@ -97,11 +122,12 @@ void settings_load() {
 void settings_save() {
     char buf[512];
     int n = ksprintf(buf, sizeof(buf),
-        "accent=%d\nwallpaper=%d\nwall_lock=%d\nwall_boot=%d\nclock=%d\ntaskbar=%d\nlang=%d\nlock_suspend=%d\nboot_splash=%d\nidle_lock=%d\nbrowser_engine=%d\nautostart=%s\n",
+        "accent=%d\nwallpaper=%d\nwall_lock=%d\nwall_boot=%d\nclock=%d\ntaskbar=%d\nlang=%d\nlock_suspend=%d\nboot_splash=%d\nidle_lock=%d\nbrowser_engine=%d\ntz=%d\nrtc_utc=%d\nautostart=%s\n",
         g_settings.accent, g_settings.wallpaper, g_settings.wallpaper_lock, g_settings.wallpaper_boot,
         g_settings.show_clock ? 1 : 0, g_settings.show_taskbar ? 1 : 0, g_settings.lang,
         g_settings.lock_on_suspend ? 1 : 0, g_settings.boot_splash ? 1 : 0,
-        g_settings.idle_lock_sec, g_settings.browser_engine, g_settings.autostart_apps);
+        g_settings.idle_lock_sec, g_settings.browser_engine,
+        g_settings.tz_offset_min, g_settings.rtc_is_utc ? 1 : 0, g_settings.autostart_apps);
     FSNode* f = g_vfs->resolve("/etc/settings.conf");
     if (!f) {
         g_vfs->mkdir("/etc");
@@ -111,3 +137,4 @@ void settings_save() {
 }
 
 } // namespace nefu
+

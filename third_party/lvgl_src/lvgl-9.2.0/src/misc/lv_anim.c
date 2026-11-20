@@ -705,3 +705,4 @@ static void remove_anim(void * a)
     if(anim->deleted_cb != NULL) anim->deleted_cb(anim);
     lv_free(a);
 }
+

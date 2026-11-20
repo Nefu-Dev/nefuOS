@@ -71,3 +71,4 @@ time_t time(time_t *t) {
 time_t mktime(void *tm) {
     return 0;
 }
+

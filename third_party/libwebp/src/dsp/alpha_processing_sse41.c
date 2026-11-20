@@ -90,3 +90,4 @@ WEBP_TSAN_IGNORE_FUNCTION void WebPInitAlphaProcessingSSE41(void) {
 WEBP_DSP_INIT_STUB(WebPInitAlphaProcessingSSE41)
 
 #endif  // WEBP_USE_SSE41
+

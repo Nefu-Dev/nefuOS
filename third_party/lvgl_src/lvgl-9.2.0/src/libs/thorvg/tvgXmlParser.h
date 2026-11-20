@@ -62,3 +62,4 @@ const char* simpleXmlNodeTypeToString(SvgNodeType type);
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

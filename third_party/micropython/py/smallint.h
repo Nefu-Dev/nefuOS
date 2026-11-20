@@ -73,3 +73,4 @@ mp_int_t mp_small_int_modulo(mp_int_t dividend, mp_int_t divisor);
 mp_int_t mp_small_int_floor_divide(mp_int_t num, mp_int_t denom);
 
 #endif // MICROPY_INCLUDED_PY_SMALLINT_H
+

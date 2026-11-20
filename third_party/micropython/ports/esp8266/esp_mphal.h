@@ -104,3 +104,4 @@ void mp_hal_pin_open_drain(mp_hal_pin_obj_t pin);
 
 void *ets_get_esf_buf_ctlblk(void);
 int ets_esf_free_bufs(int idx);
+

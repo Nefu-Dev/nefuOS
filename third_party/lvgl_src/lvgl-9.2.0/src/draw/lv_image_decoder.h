@@ -192,3 +192,4 @@ lv_draw_buf_t * lv_image_decoder_post_process(lv_image_decoder_dsc_t * dsc, lv_d
 #endif
 
 #endif /*LV_IMAGE_DECODER_H*/
+

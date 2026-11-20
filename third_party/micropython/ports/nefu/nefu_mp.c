@@ -501,3 +501,4 @@ int nefu_mp_exec(const char *src, int file_input) {
 const char *nefu_mp_version(void) {
     return MICROPY_VERSION_STRING;
 }
+

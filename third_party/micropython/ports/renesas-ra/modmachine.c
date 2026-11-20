@@ -243,3 +243,4 @@ NORETURN static void mp_machine_deepsleep(size_t n_args, const mp_obj_t *args) {
 static mp_int_t mp_machine_reset_cause(void) {
     return reset_cause;
 }
+

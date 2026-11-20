@@ -612,3 +612,4 @@ static mp_int_t mp_machine_adc_read_u16(machine_adc_obj_t *self) {
 }
 
 #endif
+

@@ -449,3 +449,4 @@ int32_t lv_clamp_height(int32_t height, int32_t min_height, int32_t max_height, 
 #endif
 
 #endif /*LV_OBJ_POS_H*/
+

@@ -52,3 +52,4 @@ typedef struct {
 #endif
 
 #endif /*LV_RTTHREAD_H*/
+

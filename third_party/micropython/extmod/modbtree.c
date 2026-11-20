@@ -439,3 +439,4 @@ MP_REGISTER_MODULE(MP_QSTR_btree, mp_module_btree);
 #endif
 
 #endif // MICROPY_PY_BTREE
+

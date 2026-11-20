@@ -23,3 +23,4 @@
         .pin = p_pin, \
         .ad = p_adc, \
     }
+

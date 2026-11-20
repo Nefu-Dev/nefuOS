@@ -146,3 +146,4 @@ static void hook_division_lines(lv_event_t * e)
 }
 
 #endif
+

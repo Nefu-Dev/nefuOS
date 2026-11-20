@@ -540,3 +540,4 @@ static void refresh_cb(lv_timer_t * timer)
 }
 
 #endif /*LV_USE_QNX*/
+

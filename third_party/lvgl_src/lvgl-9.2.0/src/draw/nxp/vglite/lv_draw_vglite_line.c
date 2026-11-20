@@ -143,3 +143,4 @@ static void _vglite_draw_line(const lv_point_t * point1, const lv_point_t * poin
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

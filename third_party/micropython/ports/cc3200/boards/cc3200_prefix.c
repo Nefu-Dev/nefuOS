@@ -67,3 +67,4 @@
     .irq_trigger    = 0, \
     .irq_flags      = 0, \
 }
+

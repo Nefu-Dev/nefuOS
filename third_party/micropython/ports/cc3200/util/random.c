@@ -107,3 +107,4 @@ uint32_t rng_get (void) {
     s_seed = lfsr( s_seed );
     return s_seed;
 }
+

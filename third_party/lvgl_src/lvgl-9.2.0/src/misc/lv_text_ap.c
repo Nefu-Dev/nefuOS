@@ -299,3 +299,4 @@ static bool lv_text_is_arabic_vowel(uint16_t c)
 }
 
 #endif
+

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_windows_input.c
  *
  */
@@ -823,3 +823,4 @@ bool lv_windows_encoder_device_window_message_handler(
 }
 
 #endif // LV_USE_WINDOWS
+

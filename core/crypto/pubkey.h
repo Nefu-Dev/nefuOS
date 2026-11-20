@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 非对称密码模块
 // 基于 core/lib/bigint.h 的 bignum::BigInt 实现：
 //   RSA（密钥生成 / 加密 / 解密 / 签名 / 验证）
@@ -47,3 +52,4 @@ int pubkey_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

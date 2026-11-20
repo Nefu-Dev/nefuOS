@@ -81,3 +81,4 @@ typedef struct {
 MEMZIP_RESULT memzip_locate(const char *filename, void **data, size_t *len);
 
 MEMZIP_RESULT memzip_stat(const char *path, MEMZIP_FILE_INFO *info);
+

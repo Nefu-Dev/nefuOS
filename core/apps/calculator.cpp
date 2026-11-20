@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Calculator App
 // Simple 4-function calculator with basic operations
 
@@ -171,7 +176,7 @@ static void calc_close(Window* w) {
 
 void calculator_launch() {
     CalcState* st = new CalcState();
-    Window* w = g_wm->create_window("Calculator", 100, 100, 240, 320);
+    Window* w = g_wm->create_window(T("计算器", "Calculator"), 100, 100, 240, 320);
     w->userdata = st;
     w->on_paint = calc_paint;
     w->on_mouse = calc_mouse;
@@ -180,3 +185,4 @@ void calculator_launch() {
 }
 
 } // namespace nefu
+

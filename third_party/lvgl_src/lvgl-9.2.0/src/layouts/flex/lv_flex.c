@@ -534,3 +534,4 @@ static int32_t lv_obj_get_height_with_margin(const lv_obj_t * obj)
 }
 
 #endif /*LV_USE_FLEX*/
+

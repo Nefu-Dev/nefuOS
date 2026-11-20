@@ -199,3 +199,4 @@ static lv_cache_compare_res_t freetype_glyph_compare_cb(const lv_freetype_glyph_
 }
 
 #endif /*LV_USE_FREETYPE*/
+

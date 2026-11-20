@@ -89,3 +89,4 @@ static WEBP_INLINE int IsFlatSource16(const uint8_t* src) {
 }
 
 #endif  // WEBP_DSP_QUANT_H_
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— 内存表格实现 + 自测
 #include "dblib/table.h"
 #include <cstdio>
@@ -247,3 +252,4 @@ int Table::self_test() {
 
 } // namespace dbx
 } // namespace nefu
+

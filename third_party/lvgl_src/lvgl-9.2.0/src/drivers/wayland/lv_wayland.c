@@ -2858,3 +2858,4 @@ bool lv_wayland_timer_handler(void)
 
 #endif /* LV_USE_WAYLAND */
 #endif /* _WIN32 */
+

@@ -108,3 +108,4 @@ int esp_hosted_wifi_get_stations(uint8_t *sta_list, size_t *sta_count);
 int esp_hosted_wifi_netinfo(esp_hosted_netinfo_t *netinfo);
 int esp_hosted_wifi_scan(esp_hosted_scan_callback_t scan_callback, void *arg, uint32_t timeout);
 #endif // MICROPY_INCLUDED_DRIVERS_ESPHOST_WIFI_H
+

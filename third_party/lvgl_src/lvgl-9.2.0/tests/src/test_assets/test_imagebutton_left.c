@@ -73,3 +73,4 @@ const lv_image_dsc_t imagebutton_left = {
 };
 
 #endif /* LV_BUILD_TEST */
+

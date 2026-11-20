@@ -113,3 +113,4 @@ lv_obj_t * lv_tabview_get_tab_bar(lv_obj_t * obj);
 #endif
 
 #endif /*LV_TABVIEW_H*/
+

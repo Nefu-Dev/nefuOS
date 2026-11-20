@@ -78,3 +78,4 @@ static inline void restore_irq_pri(uint32_t basepri) {
 #define IRQ_PRI_PENDSV          NVIC_EncodePriority(NVIC_PRIORITYGROUP_4, 15, 0)
 
 #endif // MICROPY_INCLUDED_MIMXRT_IRQ_H
+

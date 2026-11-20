@@ -141,3 +141,4 @@ static inline void mp_usbd_init(void) {
 #endif // MICROPY_HW_ENABLE_USBDEV
 
 #endif // MICROPY_INCLUDED_SHARED_TINYUSB_USBD_H
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Enable/disable modules and 3rd-party libs to be included in interpreter
 
 # Build 32-bit binaries on a 64-bit host
@@ -44,3 +49,4 @@ MICROPY_ROM_TEXT_COMPRESSION = 1
 MICROPY_VFS_FAT = 1
 MICROPY_VFS_LFS1 = 1
 MICROPY_VFS_LFS2 = 1
+

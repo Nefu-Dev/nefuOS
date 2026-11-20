@@ -91,3 +91,4 @@ void mp_bluetooth_nimble_sent_hci_packet(void);
 
 
 #endif // MICROPY_INCLUDED_EXTMOD_NIMBLE_MODBLUETOOTH_NIMBLE_H
+

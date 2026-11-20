@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ： font.h BMP，
 #include <cstdio>
 #include <cstdint>
@@ -69,3 +74,4 @@ int main() {
     printf("font_preview.bmp written %dx%d\n", W, H);
     return 0;
 }
+

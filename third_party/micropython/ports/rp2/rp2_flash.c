@@ -210,3 +210,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     make_new, rp2_flash_make_new,
     locals_dict, &rp2_flash_locals_dict
     );
+

@@ -124,3 +124,4 @@ const lv_image_dsc_t test_image_cogwheel_xrgb8888 = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

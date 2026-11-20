@@ -94,3 +94,4 @@ void lv_draw_dave2d_transform(lv_draw_dave2d_unit_t * draw_unit, const lv_area_t
 #endif
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

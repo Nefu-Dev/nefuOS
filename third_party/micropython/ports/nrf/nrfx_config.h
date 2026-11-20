@@ -243,3 +243,4 @@
 #endif
 
 #endif // NRFX_CONFIG_H
+

@@ -60,3 +60,4 @@ void mp_thread_mutex_unlock(mp_thread_mutex_t *mutex);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_MPTHREAD_H
+

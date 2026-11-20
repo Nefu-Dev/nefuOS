@@ -26,3 +26,4 @@ extern void (*SharpYuvFilterRow)(const int16_t* A, const int16_t* B, int len,
 void SharpYuvInitDsp(void);
 
 #endif  // WEBP_SHARPYUV_SHARPYUV_DSP_H_
+

@@ -245,3 +245,4 @@ void lv_arc_rotate_obj_to_angle(const lv_obj_t * obj, lv_obj_t * obj_to_rotate, 
 #endif
 
 #endif /*LV_ARC_H*/
+

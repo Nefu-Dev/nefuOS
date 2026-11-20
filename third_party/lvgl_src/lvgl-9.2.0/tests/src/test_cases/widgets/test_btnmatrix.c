@@ -458,3 +458,4 @@ void test_button_matrix_focused_event_works(void)
 }
 
 #endif
+

@@ -52,3 +52,4 @@ static inline void mp_bluetooth_hci_poll_in_ms(uint32_t ms) {
 void mp_bluetooth_hci_poll(void);
 
 #endif // MICROPY_INCLUDED_STM32_MPBTHCIPORT_H
+

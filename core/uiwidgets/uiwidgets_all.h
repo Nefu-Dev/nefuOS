@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— 聚合头
 //   #include "uiwidgets/uiwidgets_all.h"
 // 暴露 nefu::ui:全部组件类与各模块自检入口。
@@ -29,3 +34,4 @@ inline int uiwidgets_self_test() {
 
 } // namespace ui
 } // namespace nefu
+

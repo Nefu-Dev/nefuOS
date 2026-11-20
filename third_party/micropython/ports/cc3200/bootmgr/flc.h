@@ -93,3 +93,4 @@ typedef struct _sBootInfo_t
 #endif
 
 #endif // MICROPY_INCLUDED_CC3200_BOOTMGR_FLC_H
+

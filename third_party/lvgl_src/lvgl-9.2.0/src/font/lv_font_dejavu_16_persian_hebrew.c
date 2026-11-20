@@ -6603,3 +6603,4 @@ lv_font_t lv_font_dejavu_16_persian_hebrew = {
 };
 
 #endif /*#if LV_FONT_DEJAVU_16_PERSIAN_HEBREW*/
+

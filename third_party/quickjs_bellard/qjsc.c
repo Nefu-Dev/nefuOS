@@ -874,3 +874,4 @@ int main(int argc, char **argv)
     namelist_free(&init_module_list);
     return 0;
 }
+

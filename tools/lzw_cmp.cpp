@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // 完整对比：encode 写的码 vs decode 读的码
 #include <cstdio>
 #include <cstring>
@@ -90,3 +95,4 @@ int main() {
     printf("all match up to %d\n", ec < dc ? ec : dc);
     return 0;
 }
+

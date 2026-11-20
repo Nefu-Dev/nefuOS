@@ -172,3 +172,4 @@ void test_lottie_no_jump_when_visible_again(void)
 }
 
 #endif
+

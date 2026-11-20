@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 报文解剖器
 // 给一块原始以太网帧，逐层解析（以太网 -> IPv4 -> TCP/UDP/ICMP），
 // 输出一行人类可读描述，供 netlab 展示。纯只读，不修改、不分配。
@@ -17,3 +22,4 @@ int pkt_dissect_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

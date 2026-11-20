@@ -8,3 +8,4 @@
 #define SCE_USER_FAST_BOOT                         (0)
 #endif
 #endif /* R_SCE_CFG_H_ */
+

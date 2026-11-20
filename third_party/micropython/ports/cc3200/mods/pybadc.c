@@ -309,3 +309,4 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     call, adc_channel_call,
     locals_dict, &adc_channel_locals_dict
     );
+

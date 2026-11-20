@@ -50,3 +50,4 @@ extern lv_indev_t * lv_test_encoder_indev;
 #endif
 
 #endif /*LV_TEST_INDEV_H*/
+

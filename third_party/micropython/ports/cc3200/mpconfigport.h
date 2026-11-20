@@ -179,3 +179,4 @@ typedef long mp_off_t;
 #define MICROPY_PORT_WLAN_AP_KEY                    "www.wipy.io"
 #define MICROPY_PORT_WLAN_AP_SECURITY               SL_SEC_TYPE_WPA_WPA2
 #define MICROPY_PORT_WLAN_AP_CHANNEL                5
+

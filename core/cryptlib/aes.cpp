@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — AES-128 implementation（教学版，ECB 模式）
 #include "aes.h"
 #include <stdio.h>
@@ -216,3 +221,4 @@ int aes_self_test() {
 
 } // namespace crypt
 } // namespace nefu
+

@@ -483,3 +483,4 @@ static const mp_irq_methods_t pyb_rtc_irq_methods = {
     .disable = pyb_rtc_irq_disable,
     .flags = pyb_rtc_irq_flags
 };
+

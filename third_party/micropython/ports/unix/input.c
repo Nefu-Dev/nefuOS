@@ -124,3 +124,4 @@ void prompt_write_history(void) {
     #endif
     #endif
 }
+

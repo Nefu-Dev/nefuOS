@@ -90,3 +90,4 @@ struct lv_draw_sw_blend_image_dsc_t {
 #endif
 
 #endif /*LV_DRAW_SW_BLEND_PRIVATE_H*/
+

@@ -283,3 +283,4 @@ static void asm_debug_setcc_reg_reg_reg(asm_debug_t *as, int op, int reg1, int r
 #include "py/emitnative.c"
 
 #endif
+

@@ -60,3 +60,4 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
 void mp_hal_stdout_tx_str(const char *str) {
     mp_hal_stdout_tx_strn(str, strlen(str));
 }
+

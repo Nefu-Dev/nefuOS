@@ -548,3 +548,4 @@ mp_obj_t mp_obj_new_jsproxy(int ref) {
     o->ref = ref;
     return MP_OBJ_FROM_PTR(o);
 }
+

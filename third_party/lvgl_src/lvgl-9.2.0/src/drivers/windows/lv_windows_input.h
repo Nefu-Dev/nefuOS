@@ -81,3 +81,4 @@ lv_indev_t * lv_windows_acquire_encoder_indev(lv_display_t * display);
 #endif
 
 #endif /*LV_WINDOWS_INPUT_H*/
+

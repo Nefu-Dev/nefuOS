@@ -85,3 +85,4 @@ void lv_example_chart_3(void)
 }
 
 #endif
+

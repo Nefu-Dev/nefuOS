@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— 虚拟文件系统层(VFS)
 //
 // VFS 在多种具体文件系统(FAT16 / ext2 / MinixFS)之上提供统一接口:
@@ -94,3 +99,4 @@ int vfs_layer_self_test();
 
 } // namespace filesystem
 } // namespace nefu
+

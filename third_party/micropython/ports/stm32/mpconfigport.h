@@ -307,3 +307,4 @@ typedef long mp_off_t;
 
 // Needed for MICROPY_PY_RANDOM_SEED_INIT_FUNC.
 uint32_t rng_get(void);
+

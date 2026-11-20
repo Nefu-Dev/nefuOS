@@ -130,3 +130,4 @@ const lv_property_name_t lv_style_property_names[112] = {
 };
 /* *INDENT-ON* */
 #endif
+

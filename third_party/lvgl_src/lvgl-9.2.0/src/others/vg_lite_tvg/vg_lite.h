@@ -1385,3 +1385,4 @@ typedef unsigned int        vg_lite_color_t;
 }
 #endif
 #endif /* _vg_lite_h_ */
+

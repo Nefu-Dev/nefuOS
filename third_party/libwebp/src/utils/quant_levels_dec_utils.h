@@ -33,3 +33,4 @@ int WebPDequantizeLevels(uint8_t* const data, int width, int height, int stride,
 #endif
 
 #endif  // WEBP_UTILS_QUANT_LEVELS_DEC_UTILS_H_
+

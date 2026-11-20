@@ -589,3 +589,4 @@ WEBP_EXTERN WebPMuxError WebPAnimEncoderDeleteChunk(
 #endif
 
 #endif  // WEBP_WEBP_MUX_H_
+

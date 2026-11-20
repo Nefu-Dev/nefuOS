@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 消息认证码实现
 // HMAC: RFC 2104；CMAC: NIST SP 800-38B；Poly1305: RFC 8439。
 #include "mac.h"
@@ -360,3 +365,4 @@ int mac_self_test() {
 
 } // namespace crypto
 } // namespace nefu
+

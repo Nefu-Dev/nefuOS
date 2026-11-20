@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS prime number library — implementation
 #include "prime.h"
 
@@ -119,3 +124,4 @@ void factorize_u64(uint64_t n, List<Factor>& out) {
 
 } // namespace prime
 } // namespace nefu
+

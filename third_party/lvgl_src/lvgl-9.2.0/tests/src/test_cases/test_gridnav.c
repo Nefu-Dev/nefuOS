@@ -112,3 +112,4 @@ void test_gridnav_horizontal_move_only(void)
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  funcmd.cpp —— 趣味命令实现
 // =============================================================================
@@ -298,3 +303,4 @@ int funcmd_self_test() {
 
 } // namespace termcmds
 } // namespace nefu
+

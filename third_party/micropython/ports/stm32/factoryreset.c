@@ -145,3 +145,4 @@ MP_WEAK int factory_reset_create_filesystem(void) {
 #endif
 
 #endif // MICROPY_HW_ENABLE_STORAGE
+

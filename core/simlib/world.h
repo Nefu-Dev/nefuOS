@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 2D 格子世界 world
 // 教学版：智能体在网格上觅食/游走的小型生态模拟。
 // 用于理解"基于代理的建模（ABM）"：空间 + 状态 + 行为规则。
@@ -66,3 +71,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

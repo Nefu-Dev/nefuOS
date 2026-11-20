@@ -97,3 +97,4 @@ extern void wlan_set_current_time (uint32_t seconds_since_2000);
 extern void wlan_off_on (void);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_MODWLAN_H
+

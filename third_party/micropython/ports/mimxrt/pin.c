@@ -213,3 +213,4 @@ const machine_pin_af_obj_t *pin_find_af_by_name(const machine_pin_obj_t *pin, co
     // TODO: Implement pin_find_af_by_name function
     return NULL;
 }
+

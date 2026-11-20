@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Word Count — count lines, words, chars, bytes in a file
 #include "apps.h"
 #include "../gui/wm.h"
@@ -113,7 +118,7 @@ void wc_close(Window* w) {
 void wordcount_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Word Count", x, y, 320, 260);
+    Window* w = g_wm->create_window(T("字数统计", "Word Count"), x, y, 320, 260);
     if (!w) return;
     WordCount* g = new WordCount();
     g->w = w->content_w;
@@ -131,3 +136,4 @@ void wordcount_launch() {
 }
 
 } // namespace nefu
+

@@ -54,3 +54,4 @@ void mp_emitter_warning(pass_kind_t pass, const char *msg) {
 }
 
 #endif // MICROPY_WARNINGS
+

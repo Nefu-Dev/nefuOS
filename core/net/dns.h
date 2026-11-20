@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS DNS — RFC 1035 message codec (parse + build), no sockets needed.
 // Handles header, name compression, question/answer parsing for A, AAAA,
 // CNAME, PTR, NS, MX, TXT, SOA records, and query packet building.
@@ -85,3 +90,4 @@ bool self_test();
 
 } // namespace dns
 } // namespace nefu
+

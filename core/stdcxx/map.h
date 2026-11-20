@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - <map>
 // Ordered key/value map backed by an AVL tree on the nefuOS kernel heap.
 #pragma once
@@ -69,3 +74,4 @@ public:
 
 } // namespace stdx
 } // namespace nefu
+

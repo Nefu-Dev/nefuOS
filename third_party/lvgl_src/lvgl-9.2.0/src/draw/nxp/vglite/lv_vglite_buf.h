@@ -122,3 +122,4 @@ void vglite_set_buf(vg_lite_buffer_t * vgbuf, void * buf,
 #endif
 
 #endif /*LV_VGLITE_BUF_H*/
+

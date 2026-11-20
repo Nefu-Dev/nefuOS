@@ -20,3 +20,4 @@
 #include "src/dsp/cpu.h"
 
 #endif  // WEBP_SHARPYUV_SHARPYUV_CPU_H_
+

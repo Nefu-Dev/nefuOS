@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS fixed-point math library (Q16.16)
 // Integer-only math for the bare-metal kernel (no FPU, no SSE).
 // fix = int32_t, value = x / 65536.  Range approx ±32767.
@@ -56,3 +61,4 @@ fix fx_rad2deg(fix rad);      // rad * 180 / pi
 
 } // namespace fx
 } // namespace nefu
+

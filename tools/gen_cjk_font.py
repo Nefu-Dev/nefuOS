@@ -1,105 +1,118 @@
 # -*- coding: utf-8 -*-
 # nefuOS CJK bitmap font generator
-# Renders GB2312 level-1 hanzi (16-55 qu) plus full-width symbols (A1 qu)
-# from Windows simhei.ttf into a 16x16 bitmap table embedded in cjk_font.h.
+#
+# Renders the complete GB2312 character set (qu 1..87: full-width symbols,
+# hiragana/katakana, Greek, Cyrillic, pinyin and *all* 6763 hanzi) from
+# Windows simhei.ttf into a 16x16 1-bit table embedded in core/apps/cjk_font.h.
+#
+# Layout contract shared with core/gui/gfx.cpp and core/gui/lv_cjk_font.cpp:
+#   g_cjk_count  number of glyphs
+#   g_cjk_uni[]  unicode code points, ASCENDING (binary searchable)
+#   g_cjk_bits[] g_cjk_count * 32 bytes, glyph i = bits[i*32 .. i*32+31]
+#                16 rows, 2 bytes per row, MSB = leftmost pixel
+#
+# Glyphs are drawn on the *baseline* (13 px from the cell top) so hanzi with
+# few strokes (一, 口) sit where they belong instead of floating mid-cell.
+#
+# regenerate:
+#   python tools\gen_cjk_font.py
 import io
 from PIL import Image, ImageDraw, ImageFont
 
 FONT = r'C:\Windows\Fonts\simhei.ttf'
 OUT = r'D:\mycppos1\nefuOS\core\apps\cjk_font.h'
 
+CELL = 16
+BASELINE = 13       # baseline row inside the 16x16 cell
+THRESHOLD = 100     # ink if luma >= this
+
+
 def gb2312_chars():
-    """Yield (gb_bytes, unicode) for A1 qu + 16..55 qu (level-1 hanzi)."""
+    """Every assigned code point of GB2312 (A1..F7 qu), as (gb_bytes, unicode)."""
     out = []
-    # full-width symbols: qu 1 (0xA1)
-    for w in range(1, 95):
-        hi, lo = 0xA1, 0xA0 + w
-        try:
-            ch = bytes([hi, lo]).decode('gb2312')
-            out.append(((hi, lo), ord(ch)))
-        except Exception:
-            pass
-    # level-1 hanzi: qu 16..55
-    for q in range(16, 56):
+    for q in range(1, 88):
         for w in range(1, 95):
             hi, lo = 0xA0 + q, 0xA0 + w
             try:
                 ch = bytes([hi, lo]).decode('gb2312')
-                out.append(((hi, lo), ord(ch)))
             except Exception:
-                pass
+                continue
+            out.append(((hi, lo), ord(ch)))
     return out
 
-def render_glyph(font, unicode_cp, size=16):
-    """Render one glyph centered into a size x size 1-bit bitmap (row-major, MSB first)."""
-    ch = chr(unicode_cp)
-    img = Image.new('L', (size, size), 0)
+
+def render_glyph(font, uc):
+    """Render one glyph into 16 rows of 16 bits (MSB = leftmost pixel)."""
+    img = Image.new('L', (CELL, CELL), 0)
     d = ImageDraw.Draw(img)
-    # measure actual ink box
-    bbox = d.textbbox((0, 0), ch, font=font)
-    w = bbox[2] - bbox[0]
-    h = bbox[3] - bbox[1]
-    if w <= 0 or h <= 0:
+    try:
+        d.text((0, BASELINE), chr(uc), font=font, fill=255, anchor='ls')
+    except Exception:
         return None
-    # scale down if the glyph is larger than the cell (bold CJK at 16px can overflow)
-    scale = min(size / w, size / h, 1.0)
-    if scale < 0.999:
-        f2 = ImageFont.truetype(FONT, max(6, int(16 * scale)))
-        bbox2 = d.textbbox((0, 0), ch, font=f2)
-        w2 = bbox2[2] - bbox2[0]
-        h2 = bbox2[3] - bbox2[1]
-        ox = (size - w2) // 2 - bbox2[0]
-        oy = (size - h2) // 2 - bbox2[1]
-        d.text((ox, oy), ch, font=f2, fill=255)
-    else:
-        ox = (size - w) // 2 - bbox[0]
-        oy = (size - h) // 2 - bbox[1]
-        d.text((ox, oy), ch, font=font, fill=255)
     px = img.load()
     rows = []
-    for y in range(size):
+    for y in range(CELL):
         bits = 0
-        for x in range(size):
-            bits = (bits << 1) | (1 if px[x, y] >= 128 else 0)
+        for x in range(CELL):
+            bits = (bits << 1) | (1 if px[x, y] >= THRESHOLD else 0)
         rows.append(bits)
+    # a blank cell is legitimate (U+3000 ideographic space): keep it in the
+    # table so the code point resolves instead of showing a placeholder
     return rows
+
 
 def main():
     chars = gb2312_chars()
-    print('chars collected:', len(chars))
-    font = ImageFont.truetype(FONT, 16)
-    unis = []
-    bits = []
+    font = ImageFont.truetype(FONT, CELL)
+    pairs = []           # (unicode, 32 bytes)
+    seen = set()
     missing = 0
-    for (hi, lo), uc in chars:
+    for _gb, uc in chars:
+        if uc in seen:
+            continue
+        seen.add(uc)
         rows = render_glyph(font, uc)
         if rows is None:
             missing += 1
             continue
-        unis.append(uc)
+        data = []
         for r in rows:
-            bits.append((r >> 8) & 0xFF)
-            bits.append(r & 0xFF)
-    n = len(unis)
-    print('glyphs rendered:', n, 'missing:', missing)
+            data.append((r >> 8) & 0xFF)
+            data.append(r & 0xFF)
+        pairs.append((uc, data))
+
+    # ascending by unicode: gfx and the LVGL wrapper both binary-search this
+    pairs.sort(key=lambda p: p[0])
+    n = len(pairs)
+    print('gb2312 code points:', len(chars), 'glyphs:', n, 'empty/missing:', missing)
 
     out = io.StringIO()
-    out.write('// nefuOS built-in CJK bitmap font (16x16)\n')
-    out.write('// GB2312 level-1 hanzi (16-55 qu) + full-width symbols (A1 qu)\n')
-    out.write('// Rendered from simhei.ttf at build time; glyph shapes (CJK ideographs)\n')
-    out.write('// are not copyrightable and are shared for interoperability.\n')
+    out.write('// nefuOS built-in CJK bitmap font (16x16, 1bpp)\n')
+    out.write('// Generated by tools/gen_cjk_font.py - do not edit by hand.\n')
+    out.write('// Complete GB2312: qu 1..87 (symbols + kana + Greek/Cyrillic + pinyin\n')
+    out.write('// + all 6763 hanzi). Sorted by Unicode so callers can binary search.\n')
+    out.write('// Glyph shapes of CJK ideographs are not copyrightable; shared for\n')
+    out.write('// interoperability. Rendered from simhei.ttf at 16 px on baseline 13.\n')
     out.write('#pragma once\n#include <stdint.h>\n\n')
-    out.write('static const int g_cjk_count = %d;\n' % n)
+    out.write('static const int g_cjk_count = %d;\n\n' % n)
+    out.write('// unicode code points, ascending\n')
     out.write('static const uint16_t g_cjk_uni[%d] = {\n' % n)
     for i in range(0, n, 12):
-        out.write('    ' + ','.join('0x%04X' % u for u in unis[i:i+12]) + ',\n')
+        out.write('    ' + ','.join('0x%04X' % p[0] for p in pairs[i:i + 12]) + ',\n')
     out.write('};\n\n')
+    out.write('// 16 rows x 2 bytes per glyph, MSB first (LVGL A1 / gfx row layout)\n')
     out.write('static const uint8_t g_cjk_bits[%d] = {\n' % (n * 32))
-    for i in range(0, len(bits), 24):
-        out.write('    ' + ','.join('0x%02X' % b for b in bits[i:i+24]) + ',\n')
+    flat = []
+    for _uc, data in pairs:
+        flat.extend(data)
+    for i in range(0, len(flat), 24):
+        out.write('    ' + ','.join('0x%02X' % b for b in flat[i:i + 24]) + ',\n')
     out.write('};\n')
-    io.open(OUT, 'w', encoding='utf-8', newline='\n').write(out.getvalue())
-    print('wrote', OUT, 'bytes:', len(out.getvalue()))
+
+    text = out.getvalue()
+    io.open(OUT, 'w', encoding='utf-8', newline='\n').write(text)
+    print('wrote', OUT, 'bytes:', len(text))
+
 
 if __name__ == '__main__':
     main()

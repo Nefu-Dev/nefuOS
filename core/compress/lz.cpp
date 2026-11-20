@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— LZ77 家族字典压缩实现
 // 见 lz.h。每个算法都给教学注释，底部自测覆盖多种输入。
 #include "lz.h"

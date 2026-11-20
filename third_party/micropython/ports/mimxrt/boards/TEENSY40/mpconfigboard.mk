@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = MIMXRT1062
 MCU_VARIANT = MIMXRT1062DVJ6A
 
@@ -8,3 +13,4 @@ MICROPY_HW_FLASH_RESERVED ?= 0x1000  # 4KB
 
 deploy: $(BUILD)/firmware.hex
 	teensy_loader_cli --mcu=imxrt1062 -v -w $<
+

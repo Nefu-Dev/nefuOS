@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS (VFS)
 #pragma once
 #include "../klib/klib.h"
@@ -40,9 +45,24 @@ public:
     FSNode* cwd;
     void set_cwd(FSNode* n);
 
+    // ---- write-back tracking (NVFS autosave) ----
+    // Every mutating call records the affected path in a small fixed table; the
+    // autosave mirrors exactly those paths into the on-disk image instead of
+    // rebuilding 4 MiB four times a second. A change that cannot be mirrored
+    // one path at a time (delete / move / a very long path) raises
+    // dirty_all(), which asks the autosave for a full rebuild instead.
+    bool        dirty_all() const { return dirty_all_; }
+    int         dirty_count() const { return dirty_n_; }
+    const char* dirty_path(int i) const {
+        return (i >= 0 && i < dirty_n_) ? dirty_paths_[i] : "";
+    }
+    void        dirty_drop(int n);      // forget the first n (already written) paths
+    void        dirty_reset();          // forget everything, no rebuild pending
+
     void create_default_tree();
     void ensure_standard_dirs();                          // idempotent dir fix-up
     void ensure_default_files();                          // idempotent file fix-up (never clobbers)
+    void seed_empty_dirs();                               // every empty dir gets a README
     void cleanup_stray_nodes();                           // remove legacy broken nodes
     bool save(uint8_t** out, uint32_t* out_size);         // kfree
     bool load(const uint8_t* data, uint32_t size);
@@ -58,9 +78,16 @@ private:
     bool deser_node(const uint8_t*& p, const uint8_t* end, FSNode* parent);
     uint32_t ser_size(FSNode* n);
     void count_tree(FSNode* n, int& files, int& dirs);
+    void touch(const char* path);          // record one write-back path
+    void touch_node(FSNode* n);            // record a node by its full path
+    static const int DIRTY_MAX = 64;      // pending paths before a full rebuild
+    char dirty_paths_[DIRTY_MAX][96];     // fixed table: no heap churn on bare metal
+    int  dirty_n_;
+    bool dirty_all_;
     FSNode root_;
 };
 
 extern VFS* g_vfs;
 
 } // namespace nefu
+

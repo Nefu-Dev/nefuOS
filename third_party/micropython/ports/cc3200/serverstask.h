@@ -73,3 +73,4 @@ extern void servers_set_timeout(uint32_t timeout);
 extern uint32_t servers_get_timeout(void);
 
 #endif // MICROPY_INCLUDED_CC3200_SERVERSTASK_H
+

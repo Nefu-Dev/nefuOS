@@ -44,3 +44,4 @@ int gz_stream_init_from_stream(void *stream_data, stream_read_t stream_read);
 int gz_stream_read(size_t len, uint8_t *buf);
 
 #endif // MICROPY_INCLUDED_STM32_MBOOT_GZSTREAM_H
+

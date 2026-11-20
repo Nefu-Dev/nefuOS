@@ -128,3 +128,4 @@ float acosf(float x)
 	w = R(z)*s+c;
 	return 2*(df+w);
 }
+

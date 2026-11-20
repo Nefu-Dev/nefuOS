@@ -168,3 +168,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     print, machine_timer_print,
     locals_dict, &machine_timer_locals_dict
     );
+

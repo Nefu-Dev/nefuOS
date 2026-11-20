@@ -194,3 +194,4 @@ typedef struct {
 #endif
 
 #endif /*LV_DRAW_PRIVATE_H*/
+

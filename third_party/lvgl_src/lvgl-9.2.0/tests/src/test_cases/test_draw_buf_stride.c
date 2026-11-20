@@ -115,3 +115,4 @@ void test_draw_buf_stride_adjust(void)
 }
 
 #endif
+

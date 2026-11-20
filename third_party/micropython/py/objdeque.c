@@ -312,3 +312,4 @@ static mp_obj_t mp_obj_new_deque_it(mp_obj_t deque, mp_obj_iter_buf_t *iter_buf)
 #endif
 
 #endif // MICROPY_PY_COLLECTIONS_DEQUE
+

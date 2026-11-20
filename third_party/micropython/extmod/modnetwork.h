@@ -142,3 +142,4 @@ mp_obj_t mod_network_find_nic(const uint8_t *ip);
 #endif
 
 #endif // MICROPY_INCLUDED_MODNETWORK_H
+

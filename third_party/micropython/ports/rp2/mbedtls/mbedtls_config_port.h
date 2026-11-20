@@ -42,3 +42,4 @@ time_t rp2_rtctime_seconds(time_t *timer);
 #include "extmod/mbedtls/mbedtls_config_common.h"
 
 #endif /* MICROPY_INCLUDED_MBEDTLS_CONFIG_H */
+

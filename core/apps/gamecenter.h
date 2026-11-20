@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Game Center Application
 #pragma once
 
@@ -363,3 +368,4 @@ Window* open_game_center() {
 
 } // namespace apps
 } // namespace nefu
+

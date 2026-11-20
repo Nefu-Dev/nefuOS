@@ -71,3 +71,4 @@ const lv_image_dsc_t img_render_lvgl_logo_i1 = {
   .data = img_render_lvgl_logo_i1_map,
 };
 
+

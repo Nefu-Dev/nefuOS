@@ -36,3 +36,4 @@ void lv_example_dropdown_2(void)
 }
 
 #endif
+

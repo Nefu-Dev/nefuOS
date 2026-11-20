@@ -1279,3 +1279,4 @@ int VP8LGetHistoImageSymbols(int xsize, int ysize,
   WebPSafeFree(map_tmp);
   return (pic->error_code == VP8_ENC_OK);
 }
+

@@ -88,3 +88,4 @@ WEBP_EXTERN const WebPWorkerInterface* WebPGetWorkerInterface(void);
 #endif
 
 #endif  // WEBP_UTILS_THREAD_UTILS_H_
+

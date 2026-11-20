@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Snake Game
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -131,7 +136,7 @@ static void snake_close(Window* w) {
 void snake_launch() {
     SnakeState* st = new SnakeState();
     st->last_tick = platform_tick_ms();
-    Window* w = g_wm->create_window("Snake", 100, 100, GRID_W * CELL, GRID_H * CELL + 20);
+    Window* w = g_wm->create_window(T("贪吃蛇", "Snake"), 100, 100, GRID_W * CELL, GRID_H * CELL + 20);
     w->userdata = st;
     w->on_paint = snake_paint;
     w->on_tick = snake_tick_driver;

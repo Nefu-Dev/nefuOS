@@ -32,3 +32,4 @@
 #include "uart.h"
 
 #endif // MICROPY_INCLUDED_STM32_BTSTACK_PORT_H
+

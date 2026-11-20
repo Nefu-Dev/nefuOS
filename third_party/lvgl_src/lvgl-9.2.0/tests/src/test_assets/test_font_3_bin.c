@@ -313,3 +313,4 @@ unsigned char const test_font_3_buf[4892] = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

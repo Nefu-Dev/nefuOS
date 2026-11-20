@@ -393,3 +393,4 @@ static void mp_machine_pwm_duty_set_ns(machine_pwm_obj_t *self, mp_int_t duty_ns
     duty_type_flags[self->device] &= ~(1 << self->channel);
     mp_machine_pwm_start(self);
 }
+

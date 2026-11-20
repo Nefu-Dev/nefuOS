@@ -55,3 +55,4 @@ const lv_image_dsc_t img_lv_demo_music_btn_corner = {
     .data_size = sizeof(img_lv_demo_music_btn_corner_map),
 };
 #endif
+

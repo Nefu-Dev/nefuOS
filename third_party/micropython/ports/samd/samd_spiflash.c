@@ -299,3 +299,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 #endif // #if MICROPY_HW_SPIFLASH
+

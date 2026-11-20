@@ -190,3 +190,4 @@ const USBD_DescriptorsTypeDef USBD_Descriptors = {
 };
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

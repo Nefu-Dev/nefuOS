@@ -31,3 +31,4 @@
 #define mp_hal_set_interrupt_char(c) ((void)(c))
 
 #endif /* MICROPY_INCLUDED_MPHALPORT_H */
+

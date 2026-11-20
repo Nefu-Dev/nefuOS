@@ -158,3 +158,4 @@ WEBP_DSP_INIT_FUNC(VP8SSIMDspInit) {
 #endif
   }
 }
+

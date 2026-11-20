@@ -68,3 +68,4 @@
 #define MICROPY_HW_PWM3_NAME         "PWM3"
 
 #define HELP_TEXT_BOARD_LED          "1,2,3"
+

@@ -37,3 +37,4 @@ extern "C" {
 #endif
 
 #endif /*LV_COLOR_OP_PRIVATE_H*/
+

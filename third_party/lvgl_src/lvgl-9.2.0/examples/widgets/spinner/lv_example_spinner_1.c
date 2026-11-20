@@ -11,3 +11,4 @@ void lv_example_spinner_1(void)
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - <vector>
 // Dynamic array on the nefuOS kernel heap (kalloc/kfree).
 #pragma once
@@ -76,3 +81,4 @@ inline bool operator==(const vector<T>& a, const vector<T>& b) {
 
 } // namespace stdx
 } // namespace nefu
+

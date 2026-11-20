@@ -1126,3 +1126,4 @@ NORETURN void powerctrl_enter_standby_mode(void) {
     // MCU is reset on exit from standby, but just in case it's not, do an explicit reset.
     powerctrl_mcu_reset();
 }
+

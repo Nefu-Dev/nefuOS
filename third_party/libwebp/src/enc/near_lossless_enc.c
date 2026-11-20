@@ -149,3 +149,4 @@ extern void VP8LNearLosslessStub(void);
 void VP8LNearLosslessStub(void) {}
 
 #endif  // (WEBP_NEAR_LOSSLESS == 1)
+

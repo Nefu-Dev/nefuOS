@@ -39,3 +39,4 @@ void lv_example_event_4(void);
 #endif
 
 #endif /*LV_EXAMPLE_EVENT_H*/
+

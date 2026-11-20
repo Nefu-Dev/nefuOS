@@ -2453,3 +2453,4 @@ mp_obj_t mp_obj_new_bytes_iterator(mp_obj_t str, mp_obj_iter_buf_t *iter_buf) {
     o->cur = 0;
     return MP_OBJ_FROM_PTR(o);
 }
+

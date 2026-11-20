@@ -50,3 +50,4 @@ lv_obj_t * lv_switch_create(lv_obj_t * parent);
 #endif
 
 #endif /*LV_SWITCH_H*/
+

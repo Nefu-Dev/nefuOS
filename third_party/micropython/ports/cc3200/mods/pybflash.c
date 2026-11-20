@@ -105,3 +105,4 @@ void pyb_flash_init_vfs(fs_user_mount_t *vfs) {
     vfs->blockdev.u.ioctl[0] = (mp_obj_t)&pyb_flash_ioctl_obj;
     vfs->blockdev.u.ioctl[1] = (mp_obj_t)&pyb_flash_obj;
 }
+

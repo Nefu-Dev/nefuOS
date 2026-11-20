@@ -1059,3 +1059,4 @@ int VP8LGetBackwardReferences(
 
   return WebPReportProgress(pic, *percent + percent_range, percent);
 }
+

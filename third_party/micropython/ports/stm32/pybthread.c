@@ -231,3 +231,4 @@ void pyb_mutex_unlock(pyb_mutex_t *m) {
 }
 
 #endif // MICROPY_PY_THREAD
+

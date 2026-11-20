@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — Base64/Base32 (b64)
 // Base64：把 3 字节（24 位）拆成 4 个 6 位组，映射到 A-Za-z0-9+/。
 // 不足 3 字节时补 '='。用途：邮件附件（MIME）、URL 安全传输、JSON
@@ -23,3 +28,4 @@ int b64_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

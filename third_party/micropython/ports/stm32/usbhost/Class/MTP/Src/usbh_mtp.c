@@ -1063,3 +1063,4 @@ __weak void USBH_MTP_EventsCallback(USBH_HandleTypeDef *phost, uint32_t event, u
 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

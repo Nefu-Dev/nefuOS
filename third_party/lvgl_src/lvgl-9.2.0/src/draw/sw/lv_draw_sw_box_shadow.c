@@ -741,3 +741,4 @@ void lv_draw_sw_box_shadow(lv_draw_unit_t * draw_unit, const lv_draw_box_shadow_
 #endif /*LV_DRAW_SW_COMPLEX*/
 
 #endif /*LV_DRAW_USE_SW*/
+

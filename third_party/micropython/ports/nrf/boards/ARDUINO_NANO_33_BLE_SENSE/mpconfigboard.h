@@ -70,3 +70,4 @@
 void NANO33_board_early_init(void);
 void NANO33_board_deinit(void);
 void NANO33_board_enter_bootloader(void);
+

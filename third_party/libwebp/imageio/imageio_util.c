@@ -165,3 +165,4 @@ int ImgIoUtilCheckSizeArgumentsOverflow(uint64_t stride, size_t height) {
 }
 
 // -----------------------------------------------------------------------------
+

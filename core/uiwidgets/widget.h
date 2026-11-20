@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— Widget 基类
 // 纯软件绘制:所有组件渲染到 gfxlib::Buffer(离屏像素缓冲),不依赖 LVGL / 不直接操作硬件。
 // 设计目标:可在裸机与宿主(Win32)两端编译,仅依赖 gfxlib + klib。
@@ -205,3 +210,4 @@ int widget_self_test();
 
 } // namespace ui
 } // namespace nefu
+

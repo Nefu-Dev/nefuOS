@@ -407,3 +407,4 @@ const machine_pin_obj_t *pin_find_named_pin(const mp_obj_dict_t *named_pins, mp_
     }
     return NULL;
 }
+

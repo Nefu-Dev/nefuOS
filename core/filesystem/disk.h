@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— 虚拟磁盘(块设备)层
 //
 // 本模块模拟一块可寻址的磁盘:固定 512 字节扇区,内存中一块连续缓冲。
@@ -173,3 +178,4 @@ bool disk_inspect(Disk* d, DiskReport* out);
 
 } // namespace filesystem
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // fxexpr.h unit test (standalone, no nefuOS deps beyond softmath)
 #include "lib/fxexpr.h"   // -I core
 #include <stdio.h>
@@ -109,3 +114,4 @@ int main() {
     else printf("%d FAILURES\n", failures);
     return failures ? 1 : 0;
 }
+

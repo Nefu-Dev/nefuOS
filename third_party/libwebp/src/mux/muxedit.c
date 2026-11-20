@@ -657,3 +657,4 @@ WebPMuxError WebPMuxAssemble(WebPMux* mux, WebPData* assembled_data) {
 }
 
 //------------------------------------------------------------------------------
+

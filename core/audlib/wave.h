@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— WAV 文件读写 wave
 // 教学版：读写 16-bit PCM WAV 文件（单声道/双声道），用于音频教学与合成输出。
 // 类 + STL + 中文注释。
@@ -52,3 +57,4 @@ public:
 
 } // namespace audx
 } // namespace nefu
+

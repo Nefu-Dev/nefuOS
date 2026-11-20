@@ -739,3 +739,4 @@ void HAL_PCDEx_SetConnectionState(PCD_HandleTypeDef *hpcd, uint8_t state) {
 #endif // MICROPY_HW_USB_FS || MICROPY_HW_USB_HS
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

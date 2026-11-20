@@ -30,3 +30,4 @@ void lv_example_calendar_2(void)
 }
 
 #endif
+

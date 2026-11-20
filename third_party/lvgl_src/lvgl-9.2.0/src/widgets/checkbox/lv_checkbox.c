@@ -283,3 +283,4 @@ static void lv_checkbox_draw(lv_event_t * e)
     lv_draw_label(layer, &txt_dsc, &txt_area);
 }
 #endif
+

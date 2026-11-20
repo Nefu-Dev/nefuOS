@@ -105,3 +105,4 @@ extern struct _spi_bdev_t spi_bdev;
 #define MBOOT_I2C_SCL (pin_B8)
 #define MBOOT_I2C_SDA (pin_B9)
 #define MBOOT_I2C_ALTFUNC (4)
+

@@ -92,3 +92,4 @@ int32_t lv_text_get_width(const char * txt, uint32_t length, const lv_font_t * f
 #endif
 
 #endif /*LV_TEXT_H*/
+

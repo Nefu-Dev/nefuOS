@@ -240,3 +240,4 @@ static void lv_qrcode_destructor(const lv_obj_class_t * class_p, lv_obj_t * obj)
 }
 
 #endif /*LV_USE_QRCODE*/
+

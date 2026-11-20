@@ -56,3 +56,4 @@ mp_uint_t netutils_parse_inet_addr(mp_obj_t addr_in, uint8_t *out_ip, netutils_e
 void netutils_ethernet_trace(const mp_print_t *print, size_t len, const uint8_t *buf, unsigned int flags);
 
 #endif // MICROPY_INCLUDED_LIB_NETUTILS_NETUTILS_H
+

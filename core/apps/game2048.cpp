@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 2048 — sliding tile puzzle
 #include "apps.h"
 #include "../gui/wm.h"
@@ -166,7 +171,7 @@ void g_close(Window* w) {
 void game2048_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("2048", x, y, 340, 480);
+    Window* w = g_wm->create_window(T("2048", "2048"), x, y, 340, 480);
     if (!w) return;
     G2048* g = new G2048();
     g->w = w->content_w;
@@ -180,3 +185,4 @@ void game2048_launch() {
 }
 
 } // namespace nefu
+

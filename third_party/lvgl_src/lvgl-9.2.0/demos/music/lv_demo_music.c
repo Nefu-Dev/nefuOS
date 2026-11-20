@@ -256,3 +256,4 @@ static void auto_step_cb(lv_timer_t * t)
 #endif /*LV_DEMO_MUSIC_AUTO_PLAY*/
 
 #endif /*LV_USE_DEMO_MUSIC*/
+

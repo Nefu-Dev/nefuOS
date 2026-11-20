@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS graphics library — 2D affine transforms (Q16.16) + 3D wireframe
 // projection.  Everything is fixed-point (nefu::fx) so it runs on the bare
 // kernel without an FPU.
@@ -51,3 +56,4 @@ int transform_self_test();
 
 } // namespace gfxlib
 } // namespace nefu
+

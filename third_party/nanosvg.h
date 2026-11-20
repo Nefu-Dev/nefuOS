@@ -3276,3 +3276,4 @@ void nsvgDelete(NSVGimage* image)
 #endif // NANOSVG_IMPLEMENTATION
 
 #endif // NANOSVG_H
+

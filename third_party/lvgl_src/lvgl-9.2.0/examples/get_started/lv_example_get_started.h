@@ -39,3 +39,4 @@ void lv_example_get_started_4(void);
 #endif
 
 #endif /*LV_EX_GET_STARTED_H*/
+

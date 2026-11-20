@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS LVGL Demo - integrates LVGL 9.2.0 (MIT) as a second GUI engine.
 // A real LVGL display renders into a window: widgets (button, slider, arc,
 // meter, checkbox, bar) update live. Input (mouse) is forwarded to the
@@ -8,6 +13,7 @@
 // LV_USE_OS=LV_OS_NONE, LV_USE_FLOAT=0, built-in stdlib - no libc needed).
 #include "apps.h"
 #include "../gui/gfx.h"
+#include "../gui/i18n_zh.h"
 #include "../gui/widgets.h"
 #include "../gui/ttfont.h"
 
@@ -95,7 +101,7 @@ static void lvgl_build_ui() {
 
     // title
     lv_obj_t* title = lv_label_create(scr);
-    lv_label_set_text(title, "LVGL 9.2.0 running on nefuOS");
+    lv_label_set_text(title, nefu::zh_ui("LVGL 9.2.0 running on nefuOS"));
     lv_obj_set_style_text_color(title, lv_color_hex(0xCDD6F4), 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 12);
@@ -108,12 +114,12 @@ static void lvgl_build_ui() {
     lv_obj_set_style_radius(btn, 10, 0);
     lv_obj_add_event_cb(btn, on_counter_click, LV_EVENT_CLICKED, 0);
     lv_obj_t* btn_label = lv_label_create(btn);
-    lv_label_set_text(btn_label, "Click me");
+    lv_label_set_text(btn_label, nefu::zh_ui("Click me"));
     lv_obj_center(btn_label);
 
     // counter readout
     g_lv->counter_label = lv_label_create(scr);
-    lv_label_set_text(g_lv->counter_label, "clicks: 0");
+    lv_label_set_text(g_lv->counter_label, nefu::zh_ui("clicks: 0"));
     lv_obj_set_style_text_color(g_lv->counter_label, lv_color_hex(0xA6E3A1), 0);
     lv_obj_align(g_lv->counter_label, LV_ALIGN_CENTER, 60, -40);
 
@@ -126,7 +132,7 @@ static void lvgl_build_ui() {
     lv_obj_add_event_cb(sl, on_slider_change, LV_EVENT_VALUE_CHANGED, 0);
 
     g_lv->slider_value = lv_label_create(scr);
-    lv_label_set_text(g_lv->slider_value, "slider: 40");
+    lv_label_set_text(g_lv->slider_value, nefu::zh_ui("slider: 40"));
     lv_obj_set_style_text_color(g_lv->slider_value, lv_color_hex(0xF9E2AF), 0);
     lv_obj_align(g_lv->slider_value, LV_ALIGN_CENTER, 0, 58);
 
@@ -191,7 +197,7 @@ void lvgl_demo_launch() {
     lv_init();
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("LVGL Demo", x, y, 640, 420);
+    Window* w = g_wm->create_window(T("LVGL 演示", "LVGL Demo"), x, y, 640, 420);
     if (!w) return;
     LvglState* st = new LvglState();
     st->win = w;
@@ -227,3 +233,4 @@ void lvgl_demo_launch() {
 }
 
 } // namespace nefu
+

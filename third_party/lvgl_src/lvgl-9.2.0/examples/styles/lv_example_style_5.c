@@ -25,3 +25,4 @@ void lv_example_style_5(void)
 }
 
 #endif
+

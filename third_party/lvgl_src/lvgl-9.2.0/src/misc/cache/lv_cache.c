@@ -346,3 +346,4 @@ static lv_cache_entry_t * cache_add_internal_no_lock(lv_cache_t * cache, const v
 
     return entry;
 }
+

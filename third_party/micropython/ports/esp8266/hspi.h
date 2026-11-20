@@ -77,3 +77,4 @@ void spi_tx8fast(uint8_t spi_no, uint8_t dout_data);
 #define spi_rx32(spi_no)      spi_transaction(spi_no, 0, 0, 0, 0, 0, 0, 32,   0)
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— Painter 2D 绘制辅助
 // 在 gfxlib::Buffer 之上提供:圆角矩形、垂直/水平渐变、裁剪文字、alpha 混合。
 // 纯整数运算,无 STL/异常/RTTI。
@@ -65,3 +70,4 @@ int painter_self_test();
 
 } // namespace ui
 } // namespace nefu
+

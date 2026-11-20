@@ -111,3 +111,4 @@ void lv_obj_refresh_ext_draw_size(lv_obj_t * obj);
 #endif
 
 #endif /*LV_OBJ_DRAW_H*/
+

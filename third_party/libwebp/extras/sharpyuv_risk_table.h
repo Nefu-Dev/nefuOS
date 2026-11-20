@@ -25,3 +25,4 @@ extern const int kSharpYuvPrecomputedRiskYuvSampling;
 extern const uint8_t kSharpYuvPrecomputedRisk[];
 
 #endif  // WEBP_EXTRAS_SHARPYUV_RISK_TABLE_H_
+

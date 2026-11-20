@@ -252,3 +252,4 @@ static void list_delete_event_cb(lv_event_t * e)
     }
 }
 #endif /*LV_USE_DEMO_MUSIC*/
+

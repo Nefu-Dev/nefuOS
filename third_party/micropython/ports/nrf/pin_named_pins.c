@@ -92,3 +92,4 @@ const pin_af_obj_t *pin_find_af_by_name(const pin_obj_t *pin, const char *name) 
     return NULL;
 }
 */
+

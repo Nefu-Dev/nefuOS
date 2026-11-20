@@ -160,3 +160,4 @@ static inline int cyw43_sdio_transfer_cmd53(bool write, uint32_t block_size, uin
 #define CYW43_EVENT_POLL_HOOK MICROPY_EVENT_POLL_HOOK
 
 #endif // MICROPY_INCLUDED_STM32_CYW43_CONFIGPORT_H
+

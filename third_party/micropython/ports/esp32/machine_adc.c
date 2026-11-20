@@ -234,3 +234,4 @@ static void mp_machine_adc_atten_set(machine_adc_obj_t *self, mp_int_t atten) {
 static void mp_machine_adc_width_set(machine_adc_obj_t *self, mp_int_t width) {
     madcblock_bits_helper(self->block, width);
 }
+

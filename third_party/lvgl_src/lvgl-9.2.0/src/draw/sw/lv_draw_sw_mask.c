@@ -1234,3 +1234,4 @@ static inline lv_opa_t LV_ATTRIBUTE_FAST_MEM mask_mix(lv_opa_t mask_act, lv_opa_
 }
 
 #endif /*LV_DRAW_SW_COMPLEX*/
+

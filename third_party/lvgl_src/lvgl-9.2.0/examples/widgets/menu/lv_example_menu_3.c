@@ -57,3 +57,4 @@ void lv_example_menu_3(void)
 }
 
 #endif
+

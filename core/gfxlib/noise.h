@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS graphics library — noise & fractals (integer / Q16.16 only)
 // Hash-based value noise, Perlin gradient noise, fractal Brownian motion,
 // Worley cell noise, Mandelbrot/Julia escape-time (Q16.16), L-Systems,
@@ -60,3 +65,4 @@ int noise_self_test();
 
 } // namespace gfxlib
 } // namespace nefu
+

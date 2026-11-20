@@ -146,3 +146,4 @@ const lv_img_dsc_t img_benchmark_cogwheel_indexed16 = {
 };
 
 #endif
+

@@ -100,3 +100,4 @@ adc_config_t get_adc_config(int pin_id, int32_t flag);
 pwm_config_t get_pwm_config(int pin_id, int wanted_dev, uint8_t used_dev[]);
 const machine_pin_obj_t *pin_find_by_id(int pin_id);
 const machine_pin_obj_t *pin_find(mp_obj_t pin);
+

@@ -573,3 +573,4 @@ int SharpYuvConvertWithOptions(const void* r_ptr, const void* g_ptr,
 }
 
 //------------------------------------------------------------------------------
+

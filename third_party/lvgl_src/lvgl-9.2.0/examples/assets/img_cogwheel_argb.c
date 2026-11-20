@@ -124,3 +124,4 @@ const lv_image_dsc_t img_cogwheel_argb = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

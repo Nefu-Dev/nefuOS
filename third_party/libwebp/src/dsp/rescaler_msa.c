@@ -442,3 +442,4 @@ WEBP_TSAN_IGNORE_FUNCTION void WebPRescalerDspInitMSA(void) {
 WEBP_DSP_INIT_STUB(WebPRescalerDspInitMSA)
 
 #endif    // WEBP_USE_MSA
+

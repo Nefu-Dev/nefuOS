@@ -66,3 +66,4 @@ const mp_spiflash_config_t spiflash2_config = {
 };
 
 spi_bdev_t spi_bdev2;
+

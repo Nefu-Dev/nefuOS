@@ -29,3 +29,4 @@ void lv_example_label_3(void)
 }
 
 #endif
+

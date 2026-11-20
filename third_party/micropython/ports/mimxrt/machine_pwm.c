@@ -635,3 +635,4 @@ void mp_machine_pwm_duty_set_ns(machine_pwm_obj_t *self, mp_int_t duty) {
         configure_pwm(self);
     }
 }
+

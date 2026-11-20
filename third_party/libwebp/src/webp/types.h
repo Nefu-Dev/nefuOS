@@ -91,3 +91,4 @@ WEBP_EXTERN void WebPFree(void* ptr);
 #endif
 
 #endif  // WEBP_WEBP_TYPES_H_
+

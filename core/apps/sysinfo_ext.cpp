@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS System Info Extended
 // Detailed system information display
 #include "apps.h"
@@ -9,7 +14,7 @@
 namespace nefu {
 
 void sysinfo_extended_launch() {
-    Window* w = g_wm->create_window("System Information (Extended)", 80, 60, 520, 440);
+    Window* w = g_wm->create_window(T("系统信息（扩展）", "System Information (Extended)"), 80, 60, 520, 440);
     if (!w) return;
     
     // Header
@@ -89,3 +94,4 @@ void sysinfo_extended_launch() {
 }
 
 } // namespace nefu
+

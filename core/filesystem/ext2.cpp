@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— ext2 文件系统实现
 #include "ext2.h"
 #include "../klib/klib.h"
@@ -799,3 +804,4 @@ int ext2_self_test() {
 
 } // namespace filesystem
 } // namespace nefu
+

@@ -509,3 +509,4 @@ int flash_write(uint32_t flash_dest, const uint32_t *src, uint32_t num_word32) {
 
     return mp_hal_status_to_neg_errno(status);
 }
+

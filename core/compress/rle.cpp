@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— 游程编码实现
 // 见 rle.h 的接口约定。这里每个编码器都给出逐行教学注释，
 // 底部自测用多种输入形状做 round-trip。
@@ -378,3 +383,4 @@ int rle_self_test() {
 
 } // namespace compress
 } // namespace nefu
+

@@ -1,4 +1,4 @@
-# nefuOS �?exe + + + ISO�?GrubEsp 閺冨爼顤傛径鏍晸閹?ESP+GRUB 绾句胶娲忛梹婊冨剼閿?
+
 param(
     [switch]$GrubEsp
 )
@@ -52,7 +52,7 @@ $lvglCFlags = @("-std=gnu11", "-O2", "-Wall", "-I", "third_party",
                 "-I", "third_party\lvgl_conf", "-I", "third_party\lvgl_src\lvgl-9.2.0",
                 "-D", ('LV_CONF_PATH=' + $lvConfPath), "-c")
 
-# 1) 閿涘澋in32�?
+# 1) 閿涘澋in32 ?
 $bareOut = Join-Path $env:TEMP "nefu_build\bare"
 $distOut = Join-Path $env:TEMP "nefu_dist"
 New-Item -ItemType Directory -Force -Path $bareOut | Out-Null
@@ -135,12 +135,18 @@ $linkErr = Join-Path $env:TEMP ("nefu_link" + $pidTag + ".log")
 $hostLinkRsp = Join-Path $env:TEMP ("nefu_host_link" + $pidTag + ".rsp")
 $hostLinkArgs = @("-std=c++17", "-O2", "-fno-exceptions", "-fno-rtti", "-fno-builtin",
                   "-Wall", "-Wextra", "-Wno-sized-deallocation", "-I", "core", "-I", "third_party",
-                  "-DNEFU_LVGL_DEMO") +
+                  "-DNEFU_LVGL_DEMO",
+                  # Keep cc1plus' peak footprint bounded: with ~450 TUs in one
+                  # invocation the default GGC heap target lets the compiler
+                  # balloon past what a busy desktop has free, and it dies with
+                  # "cc1plus: out of memory allocating ...".  These params only
+                  # tune the garbage collector, never the generated code.
+                  "--param", "ggc-min-expand=10", "--param", "ggc-min-heapsize=65536") +
                 $lvglInclude + @("-o", $hostExe) +
-                $coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp") +
+                $coreSrc + @("backends\win32\win32.cpp", "backends\win32\ws_win32.cpp", "backends\win32\media_win32.cpp") +
                 $lvglHostObjs +
                 @("-lgdi32", "-luser32", "-lgdiplus", "-lole32", "-lws2_32", "-liphlpapi",
-                  "-lwlanapi", "-lwininet", "-lwinmm", "-lmfplat", "-lmfreadwrite", "-lmf",
+                  "-lwlanapi", "-lwininet", "-lwinhttp", "-lwinmm", "-lmfplat", "-lmfreadwrite", "-lmf",
                   "-lmfuuid", "-lcomdlg32")
 $hostLinkArgs | ForEach-Object { $_ -replace '\\', '/' } |
     ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } } |
@@ -305,10 +311,10 @@ $menuLen = (Get-Item "$bareOut\menu.bin").Length
 if ($menuLen -gt 4096) { throw "menu.bin too large: $menuLen bytes (max 4096)" }
 Write-Output "menu.bin OK: $menuLen bytes"
 
-# �?x20000 kernel_start
+#  ?x20000 kernel_start
 $objs = @("$bareOut\entry.o") + $objs
 
-# 4) link閿涘湧E �?>
+# 4) link閿涘湧E  ?>
 # Same 32KB command-line cap as the host link: pass the object list via a
 # response file so ld actually runs.
 $bareLinkRsp = Join-Path $env:TEMP ("nefu_bare_link" + $pidTag + ".rsp")
@@ -373,7 +379,7 @@ $stubLd = "D:\CLion\bin\mingw\bin\ld.exe"
 $stubGcc = "D:\CLion\bin\mingw\bin\gcc.exe"
 & $stubAs --32 "backends\bare\stub.s" -o "$bareOut\stub.o"
 if ($LASTEXITCODE -ne 0) { throw "stub.s failed" }
-& $g -m32 -ffreestanding -fno-builtin -Os -c "backends\bare\inflate.cpp" -o "$bareOut\inflate32.o"
+& $g -m32 -ffreestanding -fno-builtin -Os -c "core\net\inflate.cpp" -o "$bareOut\inflate32.o"
 if ($LASTEXITCODE -ne 0) { throw "inflate.c (m32) failed" }
 & $stubLd -mi386pe --image-base 0 -T "backends\bare\stub.ld" "$bareOut\stub.o" "$bareOut\inflate32.o" -o "$bareOut\stub.exe"
 if ($LASTEXITCODE -ne 0) { throw "stub link failed" }
@@ -421,7 +427,7 @@ $fs.WriteByte([byte](($kSectors -shr 8) -band 0xFF))
 $fs.Close()
 Write-Output "boot.bin patched: $kSectors kernel sectors (kernel_count@0x58)"
 
-# 6) ISO閿涘湕l Torito no-emulation閿涙瓬oot.bin 閻╁瓨甯撮弨鎯ф躬 ISO LBA23閿涘ernel.bin 閺€?LBA24�?#    boot.s 闁俺绻?int13 0x42 �?CD 閻╁瓨甯寸拠璇插絿閳ユ柡鈧柧绗夌紒蹇氱�?floppy.img 娑擃參妫跨仦鍌︾礉鐟佸憡婧€閸欘垳娲块幒銉ユ儙閸旑煉�?
+# 6) ISO閿涘湕l Torito no-emulation閿涙瓬oot.bin 閻╁瓨甯撮弨鎯ф躬 ISO LBA23閿涘ernel.bin 閺€?LBA24 ?#    boot.s 闁俺绻?int13 0x42  ?CD 閻╁瓨甯寸拠璇插絿閳ユ柡鈧柧绗夌紒蹇氱 ?floppy.img 娑擃參妫跨仦鍌︾礉鐟佸憡婧€閸欘垳娲块幒銉ユ儙閸旑煉 ?
 $python = "C:\Users\huawei\AppData\Local\Programs\Python\Python311\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
 $isoOut = Join-Path $distOut "nefuOS.iso"
@@ -429,15 +435,14 @@ $isoOut = Join-Path $distOut "nefuOS.iso"
 if ($LASTEXITCODE -ne 0) { throw "make_iso failed" }
 Write-Output "ISO OK: $((Get-Item $isoOut).Length) bytes"
 
-# 7) ESP + GRUB (UEFI) 绾句胶娲忛梹婊冨剼閿涘牆褰查柅澶涚礉-GrubEsp閿涘�?
-#    GPT 閸掑棗灏悰?+ FAT32 ESP閿涘苯鎯?BOOTX64.EFI閿涘湙RUB閿涘鈧宫rub.cfg閵嗕礁鍙忛柈?GRUB 濡€虫健閸?#    �?multiboot2 婢跺娈?kernel.bin閵嗕敬RUB 闁俺绻?multiboot2 閸楀繗顔呴崝鐘烘祰閸愬懏鐗抽敍灞藉敶閺嶆瓕鍤滅悰?#    鐟欙絾鐎?framebuffer 閺嶅洨顒烽獮璺虹紦缁斿鍨庢�?闂€鎸幠佸蹇ョ礄鐟?backends/bare/entry.s閿涘鈧?
+
 if ($GrubEsp) {
     $grubRoot = Join-Path $root "tools\grub_toolchain"
     $grubCore = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi\monolithic\grubx64.efi"
     $grubMods = Join-Path $grubRoot "extracted\usr\lib\grub\x86_64-efi"
     $grubCfg = Join-Path $root "tools\grub.cfg"
     if (-not (Test-Path $grubCore)) {
-        Write-Output "GRUB toolchain missing �?fetching (tools\fetch_grub_toolchain.py) ..."
+        Write-Output "GRUB toolchain missing  ?fetching (tools\fetch_grub_toolchain.py) ..."
         & $python "tools\fetch_grub_toolchain.py"
         if ($LASTEXITCODE -ne 0) { throw "fetch_grub_toolchain failed" }
     }

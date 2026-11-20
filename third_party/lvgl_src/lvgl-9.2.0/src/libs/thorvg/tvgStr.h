@@ -41,3 +41,4 @@ char* strDirname(const char* path);                 //return the full directory 
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

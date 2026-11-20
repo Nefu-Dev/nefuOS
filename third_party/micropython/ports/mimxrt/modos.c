@@ -111,3 +111,4 @@ static mp_obj_t mp_os_urandom(mp_obj_t num) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mp_os_urandom_obj, mp_os_urandom);
 #endif
+

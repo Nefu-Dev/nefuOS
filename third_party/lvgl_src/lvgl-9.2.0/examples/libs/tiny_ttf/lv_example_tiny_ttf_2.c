@@ -20,3 +20,4 @@ void lv_example_tiny_ttf_2(void)
     lv_obj_center(label);
 }
 #endif
+

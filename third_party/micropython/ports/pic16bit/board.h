@@ -41,3 +41,4 @@ int uart_rx_char(void);
 void uart_tx_char(int chr);
 
 #endif // MICROPY_INCLUDED_PIC16BIT_BOARD_H
+

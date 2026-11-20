@@ -39,3 +39,4 @@ void lv_example_canvas_5(void)
 
 }
 #endif
+

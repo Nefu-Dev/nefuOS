@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— MQTT 3.1.1（OASIS）
 //
 // 固定头：字节0 = (报文类型<<4) | 标志，随后是"剩余长度"
@@ -102,3 +107,4 @@ int mqtt_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

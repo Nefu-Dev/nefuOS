@@ -33,3 +33,4 @@ void sha256_update(CRYAL_SHA256_CTX *ctx, const BYTE data[], size_t len);
 void sha256_final(CRYAL_SHA256_CTX *ctx, BYTE hash[]);
 
 #endif   // SHA256_H
+

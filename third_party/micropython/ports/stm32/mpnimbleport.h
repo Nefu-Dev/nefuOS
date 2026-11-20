@@ -32,3 +32,4 @@
 #include "uart.h"
 
 #endif // MICROPY_INCLUDED_STM32_NIMBLE_PORT_H
+

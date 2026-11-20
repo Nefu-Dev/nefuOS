@@ -89,3 +89,4 @@ void lv_sysmon_builtin_deinit(void);
 #endif
 
 #endif /*LV_SYSMON_PRIVATE_H*/
+

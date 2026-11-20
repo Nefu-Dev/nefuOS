@@ -432,3 +432,4 @@ void CAN3_SCE_IRQHandler(void) {
 #endif // !MICROPY_HW_ENABLE_FDCAN
 
 #endif // MICROPY_HW_ENABLE_CAN
+

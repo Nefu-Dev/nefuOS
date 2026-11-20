@@ -54,3 +54,4 @@
 #define MICROPY_HW_NINA_GPIO0           (2)
 #define MICROPY_HW_NINA_GPIO1           (9)
 #define MICROPY_HW_NINA_ACK             (10)
+

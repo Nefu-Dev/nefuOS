@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 PROVIDE ( Cache_Read_Disable = 0x400047f0 );
 PROVIDE ( Cache_Read_Enable = 0x40004678 );
 PROVIDE ( FilePacketSendReqMsgProc = 0x400035a0 );
@@ -349,3 +354,4 @@ PROVIDE ( Td4s = 0x3fffd500);
 PROVIDE ( rcons = 0x3fffd0f0);
 PROVIDE ( UartDev = 0x3fffde10 );
 PROVIDE ( flashchip = 0x3fffc714);
+

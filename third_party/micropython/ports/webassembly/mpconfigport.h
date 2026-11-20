@@ -126,3 +126,4 @@ typedef long mp_off_t;
 extern const struct _mp_print_t mp_stderr_print;
 
 uint32_t mp_js_random_u32(void);
+

@@ -40,3 +40,4 @@ void lv_example_image_3(void)
 }
 
 #endif
+

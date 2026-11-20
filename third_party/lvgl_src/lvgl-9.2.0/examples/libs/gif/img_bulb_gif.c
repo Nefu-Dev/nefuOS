@@ -1124,3 +1124,4 @@ const lv_image_dsc_t img_bulb_gif = {
     .data = img_blub_gif_map,
     .data_size = sizeof(img_blub_gif_map),
 };
+

@@ -338,3 +338,4 @@ static void update_src_info(lv_imagebutton_src_info_t * info, const void * src)
 }
 
 #endif
+

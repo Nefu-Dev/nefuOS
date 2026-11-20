@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS fx scientific calculator (fx-991 style).
 // Live expression preview + DEG/RAD mode, built on the fx fixed-point library
 // via the shared fxexpr parser. Runs on the host and the bare-metal kernel.
@@ -340,3 +345,4 @@ void fxsci_launch() {
 }
 
 } // namespace nefu
+

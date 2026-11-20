@@ -422,3 +422,4 @@ int mp_format_float(FPTYPE f, char *buf, size_t buf_size, char fmt, int prec, ch
 }
 
 #endif // MICROPY_FLOAT_IMPL != MICROPY_FLOAT_IMPL_NONE
+

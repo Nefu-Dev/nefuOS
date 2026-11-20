@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 包围盒与包围球实现 + 自测
 #include "gfxmath/aabb.h"
 #include <cstdio>
@@ -80,3 +85,4 @@ int Sphere::self_test() {
 
 } // namespace gfx
 } // namespace nefu
+

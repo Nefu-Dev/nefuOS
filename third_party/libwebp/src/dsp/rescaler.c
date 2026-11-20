@@ -251,3 +251,4 @@ WEBP_DSP_INIT_FUNC(WebPRescalerDspInit) {
   assert(WebPRescalerImportRowShrink != NULL);
 #endif   // WEBP_REDUCE_SIZE
 }
+

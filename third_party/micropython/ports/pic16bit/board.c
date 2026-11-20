@@ -167,3 +167,4 @@ void uart_tx_char(int chr) {
     }
     UART1.uxtxreg = chr;
 }
+

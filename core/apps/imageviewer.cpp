@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Image Viewer - LVGL GUI
 // Decodes BMP/PPM natively; on the Win32 host the platform decoder (GDI+)
 // plus stb_image handle JPEG/PNG/GIF so real-world images open too.
@@ -643,7 +648,7 @@ static void imageviewer_open(FSNode* target) {
     ensure_gallery();
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Image Viewer", x, y, 620, 460);
+    Window* w = g_wm->create_window(T("图片查看器", "Image Viewer"), x, y, 620, 460);
     if (!w) return;
     ImageViewState* st = new ImageViewState();
     st->index = 0;

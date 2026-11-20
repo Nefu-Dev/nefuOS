@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // gameengine_all.h —— 2D 游戏引擎聚合头 + 汇总自测
 //
 // 命名空间 nefu::gameengine。bare 模式无 FPU，全部 Q16.16 定点。
@@ -34,3 +39,4 @@ inline int gameengine_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

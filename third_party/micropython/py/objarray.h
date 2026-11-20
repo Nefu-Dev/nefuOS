@@ -68,3 +68,4 @@ MP_DECLARE_CONST_FUN_OBJ_2(mp_obj_array_extend_obj);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_OBJARRAY_H
+

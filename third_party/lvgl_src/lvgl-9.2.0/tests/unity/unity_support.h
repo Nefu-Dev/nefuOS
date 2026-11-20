@@ -46,3 +46,4 @@ bool lv_test_assert_image_eq(const char * fn_ref);
 #endif
 
 #endif /*LV_UNITY_SUPPORT_H*/
+

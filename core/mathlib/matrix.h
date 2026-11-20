@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 矩阵 matrix
 // 教学版：定长 8x8 双精度矩阵，支持加/减/乘/转置/行列式/逆。
 // 行列式用递归展开（教学演示，小于 8 阶可用）。
@@ -36,3 +41,4 @@ int matrix_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

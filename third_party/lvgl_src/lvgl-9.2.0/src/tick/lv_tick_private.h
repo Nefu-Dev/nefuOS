@@ -44,3 +44,4 @@ typedef struct {
 #endif
 
 #endif /*LV_TICK_PRIVATE_H*/
+

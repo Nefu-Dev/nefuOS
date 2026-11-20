@@ -81,3 +81,4 @@ void lv_example_scale_4(void)
 }
 
 #endif
+

@@ -1403,3 +1403,4 @@ bool LottieParser::parse()
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

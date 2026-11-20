@@ -307,3 +307,4 @@ void lv_demo_vector_graphic_buffered(void)
 }
 
 #endif
+

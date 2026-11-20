@@ -101,3 +101,4 @@ id_info_t *scope_find_global(scope_t *scope, qstr qstr);
 void scope_check_to_close_over(scope_t *scope, id_info_t *id);
 
 #endif // MICROPY_INCLUDED_PY_SCOPE_H
+

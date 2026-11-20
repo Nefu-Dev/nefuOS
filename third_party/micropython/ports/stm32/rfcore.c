@@ -798,3 +798,4 @@ static mp_obj_t rfcore_sys_hci(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rfcore_sys_hci_obj, 3, 4, rfcore_sys_hci);
 
 #endif // defined(STM32WB)
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — 聚合头（STL 风格）
 // 一次 include 全部压缩模块。自测：comp_all_self_test() 汇总各模块失败数。
 #pragma once
@@ -20,3 +25,4 @@ inline int comp_all_self_test() {
 
 } // namespace comp
 } // namespace nefu
+

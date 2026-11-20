@@ -32,3 +32,4 @@
 int gettimeofday(struct timeval *tp, struct timezone *tz);
 
 #endif // MICROPY_INCLUDED_WINDOWS_MSVC_SYS_TIME_H
+

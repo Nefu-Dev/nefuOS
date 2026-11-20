@@ -1,4 +1,9 @@
-﻿#include "textlib/text_all.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "textlib/text_all.h"
 #include <cstdio>
 #include <cstdlib>
 int main(int argc, char** argv) {
@@ -17,3 +22,4 @@ int main(int argc, char** argv) {
     printf("mod%d=%d\n", m, f);
     return 0;
 }
+

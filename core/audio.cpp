@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audio subsystem (core, backend-independent)
 // Shared helpers on top of the platform audio API:
 //   platform_play_wav_mem  - play an in-memory RIFF/WAVE buffer
@@ -20,3 +25,4 @@ bool platform_play_wav_path(const char* path) {
 }
 
 } // namespace nefu
+

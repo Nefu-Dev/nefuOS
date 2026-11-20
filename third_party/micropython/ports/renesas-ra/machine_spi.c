@@ -360,3 +360,4 @@ void spi_deinit(uint32_t ch) {
 void spi_transfer(uint32_t ch, uint32_t bits, size_t len, const uint8_t *src, uint8_t *dest, uint32_t timeout) {
     ra_spi_transfer(ch, bits, dest, (uint8_t *)src, (uint32_t)len, timeout);
 }
+

@@ -172,3 +172,4 @@ void lv_draw_dave2d_triangle(lv_draw_dave2d_unit_t * u, const lv_draw_triangle_d
 }
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

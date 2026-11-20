@@ -27,3 +27,4 @@ void lv_example_style_13(void)
 }
 
 #endif
+

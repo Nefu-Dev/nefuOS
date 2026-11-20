@@ -304,3 +304,4 @@ WEBP_TSAN_IGNORE_FUNCTION void VP8FiltersInitNEON(void) {
 WEBP_DSP_INIT_STUB(VP8FiltersInitNEON)
 
 #endif  // WEBP_USE_NEON
+

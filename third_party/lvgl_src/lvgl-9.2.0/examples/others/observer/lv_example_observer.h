@@ -41,3 +41,4 @@ void lv_example_observer_6(void);
 #endif
 
 #endif /*LV_EXAMPLE_OBSERVER_H*/
+

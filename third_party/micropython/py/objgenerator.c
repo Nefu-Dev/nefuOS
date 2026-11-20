@@ -362,3 +362,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     iter, gen_instance_iternext,
     locals_dict, &gen_instance_locals_dict
     );
+

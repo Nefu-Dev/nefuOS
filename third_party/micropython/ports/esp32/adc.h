@@ -59,3 +59,4 @@ const machine_adc_obj_t *madc_search_helper(machine_adc_block_obj_t *block, adc_
 void madc_init_helper(const machine_adc_obj_t *self, size_t n_pos_args, const mp_obj_t *pos_args, mp_map_t *kw_args);
 
 #endif // MICROPY_INCLUDED_ESP32_ADC_H
+

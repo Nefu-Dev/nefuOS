@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS File Properties Dialog
 // Shows detailed file information when right-clicking a file
 #pragma once
@@ -5,6 +10,7 @@
 #include "../vfs/vfs.h"
 #include "../klib/klib.h"
 #include "lvgl.h"
+#include "../gui/lv_cjk_font.h"
 
 namespace nefu {
 namespace apps {
@@ -54,8 +60,8 @@ void show_properties(const char* filepath) {
     
     // Title
     lv_obj_t* title = lv_label_create(s_props.win);
-    lv_label_set_text(title, "File Properties");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
+    lv_label_set_text(title, nefu::zh_ui("File Properties"));
+    lv_obj_set_style_text_font(title, &nefu::lv_font_cjk_16, 0);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 0, 0);
     
     // Close button
@@ -126,3 +132,4 @@ void show_properties(const char* filepath) {
 
 } // namespace apps
 } // namespace nefu
+

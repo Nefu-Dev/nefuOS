@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 数论模块
 // 基于 long long 的整数数论：GCD/扩展 GCD、模逆元、Euler phi、Möbius、
 // 中国剩余定理、模幂、Miller-Rabin 素性检验、试除/Pollard rho 分解、
@@ -59,3 +64,4 @@ int numtheory_self_test();
 
 } // namespace mathext
 } // namespace nefu
+

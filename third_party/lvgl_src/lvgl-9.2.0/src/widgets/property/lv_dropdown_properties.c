@@ -29,3 +29,4 @@ const lv_property_name_t lv_dropdown_property_names[9] = {
 
 /* *INDENT-ON* */
 #endif
+

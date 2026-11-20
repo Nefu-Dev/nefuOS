@@ -163,3 +163,4 @@ uint32_t uzlib_crc32(const void *data, unsigned int length, uint32_t crc);
 #endif
 
 #endif /* UZLIB_H_INCLUDED */
+

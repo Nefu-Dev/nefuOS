@@ -92,3 +92,4 @@ const lv_image_dsc_t img_skew_strip = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

@@ -1,4 +1,9 @@
-﻿#include "datlib/dat_all.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "datlib/dat_all.h"
 #include <cstdio>
 #include <cstring>
 int main(int argc, char** argv){
@@ -22,3 +27,4 @@ int main(int argc, char** argv){
     if (!strcmp(m,"16")||!strcmp(m,"all")) { f=nefu::dt::timerwheel_self_test(); printf("timerwheel=%d\n",f); fflush(stdout); }
     return 0;
 }
+

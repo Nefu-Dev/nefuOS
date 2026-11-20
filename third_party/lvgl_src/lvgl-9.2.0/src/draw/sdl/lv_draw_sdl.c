@@ -467,3 +467,4 @@ static SDL_Texture * layer_get_texture(lv_layer_t * layer)
 }
 
 #endif /*LV_USE_DRAW_SDL*/
+

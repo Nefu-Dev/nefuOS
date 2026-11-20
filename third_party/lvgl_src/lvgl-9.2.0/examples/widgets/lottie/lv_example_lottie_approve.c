@@ -30,3 +30,4 @@ const uint8_t lv_example_lottie_approve[] = {
 const size_t lv_example_lottie_approve_size = sizeof(lv_example_lottie_approve);
 
 #endif
+

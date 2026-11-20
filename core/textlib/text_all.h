@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — aggregate header (STL-style)
 // 聚合头：一次引入全部文本处理模块，并提供整体自检入口。
 // 用法： #include "textlib/text_all.h"
@@ -29,3 +34,4 @@ inline int text_all_self_test() {
 
 } // namespace text
 } // namespace nefu
+

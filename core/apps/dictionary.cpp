@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS built-in dictionary app
 // Simple English-Chinese dictionary
 #include "apps.h"
@@ -80,7 +85,7 @@ static void dict_paint(Window* win) {
 void app_dictionary_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Dictionary", x, y, 320, 350);
+    Window* w = g_wm->create_window(T("词典", "Dictionary"), x, y, 320, 350);
     if (!w) return;
     DictState* st = new DictState();
     st->w = w->content_w;
@@ -92,3 +97,4 @@ void app_dictionary_launch() {
 }
 
 } // namespace nefu
+

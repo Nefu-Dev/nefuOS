@@ -731,3 +731,4 @@ static int32_t elastic_diff(lv_obj_t * scroll_obj, int32_t diff, int32_t scroll_
 
     return diff;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS search algorithm library — implementation & self test
 // See search.h for API and complexity documentation.
 #include "search.h"
@@ -242,3 +247,4 @@ int search_self_test() {
 
 } // namespace algo
 } // namespace nefu
+

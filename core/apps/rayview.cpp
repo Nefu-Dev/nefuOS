@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 光线追踪查看器 —— core/apps/rayview.cpp
 // ----------------------------------------------------------------------------
@@ -124,7 +129,7 @@ static void rv_close(Window* w) {
 void nefu::rayview_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Ray Trace Viewer", x, y, RV_W, RV_H);
+    Window* w = g_wm->create_window(T("光线追踪查看器", "Ray Trace Viewer"), x, y, RV_W, RV_H);
     if (!w) return;
     RayView* v = new RayView();
     w->userdata = v;
@@ -134,3 +139,4 @@ void nefu::rayview_launch() {
     w->on_close = rv_close;
     g_wm->raise(w);
 }
+

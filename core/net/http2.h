@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS HTTP/2.0 client subset (RFC 7540 / RFC 7541)
 //
 // A self-contained HTTP/2 client implementing the subset needed for
@@ -80,3 +85,4 @@ int http2_test_decode(const uint8_t* data, int len, Http2Response* r);
 
 } // namespace http2
 } // namespace nefu
+

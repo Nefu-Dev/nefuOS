@@ -25,3 +25,4 @@ extern const flash_cfg_t g_flash0_cfg;
 
 FSP_FOOTER
 #endif /* HAL_DATA_H_ */
+

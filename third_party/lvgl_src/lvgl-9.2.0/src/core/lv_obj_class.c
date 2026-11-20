@@ -202,3 +202,4 @@ static uint32_t get_instance_size(const lv_obj_class_t * class_p)
 
     return base->instance_size;
 }
+

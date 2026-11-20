@@ -44,3 +44,4 @@ void mp_reader_new_file(mp_reader_t *reader, qstr filename);
 void mp_reader_new_file_from_fd(mp_reader_t *reader, int fd, bool close_fd);
 
 #endif // MICROPY_INCLUDED_PY_READER_H
+

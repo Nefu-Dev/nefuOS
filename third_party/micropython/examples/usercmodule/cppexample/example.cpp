@@ -22,3 +22,4 @@ mp_obj_t cppfunc(mp_obj_t a_obj, mp_obj_t b_obj) {
     return mp_obj_new_tuple(2, tup);
 }
 }
+

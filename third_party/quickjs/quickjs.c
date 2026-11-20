@@ -1152,6 +1152,26 @@ static JSAtom __JS_NewAtomInit(JSRuntime *rt, const char *str, int len,
                                int atom_type);
 static void JS_FreeAtomStruct(JSRuntime *rt, JSAtomStruct *p);
 static void free_function_bytecode(JSRuntime *rt, JSFunctionBytecode *b);
+
+/* NEFU-DIAG: exact alive-set for JSFunctionBytecode objects. Allocator
+   address reuse makes a simple "seen before" list useless, so the set is
+   maintained on allocation and removal, which distinguishes a real double
+   free from reuse at the same address. */
+static void *nfu_bc_alive[8192];
+static int nfu_bc_next = 0;
+static void nfu_bc_add(void *p)
+{
+    nfu_bc_alive[nfu_bc_next] = p;
+    nfu_bc_next = (nfu_bc_next + 1) & 8191;
+}
+static int nfu_bc_del(void *p)
+{
+    int i;
+    for (i = 0; i < 8192; i++) {
+        if (nfu_bc_alive[i] == p) { nfu_bc_alive[i] = NULL; return 1; }
+    }
+    return 0;
+}
 static JSValue js_call_c_function(JSContext *ctx, JSValueConst func_obj,
                                   JSValueConst this_obj,
                                   int argc, JSValueConst *argv, int flags);
@@ -2064,7 +2084,43 @@ static inline BOOL js_check_stack_overflow(JSRuntime *rt, size_t alloca_size)
 {
     uintptr_t sp;
     sp = js_get_stack_pointer() - alloca_size;
-    return unlikely(sp < rt->stack_limit);
+    if (unlikely(sp < rt->stack_limit)) {
+        static int so_n = 0;
+        if (so_n++ < 3) {
+            fprintf(stderr, "qjs: SO\n");
+            if (rt->current_stack_frame) {
+                JSStackFrame* f;
+                int fi = 0;
+                for (f = rt->current_stack_frame; f && fi < 16; f = f->prev_frame, fi++) {
+                    struct JSFunctionBytecode* bc = NULL;
+                    char nm[28] = "(?)";
+                    if (JS_VALUE_GET_TAG(f->cur_func) == JS_TAG_OBJECT &&
+                        JS_VALUE_GET_OBJ(f->cur_func)) {
+                        bc = JS_VALUE_GET_OBJ(f->cur_func)->u.func.function_bytecode;
+                        if (bc && bc->func_name != JS_ATOM_NULL &&
+                            bc->func_name < rt->atom_size) {
+                            JSString* sn = rt->atom_array[bc->func_name];
+                            uint32_t k, lim = sn->len < 24 ? sn->len : 24;
+                            for (k = 0; k < lim; k++)
+                                nm[k] = sn->is_wide_char
+                                    ? (char)(sn->u.str16[k] & 0x7f)
+                                    : (char)sn->u.str8[k];
+                            nm[lim] = 0;
+                        }
+                    }
+                    fprintf(stderr, "  frame#%d name=%s bc=%p pc=%p\n",
+                            fi, nm, (void*)bc, (void*)(uintptr_t)f->cur_pc);
+                    if (fi < 4 && bc && bc->debug.source && bc->debug.source_len > 0) {
+                        int sl = bc->debug.source_len < 260 ? bc->debug.source_len : 260;
+                        fprintf(stderr, "    src[%d]: %.*s\n", bc->debug.source_len, sl, bc->debug.source);
+                    }
+                }
+            }
+            fflush(stderr);
+        }
+        return TRUE;
+    }
+    return FALSE;
 }
 #endif
 
@@ -7503,6 +7559,75 @@ static int find_line_num(JSContext *ctx, JSFunctionBytecode *b,
     return 0;
 }
 
+/* --- nfuOS debug: name the bytecode function the JS thread is inside -----
+   A page can spin inside a single bytecode loop that never reaches a poll
+   point (no backward jump, no call), so the interrupt handler never runs and
+   the C stack tells us nothing. Recording the innermost function at call
+   entry costs one hash probe and lets the watchdog report "which JS function
+   and line" instead of "somewhere in the interpreter". The readers below do
+   no allocation, so they are safe to call while the JS thread is suspended. */
+volatile void *nfu_dbg_fun = NULL;
+volatile uint32_t nfu_dbg_pc = 0;
+
+#define NFU_DBG_SLOTS 4096
+typedef struct {
+    void *b;
+    int line;
+    char text[64];
+} NfuDbgEnt;
+static NfuDbgEnt nfu_dbg_tab[NFU_DBG_SLOTS];
+
+static void nfu_dbg_note_fun(JSContext *ctx, JSFunctionBytecode *b)
+{
+    unsigned h;
+    nfu_dbg_fun = b;
+    nfu_dbg_pc = 0;
+    h = (unsigned)((((uintptr_t)b) >> 4) % NFU_DBG_SLOTS);
+    if (nfu_dbg_tab[h].b != b) {
+        const char *nm = JS_AtomToCString(ctx, b->func_name);
+        const char *fn = b->has_debug ? JS_AtomToCString(ctx, b->debug.filename) : NULL;
+        const char *tail = fn ? fn : "?";
+        if (fn) {
+            size_t L = strlen(fn);
+            if (L > 34) tail = fn + (L - 34);
+        }
+        snprintf(nfu_dbg_tab[h].text, sizeof(nfu_dbg_tab[h].text), "%s @ %s",
+                 nm && *nm ? nm : "(anon)", tail);
+        if (nm) JS_FreeCString(ctx, nm);
+        if (fn) JS_FreeCString(ctx, fn);
+        {
+            /* Resolve the line here, while the pointer is certainly valid:
+               the watchdog reads this table while the JS thread is parked and
+               must never dereference a bytecode function that the GC may have
+               already freed. */
+            int col = 0;
+            nfu_dbg_tab[h].line = find_line_num(ctx, b, 0, &col);
+        }
+        nfu_dbg_tab[h].b = b;
+    }
+}
+
+const char *nfu_js_dbg_name(void)
+{
+    void *b = nfu_dbg_fun;
+    unsigned h;
+    if (!b) return "?";
+    h = (unsigned)((((uintptr_t)b) >> 4) % NFU_DBG_SLOTS);
+    if (nfu_dbg_tab[h].b == b) return nfu_dbg_tab[h].text;
+    return "?";
+}
+
+int nfu_js_dbg_line(JSContext *ctx)
+{
+    void *b = nfu_dbg_fun;
+    unsigned h;
+    (void)ctx;
+    if (!b) return 0;
+    h = (unsigned)((((uintptr_t)b) >> 4) % NFU_DBG_SLOTS);
+    if (nfu_dbg_tab[h].b == b) return nfu_dbg_tab[h].line;
+    return 0;
+}
+
 /* return a string property without executing arbitrary JS code (used
    when dumping the stack trace or in debug print). */
 static const char *get_prop_string(JSContext *ctx, JSValueConst obj, JSAtom prop)
@@ -7539,6 +7664,8 @@ static const char *get_prop_string(JSContext *ctx, JSValueConst obj, JSAtom prop
 
 /* if filename != NULL, an additional level is added with the filename
    and line number information (used for parse error). */
+static void nfu_diag_ali(JSContext *ctx, const char *tag);
+
 static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
                             const char *filename, int line_num, int col_num,
                             int backtrace_flags)
@@ -7618,6 +7745,23 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
     dbuf_free(&dbuf);
     JS_DefinePropertyValue(ctx, error_obj, JS_ATOM_stack, str,
                            JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+}
+
+/* Diagnostic helper for "invalid array length": dump the JS stack of the
+   current exception so the caller that passed the bad length is identifiable.
+   Kept next to build_backtrace because it reuses it directly. */
+static void nfu_diag_ali(JSContext *ctx, const char *tag)
+{
+    static int n;
+    if (n >= 6) return;
+    n++;
+    build_backtrace(ctx, ctx->rt->current_exception, NULL, 0, 0, 0);
+    JSValue sv = JS_GetPropertyStr(ctx, ctx->rt->current_exception, "stack");
+    const char *cs = JS_ToCString(ctx, sv);
+    fprintf(stderr, "\n[QJS-STACK] %s\n%s\n", tag, cs ? cs : "(no stack)");
+    fflush(stderr);
+    if (cs) JS_FreeCString(ctx, cs);
+    JS_FreeValue(ctx, sv);
 }
 
 /* Note: it is important that no exception is returned by this function */
@@ -9582,8 +9726,17 @@ static JSValue js_allocate_fast_array(JSContext *ctx, int64_t len)
     JSObject *p;
     int i;
     
-    if (len > INT32_MAX)
-        return JS_ThrowRangeError(ctx, "invalid array length");
+    if (len > INT32_MAX) {
+        /* Diagnostic: a wasm-bindgen glue view length that reached here is
+           the number to fix, and a silent throw hides which caller passed it. */
+        fprintf(stderr, "\n[QJS-ARR] fast array len=%lld\n", (long long)len);
+        fflush(stderr);
+        {
+            JSValue e = JS_ThrowRangeError(ctx, "invalid array length");
+            nfu_diag_ali(ctx, "fast-array");
+            return e;
+        }
+    }
     arr = JS_NewArray(ctx);
     if (JS_IsException(arr))
         return arr;
@@ -13475,6 +13628,8 @@ static __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
                     return -1;
                 if (len1 != len) {
                 fail:
+                    fprintf(stderr, "\n[QJS-ARR] literal len=%lld\n", (long long)len);
+                    fflush(stderr);
                     JS_ThrowRangeError(ctx, "invalid array length");
                     return -1;
                 }
@@ -17822,7 +17977,40 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         call_func = rt->class_array[p->class_id].call;
         if (!call_func) {
         not_a_function:
-            return JS_ThrowTypeError(caller_ctx, "not a function");
+            /* name the callee when possible: obfuscated bundles (bloxd.io)
+               call engine APIs this build may not implement, and a bare
+               "not a function" gives no clue which one */
+            if (JS_VALUE_GET_TAG(func_obj) == JS_TAG_OBJECT) {
+                const char *nm = get_prop_string(caller_ctx, func_obj,
+                                                 JS_ATOM_name);
+                if (nm && nm[0]) {
+                    JS_ThrowTypeError(caller_ctx, "%s is not a function", nm);
+                    JS_FreeCString(caller_ctx, nm);
+                    return JS_EXCEPTION;
+                }
+                if (nm)
+                    JS_FreeCString(caller_ctx, nm);
+                /* unnamed object: the class id narrows down what the page
+                   tried to call (a stub, a plain object, ...) */
+                JS_ThrowTypeError(caller_ctx,
+                                  "object(class %d) is not a function",
+                                  (int)JS_VALUE_GET_OBJ(func_obj)->class_id);
+                return JS_EXCEPTION;
+            } else {
+                const char *tn = "value";
+                switch (JS_VALUE_GET_TAG(func_obj)) {
+                    case JS_TAG_UNDEFINED: tn = "undefined"; break;
+                    case JS_TAG_NULL:      tn = "null"; break;
+                    case JS_TAG_INT:       tn = "number"; break;
+                    case JS_TAG_FLOAT64:   tn = "number"; break;
+                    case JS_TAG_BOOL:      tn = "boolean"; break;
+                    case JS_TAG_STRING:    tn = "string"; break;
+                    case JS_TAG_SYMBOL:    tn = "symbol"; break;
+                    case JS_TAG_BIG_INT:   tn = "bigint"; break;
+                }
+                JS_ThrowTypeError(caller_ctx, "not a function (got %s)", tn);
+                return JS_EXCEPTION;
+            }
         }
         return call_func(caller_ctx, func_obj, this_obj, argc,
                          (JSValueConst *)argv, flags);
@@ -17873,6 +18061,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
     sf->prev_frame = rt->current_stack_frame;
     rt->current_stack_frame = sf;
     ctx = b->realm; /* set the current realm */
+    nfu_dbg_note_fun(ctx, b);
 
  restart:
     for(;;) {
@@ -18483,6 +18672,24 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                                                        opcode - OP_get_var_undef);
                         if (JS_IsException(sp[0]))
                             goto exception;
+                        if (unlikely(JS_IsUndefined(sp[0]))) {
+                            /* diagnostic: page read a global the engine (or
+                               shim) does not define — the missing-API ledger
+                               for obfuscated bundles (bloxd.io) */
+                            static char logged[64][64];
+                            static int logged_n = 0;
+                            const char *vn = JS_AtomToCString(ctx, cv->var_name);
+                            if (vn) {
+                                int seen = 0, qi;
+                                for (qi = 0; qi < logged_n; qi++)
+                                    if (!strcmp(logged[qi], vn)) { seen = 1; break; }
+                                if (!seen && logged_n < 64) {
+                                    snprintf(logged[logged_n++], 64, "%s", vn);
+                                    fprintf(stderr, "js: global undefined: %s\n", vn);
+                                }
+                                JS_FreeCString(ctx, vn);
+                            }
+                        }
                     }
                 } else {
                     sp[0] = JS_DupValue(ctx, val);
@@ -18825,17 +19032,20 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_goto):
             pc += (int32_t)get_u32(pc);
+            nfu_dbg_pc = (uint32_t)(pc - b->byte_code_buf);
             if (unlikely(js_poll_interrupts(ctx)))
                 goto exception;
             BREAK;
 #if SHORT_OPCODES
         CASE(OP_goto16):
             pc += (int16_t)get_u16(pc);
+            nfu_dbg_pc = (uint32_t)(pc - b->byte_code_buf);
             if (unlikely(js_poll_interrupts(ctx)))
                 goto exception;
             BREAK;
         CASE(OP_goto8):
             pc += (int8_t)pc[0];
+            nfu_dbg_pc = (uint32_t)(pc - b->byte_code_buf);
             if (unlikely(js_poll_interrupts(ctx)))
                 goto exception;
             BREAK;
@@ -20831,6 +21041,20 @@ static JSValue JS_CallConstructorInternal(JSContext *ctx,
         call_func = ctx->rt->class_array[p->class_id].call;
         if (!call_func) {
         not_a_function:
+            /* name the callee when possible (see JS_CallInternal) */
+            if (JS_VALUE_GET_TAG(func_obj) == JS_TAG_OBJECT) {
+                const char *nm = get_prop_string(ctx, func_obj, JS_ATOM_name);
+                if (nm && nm[0]) {
+                    JS_ThrowTypeError(ctx, "%s is not a function", nm);
+                    JS_FreeCString(ctx, nm);
+                    return JS_EXCEPTION;
+                }
+                if (nm)
+                    JS_FreeCString(ctx, nm);
+                JS_ThrowTypeError(ctx, "object(class %d) is not a function",
+                                  (int)JS_VALUE_GET_OBJ(func_obj)->class_id);
+                return JS_EXCEPTION;
+            }
             return JS_ThrowTypeError(ctx, "not a function");
         }
         return call_func(ctx, func_obj, new_target, argc,
@@ -32154,7 +32378,16 @@ static void free_bytecode_atoms(JSRuntime *rt,
             if ((pos + 1 + 4) > bc_len)
                 break; /* may happen if there is not enough memory when emiting bytecode */
             atom = get_u32(bc_buf + pos + 1);
-            JS_FreeAtomRT(rt, atom);
+            /* NEFU-HARDEN: the atom walk can desynchronise on a bytecode
+               buffer that was truncated while it was being emitted (upstream
+               documents that case). An atom id outside the table then reads
+               past atom_array and faults, so ids that are zero, negative or
+               past the table are skipped instead of dereferenced. */
+            if (atom != 0 && atom < (JSAtom)rt->atom_size &&
+                rt->atom_array[atom] != NULL &&
+                (uintptr_t)rt->atom_array[atom] >= 0x10000u) {
+                JS_FreeAtomRT(rt, atom);
+            }
             break;
         default:
             break;
@@ -36139,6 +36372,7 @@ static JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd)
     b = js_mallocz(ctx, function_size);
     if (!b)
         goto fail;
+    nfu_bc_add((void *)b);
     js_rc(b)->ref_count = 1;
 
     b->byte_code_buf = (void *)((uint8_t*)b + byte_code_offset);
@@ -36288,6 +36522,14 @@ static void free_function_bytecode(JSRuntime *rt, JSFunctionBytecode *b)
 {
     int i;
 
+    /* NEFU-DIAG: a second free of a bytecode object that is not in the
+       alive set means the same function was released twice. */
+    if (!nfu_bc_del((void *)b)) {
+        fprintf(stderr, "[QJS-DFREE-BC] bc=%p len=%u buf=%p\n",
+                (void *)b, (unsigned)b->byte_code_len, (void *)b->byte_code_buf);
+        fflush(stderr);
+    }
+
 #if 0
     {
         char buf[ATOM_GET_STR_BUF_SIZE];
@@ -36295,6 +36537,16 @@ static void free_function_bytecode(JSRuntime *rt, JSFunctionBytecode *b)
                JS_AtomGetStrRT(rt, buf, sizeof(buf), b->func_name));
     }
 #endif
+    /* NEFU-DIAG: byte_code_len/byte_code_buf live inside the same block as
+       the object header, so a corrupted pair means something wrote past an
+       adjacent allocation. Report it before free_bytecode_atoms walks it. */
+    if (b->byte_code_buf &&
+        (b->byte_code_len > 200000u ||
+         (uint8_t *)b->byte_code_buf < (uint8_t *)b + 64)) {
+        fprintf(stderr, "[QJS-BC-CORRUPT] bc=%p len=%u buf=%p\n",
+                (void *)b, (unsigned)b->byte_code_len, (void *)b->byte_code_buf);
+        fflush(stderr);
+    }
     if (b->byte_code_buf)
         free_bytecode_atoms(rt, b->byte_code_buf, b->byte_code_len, TRUE);
 
@@ -37202,6 +37454,32 @@ static JSValue __JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     JSFunctionDef *fd;
     JSModuleDef *m;
 
+    if (filename && !strcmp(filename, "<input>")) {
+        /* eval() called from page code. A page that spins inside eval'd code
+           shows up in the watchdog as "(anon) @ <input> line=N", which names
+           nothing by itself, so give every eval a unique name and keep a copy
+           of the big ones on disk for offline line lookup. */
+        static int s_evalcall_n = 0;
+        static char s_evalname[64];
+        size_t i2;
+        s_evalcall_n++;
+        snprintf(s_evalname, sizeof(s_evalname), "<eval%d len=%d>",
+                 s_evalcall_n, (int)input_len);
+        filename = s_evalname;
+        fprintf(stderr, "\njs: EVALCALL n=%d len=%d head=", s_evalcall_n, (int)input_len);
+        for (i2 = 0; i2 < input_len && i2 < 96; i2++)
+            fputc(input[i2] == '\n' ? ' ' : input[i2], stderr);
+        fputc('\n', stderr);
+        fflush(stderr);
+        if (input_len >= 20000) {
+            char path[200];
+            snprintf(path, sizeof(path), "D:/mycppos1/nefuOS/verify_out/eval_%d.js",
+                     s_evalcall_n);
+            FILE *fp = fopen(path, "wb");
+            if (fp) { fwrite(input, 1, input_len, fp); fclose(fp); }
+        }
+    }
+
     js_parse_init(ctx, s, input, input_len, filename);
     skip_shebang(&s->buf_ptr, s->buf_end);
 
@@ -37312,7 +37590,28 @@ static JSValue JS_EvalInternal(JSContext *ctx, JSValueConst this_obj,
     BOOL backtrace_barrier = ((flags & JS_EVAL_FLAG_BACKTRACE_BARRIER) != 0);
     int saved_js_mode = 0;
     JSValue ret;
-    
+#ifdef NF_EVAL_DUMP
+    /* NF diagnostic: log every eval input; the last record before a crash
+       identifies the exact compile that took the parser down */
+    {
+        static FILE* eval_df = NULL;
+        static int eval_n = 0;
+        if (!eval_df) {
+            const char* ddir = getenv("NF_DUMP_JS");
+            if (ddir && *ddir) {
+                char p[512];
+                snprintf(p, sizeof(p), "%s/evals.log", ddir);
+                eval_df = fopen(p, "wb");
+            }
+        }
+        if (eval_df) {
+            fprintf(eval_df, "== eval %d len=%zu file=%s\n", ++eval_n, input_len, filename ? filename : "(null)");
+            fwrite(input, 1, input_len, eval_df);
+            fputc('\n', eval_df);
+            fflush(eval_df);
+        }
+    }
+#endif
     if (unlikely(!ctx->eval_internal)) {
         return JS_ThrowTypeError(ctx, "eval is not supported");
     }
@@ -57603,7 +57902,12 @@ static JSValue js_typed_array_set_internal(JSContext *ctx,
             goto fail;
         if (offset > dst_len - src_len) {
         range_error:
+            fprintf(stderr, "\n[QJS-SET] offset=%lld src_len=%lld dst_len=%lld dstcount=%d dstcls=%d\n",
+                    (long long)offset, (long long)src_len, (long long)dst_len,
+                    (int)p->u.array.count, (int)p->class_id);
+            fflush(stderr);
             JS_ThrowRangeError(ctx, "invalid array length");
+            nfu_diag_ali(ctx, "set-range");
             goto fail;
         }
     }
@@ -57908,6 +58212,14 @@ static JSValue js_typed_array_copyWithin(JSContext *ctx, JSValueConst this_val,
     count = min_int(count, space);
     if (count > 0) {
         shift = typed_array_size_log2(p->class_id);
+        if (count > 65536) {
+            static int s_cw_n = 0;
+            if (s_cw_n++ < 40)
+                fprintf(stderr, "\njs: COPYWITHIN len=%d to=%d from=%d final=%d count=%d shift=%d bytes=%lld\n",
+                        len, to, from, final, count, shift,
+                        (long long)count << shift);
+            fflush(stderr);
+        }
         memmove(p->u.array.u.uint8_ptr + (to << shift),
                 p->u.array.u.uint8_ptr + (from << shift),
                 count << shift);
@@ -61426,3 +61738,4 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
     JS_FreeValue(ctx, obj);
     return 0;
 }
+

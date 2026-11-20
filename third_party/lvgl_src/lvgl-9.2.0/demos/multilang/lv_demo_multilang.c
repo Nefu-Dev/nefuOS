@@ -350,3 +350,4 @@ static void card_create(lv_obj_t * parent, card_info_t * info)
 }
 
 #endif
+

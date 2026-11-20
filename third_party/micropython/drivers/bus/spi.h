@@ -54,3 +54,4 @@ int mp_soft_spi_ioctl(void *self, uint32_t cmd);
 void mp_soft_spi_transfer(void *self, size_t len, const uint8_t *src, uint8_t *dest);
 
 #endif // MICROPY_INCLUDED_DRIVERS_BUS_SPI_H
+

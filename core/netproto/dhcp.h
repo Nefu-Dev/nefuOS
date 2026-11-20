@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // dhcp.h - DHCP/BOOTP 客户端协议 (RFC 2131)
 // 仅构造/解析 DHCP 报文，不做实际收发
 #ifndef NEFU_NETPROTO_DHCP_H
@@ -100,3 +105,4 @@ int dhcp_self_test();
 } // namespace nefu
 
 #endif // NEFU_NETPROTO_DHCP_H
+

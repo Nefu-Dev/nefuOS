@@ -149,3 +149,4 @@ const func __Vectors[] __attribute__ ((section(".isr_vector"),used)) = {
     SWI4_IRQHandler,
     SWI5_IRQHandler
 };
+

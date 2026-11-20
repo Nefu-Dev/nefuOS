@@ -25,9 +25,9 @@ foreach ($q in $qjSrc) {
   $qobjs += $qobj
 }
 $respFile = Join-Path $bareOut "host_sources_dbg.rsp"
-$allSrc = $coreSrc + @("backends\win32\win32.cpp") + $qobjs
+$allSrc = $coreSrc + @("backends\win32\win32.cpp", "backends\win32\ws_win32.cpp") + $qobjs
 $respContent = ($allSrc | ForEach-Object { '"' + $_ + '"' }) -join "`r`n"
 [IO.File]::WriteAllText($respFile, $respContent, (New-Object Text.UTF8Encoding $false))
-& $g -std=c++17 -O0 -g -fno-exceptions -fno-rtti -fno-builtin -w -DNEFU_DUMP_REC -I core -I third_party "-Wl,--stack,16777216" -o $hostExe "@$respFile" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 2>&1 | Select-Object -Last 8
+& $g -std=c++17 -O0 -g -fno-exceptions -fno-rtti -fno-builtin -w -DNEFU_DUMP_REC -I core -I third_party "-Wl,--stack,16777216" -o $hostExe "@$respFile" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinhttp -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 2>&1 | Select-Object -Last 8
 if ($LASTEXITCODE -ne 0) { throw "dbg link failed" }
 Write-Output "dbg exe OK: $((Get-Item $hostExe).Length) -> $hostExe"

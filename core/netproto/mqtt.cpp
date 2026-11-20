@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— MQTT 3.1.1 实现
 #include "mqtt.h"
 #include "netproto_common.h"
@@ -392,3 +397,4 @@ int mqtt_self_test() {
 
 } // namespace netproto
 } // namespace nefu
+

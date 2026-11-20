@@ -41,3 +41,4 @@ MP_DECLARE_CONST_FUN_OBJ_2(mp_time_ticks_add_obj);
 MP_DECLARE_CONST_FUN_OBJ_0(mp_time_time_ns_obj);
 
 #endif // MICROPY_INCLUDED_EXTMOD_MODUTIME_H
+

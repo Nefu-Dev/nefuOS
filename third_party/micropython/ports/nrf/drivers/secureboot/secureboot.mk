@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 DRIVERS_SECUREBOOT_DIR = drivers/secureboot
 
 SRC_SECUREBOOT += $(addprefix $(DRIVERS_SECUREBOOT_DIR)/,\
@@ -53,3 +58,4 @@ $(BUILD)/secureboot.hex: $(BUILD)/secureboot.elf
 
 secureboot: $(BUILD)/secureboot.hex
 	@echo "Secure boot"
+

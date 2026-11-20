@@ -27,3 +27,4 @@
     .adc_num = p_adc_num, \
     .adc_channel = p_adc_channel, \
 }
+

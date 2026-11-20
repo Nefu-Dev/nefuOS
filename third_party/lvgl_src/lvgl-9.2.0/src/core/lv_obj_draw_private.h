@@ -46,3 +46,4 @@ lv_layer_type_t lv_obj_get_layer_type(const lv_obj_t * obj);
 #endif
 
 #endif /*LV_OBJ_DRAW_PRIVATE_H*/
+

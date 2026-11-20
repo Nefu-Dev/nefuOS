@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Installer
 // First-run setup wizard: choose install type (single system / dual boot ESP)
 #include "apps.h"
@@ -16,7 +21,7 @@ static int s_selected_option = INSTALL_SINGLE;
 
 void installer_launch() {
     // Fullscreen installer window
-    Window* w = g_wm->create_window("nefuOS Setup", 0, 0, 800, 600);
+    Window* w = g_wm->create_window(T("nefuOS 安装向导", "nefuOS Setup"), 0, 0, 800, 600);
     if (!w) return;
     
     // Header
@@ -85,3 +90,4 @@ void installer_launch() {
 }
 
 } // namespace nefu
+

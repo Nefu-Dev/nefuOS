@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 线性模型
 // 线性回归：批量梯度下降 / 随机梯度下降 / 正规方程（最小二乘），带 L2 正则。
 // 逻辑回归：sigmoid + 交叉熵，批量梯度下降；支持二分类概率输出与多分类 OvR。
@@ -95,3 +100,4 @@ struct SoftmaxReg {
 
 } // namespace ml
 } // namespace nefu
+

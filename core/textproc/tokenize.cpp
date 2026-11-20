@@ -1,4 +1,9 @@
-﻿// nefuOS 文本处理库 —— 分词与归一化(实现)
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 文本处理库 —— 分词与归一化(实现)
 #include "tokenize.h"
 #include "../klib/klib.h"
 
@@ -402,3 +407,4 @@ int tokenize_self_test() {
 
 } // namespace textproc
 } // namespace nefu
+

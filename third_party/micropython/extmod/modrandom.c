@@ -259,3 +259,4 @@ MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_random, mp_module_random);
 #endif
 
 #endif // MICROPY_PY_RANDOM
+

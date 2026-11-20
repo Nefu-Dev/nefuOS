@@ -140,3 +140,4 @@ const lv_image_dsc_t test_image_cogwheel_i4 = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

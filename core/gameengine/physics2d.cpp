@@ -1,4 +1,9 @@
-﻿// physics2d.cpp —— 2D 物理实现：碰撞检测/解算、积分、关节、射线
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// physics2d.cpp —— 2D 物理实现：碰撞检测/解算、积分、关节、射线
 #include "physics2d.h"
 
 namespace nefu {
@@ -381,3 +386,4 @@ if (fx::fx_abs(d_after - d_before) > fx::itofix(5)) fails++;
 
 } // namespace gameengine
 } // namespace nefu
+

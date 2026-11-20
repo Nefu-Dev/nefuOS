@@ -84,3 +84,4 @@ void lv_draw_vglite_triangle(lv_draw_unit_t * draw_unit, const lv_draw_triangle_
 #endif
 
 #endif /*LV_DRAW_VGLITE_H*/
+

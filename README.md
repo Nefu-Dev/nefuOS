@@ -719,6 +719,6 @@ ELF → run → guest "Hello" output → run done). Pass criteria are the ten
 
 ## License
 
-MIT — free to use, learn from, and modify.
+GPL V2 - keep nefuOS good in this
 
 Third-party license texts are kept at `third_party/licenses/`.

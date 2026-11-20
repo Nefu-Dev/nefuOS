@@ -975,3 +975,4 @@ void mp_prof_print_instr(const byte *ip, mp_code_state_t *code_state) {
 #endif // MICROPY_PROF_INSTR_DEBUG_PRINT_ENABLE
 
 #endif // MICROPY_PY_SYS_SETTRACE
+

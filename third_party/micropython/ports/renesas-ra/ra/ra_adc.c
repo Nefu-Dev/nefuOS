@@ -611,3 +611,4 @@ bool ra_adc_deinit(void) {
 __WEAK void adc_scan_end_isr(void) {
     // dummy
 }
+

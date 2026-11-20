@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 损失函数实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 损失函数实现
 // 损失函数返回标量，可直接 backward。
 // 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
@@ -419,3 +424,4 @@ int losses_self_test() {
 
 } // namespace deeplearn
 } // namespace nefu
+

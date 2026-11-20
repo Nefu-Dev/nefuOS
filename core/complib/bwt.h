@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — Burrows–Wheeler 变换 (bwt)
 // BWT（1994）：可逆的块重排变换，把文本变成"同类字符聚集"的形态，
 // 再配合 RLE/MTF 大幅提升压缩率（bzip2 的核心前置）。
@@ -24,3 +29,4 @@ int bwt_self_test();
 
 } // namespace comp
 } // namespace nefu
+

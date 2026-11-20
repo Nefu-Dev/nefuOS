@@ -68,3 +68,4 @@ void pika_lvgl_style_t_set_shadow_width(PikaObj *self, int w){
     lv_style_set_shadow_width(lv_style, w);
 }
 #endif
+

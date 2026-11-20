@@ -857,3 +857,4 @@ SwRenderer* SwRenderer::gen()
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

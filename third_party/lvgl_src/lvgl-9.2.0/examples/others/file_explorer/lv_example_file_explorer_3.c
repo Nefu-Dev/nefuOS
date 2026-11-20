@@ -114,3 +114,4 @@ void lv_example_file_explorer_3(void)
 }
 
 #endif
+

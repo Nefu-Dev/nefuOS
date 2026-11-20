@@ -161,3 +161,4 @@ status_t PHY_LAN8720_EnableLoopback(phy_handle_t *handle, phy_loop_t mode, phy_s
 /*! @}*/
 
 #endif /* _FSL_PHYLAN8720_H_ */
+

@@ -105,3 +105,4 @@ void HSEM1_IRQHandler(void) {
     mp_sched_schedule_node(&rproc_notify_node, openamp_remoteproc_notified);
     HAL_HSEM_ActivateNotification(__HAL_HSEM_SEMID_TO_MASK(METAL_HSEM_MASTER_ID));
 }
+

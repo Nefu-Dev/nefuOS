@@ -155,3 +155,4 @@ static void obj_child_node_checked_style_init(lv_style_t * style)
 }
 
 #endif
+

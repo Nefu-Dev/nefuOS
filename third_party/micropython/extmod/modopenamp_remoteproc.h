@@ -44,3 +44,4 @@ void mp_openamp_remoteproc_remove(struct remoteproc *rproc);
 int mp_openamp_remoteproc_shutdown(struct remoteproc *rproc);
 
 #endif // MICROPY_INCLUDED_MODOPENAMP_REMOTEPROC_H
+

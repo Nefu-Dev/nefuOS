@@ -590,3 +590,4 @@ void test_freetype_outline_rendering_test(void)
 #endif /*LV_USE_FREETYPE*/
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS terminal extension commands (batch 1)
 // ~45 Unix-style commands implemented on top of the VFS + nefuOS libraries.
 #include "term_ext.h"
@@ -1917,3 +1922,4 @@ void term_ext_dispatch(TermState* t, int argc, const char** argv) {
 }
 
 } // namespace nefu
+

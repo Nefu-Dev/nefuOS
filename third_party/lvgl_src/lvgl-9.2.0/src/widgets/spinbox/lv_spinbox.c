@@ -472,3 +472,4 @@ static void lv_spinbox_updatevalue(lv_obj_t * obj)
 }
 
 #endif /*LV_USE_SPINBOX*/
+

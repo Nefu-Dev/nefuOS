@@ -72,3 +72,4 @@ extern const struct music_tune_power_up_s    microbit_music_tune_power_up_obj;
 extern const struct music_tune_power_down_s  microbit_music_tune_power_down_obj;
 
 #endif // MUSIC_TUNES_H__
+

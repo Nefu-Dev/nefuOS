@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩工具 —— 窗口应用
 //
 // 功能：
@@ -127,7 +132,7 @@ static void tool_close(Window* w) {
 void compresstool_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Compression Tool", x, y, TOOL_W, TOOL_H);
+    Window* w = g_wm->create_window(T("压缩工具", "Compression Tool"), x, y, TOOL_W, TOOL_H);
     if (!w) return;
     CompressTool* t = new CompressTool();
     t->algo = 0;
@@ -140,3 +145,4 @@ void compresstool_launch() {
 }
 
 } // namespace nefu
+

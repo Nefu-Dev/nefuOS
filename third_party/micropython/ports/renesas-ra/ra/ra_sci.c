@@ -1439,3 +1439,4 @@ void sci_uart_tei_isr(void) {
     uint32_t ch = irq_to_ch[(uint32_t)irq];
     ra_sci_isr_te(ch);
 }
+

@@ -190,3 +190,4 @@ WEBP_TSAN_IGNORE_FUNCTION void WebPRescalerDspInitNEON(void) {
 WEBP_DSP_INIT_STUB(WebPRescalerDspInitNEON)
 
 #endif    // WEBP_USE_NEON
+

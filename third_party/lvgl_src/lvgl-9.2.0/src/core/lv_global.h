@@ -264,3 +264,4 @@ lv_global_t * lv_global_default(void);
 #endif
 
 #endif /*LV_GLOBAL_H*/
+

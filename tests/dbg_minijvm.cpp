@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // throwaway: run a single .class through minijvm v2 with byte-level output.
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,3 +32,4 @@ int main(int argc, char** argv) {
     free(buf);
     return 0;
 }
+

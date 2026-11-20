@@ -673,3 +673,4 @@ void free_buffer(struct smm_buffer * buf)
 
 #endif /* LV_USE_WAYLAND */
 #endif /* _WIN32 */
+

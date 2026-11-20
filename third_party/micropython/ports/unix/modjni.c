@@ -718,3 +718,4 @@ const mp_obj_module_t mp_module_jni = {
 MP_REGISTER_MODULE(MP_QSTR_jni, mp_module_jni);
 
 #endif // MICROPY_PY_JNI
+

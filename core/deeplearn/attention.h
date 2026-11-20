@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 注意力机制
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 注意力机制
 // Scaled Dot-Product / Multi-Head Attention / Positional Encoding / Transformer Block。
 // 典型用法：
 //   MultiHeadAttention mha(d_model, nhead);
@@ -47,3 +52,4 @@ int attention_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Process List
 // Shows running processes and resource usage
 #include "apps.h"
@@ -37,7 +42,7 @@ static MockProcess processes[] = {
 #define PROCESS_COUNT (sizeof(processes) / sizeof(processes[0]))
 
 void processlist_launch() {
-    Window* w = g_wm->create_window("Process List", 60, 60, 520, 400);
+    Window* w = g_wm->create_window(T("进程列表", "Process List"), 60, 60, 520, 400);
     if (!w) return;
     
     // Header
@@ -117,3 +122,4 @@ void processlist_launch() {
 }
 
 } // namespace nefu
+

@@ -1,26 +1,43 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS settings - LVGL GUI (accent / wallpaper / clock / taskbar / language / power / hw info)
 #include "apps.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/desktop.h"
 #include "../sys/settings.h"
 #include "../sys/power.h"
 #include "../platform.h"
 
 namespace nefu {
 
-static const char* ACCENT_NAMES[4] = { "Blue", "Green", "Purple", "Orange" };
-static const char* WALL_NAMES[6] = {
-    T("蔚蓝天空", "Blue Sky"), T("落日余晖", "Sunset"), T("暗夜", "Dark"),
-    T("绿意森林", "Green Forest"), T("紫色幻境", "Purple"), T("橙韵暖阳", "Orange")
-};
+// Looked up at build time, not at static-init time: T() reads g_settings.lang,
+// and a file-scope array would freeze the labels to whatever language was
+// active before any config file had been read (English), so switching to
+// Chinese would leave these buttons English.
+static const char* accent_name(int i) {
+    static const char* zh[4] = { "蓝", "绿", "紫", "橙" };
+    static const char* en[4] = { "Blue", "Green", "Purple", "Orange" };
+    return T(zh[i & 3], en[i & 3]);
+}
+static const char* wall_name(int i) {
+    static const char* zh[6] = { "蔚蓝天空", "落日余晖", "暗夜", "绿意森林", "紫色幻境", "橙韵暖阳" };
+    static const char* en[6] = { "Blue Sky", "Sunset", "Dark", "Green Forest", "Purple", "Orange" };
+    return T(zh[i % 6], en[i % 6]);
+}
 
 struct SettingsLvState {
     LvglWin* lw;
     lv_obj_t* btns[33];
 };
 
+static void settings_build_ui(SettingsLvState* st);       // forward decl
+static void settings_rebuild_async(void* p);              // forward decl
+
 static void settings_lv_click(lv_event_t* e) {
     SettingsLvState* st = (SettingsLvState*)lv_event_get_user_data(e);
-    (void)st;
     lv_obj_t* btn = (lv_obj_t*)lv_event_get_target(e);
     int id = (int)(intptr_t)lv_obj_get_user_data(btn);
     if (id >= 0 && id <= 3) {
@@ -55,6 +72,11 @@ static void settings_lv_click(lv_event_t* e) {
         os_suspend();
     }
     settings_save();
+    // Language buttons: switch the whole UI over right now (page rebuild is
+    // deferred to the next timer tick, see settings_rebuild_async).
+    if (id == 28 || id == 29) {
+        lv_async_call(settings_rebuild_async, st);
+    }
     if (id == 22) {
         lv_obj_t* lbl = lv_obj_get_child(btn, 0);
         if (lbl) lv_label_set_text(lbl, g_settings.show_clock ? T("[x] 显示时钟", "[x] Show clock") : T("[ ] 显示时钟", "[ ] Show clock"));
@@ -106,70 +128,104 @@ static lv_obj_t* sec_label(lv_obj_t* parent, const char* text, int x, int y) {
     return l;
 }
 
-void settings_launch() {
-    int x, y;
-    cascade_pos(&x, &y);
-    // 480x545 fits the 800x600 work area (600 - 30 taskbar - margins);
-    // lvgl_win_create additionally clamps size/position as a safety net.
-    LvglWin* lw = lvgl_win_create("Settings", x, y, 480, 545);
-    if (!lw) return;
-    SettingsLvState* st = new SettingsLvState();
-    st->lw = lw;
-    lw->userdata = st;
+// Build (or rebuild) the whole settings page inside the window's content area.
+// Called once when the window opens and again right after a language switch,
+// so the page always speaks the language that is active now.
+static void settings_build_ui(SettingsLvState* st) {
+    if (!st || !st->lw || !st->lw->content) return;
+    LvglWin* lw = st->lw;
 
     // Personalization section
     sec_label(lw->content, T("个性化 nefuOS", "Personalize nefuOS"), 12, 6);
     sec_label(lw->content, T("强调色:", "Accent color:"), 12, 28);
     for (int i = 0; i < 4; i++)
-        st->btns[i] = make_btn(st, lw->content, ACCENT_NAMES[i], 12 + i * 108, 46, 100, 26, i, 0x3D4B66);
+        st->btns[i] = make_btn(st, lw->content, accent_name(i), 12 + i * 108, 46, 100, 26, i, 0x3D4B66);
 
     sec_label(lw->content, T("桌面壁纸:", "Desktop wallpaper:"), 12, 78);
     for (int i = 0; i < 6; i++)
-        st->btns[4 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + (i % 3) * 108, 96 + (i / 3) * 30, 100, 26, 4 + i, 0x3D4B66);
+        st->btns[4 + i] = make_btn(st, lw->content, wall_name(i), 12 + (i % 3) * 108, 96 + (i / 3) * 30, 100, 26, 4 + i, 0x3D4B66);
 
-    sec_label(lw->content, T("锁屏壁纸:", "Lock screen wallpaper:"), 12, 142);
+    sec_label(lw->content, T("锁屏壁纸:", "Lock screen wallpaper:"), 12, 160);
     for (int i = 0; i < 6; i++)
-        st->btns[10 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + (i % 3) * 108, 160 + (i / 3) * 30, 100, 26, 10 + i, 0x3D4B66);
+        st->btns[10 + i] = make_btn(st, lw->content, wall_name(i), 12 + (i % 3) * 108, 178 + (i / 3) * 30, 100, 26, 10 + i, 0x3D4B66);
 
-    sec_label(lw->content, T("开机启动壁纸:", "Boot splash wallpaper:"), 12, 206);
+    sec_label(lw->content, T("开机启动壁纸:", "Boot splash wallpaper:"), 12, 238);
     for (int i = 0; i < 6; i++)
-        st->btns[16 + i] = make_btn(st, lw->content, WALL_NAMES[i], 12 + (i % 3) * 108, 224 + (i / 3) * 30, 100, 26, 16 + i, 0x3D4B66);
+        st->btns[16 + i] = make_btn(st, lw->content, wall_name(i), 12 + (i % 3) * 108, 256 + (i / 3) * 30, 100, 26, 16 + i, 0x3D4B66);
 
     // Display & language section
     st->btns[22] = make_btn(st, lw->content, g_settings.show_clock ? T("[x] 显示时钟", "[x] Show clock") : T("[ ] 显示时钟", "[ ] Show clock"),
-                           12, 292, 160, 26, 22, 0x55678A);
+                           12, 316, 160, 26, 22, 0x55678A);
     st->btns[23] = make_btn(st, lw->content, g_settings.show_taskbar ? T("[x] 显示任务栏", "[x] Show taskbar") : T("[ ] 显示任务栏", "[ ] Show taskbar"),
-                           184, 292, 180, 26, 23, 0x55678A);
+                           184, 316, 180, 26, 23, 0x55678A);
     st->btns[24] = make_btn(st, lw->content, g_settings.boot_splash ? T("[x] 开机动画", "[x] Show boot splash") : T("[ ] 开机动画", "[ ] Show boot splash"),
-                           12, 322, 180, 26, 24, 0x55678A);
+                           12, 346, 180, 26, 24, 0x55678A);
     st->btns[25] = make_btn(st, lw->content, g_settings.lock_on_suspend ? T("[x] 挂起后锁定", "[x] Lock on suspend") : T("[ ] 挂起后锁定", "[ ] Lock on suspend"),
-                           200, 322, 180, 26, 25, 0x55678A);
+                           200, 346, 180, 26, 25, 0x55678A);
     st->btns[26] = make_btn(st, lw->content, g_settings.idle_lock_sec ? T("[x] 空闲 30 秒自动锁定", "[x] Auto-lock after 30s idle") : T("[ ] 空闲自动锁定", "[ ] Auto-lock idle (off)"),
-                           12, 352, 260, 26, 26, 0x55678A);
+                           12, 376, 260, 26, 26, 0x55678A);
     st->btns[27] = make_btn(st, lw->content, g_settings.browser_engine ? T("浏览器引擎: NoJS", "Browser engine: NoJS") : T("浏览器引擎: MiniJS", "Browser engine: MiniJS"),
-                           12, 382, 220, 26, 27, 0x55678A);
+                           12, 406, 220, 26, 27, 0x55678A);
 
-    sec_label(lw->content, T("语言:", "Language:"), 12, 416);
-    st->btns[28] = make_btn(st, lw->content, "English", 12, 434, 84, 26, 28, 0x3D4B66);
-    st->btns[29] = make_btn(st, lw->content, "中文", 104, 434, 84, 26, 29, 0x3D4B66);
+    sec_label(lw->content, T("语言:", "Language:"), 12, 436);
+    st->btns[28] = make_btn(st, lw->content, "English", 12, 454, 84, 26, 28, 0x3D4B66);
+    st->btns[29] = make_btn(st, lw->content, "中文", 104, 454, 84, 26, 29, 0x3D4B66);
 
-    // Hardware info section
+    // Hardware info section (kept below the language buttons: the old y values
+    // collided with them and printed on top of the toggle row)
     HwInfo hw;
     platform_hw_info(&hw);
     char hw_txt[256];
-    ksprintf(hw_txt, sizeof(hw_txt), "CPU: %s @ %dMHz", hw.cpu_model, hw.cpu_mhz);
-    sec_label(lw->content, hw_txt, 12, 404);
-    ksprintf(hw_txt, sizeof(hw_txt), "Memory: %d MB total", (int)hw.mem_total_mb);
-    sec_label(lw->content, hw_txt, 12, 412);
-    ksprintf(hw_txt, sizeof(hw_txt), "BIOS: %s %s", hw.bios_vendor, hw.bios_version);
-    sec_label(lw->content, hw_txt, 12, 426);
+    ksprintf(hw_txt, sizeof(hw_txt), T("CPU: %s @ %dMHz", "CPU: %s @ %dMHz"), hw.cpu_model, hw.cpu_mhz);
+    sec_label(lw->content, T("硬件信息:", "Hardware:"), 12, 496);
+    sec_label(lw->content, hw_txt, 12, 514);
+    ksprintf(hw_txt, sizeof(hw_txt), T("内存: 共 %d MB", "Memory: %d MB total"), (int)hw.mem_total_mb);
+    sec_label(lw->content, hw_txt, 12, 528);
+    ksprintf(hw_txt, sizeof(hw_txt), T("BIOS: %s %s", "BIOS: %s %s"), hw.bios_vendor, hw.bios_version);
+    sec_label(lw->content, hw_txt, 12, 542);
 
     // Power operations section
-    sec_label(lw->content, T("电源:", "Power:"), 12, 488);
-    st->btns[30] = make_btn(st, lw->content, T("关机", "Shutdown"), 12, 506, 100, 30, 30, 0x993333);
-    st->btns[31] = make_btn(st, lw->content, T("重启", "Reboot"), 118, 506, 100, 30, 31, 0x336699);
-    st->btns[32] = make_btn(st, lw->content, T("挂起", "Suspend"), 224, 506, 100, 30, 32, 0x555577);
+    sec_label(lw->content, T("电源:", "Power:"), 12, 566);
+    st->btns[30] = make_btn(st, lw->content, T("关机", "Shutdown"), 12, 586, 100, 30, 30, 0x993333);
+    st->btns[31] = make_btn(st, lw->content, T("重启", "Reboot"), 118, 586, 100, 30, 31, 0x336699);
+    st->btns[32] = make_btn(st, lw->content, T("挂起", "Suspend"), 224, 586, 100, 30, 32, 0x555577);
 
-    sec_label(lw->content, "All settings are saved to /etc/settings.conf and persist across reboots", 12, 508);
+    sec_label(lw->content, T("所有设置保存在 /etc/settings.conf,重启后依然生效",
+                             "All settings are saved to /etc/settings.conf and persist across reboots"),
+              12, 624);
 }
+
+// Deferred UI rebuild after a language change. Deferred because the click
+// handler runs inside an LVGL event: deleting the button that fired the event
+// right there would free the object under LVGL's feet. lv_async_call runs it
+// from the next lv_timer_handler tick instead.
+static void settings_rebuild_async(void* p) {
+    SettingsLvState* st = (SettingsLvState*)p;
+    if (!st || !st->lw || !st->lw->content || !st->lw->open) return;
+    klogf("settings: rebuild begin lang=%d", g_settings.lang);
+    lv_obj_t* c = st->lw->content;
+    for (int i = 0; i < 33; i++) st->btns[i] = 0;
+    lv_obj_clean(c);                 // drop every label/button of the old language
+    klogf("settings: cleaned");
+    settings_build_ui(st);
+    klogf("settings: ui rebuilt");
+    lvgl_win_set_title(st->lw, T("设置", "Settings"));   // title bar + taskbar button
+    klogf("settings: title set");
+    desktop_relabel_lang();          // icons + Start button + taskbar follow
+    klogf("settings: desktop relabelled");
+}
+
+void settings_launch() {
+    int x, y;
+    cascade_pos(&x, &y);
+    // The window is clamped to the live screen work area by lvgl_win_create,
+    // so a 480x545 page still fits on any resolution.
+    LvglWin* lw = lvgl_win_create(T("设置", "Settings"), x, y, 480, 545);
+    if (!lw) return;
+    SettingsLvState* st = new SettingsLvState();
+    st->lw = lw;
+    lw->userdata = st;
+    settings_build_ui(st);
+}
+
 } // namespace nefu

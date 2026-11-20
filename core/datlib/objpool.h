@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — object pool (objpool)
 // 对象池：预分配一批固定大小节点，空闲链表复用，避免频繁 new/delete
 // 造成的内存碎片与分配开销。常用于粒子系统、消息队列、事件循环、
@@ -73,3 +78,4 @@ int objpool_self_test();
 
 } // namespace dt
 } // namespace nefu
+

@@ -221,3 +221,4 @@ extern struct _spi_bdev_t spi_bdev;
 #define MBOOT_SPIFLASH_ERASE_BLOCKS_PER_PAGE    (128 / 4) // 128k page, 4k erase block
 #define MBOOT_SPIFLASH_CONFIG                   (&spiflash_config)
 #define MBOOT_SPIFLASH_SPIFLASH                 (&spi_bdev.spiflash)
+

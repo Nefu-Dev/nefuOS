@@ -66,3 +66,4 @@ struct lv_ime_pinyin_t {
 #endif
 
 #endif /*LV_IME_PINYIN_PRIVATE_H*/
+

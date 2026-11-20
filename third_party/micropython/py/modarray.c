@@ -43,3 +43,4 @@ const mp_obj_module_t mp_module_array = {
 MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_array, mp_module_array);
 
 #endif
+

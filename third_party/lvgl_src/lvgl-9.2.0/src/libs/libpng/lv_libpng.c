@@ -329,3 +329,4 @@ static lv_draw_buf_t * decode_png(lv_image_decoder_dsc_t * dsc)
 }
 
 #endif /*LV_USE_LIBPNG*/
+

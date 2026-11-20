@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* Memory configuration */
 
 /* Reserved Area
@@ -61,3 +66,4 @@ _gc_heap_end = ORIGIN(m_ocrm) + LENGTH(m_ocrm);
 /* CM4 DTCM */
 _openamp_shm_region_start = 0x20220000;
 _openamp_shm_region_end  = 0x20230000;
+

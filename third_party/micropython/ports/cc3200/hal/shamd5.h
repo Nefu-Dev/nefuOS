@@ -119,3 +119,4 @@ extern void SHAMD5ResultRead(uint32_t ui32Base, uint8_t *pui8Dest);
 #endif
 
 #endif //  __DRIVERLIB_SHAMD5_H__
+

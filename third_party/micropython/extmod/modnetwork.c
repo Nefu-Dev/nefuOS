@@ -186,3 +186,4 @@ const mp_obj_module_t mp_module_network = {
 MP_REGISTER_MODULE(MP_QSTR_network, mp_module_network);
 
 #endif  // MICROPY_PY_NETWORK
+

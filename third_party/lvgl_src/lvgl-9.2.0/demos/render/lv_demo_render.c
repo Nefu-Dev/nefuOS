@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_demo_render.c
  *
  */
@@ -1147,3 +1147,4 @@ static void add_to_cell(lv_obj_t * obj, int32_t col, int32_t row)
 }
 
 #endif
+

@@ -75,3 +75,4 @@ void lv_example_table_1(void)
 }
 
 #endif
+

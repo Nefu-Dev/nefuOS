@@ -53,3 +53,4 @@ struct lv_roller_t {
 #endif
 
 #endif /*LV_ROLLER_PRIVATE_H*/
+

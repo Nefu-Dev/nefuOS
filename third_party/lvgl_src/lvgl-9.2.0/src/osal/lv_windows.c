@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_windows.c
  *
  */
@@ -220,3 +220,4 @@ static unsigned __stdcall thread_start_routine(void * parameter)
 }
 
 #endif /*LV_USE_OS == LV_OS_WINDOWS*/
+

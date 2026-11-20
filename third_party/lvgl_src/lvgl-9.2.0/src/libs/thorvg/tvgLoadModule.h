@@ -111,3 +111,4 @@ struct FontLoader : LoadModule
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

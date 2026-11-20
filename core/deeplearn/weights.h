@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 参数序列化
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 参数序列化
 // 典型用法：
 //   n = pack_params_size(params, n);
 //   buf = new uint8[n]; pack_params(params, n, buf);
@@ -31,3 +36,4 @@ int weights_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

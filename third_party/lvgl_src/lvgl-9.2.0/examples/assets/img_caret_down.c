@@ -56,3 +56,4 @@ const lv_image_dsc_t img_caret_down = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

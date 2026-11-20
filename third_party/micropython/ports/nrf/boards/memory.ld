@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 
 /* Flash layout: bootloader_head | softdevice     | application     | filesystem    | bootloader_tail */
 /* RAM layout:   bootloader RAM  | softdevice RAM  | application RAM */
@@ -27,3 +32,4 @@ MEMORY
     FLASH_TEXT (rx) : ORIGIN = _app_start,     LENGTH = _app_size     /* app */
     RAM (xrw)       : ORIGIN = _app_ram_start, LENGTH = _app_ram_size
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Wiki - database-backed encyclopedia.
 // Data lives in /var/lib/nefuos/db/wiki.db (one entry per line,
 // "title<TAB>body", '~' in body renders as a newline).
@@ -535,3 +540,4 @@ void wiki_launch() {
 }
 
 } // namespace nefu
+

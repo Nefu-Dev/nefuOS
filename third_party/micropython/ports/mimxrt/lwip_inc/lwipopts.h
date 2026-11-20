@@ -54,3 +54,4 @@ extern uint32_t trng_random_u32(void);
 typedef uint32_t sys_prot_t;
 
 #endif // MICROPY_INCLUDED_MIMXRT_LWIP_LWIPOPTS_H
+

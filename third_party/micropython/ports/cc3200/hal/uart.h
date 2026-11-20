@@ -232,3 +232,4 @@ extern unsigned long UARTTxIntModeGet(unsigned long ulBase);
 #endif
 
 #endif //  __UART_H__
+

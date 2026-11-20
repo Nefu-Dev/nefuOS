@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - internal <_avltree.h>
 // A generic AVL tree carrying a per-key mapped value. Used by <map> and <set>.
 // Header-only, allocates nodes on the nefuOS kernel heap. Not a public header.
@@ -152,3 +157,4 @@ private:
 
 } // namespace stdx
 } // namespace nefu
+

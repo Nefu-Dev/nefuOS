@@ -409,3 +409,4 @@ void  MSC_BOT_CplClrFeature (USBD_HandleTypeDef  *pdev, uint8_t epnum)
 #endif // MICROPY_HW_USB_MSC
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Ignore this file during non-NDK builds.
 ifdef NDK_ROOT
 LOCAL_PATH := $(call my-dir)
@@ -293,3 +298,4 @@ ifeq ($(USE_CPUFEATURES),yes)
   $(call import-module,android/cpufeatures)
 endif
 endif  # NDK_ROOT
+

@@ -32,3 +32,4 @@ void usb_init(void);
 void usb_usj_mode(void);
 
 #endif // MICROPY_INCLUDED_ESP32_USB_H
+

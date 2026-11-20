@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audio driver - real mainstream sound cards.
 //   * Intel AC'97 (82801AA/BA/CA/DB/EB/FB/GB + VIA) - NABMBAR DMA, BDL ring
 //   * Intel HD Audio (ICH6/7/9/10, 5/6/7 series)    - CORB/RIRB + SD0 stream
@@ -544,3 +549,4 @@ void audio_output_volume(int percent) {
 } // namespace audio
 } // namespace drivers
 } // namespace nefu
+

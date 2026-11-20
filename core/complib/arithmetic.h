@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — 算术编码 (arithmetic)
 // 算术编码：把整个消息编码为 [0,1) 区间上的一个实数。每个符号按
 // 概率把当前区间细分，最终区间内任一点即可解码。相比 Huffman
@@ -19,3 +24,4 @@ int arithmetic_self_test();
 
 } // namespace comp
 } // namespace nefu
+

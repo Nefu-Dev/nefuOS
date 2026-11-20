@@ -3777,3 +3777,4 @@ int main(int argc, char *argv[])
     re_string_list_free(&rgi_emoji_zwj_sequence);
     return 0;
 }
+

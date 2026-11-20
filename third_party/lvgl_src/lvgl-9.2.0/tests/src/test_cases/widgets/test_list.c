@@ -63,3 +63,4 @@ void test_list_snapshot(void)
 }
 
 #endif
+

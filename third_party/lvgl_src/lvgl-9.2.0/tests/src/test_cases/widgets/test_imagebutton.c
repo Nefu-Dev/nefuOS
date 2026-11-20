@@ -56,3 +56,4 @@ void test_imagebutton_basic_appearance(void)
 }
 
 #endif
+

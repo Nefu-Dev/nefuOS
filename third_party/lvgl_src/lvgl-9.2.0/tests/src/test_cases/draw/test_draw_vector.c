@@ -340,3 +340,4 @@ void test_draw_during_rendering(void)
 }
 
 #endif
+

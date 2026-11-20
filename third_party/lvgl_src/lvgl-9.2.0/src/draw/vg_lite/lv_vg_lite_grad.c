@@ -685,3 +685,4 @@ static lv_cache_compare_res_t grad_compare_cb(const grad_item_t * lhs, const gra
 }
 
 #endif /*LV_USE_DRAW_VG_LITE && LV_USE_VECTOR_GRAPHIC*/
+

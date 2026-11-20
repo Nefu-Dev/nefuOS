@@ -40,3 +40,4 @@ typedef long mp_off_t;
 #endif
 
 #define MICROPY_MPHALPORT_H "port/mphalport.h"
+

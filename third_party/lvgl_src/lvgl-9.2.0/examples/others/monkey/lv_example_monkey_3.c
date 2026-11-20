@@ -31,3 +31,4 @@ void lv_example_monkey_3(void)
 }
 
 #endif
+

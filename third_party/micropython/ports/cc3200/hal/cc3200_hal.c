@@ -186,3 +186,4 @@ static void hal_TickInit (void) {
 #endif
 
 MP_REGISTER_ROOT_POINTER(struct _os_term_dup_obj_t *os_term_dup_obj);
+

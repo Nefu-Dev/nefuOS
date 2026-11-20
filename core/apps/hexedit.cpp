@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Hex Editor — view and edit raw bytes of VFS files
 #include "apps.h"
 #include "../gui/wm.h"
@@ -178,7 +183,7 @@ void hex_close(Window* w) {
 void hexedit_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Hex Editor", x, y, 380, 400);
+    Window* w = g_wm->create_window(T("十六进制编辑器", "Hex Editor"), x, y, 380, 400);
     if (!w) return;
     HexEdit* g = new HexEdit();
     g->w = w->content_w;
@@ -204,3 +209,4 @@ void hexedit_launch() {
 }
 
 } // namespace nefu
+

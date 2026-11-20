@@ -7655,3 +7655,4 @@ unsigned encode(const std::string & filename,
 #endif /*LODEPNG_COMPILE_CPP*/
 
 #endif /*LV_USE_LODEPNG*/
+

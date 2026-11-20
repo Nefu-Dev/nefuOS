@@ -11,3 +11,4 @@ extern "C" {
 }
 #endif
 #endif /* R_ADC_CFG_H_ */
+

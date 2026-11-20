@@ -234,3 +234,4 @@ extern struct _spi_bdev_t spi_bdev;
 #define MICROPY_HW_USB_INTERFACE_HS_STRING      "Opta Interface"
 #define MICROPY_HW_USB_CONFIGURATION_FS_STRING  "Opta Config"
 #define MICROPY_HW_USB_CONFIGURATION_HS_STRING  "Opta Config"
+

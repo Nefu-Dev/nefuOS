@@ -1299,3 +1299,4 @@ static inline lv_result_t lv_argb8888_blend_normal_to_argb8888_mix_mask_opa_neon
 #endif
 
 #endif /*LV_BLEND_NEON_H*/
+

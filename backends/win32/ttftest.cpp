@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // temporary fontview crash repro v6 - step printf
 #include "../../core/gui/gfx.h"
 #include "../../core/gui/ttfont.h"
@@ -55,3 +60,4 @@ int main() {
     free(buf);
     return 0;
 }
+

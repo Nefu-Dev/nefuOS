@@ -87,3 +87,4 @@ typedef uint32_t sys_prot_t;
 #define sys_jiffies sys_now
 
 #endif // MICROPY_INCLUDED_STM32_LWIP_LWIPOPTS_H
+

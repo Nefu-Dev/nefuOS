@@ -63,3 +63,4 @@ static mp_obj_t machine_bitstream_(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_bitstream_obj, 4, 4, machine_bitstream_);
 
 #endif // MICROPY_PY_MACHINE_BITSTREAM
+

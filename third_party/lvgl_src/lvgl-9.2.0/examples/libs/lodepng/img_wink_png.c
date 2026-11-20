@@ -344,3 +344,4 @@ const lv_image_dsc_t img_wink_png = {
 };
 
 #endif /*LV_USE_LODEPNG && LV_BUILD_EXAMPLES*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 3D 图形库 —— ppm: PPM 图像读写（P6 二进制格式）
 // ----------------------------------------------------------------------------
@@ -22,3 +27,4 @@ int ppm_self_test();
 
 } // namespace gfx3d
 } // namespace nefu
+

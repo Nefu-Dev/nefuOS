@@ -33,3 +33,4 @@ void lv_example_keyboard_2(void)
     lv_keyboard_set_textarea(kb, ta);
 }
 #endif
+

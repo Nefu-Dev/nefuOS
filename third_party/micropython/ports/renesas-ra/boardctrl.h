@@ -95,3 +95,4 @@ void boardctrl_start_soft_reset(boardctrl_state_t *state);
 void boardctrl_end_soft_reset(boardctrl_state_t *state);
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_BOARDCTRL_H
+

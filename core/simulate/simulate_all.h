@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— 聚合头
 //   #include "simulate/simulate_all.h"
 // 一次性引入全部仿真模块，并提供统一的 simulate_self_test()。
@@ -27,3 +32,4 @@ inline int simulate_self_test() {
 
 } // namespace simulate
 } // namespace nefu
+

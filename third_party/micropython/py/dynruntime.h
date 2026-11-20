@@ -322,3 +322,4 @@ static inline void mp_obj_get_array_dyn(mp_obj_t o, size_t *len, mp_obj_t **item
 }
 
 #endif // MICROPY_INCLUDED_PY_DYNRUNTIME_H
+

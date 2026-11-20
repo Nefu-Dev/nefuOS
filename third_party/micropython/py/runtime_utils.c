@@ -50,3 +50,4 @@ mp_obj_t mp_call_function_2_protected(mp_obj_t fun, mp_obj_t arg1, mp_obj_t arg2
         return MP_OBJ_NULL;
     }
 }
+

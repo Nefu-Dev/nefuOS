@@ -1,4 +1,9 @@
-﻿// minilang 宿主测试主程序：跑全部模块 self_test，并做端到端集成测试。
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// minilang 宿主测试主程序：跑全部模块 self_test，并做端到端集成测试。
 // 编译：
 //   g++ -std=c++17 -fno-exceptions -fno-rtti -fno-builtin -O2 -I core ^
 //     tests/minilang_test_main.cpp core/minilang/*.cpp ^
@@ -94,5 +99,6 @@ int main() {
     printf("== minilang result: %s ==\n", g_fails == 0 ? "ALL PASSED" : "FAILURES");
     return g_fails ? 1 : 0;
 }
+
 
 

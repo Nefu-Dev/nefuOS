@@ -49,3 +49,4 @@ const mp_obj_module_t mp_module_collections = {
 MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_collections, mp_module_collections);
 
 #endif // MICROPY_PY_COLLECTIONS
+

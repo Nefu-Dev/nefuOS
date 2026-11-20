@@ -148,3 +148,4 @@ void soft_timer_remove(soft_timer_entry_t *entry) {
     soft_timer_heap = (soft_timer_entry_t *)mp_pairheap_delete(soft_timer_lt, &soft_timer_heap->pairheap, &entry->pairheap);
     MICROPY_PY_PENDSV_EXIT;
 }
+

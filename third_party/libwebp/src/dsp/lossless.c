@@ -679,3 +679,4 @@ WEBP_DSP_INIT_FUNC(VP8LDspInit) {
 #undef COPY_PREDICTOR_ARRAY
 
 //------------------------------------------------------------------------------
+

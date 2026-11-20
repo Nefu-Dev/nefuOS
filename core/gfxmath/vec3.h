@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 三维向量 vec3
 // 教学版：三维空间向量运算（点、叉积、长度、归一化、插值）。
 // 用于 3D 图形学中的坐标、方向、法线计算。class / STL / cmath / 中文注释。
@@ -58,3 +63,4 @@ struct Vec3 {
 
 } // namespace gfx
 } // namespace nefu
+

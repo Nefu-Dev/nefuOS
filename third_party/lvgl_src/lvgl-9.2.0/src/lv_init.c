@@ -436,3 +436,4 @@ void lv_deinit(void)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

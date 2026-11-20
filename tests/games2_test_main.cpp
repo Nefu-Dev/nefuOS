@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // games2_test_main.cpp —— 第二批小游戏公共工具的宿主机自测
 //
 // 编译命令（在 nefuOS 根目录）：
@@ -247,3 +252,4 @@ int main() {
     printf("games2 self test: %d failures\n", failures);
     return failures != 0;
 }
+

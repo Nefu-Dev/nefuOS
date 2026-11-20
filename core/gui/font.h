@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // auto-generated:8x16 ASCII bitmap font(32..127),per char 16 bytes,one row per byte 8 pixel,MSB=left side
 // generator tool:tools/fontgen.cpp,do not edit manually
 #pragma once
@@ -100,3 +105,4 @@ const unsigned char nefu::font8x16[96][16] = {
   { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x4C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, // 126 '~'
   { 0x00, 0x00, 0x00, 0xF8, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0xF8, 0x00, 0x00, 0x00 }, // 127 ' '
 };
+

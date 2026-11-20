@@ -41,3 +41,4 @@ void lv_example_scroll_6(void);
 #endif
 
 #endif /*LV_EXAMPLE_SCROLL_H*/
+

@@ -867,3 +867,4 @@ WEBP_DSP_INIT_FUNC(VP8EncDspInit) {
   assert(VP8Copy4x4 != NULL);
   assert(VP8Copy16x8 != NULL);
 }
+

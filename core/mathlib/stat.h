@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 描述统计 stat
 // 教学版：均值/方差/标准差/极值/中位数/众数/分位数，支持在线更新。
 #pragma once
@@ -41,3 +46,4 @@ int stat_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

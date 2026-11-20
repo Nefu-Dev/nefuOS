@@ -302,3 +302,4 @@ void mp_warning(const char *category, const char *msg, ...);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_RUNTIME_H
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
 // nefuOS 数学扩展库 —— 多项式模块实现
 #include "poly.h"
@@ -386,3 +391,4 @@ int poly_self_test() {
 
 } // namespace mathext
 } // namespace nefu
+

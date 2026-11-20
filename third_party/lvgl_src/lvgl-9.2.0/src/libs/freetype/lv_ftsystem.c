@@ -289,3 +289,4 @@ ft_lv_fs_stream_io(FT_Stream       stream,
 #endif /* !FT_CONFIG_OPTION_DISABLE_STREAM_SUPPORT */
 
 #endif/*LV_FREETYPE_USE_LV_FTSYSTEM*/
+

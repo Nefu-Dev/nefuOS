@@ -1,4 +1,9 @@
-﻿#include "lib/softmath.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "lib/softmath.h"
 #include <cstdio>
 int main() {
     using namespace nefu::fx;
@@ -6,3 +11,4 @@ int main() {
     printf("sin(1.5)=%d cos(1.5)=%d\n", fx_sin(fxf(15,10)), fx_cos(fxf(15,10)));
     return 0;
 }
+

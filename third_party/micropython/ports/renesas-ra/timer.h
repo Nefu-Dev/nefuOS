@@ -34,3 +34,4 @@ void timer_init0(void);
 void timer_deinit(void);
 
 #endif // MICROPY_INCLUDED_RA_TIMER_H
+

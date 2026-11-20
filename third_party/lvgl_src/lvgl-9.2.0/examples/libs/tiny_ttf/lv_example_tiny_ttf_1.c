@@ -23,3 +23,4 @@ void lv_example_tiny_ttf_1(void)
     lv_obj_center(label);
 }
 #endif
+

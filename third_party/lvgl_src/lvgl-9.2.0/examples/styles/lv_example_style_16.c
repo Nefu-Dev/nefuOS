@@ -1,4 +1,4 @@
-﻿#include "../lv_examples.h"
+#include "../lv_examples.h"
 #if LV_BUILD_EXAMPLES
 
 #if LV_USE_DRAW_SW_COMPLEX_GRADIENTS
@@ -82,3 +82,4 @@ void lv_example_style_16(void)
 #endif /*LV_USE_DRAW_SW_COMPLEX_GRADIENTS*/
 
 #endif /*LV_BUILD_EXAMPLES*/
+

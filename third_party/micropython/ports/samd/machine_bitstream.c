@@ -204,3 +204,4 @@ void machine_bitstream_high_low(mp_hal_pin_obj_t pin, uint32_t *timing_ns, const
 #endif // > CORTEX_M0
 
 #endif // MICROPY_PY_MACHINE_BITSTREAM
+

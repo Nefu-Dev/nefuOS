@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // probe: compile FS_FLOW source and report parse error
 #include <cstdio>
 #include <cstdlib>
@@ -60,3 +65,4 @@ int main() {
     printf("probe done\n");
     return 0;
 }
+

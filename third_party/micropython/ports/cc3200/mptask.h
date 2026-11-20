@@ -44,3 +44,4 @@ extern StackType_t mpTaskStack[];
 extern void TASK_MicroPython(void *pvParameters);
 
 #endif // MICROPY_INCLUDED_CC3200_MPTASK_H
+

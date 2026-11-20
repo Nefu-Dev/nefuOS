@@ -45,3 +45,4 @@ int eth_stop(eth_t *self);
 void eth_low_power_mode(eth_t *self, bool enable);
 
 #endif // MICROPY_INCLUDED_STM32_ETH_H
+

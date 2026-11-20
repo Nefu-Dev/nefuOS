@@ -321,3 +321,4 @@ DEF(RGI_Emoji_Tag_Sequence)
 DEF(RGI_Emoji_ZWJ_Sequence)
 DEF(RGI_Emoji)
 #endif
+

@@ -123,3 +123,4 @@ static const uint8_t kImgGridData[] = {
 };
 
 #endif  // WEBP_TESTS_FUZZER_IMG_GRID_H_
+

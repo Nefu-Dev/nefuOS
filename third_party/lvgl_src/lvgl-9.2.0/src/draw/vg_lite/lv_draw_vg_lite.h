@@ -88,3 +88,4 @@ void lv_draw_vg_lite_vector(lv_draw_unit_t * draw_unit, const lv_draw_vector_tas
 #endif
 
 #endif /*LV_DRAW_VG_LITE_H*/
+

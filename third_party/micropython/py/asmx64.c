@@ -640,3 +640,4 @@ void asm_x64_call_ind(asm_x64_t *as, size_t fun_id, int temp_r64) {
 }
 
 #endif // MICROPY_EMIT_X64
+

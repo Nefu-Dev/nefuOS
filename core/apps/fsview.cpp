@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统查看器 —— 窗口应用
 //
 // 在一块虚拟磁盘上格式化一个 FAT16,然后可视化:
@@ -188,7 +193,7 @@ static void fs_close(Window* w) {
 void fsview_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("FS Viewer", x, y, FS_W, FS_H);
+    Window* w = g_wm->create_window(T("文件系统查看器", "FS Viewer"), x, y, FS_W, FS_H);
     if (!w) return;
     FsView* v = new FsView();
     v->reset();
@@ -200,3 +205,4 @@ void fsview_launch() {
 }
 
 } // namespace nefu
+

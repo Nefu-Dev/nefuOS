@@ -257,3 +257,4 @@ void boardctrl_end_soft_reset(boardctrl_state_t *state) {
     // Set reset_mode to normal boot.
     state->reset_mode = BOARDCTRL_RESET_MODE_NORMAL;
 }
+

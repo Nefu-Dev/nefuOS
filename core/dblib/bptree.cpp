@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— B+ 树实现 + 自测
 // 教学重点：分裂（split）与借位/合并（borrow/merge）保持平衡。
 #include "dblib/bptree.h"
@@ -282,3 +287,4 @@ int BpTree::self_test() {
 
 } // namespace dbx
 } // namespace nefu
+

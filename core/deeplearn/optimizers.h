@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 优化器
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 优化器
 // SGD+momentum / Adam / AdamW / RMSprop / AdaGrad / 学习率调度。
 // 优化器持有参数张量指针列表，step() 用 grad 更新 data 并清 grad。
 //
@@ -93,3 +98,4 @@ int optimizers_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

@@ -97,3 +97,4 @@ microbit_image_obj_t *microbit_image_dim(microbit_image_obj_t *lhs, mp_int_t val
 microbit_image_obj_t *microbit_image_sum(microbit_image_obj_t *lhs, microbit_image_obj_t *rhs, bool add);
 
 #endif // __MICROPY_INCLUDED_MICROBIT_IMAGE_H__
+

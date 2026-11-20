@@ -175,3 +175,4 @@ const mp_obj_module_t mp_module_termios = {
 MP_REGISTER_MODULE(MP_QSTR_termios, mp_module_termios);
 
 #endif // MICROPY_PY_TERMIOS
+

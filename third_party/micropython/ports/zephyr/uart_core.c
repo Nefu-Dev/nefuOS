@@ -143,3 +143,4 @@ static int mp_console_getchar(void) {
 }
 
 #endif  // CONFIG_CONSOLE_SUBSYS
+

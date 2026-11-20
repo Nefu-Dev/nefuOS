@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS software WebGL2 engine  - see swgl.h for design notes.
 //
 // Compiled for BOTH backends:
@@ -19,8 +24,16 @@
 #define SWDBG(...) do {} while (0)
 #endif
 
+#include <cstdio>   // fprintf(stderr) - bare libc routes it to the debugcon
+
 namespace nefu {
 namespace {
+
+// Staging slots for out-of-band buffer uploads (ids are 1-based; 0 = failure).
+// Sized so a frame's worth of chunk meshes fits without recycling.
+struct GlBinSlot { uint8_t* p; int len; int used; int seat; };
+static const int kGlBinN = 1024;
+static GlBinSlot g_glbin[kGlBinN];
 
 // bounded string copy (clip_str equivalent - browser.cpp's is TU-local)
 static void sw_cp(char* dst, int cap, const char* src) {
@@ -474,7 +487,12 @@ struct SwCanvas {
     float gl_psize;
     bool discard;
 };
-static SwCanvas s_cv[4];
+// The canvas structures are allocated on demand instead of living in .bss:
+// one SwCanvas is ~600 KB (the uniform tables are 256 entries wide), so four
+// of them as static objects would add 2.4 MB to the kernel image - more than
+// the bare kernel's whole 10 MB budget allows. The heap arena is far larger,
+// and a page normally opens one context anyway.
+static SwCanvas* s_cv[4];
 
 // ===================== parser =====================
 struct SwParser {
@@ -1164,10 +1182,17 @@ static void sw_sh_compile(SwShader& sh, const char* src) {
     }
     if (ps.err) {
         if (!sh.err[0]) sw_cp(sh.err, sizeof(sh.err), "parse error");
+        // Surface the reason: the JS bridge cannot carry a shader info log, so
+        // without this the page only ever sees a generic link failure and the
+        // real GLSL construct that broke our compiler is lost.
+        static int _shfail = 0;
+        if (_shfail < 8) { _shfail++; fprintf(stderr, "[GLSH] compile fail type=%d err=%s\n", sh.type, sh.err); }
         return;
     }
     if (sh.main_idx < 0) {
         sw_cp(sh.err, sizeof(sh.err), "no main()");
+        static int _nmain = 0;
+        if (_nmain < 8) { _nmain++; fprintf(stderr, "[GLSH] no main() type=%d\n", sh.type); }
         return;
     }
     sh.compiled = true;
@@ -1229,6 +1254,12 @@ static void sw_prog_link(SwCanvas& cv, SwProg& p) {
     SwShader* fs = p.fs >= 0 && p.fs < SW_MAX_SH && cv.sh[p.fs].used ? &cv.sh[p.fs] : 0;
     if (!vs || !vs->compiled || !fs || !fs->compiled) {
         sw_cp(p.err, sizeof(p.err), "shaders not compiled");
+        static int _lfail = 0;
+        if (_lfail < 8) {
+            _lfail++;
+            fprintf(stderr, "[GLPROG] link fail: no compiled shaders vs=%d fs=%d\n",
+                    vs ? (int)vs->compiled : -1, fs ? (int)fs->compiled : -1);
+        }
         return;
     }
     // uniforms: union of VS + FS names
@@ -1281,6 +1312,8 @@ static void sw_prog_link(SwCanvas& cv, SwProg& p) {
         }
         if (vsi < 0) {
             sw_cp(p.err, sizeof(p.err), "unmatched varying");
+            static int _vfail = 0;
+            if (_vfail < 8) { _vfail++; fprintf(stderr, "[GLPROG] link fail: unmatched varying %s\n", v.name); }
             return;
         }
         sw_cp(p.varying_fs_name[p.varying_n], 20, v.name);
@@ -2409,34 +2442,36 @@ static void sw_do_draw(SwCanvas& cv, int mode, int count, int first, int instCou
 // ===================== command dispatch =====================
 static SwCanvas* sw_canvas_find(const char* cid) {
     for (int i = 0; i < 4; i++)
-        if (s_cv[i].used && !strcmp(s_cv[i].cid, cid)) return &s_cv[i];
+        if (s_cv[i] && s_cv[i]->used && !strcmp(s_cv[i]->cid, cid)) return s_cv[i];
     return 0;
 }
 static SwCanvas* sw_canvas_get(const char* cid) {
     SwCanvas* c = sw_canvas_find(cid);
     if (c) return c;
     for (int i = 0; i < 4; i++) {
-        if (!s_cv[i].used) {
-            memset(&s_cv[i], 0, sizeof(SwCanvas));
-            s_cv[i].used = true;
-            sw_cp(s_cv[i].cid, sizeof(s_cv[i].cid), cid);
-            s_cv[i].w = 300;
-            s_cv[i].h = 150;
-            s_cv[i].cur_prog = -1;
-            s_cv[i].cur_buf = -1;
-            s_cv[i].cur_elem = -1;
-            s_cv[i].cur_vao = -1;
-            s_cv[i].active_unit = 0;
-            s_cv[i].depth_func = SW_LEQUAL;
-            s_cv[i].blend_src = SW_ONE;
-            s_cv[i].blend_dst = SW_ZERO;
-            s_cv[i].cull_face = SW_BACK;
-            s_cv[i].color_mask[0] = s_cv[i].color_mask[1] = s_cv[i].color_mask[2] = s_cv[i].color_mask[3] = true;
-            s_cv[i].depth_mask = true;
-            s_cv[i].unpack_alignment = 4;
-            for (int u = 0; u < 8; u++) s_cv[i].unit_tex[u] = -1;
-            return &s_cv[i];
-        }
+        if (s_cv[i]) continue;          // slot taken
+        SwCanvas* cv = (SwCanvas*)kalloc(sizeof(SwCanvas));
+        if (!cv) return 0;
+        memset(cv, 0, sizeof(SwCanvas));
+        s_cv[i] = cv;
+        cv->used = true;
+        sw_cp(cv->cid, sizeof(cv->cid), cid);
+        cv->w = 300;
+        cv->h = 150;
+        cv->cur_prog = -1;
+        cv->cur_buf = -1;
+        cv->cur_elem = -1;
+        cv->cur_vao = -1;
+        cv->active_unit = 0;
+        cv->depth_func = SW_LEQUAL;
+        cv->blend_src = SW_ONE;
+        cv->blend_dst = SW_ZERO;
+        cv->cull_face = SW_BACK;
+        cv->color_mask[0] = cv->color_mask[1] = cv->color_mask[2] = cv->color_mask[3] = true;
+        cv->depth_mask = true;
+        cv->unpack_alignment = 4;
+        for (int u = 0; u < 8; u++) cv->unit_tex[u] = -1;
+        return cv;
     }
     return 0;
 }
@@ -2490,8 +2525,68 @@ static uint8_t* sw_decode_data(const char* s, int* outLen) {
 
 } // namespace (internal helpers)
 
+// ---------------------------------------------------------------------------
+// Out-of-band GL upload pool.
+// The JS side serialises commands as one text line per frame, and that buffer
+// is a few KB. Vertex/index payloads are orders of magnitude larger, so they
+// are handed over here instead: the text line carries only a pool id and the
+// bytes are copied straight into the target buffer.
+// ---------------------------------------------------------------------------
+unsigned nefu_glbin_put(const void* data, int len) {
+    if (!data || len <= 0) return 0;
+    for (int i = 1; i < kGlBinN; i++) {
+        if (g_glbin[i].used) continue;
+        uint8_t* copy = (uint8_t*)kalloc((size_t)len);
+        if (!copy) return 0;
+        memcpy(copy, data, (size_t)len);
+        g_glbin[i].used = 1;
+        g_glbin[i].p = copy;
+        g_glbin[i].len = len;
+        g_glbin[i].seat = 0;
+        return (unsigned)i;
+    }
+    // Pool exhausted: fall back to the oldest slot so a stuck upload can never
+    // wedge the renderer for the rest of the session.
+    static unsigned s_evict = 1;
+    int i = (int)s_evict;
+    s_evict = (s_evict + 1) % (unsigned)kGlBinN;
+    if (s_evict == 0) s_evict = 1;
+    if (g_glbin[i].p) kfree(g_glbin[i].p);
+    uint8_t* copy = (uint8_t*)kalloc((size_t)len);
+    if (!copy) { g_glbin[i].used = 0; g_glbin[i].p = 0; g_glbin[i].len = 0; return 0; }
+    memcpy(copy, data, (size_t)len);
+    g_glbin[i].used = 1;
+    g_glbin[i].p = copy;
+    g_glbin[i].len = len;
+    return (unsigned)i;
+}
+
+int nefu_glbin_take(unsigned id, const uint8_t** out) {
+    *out = 0;
+    if (id == 0 || id >= (unsigned)kGlBinN || !g_glbin[id].used) return 0;
+    *out = g_glbin[id].p;
+    return g_glbin[id].len;
+}
+
+static void glbin_ret(unsigned id) {
+    if (id == 0 || id >= (unsigned)kGlBinN) return;
+    if (g_glbin[id].p) kfree(g_glbin[id].p);
+    g_glbin[id].p = 0;
+    g_glbin[id].len = 0;
+    g_glbin[id].used = 0;
+}
+
+// The WGL host path copies pool payloads straight into real GL objects, so it
+// has to release the pool slot itself (glbin_ret above is file-local).
+void nefu_glbin_release(unsigned id) { glbin_ret(id); }
+
 void swgl_cmd(const char* cid, const char* cmd, const char* val) {
     if (!cid || !cmd || !val) return;
+    // Sequence trace for shader-pipeline debugging: NF_GLTRACE=1 prints every
+    // command name so the last calls before a JS-side effect failure are visible.
+    static int s_trace = -1;
+    if (s_trace < 0) { const char* e = getenv("NF_GLTRACE"); s_trace = (e && *e == '1') ? 1 : 0; }
+    if (s_trace) { fprintf(stderr, "[GLT] %s\n", cmd); fflush(stderr); }
     // decode percent-encoding in place
     char* v = (char*)kalloc(strlen(val) + 1);
     if (!v) return;
@@ -2602,6 +2697,46 @@ void swgl_cmd(const char* cid, const char* cmd, const char* val) {
         int target = sw_atoi(a[1]);
         if (target == SW_ARRAY_BUFFER) cv->cur_buf = sw_buf_slot(*cv, sid);
         else cv->cur_elem = sw_buf_slot(*cv, sid);
+    } else if (!strcmp(c, "bufp")) { // bufferData with an out-of-band payload: bid,target,binid,bytes
+        unsigned bid = sw_parse_sid(a[0]);
+        int target = sw_atoi(a[1]);
+        unsigned gid = (unsigned)sw_atoi(a[2]);
+        SwBuf_* b = sw_buf_of(*cv, bid);
+        if (!b) {
+            for (int i = 0; i < SW_MAX_BUF; i++)
+                if (!cv->bu[i].used) {
+                    cv->bu[i].used = true;
+                    cv->bu[i].sid = bid;
+                    cv->bu[i].target = target;
+                    b = &cv->bu[i];
+                    break;
+                }
+        }
+        const uint8_t* src = 0;
+        int len = nefu_glbin_take(gid, &src);
+        if (b && src && len > 0) {
+            if (b->data) { kfree(b->data); b->data = 0; }
+            b->bytes = 0;
+            kfree(v);
+            v = 0;
+            b->data = (uint8_t*)kalloc((size_t)len);
+            if (b->data) { memcpy(b->data, src, (size_t)len); b->bytes = len; }
+        }
+        glbin_ret(gid);
+        if (!b) { kfree(v); return; }
+        SWDBG("bufp bid=%u bytes=%d\\n", bid, b->bytes);
+    } else if (!strcmp(c, "bufsubp")) { // bufferSubData out-of-band: bid,target,offset,binid,bytes
+        unsigned bid = sw_parse_sid(a[0]);
+        int offset = sw_atoi(a[2]);
+        unsigned gid = (unsigned)sw_atoi(a[3]);
+        SwBuf_* b = sw_buf_of(*cv, bid);
+        const uint8_t* src = 0;
+        int len = nefu_glbin_take(gid, &src);
+        if (b && src && len > 0 && b->data && offset >= 0 &&
+            (size_t)(offset + len) <= (size_t)b->bytes) {
+            memcpy(b->data + offset, src, (size_t)len);
+        }
+        glbin_ret(gid);
     } else if (!strcmp(c, "buf")) {   // bufferData (new form: bid,target,type,usage,b64 | old: bid,target,f1,f2,...)
         unsigned bid = sw_parse_sid(a[0]);
         int target = sw_atoi(a[1]);
@@ -2997,23 +3132,92 @@ void swgl_resize(const char* cid, int w, int h) {
     SwCanvas* c = sw_canvas_find(cid);
     if (c) sw_canvas_resize(*c, w, h);
 }
+
+// Texture pixels that arrive out of band.
+//
+// The "texim" wire command only carries size and format: a base64-encoded
+// 1024x1024 RGBA image would be a 5.6 MB text line, and the control channel
+// is a single line. The browser therefore keeps the bytes in its own pending
+// slot (filled on the JS worker thread, where no GL may run) and hands them
+// to this function when the command is dispatched on the UI thread, so the
+// ordering is identical to a normal texture upload.
+void swgl_tex_image(const char* cid, int w, int h, int format, int type,
+                    const uint8_t* px, int len) {
+    SwCanvas* cv = sw_canvas_find(cid);
+    if (!cv || w <= 0 || h <= 0 || !px || len <= 0) return;
+    int ti = cv->unit_tex[cv->active_unit];
+    if (ti < 0 || ti >= SW_MAX_TEX) return;
+    SwTex& t = cv->tx[ti];
+    if (t.rgba && (t.w != w || t.h != h)) { kfree(t.rgba); t.rgba = 0; }
+    if (!t.rgba) {
+        t.rgba = (uint8_t*)kalloc((size_t)w * h * 4);
+        if (!t.rgba) return;
+    }
+    t.w = w; t.h = h;
+    t.format = format; t.data_type = type;
+    memset(t.rgba, 0, (size_t)w * h * 4);
+    int srcBytes = format == SW_RGBA ? 4 : format == SW_RGB ? 3 :
+                   format == SW_LUMINANCE_ALPHA ? 2 : 1;
+    for (int y = 0; y < h && y * srcBytes * w < len; y++) {
+        for (int x = 0; x < w; x++) {
+            const uint8_t* s = px + (y * w + x) * srcBytes;
+            uint8_t* o = t.rgba + (y * w + x) * 4;
+            switch (format) {
+                case SW_RGBA: o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = s[3]; break;
+                case SW_RGB: o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = 255; break;
+                case SW_LUMINANCE: o[0] = o[1] = o[2] = s[0]; o[3] = 255; break;
+                case SW_ALPHA: o[0] = o[1] = o[2] = 0; o[3] = s[0]; break;
+                case SW_LUMINANCE_ALPHA: o[0] = o[1] = o[2] = s[0]; o[3] = s[1]; break;
+                default: o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = 255; break;
+            }
+        }
+    }
+}
+void swgl_tex_sub_image(const char* cid, int x0, int y0, int w, int h,
+                         int format, int type, const uint8_t* px, int len) {
+    (void)type;
+    SwCanvas* cv = sw_canvas_find(cid);
+    if (!cv || w <= 0 || h <= 0 || !px || len <= 0) return;
+    int ti = cv->unit_tex[cv->active_unit];
+    if (ti < 0 || ti >= SW_MAX_TEX) return;
+    SwTex& t = cv->tx[ti];
+    if (!t.rgba) return;   // texture was never allocated (no texImage2D first)
+    int srcBytes = format == SW_RGBA ? 4 : format == SW_RGB ? 3 :
+                   format == SW_LUMINANCE_ALPHA ? 2 : 1;
+    for (int y = 0; y < h && y0 + y < t.h; y++) {
+        for (int x = 0; x < w && x0 + x < t.w; x++) {
+            const uint8_t* s = px + (y * w + x) * srcBytes;
+            uint8_t* o = t.rgba + ((y0 + y) * t.w + (x0 + x)) * 4;
+            switch (format) {
+                case SW_RGBA: o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = s[3]; break;
+                case SW_RGB: o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = 255; break;
+                case SW_LUMINANCE: o[0] = o[1] = o[2] = s[0]; o[3] = 255; break;
+                case SW_ALPHA: o[0] = o[1] = o[2] = 0; o[3] = s[0]; break;
+                case SW_LUMINANCE_ALPHA: o[0] = o[1] = o[2] = s[0]; o[3] = s[1]; break;
+                default: o[0] = s[0]; o[1] = s[1]; o[2] = s[2]; o[3] = 255; break;
+            }
+        }
+    }
+}
 void swgl_shutdown() {
     for (int i = 0; i < 4; i++) {
-        if (!s_cv[i].used) continue;
+        if (!s_cv[i]) continue;
+        SwCanvas* cv = s_cv[i];
         for (int j = 0; j < SW_MAX_BUF; j++)
-            if (s_cv[i].bu[j].data) kfree(s_cv[i].bu[j].data);
+            if (cv->bu[j].data) kfree(cv->bu[j].data);
         for (int j = 0; j < SW_MAX_TEX; j++)
-            if (s_cv[i].tx[j].rgba) kfree(s_cv[i].tx[j].rgba);
+            if (cv->tx[j].rgba) kfree(cv->tx[j].rgba);
         for (int j = 0; j < SW_MAX_SH; j++)
-            if (s_cv[i].sh[j].arena) sw_afree(s_cv[i].sh[j].arena);
-        if (s_cv[i].fb) kfree(s_cv[i].fb);
-        if (s_cv[i].depth) kfree(s_cv[i].depth);
-        memset(&s_cv[i], 0, sizeof(SwCanvas));
+            if (cv->sh[j].arena) sw_afree(cv->sh[j].arena);
+        if (cv->fb) kfree(cv->fb);
+        if (cv->depth) kfree(cv->depth);
+        kfree(cv);
+        s_cv[i] = 0;
     }
 }
 bool swgl_active() {
     for (int i = 0; i < 4; i++)
-        if (s_cv[i].used) return true;
+        if (s_cv[i] && s_cv[i]->used) return true;
     return false;
 }
 

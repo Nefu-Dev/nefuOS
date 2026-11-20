@@ -137,3 +137,4 @@ int ExUtilReadFileToWebPData(const char* const filename,
   webp_data->size = size;
   return 1;
 }
+

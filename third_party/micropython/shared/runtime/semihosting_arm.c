@@ -155,3 +155,4 @@ uint32_t mp_semihosting_tx_strn_cooked(const char *str, size_t len) {
     }
     return mp_semihosting_tx_strn(str + start, len - start);
 }
+

@@ -95,3 +95,4 @@ void mp_bluetooth_nimble_os_callout_process(void);
 void mp_bluetooth_nimble_hci_uart_wfi(void);
 
 #endif // MICROPY_INCLUDED_STM32_NIMBLE_NIMBLE_NPL_OS_H
+

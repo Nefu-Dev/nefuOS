@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— K-Means 聚类
 // K-Means++ 初始化（加速收敛、避免坏初始化），迭代分配-更新直到质心稳定。
 // 评估：惯性（inertia，簇内平方距离和）与轮廓系数（silhouette）。
@@ -45,3 +50,4 @@ int kmedoids_self_test();
 
 } // namespace ml
 } // namespace nefu
+

@@ -80,3 +80,4 @@ extern void WatchdogStallDisable(unsigned long ulBase);
 #endif
 
 #endif // __WATCHDOG_H__
+

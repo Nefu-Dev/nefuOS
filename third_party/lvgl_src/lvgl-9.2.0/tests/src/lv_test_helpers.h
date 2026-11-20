@@ -25,3 +25,4 @@ static inline size_t lv_test_get_free_mem(void)
 void lv_test_wait(uint32_t ms);
 
 #endif /*LV_TEST_HELPERS_H*/
+

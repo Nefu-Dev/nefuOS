@@ -125,3 +125,4 @@ void mp_raw_code_save_file(mp_compiled_module_t *cm, qstr filename);
 void mp_native_relocate(void *reloc, uint8_t *text, uintptr_t reloc_text);
 
 #endif // MICROPY_INCLUDED_PY_PERSISTENTCODE_H
+

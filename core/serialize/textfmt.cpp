@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据序列化与编解码库 —— 文本格式模块实现
 // 见 textfmt.h 的设计说明。这里逐个实现 8 种文本格式的解析/生成与自测。
 #include "textfmt.h"
@@ -2719,3 +2724,4 @@ int textfmt_self_test() {
 // ============================================================================
 } // namespace serialize
 } // namespace nefu
+

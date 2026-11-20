@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 鸟群模拟实现 + 自测
 #include "simlib/boids.h"
 #include <cmath>
@@ -138,3 +143,4 @@ int Boids::self_test() {
 
 } // namespace simx
 } // namespace nefu
+

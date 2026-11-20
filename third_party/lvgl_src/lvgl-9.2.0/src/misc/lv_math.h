@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_math.h
  *
  */
@@ -179,3 +179,4 @@ uint32_t lv_rand(uint32_t min, uint32_t max);
 #endif
 
 #endif
+

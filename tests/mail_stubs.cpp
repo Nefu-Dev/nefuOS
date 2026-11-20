@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // mail_logic_test stubs: minimal host-side implementations of the platform
 // + kernel entry points that email.h / vfs.cpp touch in the logic paths.
 #include <cstdlib>
@@ -5,6 +10,7 @@
 #include "../core/gui/wm.h"
 #include "../core/vfs/vfs.h"
 #include "../core/net/net.h"
+#include "../core/net/tls13.h"
 
 namespace nefu {
 
@@ -47,6 +53,42 @@ void platform_ttf_free(uint8_t* p) { (void)p; }
 WM* g_wm = 0;   // vfs.cpp provides g_vfs; net.cpp provides g_net (not linked here)
 NetIf g_net;
 
+// ---- bare TCP (never exercised by the logic tests) ----
+int tcp_connect(uint32_t ip, uint16_t port, int timeout_ms) {
+    (void)ip; (void)port; (void)timeout_ms;
+    return -1;
+}
+int tcp_send(int fd, const void* data, int len) {
+    (void)fd; (void)data; (void)len;
+    return -1;
+}
+int tcp_recv(int fd, void* buf, int maxlen, int timeout_ms) {
+    (void)fd; (void)buf; (void)maxlen; (void)timeout_ms;
+    return -1;
+}
+void tcp_close(int fd) { (void)fd; }
+
+// ---- TLS 1.3 (never exercised by the logic tests) ----
+namespace tls {
+struct Tls13Conn;
+Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
+                         const char* hostname, char* err, int errsz) {
+    (void)rf; (void)sf; (void)ctx; (void)hostname;
+    if (err && errsz > 0) err[0] = 0;
+    return 0;
+}
+int tls13_send(Tls13Conn* c, const uint8_t* data, int len) {
+    (void)c; (void)data; (void)len;
+    return -1;
+}
+int tls13_recv(Tls13Conn* c, uint8_t* buf, int maxlen, int timeout_ms) {
+    (void)c; (void)buf; (void)maxlen; (void)timeout_ms;
+    return -1;
+}
+void tls13_close(Tls13Conn* c) { (void)c; }
+const char* tls13_alpn(Tls13Conn* c) { (void)c; return ""; }
+} // namespace tls
+
 // ---- WM stub (open_email is never called in the logic tests) ----
 Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fullscreen) {
     (void)title; (void)x; (void)y; (void)w; (void)h; (void)fullscreen;
@@ -59,3 +101,4 @@ void nefuos_tick() {}
 void nefuos_frame() {}
 
 } // namespace nefu
+

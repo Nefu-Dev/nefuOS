@@ -40,3 +40,4 @@ void mp_thread_gc_others(void);
 void mp_thread_deinit(void);
 
 #endif // MICROPY_INCLUDED_ZEPHYR_MPTHREADPORT_H
+

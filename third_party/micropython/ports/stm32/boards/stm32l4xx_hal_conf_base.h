@@ -102,3 +102,4 @@
 #define assert_param(expr) ((void)0)
 
 #endif // MICROPY_INCLUDED_STM32L4XX_HAL_CONF_BASE_H
+

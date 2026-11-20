@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // auto-generated 16x16 hanzi bitmap font (SimSun), 512 glyphs
 #ifndef NEFU_FONT16_H
 #define NEFU_FONT16_H
@@ -521,3 +526,4 @@ static const Glyph16 font16[] = {
 static const int font16_count = 512;
 }
 #endif
+

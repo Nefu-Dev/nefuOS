@@ -182,3 +182,4 @@ inline static void pwpr_protect(void) {
 }
 
 #endif /* RA_RA_GPIO_H_ */
+

@@ -77,3 +77,4 @@ static inline void *mp_asm_base_get_code(mp_asm_base_t *as) {
 }
 
 #endif // MICROPY_INCLUDED_PY_ASMBASE_H
+

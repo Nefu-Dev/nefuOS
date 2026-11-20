@@ -75,3 +75,4 @@ void mp_hal_wait_sem(struct k_sem *sem, uint32_t timeout_ms) {
         }
     }
 }
+

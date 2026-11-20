@@ -112,3 +112,4 @@ const SharpYuvConversionMatrix* SharpYuvGetConversionMatrix(
   }
   return NULL;
 }
+

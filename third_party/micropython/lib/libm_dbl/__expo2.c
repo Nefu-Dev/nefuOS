@@ -14,3 +14,4 @@ double __expo2(double x)
 	/* exp(x - k ln2) * 2**(k-1) */
 	return exp(x - kln2) * scale * scale;
 }
+

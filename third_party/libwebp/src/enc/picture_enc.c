@@ -302,3 +302,4 @@ LOSSLESS_ENCODE_FUNC(WebPEncodeLosslessBGRA, WebPPictureImportBGRA)
 #undef LOSSLESS_ENCODE_FUNC
 
 //------------------------------------------------------------------------------
+

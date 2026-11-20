@@ -242,3 +242,4 @@ int VP8LGetBackwardReferences(
 #endif
 
 #endif  // WEBP_ENC_BACKWARD_REFERENCES_ENC_H_
+

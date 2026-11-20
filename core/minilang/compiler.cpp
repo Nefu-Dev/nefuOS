@@ -1,4 +1,9 @@
-﻿// ============================================================================
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ============================================================================
 // nefu::minilang —— AST 到字节码编译器（实现）
 // ============================================================================
 #include "compiler.h"
@@ -362,6 +367,7 @@ int compiler_self_test() {
 
 } // namespace minilang
 } // namespace nefu
+
 
 
 

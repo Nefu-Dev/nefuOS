@@ -119,3 +119,4 @@ uint16_t  USBD_GetRxCount (USBD_HandleTypeDef  *pdev ,
 * @}
 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

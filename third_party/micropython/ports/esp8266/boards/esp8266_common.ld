@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* GNU linker script for ESP8266, common sections and symbols */
 
 /* define the top of RAM */
@@ -316,3 +321,4 @@ SECTIONS
 
 /* get ROM code address */
 INCLUDE "boards/eagle.rom.addr.v6.ld"
+

@@ -539,3 +539,4 @@ static void prvTestAndDecrement(lv_thread_sync_t * pxCond,
 #endif
 
 #endif /*LV_USE_OS == LV_OS_FREERTOS*/
+

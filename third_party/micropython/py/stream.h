@@ -136,3 +136,4 @@ int mp_stream_posix_fsync(void *stream);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_STREAM_H
+

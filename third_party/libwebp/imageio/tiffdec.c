@@ -291,3 +291,4 @@ int ReadTIFF(const uint8_t* const data, size_t data_size,
 #endif  // WEBP_HAVE_TIFF
 
 // -----------------------------------------------------------------------------
+

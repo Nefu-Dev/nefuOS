@@ -43,3 +43,4 @@ void uart_tx_strn(machine_uart_obj_t *uart_obj, const char *str, uint len);
 void uart_tx_strn_cooked(machine_uart_obj_t *uart_obj, const char *str, uint len);
 
 #endif
+

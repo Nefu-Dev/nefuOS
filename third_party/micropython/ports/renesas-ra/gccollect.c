@@ -69,3 +69,4 @@ void gc_collect(void) {
     printf(" 1=" UINT_FMT " 2=" UINT_FMT " m=" UINT_FMT "\n", info.num_1block, info.num_2block, info.max_block);
     #endif
 }
+

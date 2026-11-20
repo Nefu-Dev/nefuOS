@@ -820,3 +820,4 @@ static uint32_t lv_text_iso8859_1_get_length(const char * txt)
 #error "Invalid character encoding. See `LV_TXT_ENC` in `lv_conf.h`"
 
 #endif
+

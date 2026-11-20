@@ -161,3 +161,4 @@ const stream_methods_t VFS_LFSx_STREAM_METHODS = {
 };
 
 #endif // MBOOT_FSLOAD && (MBOOT_VFS_LFS1 || MBOOT_VFS_LFS2)
+

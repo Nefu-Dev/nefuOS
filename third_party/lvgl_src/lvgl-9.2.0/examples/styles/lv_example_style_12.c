@@ -22,3 +22,4 @@ void lv_example_style_12(void)
 }
 
 #endif
+

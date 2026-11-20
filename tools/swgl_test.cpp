@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // swgl unit test - compiles swgl.cpp standalone on Windows (MinGW) and verifies
 // the software WebGL2 rasterizer pixel-by-pixel: clear/depth, textures,
 // instancing, blending, scissor, color masks and GLSL control flow.
@@ -384,3 +389,4 @@ void main() {
     printf("swgl_test: %d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }
+

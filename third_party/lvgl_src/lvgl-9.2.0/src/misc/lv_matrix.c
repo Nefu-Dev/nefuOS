@@ -223,3 +223,4 @@ bool lv_matrix_is_identity_or_translation(const lv_matrix_t * matrix)
  **********************/
 
 #endif /*LV_USE_MATRIX*/
+

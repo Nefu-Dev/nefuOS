@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS sorting visualizer — watch classic algorithms sort a random array
 // Controls:
 //   Space / Enter : start or pause the animation
@@ -338,7 +343,7 @@ static void vis_close(Window* w) {
 void algoviz_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Sorting Visualizer", x, y, VIS_W, VIS_H);
+    Window* w = g_wm->create_window(T("排序可视化", "Sorting Visualizer"), x, y, VIS_W, VIS_H);
     if (!w) return;
     SortVis* v = new SortVis();
     v->randomize();
@@ -351,3 +356,4 @@ void algoviz_launch() {
 }
 
 } // namespace nefu
+

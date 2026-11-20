@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 微型数据集工具实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 微型数据集工具实现
 // DataSet 持有拷贝张量，LCG shuffle，z-score 归一化。
 // 内存：new[]/delete[]，禁 STL；定点 Q16.16；无异常/RTTI。
 #pragma GCC optimize("no-tree-loop-distribute-patterns")
@@ -136,3 +141,4 @@ int data_self_test() {
 
 } // namespace deeplearn
 } // namespace nefu
+

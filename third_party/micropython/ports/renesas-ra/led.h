@@ -42,3 +42,4 @@ void led_debug(int value, int delay);
 extern const mp_obj_type_t ra_led_type;
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_LED_H
+

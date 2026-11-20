@@ -176,3 +176,4 @@ static void lv_monkey_timer_cb(lv_timer_t * timer)
 }
 
 #endif /*LV_USE_MONKEY*/
+

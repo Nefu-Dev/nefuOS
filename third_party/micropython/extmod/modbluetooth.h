@@ -513,3 +513,4 @@ int mp_bluetooth_gatts_db_write(mp_gatts_db_t db, uint16_t handle, const uint8_t
 int mp_bluetooth_gatts_db_resize(mp_gatts_db_t db, uint16_t handle, size_t len, bool append);
 
 #endif // MICROPY_INCLUDED_EXTMOD_MODBLUETOOTH_H
+

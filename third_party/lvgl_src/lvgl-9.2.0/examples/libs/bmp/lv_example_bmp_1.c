@@ -15,3 +15,4 @@ void lv_example_bmp_1(void)
 }
 
 #endif
+

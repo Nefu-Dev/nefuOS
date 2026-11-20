@@ -106,3 +106,4 @@ void mathMultiply(Point* pt, const Matrix* transform)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

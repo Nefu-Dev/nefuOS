@@ -11,3 +11,4 @@
 // I2C0 (non-default)
 #define MICROPY_HW_I2C0_SCL  (4)
 #define MICROPY_HW_I2C0_SDA  (5)
+

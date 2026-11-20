@@ -5531,3 +5531,4 @@ static const uint8_t kImgPeakData[] = {
 };
 
 #endif  // WEBP_TESTS_FUZZER_IMG_PEAK_H_
+

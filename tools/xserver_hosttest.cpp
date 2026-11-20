@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // tools/xserver_hosttest.cpp
 //
 // Standalone host validation of the embedded X11 server wire protocol.
@@ -148,3 +153,4 @@ int main() {
     printf("\n== %s ==\n", g_fail ? "HOSTTEST FAIL" : "HOSTTEST PASS");
     return g_fail ? 1 : 0;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS WM implementation
 #include "wm.h"
 #include "lv_cjk_font.h"
@@ -12,6 +17,13 @@ namespace nefu {
 // above windows: the destination is split vertically around the menu rect.
 static void blit_except_menu(Surface& fb, Surface& back,
                              int dx, int dy, int sx, int sy, int w, int h) {
+    // Nothing to exclude when the Start menu is not open. The rect is
+    // (0,0,0,0) in that case, which the overlap test below would read as
+    // "the menu covers row 0" and drop that row from the blit.
+    if (!start_menu_visible()) {
+        gfx::blit_clip(fb, back, dx, dy, sx, sy, w, h);
+        return;
+    }
     int mx1, my1, mx2, my2;
     start_menu_rect(&mx1, &my1, &mx2, &my2);
     if (my1 >= dy + h || my2 < dy || mx1 >= dx + w || mx2 < dx) {
@@ -105,9 +117,11 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fu
     if (w < 60 || h < 40) return 0;
 
     if (!fullscreen) {
-        // Clamp window size to screen bounds
-        const int SCREEN_W = 800;
-        const int SCREEN_H = 600;
+        // Clamp window size to the real screen bounds (the desktop adapts to
+        // any resolution, so this must never assume 800x600)
+        Screen* scr = platform_screen();
+        const int SCREEN_W = scr ? scr->width : 800;
+        const int SCREEN_H = scr ? scr->height : 600;
         const int TASKBAR_H = 30;
         const int MAX_W = SCREEN_W - 8;
         const int MAX_H = SCREEN_H - TASKBAR_H - 8;
@@ -134,6 +148,7 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fu
     win->scroll_y = 0;
     win->content_scroll_h = 0;
     win->app_scroll = false;
+    win->own_scrollbar = false;
     win->title = title ? title : "";
     win->content_w = w;
     win->content_h = fullscreen ? h : h - 18;
@@ -188,7 +203,7 @@ Window* WM::create_window(const char* title, int x, int y, int w, int h, bool fu
             lv_obj_t* tl = lv_label_create(hdr);
             lv_label_set_text(tl, title ? title : "");
             lv_obj_set_style_text_color(tl, lv_color_hex(0xFFFFFF), 0);
-            lv_obj_set_style_text_font(tl, &lv_font_montserrat_14, 0);
+            lv_obj_set_style_text_font(tl, &nefu::lv_font_cjk_16, 0);
             // Minimize button
             lv_obj_t* minbtn = lv_win_add_button(lvw->win, LV_SYMBOL_MINUS, 28);
             lv_obj_set_style_bg_color(minbtn, lv_color_hex(0x3D4B66), 0);
@@ -280,6 +295,29 @@ void WM::minimize_all() {
         }
     }
     focus_ = 0;
+}
+
+// Minimize a window, or bring it back if it is already minimized. The
+// taskbar uses this to toggle a window, and the shell uses it to step
+// aside when it hands the screen to another app.
+void WM::toggle_minimize(Window* w) {
+    if (!w || w->closed) return;
+    if (w->minimized) {
+        w->minimized = false;
+        if (w->lvw && w->lvw->win) lv_obj_remove_flag(w->lvw->win, LV_OBJ_FLAG_HIDDEN);
+        raise(w);
+    } else {
+        w->minimized = true;
+        if (w->lvw && w->lvw->win) lv_obj_add_flag(w->lvw->win, LV_OBJ_FLAG_HIDDEN);
+        // focus must not stay on a window that is no longer on screen
+        if (focus_ == w) {
+            focus_ = 0;
+            for (int i = wins_.size() - 1; i >= 0; i--) {
+                Window* o = wins_[i];
+                if (o && !o->closed && o->visible && !o->minimized) { focus_ = o; break; }
+            }
+        }
+    }
 }
 
 void WM::cleanup() {
@@ -389,10 +427,14 @@ void WM::paint_all(Surface& fb) {
                 // fullscreen the header is hidden (no drag) and the WM owns
                 // the geometry; do not let a stale LVGL coord pull it back.
                 if (!w->fs_toggle) {
-                    // Keep the window inside the 800x600 work area: a window
-                    // dragged past the edge would otherwise become unreachable.
-                    int MAX_X = 800 - w->w; if (MAX_X < 0) MAX_X = 0;
-                    int MAX_Y = 600 - WM::TASKBAR_H - w->h; if (MAX_Y < 0) MAX_Y = 0;
+                    // Keep the window inside the work area (its real size
+                    // follows the current resolution): a window dragged past
+                    // the edge would otherwise become unreachable.
+                    Screen* fscr = platform_screen();
+                    int fw = fscr ? fscr->width : 800;
+                    int fh = fscr ? fscr->height : 600;
+                    int MAX_X = fw - w->w; if (MAX_X < 0) MAX_X = 0;
+                    int MAX_Y = fh - WM::TASKBAR_H - w->h; if (MAX_Y < 0) MAX_Y = 0;
                     if (lv_x < 0) lv_x = 0;
                     if (lv_y < 0) lv_y = 0;
                     if (lv_x > MAX_X) lv_x = MAX_X;
@@ -421,6 +463,7 @@ void WM::paint_all(Surface& fb) {
             }
         }
         if (w->fullscreen) continue;   // fullscreen windows have no scrollbar
+        if (w->own_scrollbar) continue; // app paints/handles its own scrollbar
         
         // Draw vertical scrollbar (hidden while the Start menu covers it)
         int sb_x = w->content_x + w->content_w - 8;
@@ -509,6 +552,10 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
     }
 
     Window* win = hit(x, y);
+    if (pressed) klogf("wm press %d,%d win='%s' onmouse=%d dragging=%d",
+                       x, y, win ? win->title.c_str() : "none",
+                       (win && win->on_mouse) ? 1 : 0,
+                       (win && win->dragging) ? 1 : 0);
     if (!win) return;
 
     int hdr = wm_hdr_h(win);
@@ -547,7 +594,7 @@ void WM::handle_mouse(int x, int y, uint8_t buttons) {
     }
 
     // Scrollbar click handling
-    if (pressed && win->content_scroll_h > win->content_h) {
+    if (pressed && !win->own_scrollbar && win->content_scroll_h > win->content_h) {
         int sb_x, sb_y, sb_h, thumb_h, thumb_y;
         wm_sb_geom(win, sb_x, sb_y, sb_h, thumb_h, thumb_y);
         
@@ -731,3 +778,4 @@ void WM::toggle_fullscreen(Window* w) {
 }
 
 } // namespace nefu
+

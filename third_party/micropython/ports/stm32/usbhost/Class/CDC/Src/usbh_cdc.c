@@ -753,3 +753,4 @@ __weak void USBH_CDC_LineCodingChanged(USBH_HandleTypeDef *phost)
 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx — internal core (allocator / move / tag dispatch)
 // Shared by every C++ standard-library header in this module. Uses the nefuOS
 // kernel heap (kalloc/kfree) so containers are uniform with the rest of the OS.
@@ -38,3 +43,4 @@ inline T&& forward(typename remove_reference<T>::type& t) { return static_cast<T
 
 } // namespace stdx
 } // namespace nefu
+

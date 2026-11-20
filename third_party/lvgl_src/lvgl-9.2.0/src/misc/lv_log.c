@@ -144,3 +144,4 @@ void lv_log(const char * format, ...)
  **********************/
 
 #endif /*LV_USE_LOG*/
+

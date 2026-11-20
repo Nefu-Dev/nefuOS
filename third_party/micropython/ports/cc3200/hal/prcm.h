@@ -283,3 +283,4 @@ extern unsigned long PRCMCameraFreqSet(unsigned char ulDivider, unsigned char ul
 #endif
 
 #endif //  __PRCM_H__
+

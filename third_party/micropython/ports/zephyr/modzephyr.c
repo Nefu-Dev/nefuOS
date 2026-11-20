@@ -92,3 +92,4 @@ const mp_obj_module_t mp_module_zephyr = {
 MP_REGISTER_MODULE(MP_QSTR_zephyr, mp_module_zephyr);
 
 #endif // MICROPY_PY_ZEPHYR
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // pong.cpp —— nefuOS 乒乓球（Pong）
 //
 // 玩法：
@@ -268,7 +273,7 @@ static void pong_close(Window* w) {
 void pong_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Pong", x, y, PW, PH);
+    Window* w = g_wm->create_window(T("乒乓", "Pong"), x, y, PW, PH);
     if (!w) return;
     Pong* g = new Pong();
     g->reset();
@@ -282,3 +287,4 @@ void pong_launch() {
 }
 
 } // namespace nefu
+

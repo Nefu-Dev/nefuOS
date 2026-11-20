@@ -99,3 +99,4 @@ double acos(double x)
 	w = R(z)*s+c;
 	return 2*(df+w);
 }
+

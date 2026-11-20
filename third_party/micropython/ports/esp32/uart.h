@@ -49,3 +49,4 @@ int uart_stdout_tx_strn(const char *str, size_t len);
 #endif // MICROPY_HW_ENABLE_UART_REPL
 
 #endif // MICROPY_INCLUDED_ESP32_UART_H
+

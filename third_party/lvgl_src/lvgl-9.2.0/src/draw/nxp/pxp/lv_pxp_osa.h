@@ -58,3 +58,4 @@ pxp_cfg_t * pxp_get_default_cfg(void);
 #endif
 
 #endif /*LV_PXP_OSA_H*/
+

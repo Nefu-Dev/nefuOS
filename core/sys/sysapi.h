@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS System API Library
 // Provides system-level functionality for applications
 // Version: 1.0
@@ -188,3 +193,4 @@ bool app_installed(int app_id);
 
 } // namespace sysapi
 } // namespace nefu
+

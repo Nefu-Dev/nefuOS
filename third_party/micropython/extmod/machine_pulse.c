@@ -63,3 +63,4 @@ static mp_obj_t machine_time_pulse_us_(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_time_pulse_us_obj, 2, 3, machine_time_pulse_us_);
 
 #endif
+

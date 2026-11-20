@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for SAMD21
 */
 
@@ -26,3 +31,4 @@ _sflash_fs = _flashsize - _codesize - _bootloader;
 
 _sheap = _ebss;
 _eheap = _sstack;
+

@@ -77,3 +77,4 @@ int pyb_mutex_lock(pyb_mutex_t *m, int wait);
 void pyb_mutex_unlock(pyb_mutex_t *m);
 
 #endif // MICROPY_INCLUDED_STM32_PYBTHREAD_H
+

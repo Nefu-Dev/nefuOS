@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // klib formatted output
 #include "klib.h"
 #include "../platform.h"
@@ -109,20 +114,39 @@ static void kvfmt(char* buf, size_t bufsz, const char* fmt, va_list ap) {
         }
         case 'c': pchar(p, end, (char)va_arg(ap, int)); break;
         case 'd': {
+            // honour the width field ("%02d"): the old code accepted the digits
+            // but never used them, so 6 printed as "6" instead of "06" - which
+            // is why the clock showed "17:6" for 17:06.
             if (is64) {
                 long long v = va_arg(ap, long long);
-                if (v < 0) { pchar(p, end, '-'); pnum64(p, end, (unsigned long long)(-(v + 1)) + 1, 10, false); }
-                else pnum64(p, end, (unsigned long long)v, 10, false);
+                int neg = v < 0;
+                if (neg) { pchar(p, end, '-'); v = -v; }
+                unsigned long long uv = (unsigned long long)v;
+                int digits = 1; for (unsigned long long t = uv; t >= 10; t /= 10) digits++;
+                int need = width - digits - (neg ? 1 : 0);
+                for (int i = 0; i < need && p < end; i++) pchar(p, end, '0');
+                pnum64(p, end, uv, 10, false);
             } else {
                 int v = va_arg(ap, int);
-                if (v < 0) { pchar(p, end, '-'); pnum(p, end, (unsigned int)(-(v + 1)) + 1, 10, false, false); }
-                else pnum(p, end, (unsigned int)v, 10, false, false);
+                int neg = v < 0;
+                if (neg) { pchar(p, end, '-'); v = -(v + 1) + 1; }
+                unsigned int uv = (unsigned int)v;
+                int digits = 1; for (unsigned int t = uv; t >= 10; t /= 10) digits++;
+                int need = width - digits - (neg ? 1 : 0);
+                for (int i = 0; i < need && p < end; i++) pchar(p, end, '0');
+                pnum(p, end, uv, 10, false, false);
             }
             break;
         }
         case 'u': {
-            if (is64) pnum64(p, end, va_arg(ap, unsigned long long), 10, false);
-            else pnum(p, end, va_arg(ap, unsigned int), 10, false, false);
+            unsigned int uv;
+            if (is64) uv = (unsigned int)va_arg(ap, unsigned long long);
+            else uv = va_arg(ap, unsigned int);
+            int digits = 1; for (unsigned int t = uv; t >= 10; t /= 10) digits++;
+            int need = width - digits;
+            for (int i = 0; i < need && p < end; i++) pchar(p, end, '0');
+            if (is64) pnum64(p, end, (unsigned long long)uv, 10, false);
+            else pnum(p, end, uv, 10, false, false);
             break;
         }
         case 'x': pnum(p, end, va_arg(ap, unsigned int), 16, false, false); break;
@@ -160,3 +184,4 @@ void klogf(const char* fmt, ...) {
 }
 
 } // namespace nefu
+

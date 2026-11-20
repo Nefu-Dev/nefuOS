@@ -53,3 +53,4 @@ uint32_t mp_semihosting_tx_strn(const char *str, size_t len);
 uint32_t mp_semihosting_tx_strn_cooked(const char *str, size_t len);
 
 #endif // MICROPY_INCLUDED_SHARED_RUNTIME_SEMIHOSTING_ARM_H
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— ARP（地址解析协议，RFC 826）
 //
 // 作用：把 IPv4 地址（如 192.168.1.1）解析成对应的以太网 MAC 地址。
@@ -90,3 +95,4 @@ int arp_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

@@ -489,3 +489,4 @@ void BOARD_BootClockRUN(void) {
     SystemCoreClock = BOARD_BOOTCLOCKRUN_CORE_CLOCK;
     CLOCK_SetMode(kCLOCK_ModeRun);
 }
+

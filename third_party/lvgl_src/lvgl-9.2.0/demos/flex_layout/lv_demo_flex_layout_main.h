@@ -104,3 +104,4 @@ void flex_loader_attach(view_t * ui);
 #endif
 
 #endif /*LV_DEMO_FLEX_LAYOUT_MAIN_H*/
+

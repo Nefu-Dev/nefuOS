@@ -77,3 +77,4 @@ void test_lodepng_1(void)
 }
 
 #endif
+

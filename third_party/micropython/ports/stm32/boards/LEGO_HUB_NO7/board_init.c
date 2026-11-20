@@ -217,3 +217,4 @@ void board_mboot_state_change(int state, uint32_t arg) {
 }
 
 #endif
+

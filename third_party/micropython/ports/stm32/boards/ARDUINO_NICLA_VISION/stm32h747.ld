@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for STM32H747
 */
 
@@ -51,3 +56,4 @@ _openamp_shm_region_start = ORIGIN(SRAM4);
 _openamp_shm_region_end = ORIGIN(SRAM4) + LENGTH(SRAM4);
 
 INCLUDE common_blifs.ld
+

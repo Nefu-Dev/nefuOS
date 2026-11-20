@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 ifneq ($(MKENV_INCLUDED),1)
 # We assume that mkenv is in the same directory as this file.
 THIS_MAKEFILE = $(lastword $(MAKEFILE_LIST))
@@ -284,3 +289,4 @@ print-def:
 	@$(RM) -f __empty__.c
 
 -include $(OBJ:.o=.P)
+

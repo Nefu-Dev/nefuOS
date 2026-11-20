@@ -61,3 +61,4 @@ static WEBP_INLINE double StopwatchReadAndReset(Stopwatch* watch) {
 #endif   /* _WIN32 */
 
 #endif  // WEBP_EXAMPLES_STOPWATCH_H_
+

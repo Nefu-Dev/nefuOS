@@ -99,3 +99,4 @@ void test_profiler_disable(void)
 }
 
 #endif
+

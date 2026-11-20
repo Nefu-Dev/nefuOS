@@ -20,3 +20,4 @@
 #include "stm32f4xx_hal_fmpi2c.h"
 
 #endif // MICROPY_INCLUDED_STM32F4XX_HAL_CONF_H
+

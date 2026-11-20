@@ -523,3 +523,4 @@ int32_t lv_anim_path_custom_bezier3(const lv_anim_t * a);
 #endif
 
 #endif /*LV_ANIM_H*/
+

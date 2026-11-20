@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  extracmd.h —— 扩展命令与真实算法: base64 / crc32 / bc / tr / cut / comm /
 //                env / traceroute / factor
@@ -48,3 +53,4 @@ int extracmd_self_test();
 
 } // namespace termcmds
 } // namespace nefu
+

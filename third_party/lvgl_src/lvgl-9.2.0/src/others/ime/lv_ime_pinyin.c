@@ -1194,3 +1194,4 @@ static void pinyin_k9_cand_page_proc(lv_obj_t * obj, uint16_t dir)
 #endif  /*LV_IME_PINYIN_USE_K9_MODE*/
 
 #endif  /*LV_USE_IME_PINYIN*/
+

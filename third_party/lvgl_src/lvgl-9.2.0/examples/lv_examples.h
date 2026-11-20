@@ -47,3 +47,4 @@ extern "C" {
 #endif
 
 #endif /*LV_EXAMPLES_H*/
+

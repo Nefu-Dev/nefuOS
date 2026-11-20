@@ -1296,3 +1296,4 @@ void LottieExpressions::retrieve(LottieExpressions* instance)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

@@ -40,3 +40,4 @@ void lv_example_gridnav_5(void);
 #endif
 
 #endif /*LV_EXAMPLE_GRIDNAV_H*/
+

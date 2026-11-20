@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — n-gram & text statistics
 // n-gram：相邻 n 个字符（或词）构成的片段，用于文本相似度、
 // 语言模型特征、拼写纠错提示等。本模块同时提供通用文本统计：
@@ -38,3 +43,4 @@ int ngram_self_test();
 
 } // namespace text
 } // namespace nefu
+

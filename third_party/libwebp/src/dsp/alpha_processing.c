@@ -494,3 +494,4 @@ WEBP_DSP_INIT_FUNC(WebPInitAlphaProcessing) {
   assert(WebPHasAlpha32b != NULL);
   assert(WebPAlphaReplace != NULL);
 }
+

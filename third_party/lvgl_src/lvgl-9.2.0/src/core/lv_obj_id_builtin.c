@@ -120,3 +120,4 @@ int lv_obj_id_compare(const void * id1, const void * id2)
 }
 
 #endif /*LV_USE_OBJ_ID_BUILTIN*/
+

@@ -54,3 +54,4 @@ static mp_obj_t mp_time_time_get(void) {
     return mp_obj_new_int_from_uint(timeutils_mktime(
         tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec));
 }
+

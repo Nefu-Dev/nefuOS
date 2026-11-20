@@ -65,3 +65,4 @@ uint32_t lv_layout_register(lv_layout_update_cb_t cb, void * user_data);
 #endif
 
 #endif /*LV_LAYOUT_H*/
+

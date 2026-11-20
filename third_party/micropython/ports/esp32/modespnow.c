@@ -863,3 +863,4 @@ MP_REGISTER_MODULE(MP_QSTR__espnow, mp_module_espnow);
 MP_REGISTER_ROOT_POINTER(struct _esp_espnow_obj_t *espnow_singleton);
 
 #endif // MICROPY_PY_ESPNOW
+

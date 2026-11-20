@@ -53,3 +53,4 @@ struct lv_slider_t {
 #endif
 
 #endif /*LV_SLIDER_PRIVATE_H*/
+

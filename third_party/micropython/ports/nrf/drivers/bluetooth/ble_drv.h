@@ -127,3 +127,4 @@ void ble_drv_discover_descriptors(void);
 #endif // BLUETOOTH_SD
 
 #endif // BLUETOOTH_LE_DRIVER_H__
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Disk Usage Analyzer
 #include "apps.h"
 #include "../gui/wm.h"
@@ -66,7 +71,7 @@ static void diskusage_paint(Window* win) {
 void diskusage_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Disk Usage", x, y, 300, 280);
+    Window* w = g_wm->create_window(T("磁盘分析", "Disk Usage"), x, y, 300, 280);
     if (!w) return;
     DiskUsageState* st = new DiskUsageState();
     st->w = w->content_w;
@@ -77,3 +82,4 @@ void diskusage_launch() {
 }
 
 } // namespace nefu
+

@@ -68,3 +68,4 @@ void lv_bin_decoder_close(lv_image_decoder_t * decoder, lv_image_decoder_dsc_t *
 #endif
 
 #endif /*LV_BIN_DECODER_H*/
+

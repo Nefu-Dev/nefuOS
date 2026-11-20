@@ -37,3 +37,4 @@ void lv_nuttx_profiler_init(void);
 #endif
 
 #endif /*LV_NUTTX_PROFILER_H*/
+

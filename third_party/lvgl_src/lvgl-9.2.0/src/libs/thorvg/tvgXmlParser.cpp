@@ -593,3 +593,4 @@ const char* simpleXmlFindAttributesTag(const char* buf, unsigned bufLength)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

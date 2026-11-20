@@ -103,3 +103,4 @@ smm_buffer_t * smm_next(smm_buffer_t * buf);
 #endif
 
 #endif /* LV_WAYLAND_SMM_H */
+

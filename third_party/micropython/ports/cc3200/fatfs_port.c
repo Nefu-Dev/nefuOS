@@ -72,3 +72,4 @@ DWORD get_fattime(void) {
            ((tm.tm_mday) << 16) | ((tm.tm_hour) << 11) |
            ((tm.tm_min) << 5) | (tm.tm_sec >> 1);
 }
+

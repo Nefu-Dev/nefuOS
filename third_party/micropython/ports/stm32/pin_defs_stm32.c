@@ -28,3 +28,4 @@ uint32_t pin_get_pull(const machine_pin_obj_t *pin) {
 uint32_t pin_get_af(const machine_pin_obj_t *pin) {
     return (pin->gpio->AFR[pin->pin >> 3] >> ((pin->pin & 7) * 4)) & 0xf;
 }
+

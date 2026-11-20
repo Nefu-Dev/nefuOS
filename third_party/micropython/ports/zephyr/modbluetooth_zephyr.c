@@ -407,3 +407,4 @@ int mp_bluetooth_gap_peripheral_connect_cancel(void) {
 MP_REGISTER_ROOT_POINTER(struct _mp_bluetooth_zephyr_root_pointers_t *bluetooth_zephyr_root_pointers);
 
 #endif // MICROPY_PY_BLUETOOTH
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS minesweeper - WM window (surface back + direct blit), click reveal, F flag, R restart
 #include "apps.h"
 #include "../gui/wm.h"
@@ -149,7 +154,7 @@ static void miner_wm_key(Window* w, const KeyEvent* e) {
 void miner_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Minesweeper", x, y, 340, 420);
+    Window* w = g_wm->create_window(T("扫雷", "Minesweeper"), x, y, 340, 420);
     if (!w) return;
     MinerLvState* st = new MinerLvState();
     st->w = w->content_w;
@@ -162,3 +167,4 @@ void miner_launch() {
     g_wm->raise(w);
 }
 } // namespace nefu
+

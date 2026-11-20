@@ -99,3 +99,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 const mp_obj_bool_t mp_const_false_obj = {{&mp_type_bool}, false};
 const mp_obj_bool_t mp_const_true_obj = {{&mp_type_bool}, true};
 #endif
+

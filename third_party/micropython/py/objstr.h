@@ -120,3 +120,4 @@ extern const mp_obj_dict_t mp_obj_array_locals_dict;
 #endif
 
 #endif // MICROPY_INCLUDED_PY_OBJSTR_H
+

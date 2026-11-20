@@ -491,3 +491,4 @@ MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_re, mp_module_re);
 #endif
 
 #endif // MICROPY_PY_RE
+

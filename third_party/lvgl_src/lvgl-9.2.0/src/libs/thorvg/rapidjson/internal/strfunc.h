@@ -81,3 +81,4 @@ bool CountStringCodePoint(const typename Encoding::Ch* s, SizeType length, SizeT
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_INTERNAL_STRFUNC_H_
+

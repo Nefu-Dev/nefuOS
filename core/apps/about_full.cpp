@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS About Dialog
 // Shows system information and credits
 #include "apps.h"
@@ -9,7 +14,7 @@
 namespace nefu {
 
 void about_launch_full() {
-    Window* w = g_wm->create_window("About nefuOS", 100, 80, 460, 420);
+    Window* w = g_wm->create_window(T("关于 nefuOS", "About nefuOS"), 100, 80, 460, 420);
     if (!w) return;
     
     // Header with logo area
@@ -71,3 +76,4 @@ void about_launch_full() {
 }
 
 } // namespace nefu
+

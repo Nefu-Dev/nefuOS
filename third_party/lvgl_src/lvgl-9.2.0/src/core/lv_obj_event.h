@@ -196,3 +196,4 @@ lv_draw_task_t * lv_event_get_draw_task(lv_event_t * e);
 #endif
 
 #endif /*LV_OBJ_EVENT_H*/
+

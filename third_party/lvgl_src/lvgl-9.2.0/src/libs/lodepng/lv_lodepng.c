@@ -259,3 +259,4 @@ static void convert_color_depth(uint8_t * img_p, uint32_t px_cnt)
 }
 
 #endif /*LV_USE_LODEPNG*/
+

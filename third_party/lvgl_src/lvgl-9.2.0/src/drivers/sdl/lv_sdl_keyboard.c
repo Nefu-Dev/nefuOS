@@ -216,3 +216,4 @@ static uint32_t keycode_to_ctrl_key(SDL_Keycode sdl_key)
 }
 
 #endif /*LV_USE_SDL*/
+

@@ -124,3 +124,4 @@ static void sample_fragment_inc_click(lv_event_t * e)
 }
 
 #endif
+

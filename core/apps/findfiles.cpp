@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS File Search — recursive name/pattern search with results list
 #include "apps.h"
 #include "../gui/wm.h"
@@ -182,7 +187,7 @@ void ff_close(Window* w) {
 void findfiles_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("File Search", x, y, 420, 420);
+    Window* w = g_wm->create_window(T("文件搜索", "File Search"), x, y, 420, 420);
     if (!w) return;
     FindFiles* g = new FindFiles();
     g->w = w->content_w;
@@ -202,3 +207,4 @@ void findfiles_launch() {
 }
 
 } // namespace nefu
+

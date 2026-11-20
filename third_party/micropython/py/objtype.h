@@ -53,3 +53,4 @@ mp_obj_t mp_obj_instance_call(mp_obj_t self_in, size_t n_args, size_t n_kw, cons
 mp_obj_t mp_obj_instance_getiter(mp_obj_t self_in, mp_obj_iter_buf_t *iter_buf);
 
 #endif // MICROPY_INCLUDED_PY_OBJTYPE_H
+

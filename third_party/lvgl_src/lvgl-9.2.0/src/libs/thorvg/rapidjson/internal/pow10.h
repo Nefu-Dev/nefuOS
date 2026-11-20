@@ -53,3 +53,4 @@ inline double Pow10(int n) {
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_POW10_
+

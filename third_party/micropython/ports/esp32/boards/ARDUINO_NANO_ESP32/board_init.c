@@ -114,3 +114,4 @@ void NANO_ESP32_board_startup(void) {
     rgb_pulse_delay();
     double_tap_invalidate();
 }
+

@@ -192,3 +192,4 @@ WEBP_TSAN_IGNORE_FUNCTION void WebPInitAlphaProcessingNEON(void) {
 WEBP_DSP_INIT_STUB(WebPInitAlphaProcessingNEON)
 
 #endif  // WEBP_USE_NEON
+

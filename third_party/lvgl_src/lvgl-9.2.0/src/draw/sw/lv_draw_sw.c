@@ -833,3 +833,4 @@ static void rotate270_l8(const uint8_t * src, uint8_t * dst, int32_t src_width, 
 #endif
 
 #endif /*LV_USE_DRAW_SW*/
+

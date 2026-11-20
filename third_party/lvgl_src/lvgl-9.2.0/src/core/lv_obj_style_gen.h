@@ -873,3 +873,4 @@ void lv_obj_set_style_grid_cell_row_span(lv_obj_t * obj, int32_t value, lv_style
 #endif
 
 #endif /* LV_OBJ_STYLE_GEN_H */
+

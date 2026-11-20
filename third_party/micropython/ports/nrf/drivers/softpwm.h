@@ -44,3 +44,4 @@ void pwm_set_duty_cycle(int32_t pin, int32_t value);
 void pwm_release(int32_t pin);
 
 #endif // __MICROPY_INCLUDED_LIB_PWM_H__
+

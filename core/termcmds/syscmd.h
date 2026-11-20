@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  syscmd.h —— 系统命令: ps/uptime/free/hostname/uname/whoami/date/cal/clear/echo
 // -----------------------------------------------------------------------------
@@ -30,3 +35,4 @@ int syscmd_self_test();
 
 } // namespace termcmds
 } // namespace nefu
+

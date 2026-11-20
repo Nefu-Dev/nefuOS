@@ -168,3 +168,4 @@ void SlowTicker_IRQHandler(void)
 }
 
 #endif // MICROPY_PY_MACHINE_SOFT_PWM
+

@@ -670,3 +670,4 @@ static void _delete(lv_libinput_t * dsc)
 }
 
 #endif /* LV_USE_LIBINPUT */
+

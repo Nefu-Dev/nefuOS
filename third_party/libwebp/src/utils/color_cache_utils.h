@@ -87,3 +87,4 @@ void VP8LColorCacheClear(VP8LColorCache* const color_cache);
 #endif
 
 #endif  // WEBP_UTILS_COLOR_CACHE_UTILS_H_
+

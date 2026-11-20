@@ -1231,3 +1231,4 @@ static lv_obj_t * get_label(const lv_obj_t * obj)
 }
 
 #endif
+

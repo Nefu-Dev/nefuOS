@@ -365,3 +365,4 @@ WEBP_EXTERN void WebPAnimDecoderDelete(WebPAnimDecoder* dec);
 #endif
 
 #endif  // WEBP_WEBP_DEMUX_H_
+

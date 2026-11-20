@@ -55,3 +55,4 @@ static mp_obj_t mp_time_time_get(void) {
     ra_rtc_get_time(&time);
     return mp_obj_new_int(timeutils_seconds_since_epoch(time.year, time.month, time.date, time.hour, time.minute, time.second));
 }
+

@@ -540,3 +540,4 @@ void mp_binary_set_val_array_from_int(char typecode, void *p, size_t index, mp_i
             break;
     }
 }
+

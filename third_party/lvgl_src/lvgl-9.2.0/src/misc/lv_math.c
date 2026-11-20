@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_math.c
  *
  */
@@ -454,3 +454,4 @@ int32_t lv_bezier3(int32_t t, int32_t u0, uint32_t u1, int32_t u2, int32_t u3)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

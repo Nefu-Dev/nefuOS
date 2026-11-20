@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Font Viewer - demonstrates scalable TrueType rendering
 // powered by stb_truetype (MIT) with the embedded Montserrat-Medium font
 // (OFL-1.1). Shows font metrics, a sample line at multiple sizes, and an
@@ -108,7 +113,7 @@ void fontview_launch() {
     ttf_init();
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Font Viewer", x, y, 420, 320);
+    Window* w = g_wm->create_window(T("字体查看器", "Font Viewer"), x, y, 420, 320);
     if (!w) return;
     FontViewState* st = new FontViewState();
     st->y_off = 0;
@@ -122,3 +127,4 @@ void fontview_launch() {
 }
 
 } // namespace nefu
+

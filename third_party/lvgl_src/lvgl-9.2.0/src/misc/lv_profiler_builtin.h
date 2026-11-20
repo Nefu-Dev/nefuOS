@@ -83,3 +83,4 @@ void lv_profiler_builtin_write(const char * func, char tag);
 #endif
 
 #endif /*LV_PROFILER_BUILTIN_H*/
+

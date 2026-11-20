@@ -6208,3 +6208,4 @@ const uint8_t kSharpYuvPrecomputedRisk[] = {
     5,  7,  6,  3,  2,  2,  4,  6,  8,  7,  4,  3,  2,  5,  7,  8,  8,  5,  3,
     0,
 };
+

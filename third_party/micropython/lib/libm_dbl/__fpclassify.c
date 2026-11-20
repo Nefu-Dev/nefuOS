@@ -9,3 +9,4 @@ int __fpclassifyd(double x)
 	if (e==0x7ff) return u.i<<12 ? FP_NAN : FP_INFINITE;
 	return FP_NORMAL;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 素数 prime
 // 教学版：试除判断素数、埃拉托色尼筛、分解质因数、最大公约数辅助。
 #pragma once
@@ -25,3 +30,4 @@ int prime_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

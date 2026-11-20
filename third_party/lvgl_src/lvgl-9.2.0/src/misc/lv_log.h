@@ -160,3 +160,4 @@ void lv_log_add(lv_log_level_t level, const char * file, int line,
 #endif
 
 #endif /*LV_LOG_H*/
+

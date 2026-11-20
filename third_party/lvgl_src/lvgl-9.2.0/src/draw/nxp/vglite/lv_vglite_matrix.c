@@ -79,3 +79,4 @@ void vglite_set_transformation_matrix(const lv_area_t * dest_area, const lv_draw
  **********************/
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

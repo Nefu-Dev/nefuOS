@@ -125,3 +125,4 @@ uint64_t VP8LHistogramEstimateBits(VP8LHistogram* const p);
 #endif
 
 #endif  // WEBP_ENC_HISTOGRAM_ENC_H_
+

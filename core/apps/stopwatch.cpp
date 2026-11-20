@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Stopwatch — lap timing
 #include "apps.h"
 #include "../gui/wm.h"
@@ -96,7 +101,7 @@ void sw_close(Window* w) {
 void stopwatch_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Stopwatch", x, y, 280, 320);
+    Window* w = g_wm->create_window(T("秒表", "Stopwatch"), x, y, 280, 320);
     if (!w) return;
     Stopwatch* g = new Stopwatch();
     g->w = w->content_w;
@@ -114,3 +119,4 @@ void stopwatch_launch() {
 }
 
 } // namespace nefu
+

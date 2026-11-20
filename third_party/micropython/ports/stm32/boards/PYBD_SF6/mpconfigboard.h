@@ -64,3 +64,4 @@
 #define MICROPY_HW_ETH_RMII_TX_EN   (pyb_pin_W8)
 #define MICROPY_HW_ETH_RMII_TXD0    (pyb_pin_W45)
 #define MICROPY_HW_ETH_RMII_TXD1    (pyb_pin_W49)
+

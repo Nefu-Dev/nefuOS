@@ -203,3 +203,4 @@ void user_uart_callback(uart_callback_args_t *p_args);
 void g_hal_init(void);
 FSP_FOOTER
 #endif /* HAL_DATA_H_ */
+

@@ -54,3 +54,4 @@ void lv_example_ime_pinyin_1(void)
 }
 
 #endif
+

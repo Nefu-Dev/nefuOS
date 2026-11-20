@@ -53,3 +53,4 @@ static mp_obj_t mp_time_time_get(void) {
     aon_timer_get_time(&ts);
     return mp_obj_new_int_from_ull(ts.tv_sec);
 }
+

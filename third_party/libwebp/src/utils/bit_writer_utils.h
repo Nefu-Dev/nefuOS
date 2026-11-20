@@ -152,3 +152,4 @@ static WEBP_INLINE void VP8LPutBits(VP8LBitWriter* const bw,
 #endif
 
 #endif  // WEBP_UTILS_BIT_WRITER_UTILS_H_
+

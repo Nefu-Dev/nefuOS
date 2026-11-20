@@ -80,3 +80,4 @@ static void obj_child_node_event_handler(lv_event_t * e)
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS window manager
 #pragma once
 #include "../klib/klib.h"
@@ -27,6 +32,8 @@ struct Window {
     int content_scroll_h;   // total scrollable content height (auto-detected)
     bool app_scroll;        // app draws its own scrolled view (blit offset 0);
                             // scroll_y mirrors the app offset for the scrollbar
+    bool own_scrollbar;     // the app paints and handles its own scrollbar
+                            // (browser): the WM must not draw or hit-test one
     String title;
     Surface back;                    // content buffer()
     int content_x, content_y;        // content screen coords
@@ -61,6 +68,7 @@ public:
     void handle_scroll(int delta);
     void raise(Window* w);
     void minimize_all();                 // Win+D/Win+M: minimize every window (show desktop)
+    void toggle_minimize(Window* w);     // minimize a window / bring it back
     void toggle_maximize(Window* w);
     void toggle_fullscreen(Window* w);   // F11 fullscreen/restore (hides the title bar, fills the whole screen)
     void cycle_focus(bool reverse);      // Ctrl+Tab / Ctrl+Shift+Tab: focus the next/previous open window
@@ -83,3 +91,4 @@ private:
 extern WM* g_wm;
 
 } // namespace nefu
+

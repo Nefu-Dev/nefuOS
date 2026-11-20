@@ -41,3 +41,4 @@ lv_indev_t * lv_sdl_mouse_create(void);
 #endif
 
 #endif /* LV_SDL_MOUSE_H */
+

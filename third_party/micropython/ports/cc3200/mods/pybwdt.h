@@ -34,3 +34,4 @@ void pybwdt_srv_sleeping (bool state);
 void pybwdt_sl_alive (void);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBWDT_H
+

@@ -226,3 +226,4 @@ static inline void mpu_init(void) {
 #endif
 
 #endif // MICROPY_INCLUDED_STM32_MPU_H
+

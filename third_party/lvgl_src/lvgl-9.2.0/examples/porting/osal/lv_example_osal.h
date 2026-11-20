@@ -36,3 +36,4 @@ void lv_example_osal(void);
 #endif
 
 #endif /*LV_EXAMPLE_OSAL_H*/
+

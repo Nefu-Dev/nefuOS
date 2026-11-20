@@ -140,3 +140,4 @@ mp_obj_t mp_vfs_blockdev_ioctl(mp_vfs_blockdev_t *self, uintptr_t cmd, uintptr_t
 }
 
 #endif // MICROPY_VFS
+

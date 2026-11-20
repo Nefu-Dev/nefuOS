@@ -198,3 +198,4 @@ void lv_draw_sw_triangle(lv_draw_unit_t * draw_unit, const lv_draw_triangle_dsc_
  **********************/
 
 #endif /*LV_USE_DRAW_SW*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 USE_MBOOT ?= 0
 
 # MCU settings
@@ -22,3 +27,4 @@ MICROPY_PY_LWIP = 1
 MICROPY_PY_SSL = 1
 MICROPY_SSL_MBEDTLS = 1
 MICROPY_HW_ENABLE_ISR_UART_FLASH_FUNCS_IN_RAM = 1
+

@@ -1114,3 +1114,4 @@ int qrcodegen_version2size(int version)
     return ((version - 1) * 4 + 21);
 }
 #endif
+

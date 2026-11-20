@@ -29,3 +29,4 @@
 extern char *realpath(const char *path, char *resolved_path);
 
 #endif // MICROPY_INCLUDED_WINDOWS_REALPATH_H
+

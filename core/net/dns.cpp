@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS DNS — RFC 1035 message codec implementation
 #include "dns.h"
 #include "../lib/hash.h"
@@ -364,3 +369,4 @@ bool self_test() {
 
 } // namespace dns
 } // namespace nefu
+

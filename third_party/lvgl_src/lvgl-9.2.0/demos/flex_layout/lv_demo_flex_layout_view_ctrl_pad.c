@@ -311,3 +311,4 @@ static void tab_layout_create(lv_obj_t * tab, view_t * ui)
 }
 
 #endif
+

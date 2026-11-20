@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // stubs for ttf repro
 #include "../../core/klib/klib.h"
 #include "../../core/platform.h"
@@ -12,3 +17,4 @@ bool platform_ttf_text(const char* s, int size, int& w, int& h, uint8_t*& extra)
 }
 void platform_ttf_free(uint8_t* p) { (void)p; }
 }
+

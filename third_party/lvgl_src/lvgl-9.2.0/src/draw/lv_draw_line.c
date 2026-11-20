@@ -75,3 +75,4 @@ void LV_ATTRIBUTE_FAST_MEM lv_draw_line(lv_layer_t * layer, const lv_draw_line_d
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

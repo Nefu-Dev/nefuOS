@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Tetris — classic falling-block game
 #include "apps.h"
 #include "../gui/wm.h"
@@ -203,7 +208,7 @@ void tet_close(Window* w) {
 void tetris_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Tetris", x, y, 400, 460);
+    Window* w = g_wm->create_window(T("俄罗斯方块", "Tetris"), x, y, 400, 460);
     if (!w) return;
     Tetris* g = new Tetris();
     g->w = w->content_w;
@@ -218,3 +223,4 @@ void tetris_launch() {
 }
 
 } // namespace nefu
+

@@ -194,3 +194,4 @@ static WEBP_INLINE int VP8GetBitAlt(VP8BitReader* WEBP_RESTRICT const br,
 #endif
 
 #endif  // WEBP_UTILS_BIT_READER_INL_UTILS_H_
+

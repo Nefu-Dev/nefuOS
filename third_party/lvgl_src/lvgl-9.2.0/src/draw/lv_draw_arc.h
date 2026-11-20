@@ -88,3 +88,4 @@ void lv_draw_arc_get_area(int32_t x, int32_t y, uint16_t radius,  lv_value_preci
 #endif
 
 #endif /*LV_DRAW_ARC_H*/
+

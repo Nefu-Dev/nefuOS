@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 多维张量（Q16.16 定点，无 FPU）
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 多维张量（Q16.16 定点，无 FPU）
 // 设计：
 //   * Tensor 是一个多维数组句柄，data 为行主序扁平缓冲（new[] 路由到 kalloc）；
 //   * 元素类型 nefu::fx::fix（int32 Q16.16），所有"浮点"运算走整数 / fx 库；
@@ -170,3 +175,4 @@ int tensor_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

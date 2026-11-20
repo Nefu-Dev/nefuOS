@@ -160,3 +160,4 @@ int random_utf8_chars(utf8_t * buf, int buf_len, const unicode_t * ranges, uint3
     buf[buf_index] = '\0';
     return buf_index;
 }
+

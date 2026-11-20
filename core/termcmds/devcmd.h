@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  devcmd.h —— 开发/工具命令: xxd/hexdump/strings/file/which/find/man/help/history
 // =============================================================================
@@ -41,3 +46,4 @@ int devcmd_self_test();
 
 } // namespace termcmds
 } // namespace nefu
+

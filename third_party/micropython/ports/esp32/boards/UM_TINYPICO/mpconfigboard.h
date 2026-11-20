@@ -8,3 +8,4 @@
 #define MICROPY_HW_SPI1_SCK (18)
 #define MICROPY_HW_SPI1_MOSI (23)
 #define MICROPY_HW_SPI1_MISO (19)
+

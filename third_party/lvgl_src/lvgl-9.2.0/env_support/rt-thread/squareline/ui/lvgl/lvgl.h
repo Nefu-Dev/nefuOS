@@ -13,3 +13,4 @@
 #include "../../../../../lvgl.h" /* back to the root folder's lvgl.h */
 
 #endif /* __RTTHREAD__ */
+

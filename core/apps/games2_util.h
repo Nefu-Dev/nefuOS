@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // games2_util.h —— nefuOS 第二批小游戏的公共工具库
 //
 // 本头文件提供：
@@ -338,3 +343,4 @@ struct Trail {
 
 } // namespace games2
 } // namespace nefu
+

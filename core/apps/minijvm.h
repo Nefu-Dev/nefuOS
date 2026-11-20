@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mini JVM - a small Java class-file interpreter for the nefuOS kernel.
 //
 // This is the "real JDK on nefuOS" runner (jdk-integration-plan.md Phase 2):
@@ -65,3 +70,4 @@ struct MiniJvmStats {
 void minijvm_stats(MiniJvmStats* out);
 
 } // namespace nefu
+

@@ -57,3 +57,4 @@ int16_t eth_phy_dp838xx_get_link_status(uint32_t phy_addr) {
 }
 
 #endif
+

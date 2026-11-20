@@ -1424,3 +1424,4 @@ lv_font_t test_font_montserrat_ascii_4bpp_compressed = {
 #endif /*#if TEST_FONT_MONTSERRAT_ASCII_4BPP_COMPRESSED*/
 
 #endif /*LV_BUILD_TEST*/
+

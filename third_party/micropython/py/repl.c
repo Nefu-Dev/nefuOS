@@ -328,3 +328,4 @@ size_t mp_repl_autocomplete(const char *str, size_t len, const mp_print_t *print
 }
 
 #endif // MICROPY_HELPER_REPL
+

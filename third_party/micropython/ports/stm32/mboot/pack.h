@@ -80,3 +80,4 @@ int mboot_pack_write(uint32_t addr, const uint8_t *src8, size_t len, bool dry_ru
 #endif // MBOOT_ENABLE_PACKING
 
 #endif // MICROPY_INCLUDED_STM32_MBOOT_PACK_H
+

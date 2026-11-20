@@ -30,3 +30,4 @@
 extern const mp_obj_type_t pyb_adc_type;
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBADC_H
+

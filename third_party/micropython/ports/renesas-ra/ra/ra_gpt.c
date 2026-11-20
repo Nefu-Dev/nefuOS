@@ -624,3 +624,4 @@ void ra_gpt_timer_deinit(uint32_t pwm_pin, uint32_t ch, uint8_t id) {
 
     ra_gpt_timer_release_pin(pwm_pin);
 }
+

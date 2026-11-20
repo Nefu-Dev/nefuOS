@@ -723,3 +723,4 @@ static void mp_machine_i2s_irq_update(machine_i2s_obj_t *self) {
 }
 
 MP_REGISTER_ROOT_POINTER(struct _machine_i2s_obj_t *machine_i2s_obj[MICROPY_HW_I2S_NUM]);
+

@@ -629,3 +629,4 @@ void asm_rv32_meta_comparison_le(asm_rv32_t *state, mp_uint_t rs1, mp_uint_t rs2
 }
 
 #endif // MICROPY_EMIT_RV32
+

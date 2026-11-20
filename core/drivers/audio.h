@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audio driver - unified sound-card output interface.
 // Mainstream families implemented in core/drivers/audio_driver.cpp:
 //   * Intel AC'97 (ICH family + VIA) - NABMBAR DMA, BDL ring
@@ -54,3 +59,4 @@ void audio_output_volume(int percent);
 } // namespace audio
 } // namespace drivers
 } // namespace nefu
+

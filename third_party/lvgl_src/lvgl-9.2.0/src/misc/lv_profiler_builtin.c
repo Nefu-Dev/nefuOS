@@ -260,3 +260,4 @@ static void flush_no_lock(void)
 }
 
 #endif /*LV_USE_PROFILER_BUILTIN*/
+

@@ -284,3 +284,4 @@ static lv_fs_res_t fs_dir_read(lv_fs_drv_t * drv, void * dir_p, char * fn, uint3
 #endif
 
 #endif /*LV_USE_FS_LITTLEFS*/
+

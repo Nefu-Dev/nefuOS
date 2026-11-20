@@ -294,3 +294,4 @@ const lv_font_t * lv_font_default(void);
 #endif
 
 #endif /*USE_FONT*/
+

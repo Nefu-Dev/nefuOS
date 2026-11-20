@@ -149,3 +149,4 @@ int nina_bsp_spi_transfer(const uint8_t *tx_buf, uint8_t *rx_buf, uint32_t size)
 }
 
 #endif // MICROPY_PY_NETWORK_NINAW10
+

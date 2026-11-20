@@ -181,3 +181,4 @@ static void lcd_send_color(lv_display_t * disp, const uint8_t * cmd, size_t cmd_
 /*This dummy typedef exists purely to silence -Wpedantic.*/
 typedef int keep_pedantic_happy;
 #endif
+

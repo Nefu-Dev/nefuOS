@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Notification Center
 // Shows system notifications and alerts
 #include "apps.h"
@@ -46,7 +51,7 @@ void notif_add(const char* title, const char* body) {
 }
 
 void notifcenter_launch() {
-    Window* w = g_wm->create_window("Notification Center", 120, 80, 420, 400);
+    Window* w = g_wm->create_window(T("通知中心", "Notification Center"), 120, 80, 420, 400);
     if (!w) return;
     
     // Header
@@ -110,3 +115,4 @@ void notifcenter_launch() {
 }
 
 } // namespace nefu
+

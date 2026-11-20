@@ -1178,3 +1178,4 @@ void JS_PrintValue(JSContext *ctx, JSPrintValueWrite *write_func, void *write_op
 #endif
 
 #endif /* QUICKJS_H */
+

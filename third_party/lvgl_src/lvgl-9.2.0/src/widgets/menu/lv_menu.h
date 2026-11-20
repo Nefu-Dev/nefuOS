@@ -211,3 +211,4 @@ void lv_menu_clear_history(lv_obj_t * obj);
 #endif
 
 #endif /*LV_MENU_H*/
+

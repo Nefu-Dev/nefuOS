@@ -245,3 +245,4 @@ bool ra_adc_deinit(void);
 __attribute__((weak)) void adc_scan_end_isr(void);
 
 #endif /* RA_ADC_H_ */
+

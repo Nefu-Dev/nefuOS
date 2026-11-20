@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS deepviz —— 训练一个小型 MLP 求解 XOR，实时绘制损失曲线与网络结构。
 // 本应用演示 nefu::deeplearn 全定点自动微分库：
 //   - 2-3-1 MLP，Adam 优化，MSE 损失；
@@ -300,7 +305,7 @@ static void viz_close(Window* w) {
 void deepviz_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("DeepViz", x, y, VIZ_W, VIZ_H);
+    Window* w = g_wm->create_window(T("深度可视化", "DeepViz"), x, y, VIZ_W, VIZ_H);
     if (!w) return;
     DeepViz* v = new DeepViz();
     w->userdata = v;
@@ -312,3 +317,4 @@ void deepviz_launch() {
 }
 
 } // namespace nefu
+

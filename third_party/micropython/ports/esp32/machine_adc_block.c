@@ -70,3 +70,4 @@ static machine_adc_obj_t *mp_machine_adc_block_connect(machine_adc_block_obj_t *
     madc_init_helper(adc, 0, NULL, kw_args);
     return (machine_adc_obj_t *)adc;
 }
+

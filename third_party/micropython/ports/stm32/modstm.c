@@ -72,3 +72,4 @@ const mp_obj_module_t stm_module = {
 MP_REGISTER_MODULE(MP_QSTR_stm, stm_module);
 
 #endif // MICROPY_PY_STM
+

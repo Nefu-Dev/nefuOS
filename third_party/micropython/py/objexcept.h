@@ -49,3 +49,4 @@ void mp_obj_exception_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest);
     );
 
 #endif // MICROPY_INCLUDED_PY_OBJEXCEPT_H
+

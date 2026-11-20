@@ -151,3 +151,4 @@ int WebPConfigLosslessPreset(WebPConfig* config, int level) {
 }
 
 //------------------------------------------------------------------------------
+

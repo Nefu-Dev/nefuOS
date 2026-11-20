@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Makefile directives for Apache Mynewt NimBLE component
 
 ifeq ($(MICROPY_BLUETOOTH_NIMBLE),1)
@@ -120,3 +125,4 @@ $(BUILD)/$(NIMBLE_LIB_DIR)/%.o: CFLAGS += -Wno-maybe-uninitialized -Wno-pointer-
 endif
 
 endif
+

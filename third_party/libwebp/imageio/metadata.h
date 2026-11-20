@@ -45,3 +45,4 @@ int MetadataCopy(const char* metadata, size_t metadata_len,
 #endif
 
 #endif  // WEBP_IMAGEIO_METADATA_H_
+

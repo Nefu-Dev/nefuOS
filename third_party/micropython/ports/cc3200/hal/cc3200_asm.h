@@ -100,3 +100,4 @@ static inline mp_uint_t disable_irq(void) {
 }
 
 #endif /* CC3200_ASM_H_ */
+

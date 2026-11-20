@@ -77,3 +77,4 @@ static void mp_machine_wdt_timeout_ms_set(machine_wdt_obj_t *self, mp_int_t time
     WDOG_SetTimeoutValue(WDOG1, (uint16_t)timeout);
     WDOG_Refresh(WDOG1);
 }
+

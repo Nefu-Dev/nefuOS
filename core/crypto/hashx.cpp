@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 哈希算法实现
 // 参考 FIPS-202 (SHA-3)、FIPS-180-4 (SHA-512/384)、RFC 7693 (BLAKE2s)、
 // RFC 1320 (MD4)、ISO 10118-3 (RIPEMD-160)、GM/T 0004 (SM3)。
@@ -536,3 +541,4 @@ int hashx_self_test() {
 
 } // namespace crypto
 } // namespace nefu
+

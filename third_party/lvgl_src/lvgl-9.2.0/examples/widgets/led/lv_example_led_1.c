@@ -24,3 +24,4 @@ void lv_example_led_1(void)
 }
 
 #endif
+

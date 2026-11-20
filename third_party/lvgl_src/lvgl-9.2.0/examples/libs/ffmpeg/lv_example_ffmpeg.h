@@ -37,3 +37,4 @@ void lv_example_ffmpeg_2(void);
 #endif
 
 #endif /*LV_EXAMPLE_FFMPEG_H*/
+

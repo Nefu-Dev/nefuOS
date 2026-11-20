@@ -90,3 +90,4 @@ void test_bin_decoder_argb8888_tile(void)
 }
 
 #endif
+

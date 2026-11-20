@@ -74,3 +74,4 @@ static inline void adc_deselect_vbat(ADC_TypeDef *adc, uint32_t channel) {
 #endif
 
 #endif // MICROPY_INCLUDED_STM32_ADC_H
+

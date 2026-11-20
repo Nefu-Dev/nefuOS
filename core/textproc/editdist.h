@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 编辑距离与序列相似性
 // 本模块从零实现经典的串距离度量，全部基于显式 new[]/delete[] 缓冲，
 // 不依赖 STL / 异常 / RTTI，可同时在宿主(g++)与裸机 freestanding 下编译。
@@ -107,3 +112,4 @@ int editdist_self_test();
 
 } // namespace textproc
 } // namespace nefu
+

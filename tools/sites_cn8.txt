@@ -1,0 +1,8 @@
+baidu https://www.baidu.com/
+qq https://www.qq.com/
+netease https://www.163.com/
+sina https://www.sina.com.cn/
+sohu https://www.sohu.com/
+ifeng https://www.ifeng.com/
+douban https://www.douban.com/
+ctrip https://www.ctrip.com/

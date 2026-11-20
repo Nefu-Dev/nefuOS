@@ -58,3 +58,4 @@ void lv_example_event_4(void)
 }
 
 #endif
+

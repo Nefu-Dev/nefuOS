@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 分词与归一化
 //   - 大小写归一(全小写 / 全大写)
 //   - 词干提取(Porter 词干简化版：去 -ing/-ed/-ly/-es/-s/-ment 等后缀)
@@ -59,3 +64,4 @@ int tokenize_self_test();
 
 } // namespace textproc
 } // namespace nefu
+

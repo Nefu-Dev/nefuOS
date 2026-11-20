@@ -158,3 +158,4 @@ int WebPRescalerExport(WebPRescaler* const rescaler) {
 }
 
 //------------------------------------------------------------------------------
+

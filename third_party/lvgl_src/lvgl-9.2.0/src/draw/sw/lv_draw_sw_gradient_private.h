@@ -48,3 +48,4 @@ struct lv_grad_t {
 #endif
 
 #endif /*LV_DRAW_SW_GRADIENT_PRIVATE_H*/
+

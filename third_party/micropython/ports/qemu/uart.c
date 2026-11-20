@@ -209,3 +209,4 @@ void uart_tx_strn(const char *buffer, size_t length) {
 }
 
 #endif
+

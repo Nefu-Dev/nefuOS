@@ -267,3 +267,4 @@ char * lv_strncat(char * dst, const char * src, size_t src_len)
  **********************/
 
 #endif /*LV_STDLIB_BUILTIN*/
+

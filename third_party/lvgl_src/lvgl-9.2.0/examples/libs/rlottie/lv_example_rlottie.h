@@ -37,3 +37,4 @@ void lv_example_rlottie_2(void);
 #endif
 
 #endif /*LV_EXAMPLE_RLOTTIE_H*/
+

@@ -69,3 +69,4 @@ int usbd_hid_rx(usbd_hid_itf_t *hid, size_t len, uint8_t *buf, uint32_t timeout_
 }
 
 #endif // MICROPY_HW_USB_HID
+

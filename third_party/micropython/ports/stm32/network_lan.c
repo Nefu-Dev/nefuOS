@@ -190,3 +190,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 #endif // defined(MICROPY_HW_ETH_MDC)
+

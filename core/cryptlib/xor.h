@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — XOR 流密码 & 经典变换 (xor)
 // XOR 流密码：最简单的"一次性密码本"变体——密钥字节与明文逐位异或。
 // 安全性完全依赖密钥（教学演示；真实场景用 CSPRNG 密钥 + 不重用）。
@@ -23,3 +28,4 @@ int xor_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

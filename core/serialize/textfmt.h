@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据序列化与编解码库 —— 文本格式模块
 // textfmt.h: CSV / INI / XML / TOML / JSON5 / .properties / .env / S-expression
 //
@@ -244,3 +249,4 @@ int textfmt_self_test();
 // textfmt.h: 文本序列化集合（CSV/INI/XML/TOML/JSON5/properties/.env/S-expression）。
 // 命名空间 nefu::serialize。
 // end.
+

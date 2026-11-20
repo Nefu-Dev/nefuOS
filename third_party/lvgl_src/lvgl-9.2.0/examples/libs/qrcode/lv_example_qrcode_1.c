@@ -26,3 +26,4 @@ void lv_example_qrcode_1(void)
 }
 
 #endif
+

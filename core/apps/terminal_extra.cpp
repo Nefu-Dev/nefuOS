@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Extra Terminal Commands
 // Additional Unix-like commands: awk, sed, sort, uniq, tr, cut, paste, join, split, etc.
 #pragma once
@@ -505,3 +510,4 @@ void register_extra_commands() {
 
 } // namespace term_extra
 } // namespace nefu
+

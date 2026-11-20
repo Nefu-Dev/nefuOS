@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Screenshot app
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -46,7 +51,7 @@ static void screenshot_on_mouse(Window* win, int mx, int my, uint8_t buttons) {
 void app_screenshot_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Screenshot", x, y, 300, 200);
+    Window* w = g_wm->create_window(T("截图工具", "Screenshot"), x, y, 300, 200);
     if (!w) return;
     ScreenshotState* st = new ScreenshotState();
     st->w = w->content_w;
@@ -59,3 +64,4 @@ void app_screenshot_launch() {
 }
 
 } // namespace nefu
+

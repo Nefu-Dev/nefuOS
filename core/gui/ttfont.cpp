@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS TrueType font renderer - stb_truetype backend.
 // stb_truetype is MIT licensed (nothings/stb). Embedded font:
 // Montserrat-Medium.ttf, SIL Open Font License 1.1 (Google Fonts).
@@ -246,3 +251,4 @@ void ttf_draw_wrapped(void* fb_surface, int x, int y, const char* s, int size,
 }
 
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // php2html.h — PHP template mini-transpiler for nefuOS
 //
 // Executes common PHP constructs at template time and emits the resulting
@@ -2024,3 +2029,4 @@ static int php_convert(const char* src, char* out, int out_sz) {
 } // namespace nfuphp
 
 #endif // NEFU_PHP2HTML_H
+

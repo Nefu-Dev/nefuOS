@@ -63,3 +63,4 @@ void lv_example_button_2(void)
     lv_obj_center(label);
 }
 #endif
+

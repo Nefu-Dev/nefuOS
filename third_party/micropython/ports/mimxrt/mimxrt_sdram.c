@@ -286,3 +286,4 @@ void mimxrt_sdram_init(void) {
 }
 
 #endif
+

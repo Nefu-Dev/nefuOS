@@ -247,3 +247,4 @@ static mp_obj_t fat_vfs_open(mp_obj_t self_in, mp_obj_t path_in, mp_obj_t mode_i
 MP_DEFINE_CONST_FUN_OBJ_3(fat_vfs_open_obj, fat_vfs_open);
 
 #endif // MICROPY_VFS && MICROPY_VFS_FAT
+

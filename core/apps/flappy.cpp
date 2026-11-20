@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // flappy.cpp —— nefuOS 像素鸟（Flappy Bird 克隆）
 //
 // 玩法：
@@ -246,7 +251,7 @@ static void flappy_close(Window* w) {
 void flappy_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Flappy", x, y, FW, FH);
+    Window* w = g_wm->create_window(T("像素鸟", "Flappy"), x, y, FW, FH);
     if (!w) return;
     Flappy* g = new Flappy();
     g->best = 0;
@@ -261,3 +266,4 @@ void flappy_launch() {
 }
 
 } // namespace nefu
+

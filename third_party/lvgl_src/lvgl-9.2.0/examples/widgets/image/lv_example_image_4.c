@@ -39,3 +39,4 @@ void lv_example_image_4(void)
 }
 
 #endif
+

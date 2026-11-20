@@ -103,3 +103,4 @@ mp_lexer_t *mp_lexer_new_from_str_len_dedent(qstr src_name, const char *str, siz
     mp_reader_new_mem_dedent(&reader, (const byte *)str, len, free_len);
     return mp_lexer_new(src_name, reader);
 }
+

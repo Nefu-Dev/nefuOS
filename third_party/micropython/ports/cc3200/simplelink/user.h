@@ -1061,3 +1061,4 @@ typedef OsiLockObj_t                            _SlLockObj_t;
 #endif // __cplusplus
 
 #endif // __USER_H__
+

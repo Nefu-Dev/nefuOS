@@ -409,3 +409,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 MP_REGISTER_ROOT_POINTER(void *machine_rtc_irq_object);
+

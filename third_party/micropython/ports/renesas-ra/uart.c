@@ -557,3 +557,4 @@ const mp_irq_methods_t uart_irq_methods = {
     .trigger = uart_irq_trigger,
     .info = uart_irq_info,
 };
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS
 #pragma once
 #include "gfx.h"
@@ -20,6 +25,21 @@ void desktop_paint_setup(Surface& fb);  // first-boot setup wizard
 // pure-framebuffer overlay such as the lock screen is dismissed, so its
 // pixels are not left behind because LVGL only redraws dirty regions).
 void desktop_mark_dirty();
+
+// Adapt the whole desktop to a new framebuffer size (host window resized, or a
+// different display resolution at boot). Recomputes the icon grid, wallpaper
+// band, taskbar, start menu and the LVGL display resolution.
+void desktop_on_screen_resize(int w, int h);
+
+// Re-apply the current UI language to the desktop chrome (icon labels, Start
+// button, taskbar buttons, start menu) so a language switch is visible at once.
+void desktop_relabel_lang();
+
+// Invalidate one rectangle of the LVGL desktop so the next desktop frame repaints
+// it. Used by the bare-metal software cursor to erase its previous arrow: LVGL
+// only redraws dirty regions, so without this the old cursor would be left on
+// screen as a trail.
+void desktop_dirty_rect(int x, int y, int w, int h);
 
 // first-boot setup wizard state (owned by nefuos.cpp)
 bool nefuos_setup_active();
@@ -50,3 +70,4 @@ bool start_menu_visible();
 void start_menu_rect(int* x1, int* y1, int* x2, int* y2);
 
 } // namespace nefu
+

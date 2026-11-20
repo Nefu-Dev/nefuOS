@@ -44,3 +44,4 @@ void lv_example_spinbox_1(void)
 }
 
 #endif
+

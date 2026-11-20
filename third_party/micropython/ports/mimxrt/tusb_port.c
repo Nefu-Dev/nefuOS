@@ -136,3 +136,4 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
 
     return desc_str;
 }
+

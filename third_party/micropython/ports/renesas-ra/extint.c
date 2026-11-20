@@ -394,3 +394,4 @@ void extint_init0(void) {
 }
 
 MP_REGISTER_ROOT_POINTER(mp_obj_t pyb_extint_callback[PYB_EXTI_NUM_VECTORS]);
+

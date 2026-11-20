@@ -22,3 +22,4 @@ void lv_example_scale_1(void)
 }
 
 #endif
+

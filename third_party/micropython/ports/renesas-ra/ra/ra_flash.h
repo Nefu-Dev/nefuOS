@@ -74,3 +74,4 @@ bool FLASH_SECTION internal_flash_eraseblock(uint8_t *addr);
 bool FLASH_SECTION internal_flash_init(void);
 
 #endif /* RA_FLASH_H_ */
+

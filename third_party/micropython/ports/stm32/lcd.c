@@ -534,3 +534,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 #endif // MICROPY_HW_HAS_LCD
+

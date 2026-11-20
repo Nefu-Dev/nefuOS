@@ -406,3 +406,4 @@ WEBP_TSAN_IGNORE_FUNCTION void WebPInitAlphaProcessingSSE2(void) {
 WEBP_DSP_INIT_STUB(WebPInitAlphaProcessingSSE2)
 
 #endif  // WEBP_USE_SSE2
+

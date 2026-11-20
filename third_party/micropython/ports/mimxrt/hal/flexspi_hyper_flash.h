@@ -74,3 +74,4 @@ static inline uint32_t flexspi_get_frequency(void) {
 }
 
 #endif // MICROPY_INCLUDED_MIMXRT_HAL_FLEXSPI_HYPER_FLASH_H
+

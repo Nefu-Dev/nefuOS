@@ -171,3 +171,4 @@ extern "C" {
 
 #endif /*__SIMPLELINK_TRACE_H__*/
 
+

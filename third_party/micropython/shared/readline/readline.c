@@ -582,3 +582,4 @@ void readline_push_history(const char *line) {
 }
 
 MP_REGISTER_ROOT_POINTER(const char *readline_hist[MICROPY_READLINE_HISTORY_SIZE]);
+

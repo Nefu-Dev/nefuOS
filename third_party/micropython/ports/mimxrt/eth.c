@@ -656,3 +656,4 @@ void eth_low_power_mode(eth_t *self, bool enable) {
     #endif
 }
 #endif // defined(IOMUX_TABLE_ENET)
+

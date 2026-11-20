@@ -23,3 +23,4 @@ void lv_example_monkey_2(void)
 }
 
 #endif
+

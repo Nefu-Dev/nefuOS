@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // spaceinv.cpp —— nefuOS 太空侵略者（Space Invaders）
 //
 // 玩法：
@@ -528,7 +533,7 @@ static void si_close(Window* w) {
 void spaceinv_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Space Invaders", x, y, SW, SH);
+    Window* w = g_wm->create_window(T("太空侵略者", "Space Invaders"), x, y, SW, SH);
     if (!w) return;
     SpaceInv* g = new SpaceInv();
     g->reset();
@@ -542,3 +547,4 @@ void spaceinv_launch() {
 }
 
 } // namespace nefu
+

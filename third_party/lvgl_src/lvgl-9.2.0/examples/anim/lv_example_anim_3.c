@@ -163,3 +163,4 @@ static void page_obj_init(lv_obj_t * par)
 }
 
 #endif
+

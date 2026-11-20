@@ -124,3 +124,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     make_new, object_make_new
     OBJECT_TYPE_LOCALS_DICT
     );
+

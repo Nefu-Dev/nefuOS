@@ -191,3 +191,4 @@ struct lv_cache_slot_size_t {
 #endif
 
 #endif /*LV_CACHE_PRIVATE_H*/
+

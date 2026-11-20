@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 对称密码实现
 // 参考 FIPS-197 (AES)、FIPS-46-3 (DES/3DES)、RFC 8439 (ChaCha20)、
 // eSTREAM (Salsa20)、 Schneier Blowfish、GM/T 0002 (SM4)。
@@ -875,3 +880,4 @@ int cipher_self_test() {
 
 } // namespace crypto
 } // namespace nefu
+

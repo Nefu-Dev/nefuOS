@@ -101,3 +101,4 @@ void test_jdpgd_align_tile(void)
 }
 
 #endif
+

@@ -656,3 +656,4 @@ int32_t load_kern(lv_fs_file_t * fp, lv_font_fmt_txt_dsc_t * font_dsc, uint8_t f
 
     return kern_length;
 }
+

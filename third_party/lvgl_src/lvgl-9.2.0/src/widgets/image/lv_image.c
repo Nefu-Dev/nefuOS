@@ -876,3 +876,4 @@ static lv_point_t lv_image_get_pivot_helper(lv_obj_t * obj)
 #endif
 
 #endif
+

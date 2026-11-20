@@ -12,3 +12,4 @@
 #define LVGL_VERSION_INFO ""
 
 #endif /* LVGL_VERSION_H */
+

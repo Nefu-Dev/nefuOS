@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — sorted list (sortedlist)
 // 有序列表：元素始终按序存储，支持插入保持有序、按排名访问、
 // 按值查排名。实现为"分块跳表"风格的简单多级链表——
@@ -142,3 +147,4 @@ int sortedlist_self_test();
 
 } // namespace dt
 } // namespace nefu
+

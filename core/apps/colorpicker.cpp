@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Color Picker app
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -69,7 +74,7 @@ static void colorpicker_on_mouse(Window* win, int mx, int my, uint8_t buttons) {
 void app_colorpicker_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Color Picker", x, y, 260, 250);
+    Window* w = g_wm->create_window(T("取色器", "Color Picker"), x, y, 260, 250);
     if (!w) return;
     ColorPickerState* st = new ColorPickerState();
     st->w = w->content_w;
@@ -82,3 +87,4 @@ void app_colorpicker_launch() {
 }
 
 } // namespace nefu
+

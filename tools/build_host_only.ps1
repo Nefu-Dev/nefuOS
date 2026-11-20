@@ -14,7 +14,7 @@ $coreSrc = @(
   "core\apps\minesweep.cpp", "core\apps\imageviewer.cpp", "core\apps\music.cpp", "core\apps\videoplayer.cpp", "core\apps\monitor.cpp",
   "core\apps\browser.cpp", "core\apps\netcfg.cpp",
   "core\apps\nefvm.cpp", "core\apps\nefud.cpp", "core\apps\jpeg.cpp", "core\net\net.cpp",
-  "core\gui\ttfont.cpp", "core\apps\fontview.cpp", "core\apps\lvgl_demo.cpp",
+  "core\gui\ttfont.cpp", "core\gui\lv_cjk_font.cpp", "core\gui\i18n_zh.cpp", "core\apps\fontview.cpp", "core\apps\lvgl_demo.cpp",
   "core\gui\lvgl_win.cpp",
   "core\apps\lvgl_desktop.cpp",
   "core\sys\settings.cpp", "core\sys\sha256.cpp", "core\sys\power.cpp",
@@ -33,6 +33,12 @@ $coreSrc = @(
     "core\lib\json.cpp", "core\lib\regex.cpp", "core\lib\softmath.cpp", "core\lib\hash.cpp",
   "core\lib\deflate.cpp", "core\lib\bigint.cpp", "core\lib\prime.cpp",
   "core\net\dns.cpp",
+  "core\net\tls13.cpp", "core\lib\zip.cpp", "core\apps\npkg.cpp", "core\apps\update.cpp",
+  "core\audio\audio_engine.cpp", "core\elf\elfrun.cpp", "core\klib\aes128.cpp",
+  "core\apps\ncode.cpp", "core\apps\electron.cpp", "core\apps\minijvm.cpp",
+  "core\apps\minijvm_core.cpp", "core\apps\minijvm_builtin.cpp",
+  "core\sys\sysapi.cpp", "core\x11\xserver.cpp", "core\drivers\audio_driver.cpp",
+
   "core\apps\term_ext.cpp", "core\apps\tetris.cpp", "core\apps\game2048.cpp", "core\apps\sudoku.cpp",
   "core\apps\memorymatch.cpp", "core\apps\hexedit.cpp", "core\apps\jsonview.cpp", "core\apps\findfiles.cpp",
   "core\apps\pomodoro.cpp", "core\apps\stopwatch.cpp", "core\apps\wordcount.cpp",
@@ -132,7 +138,7 @@ $coreSrc = @(
 
   "core\netproto\netstack.cpp", "core\netproto\ntp.cpp", "core\netproto\pkt_dissect.cpp", "core\netproto\pktlog.cpp",
 
-  "core\netproto\socket.cpp", "core\netproto\tcp.cpp", "core\netproto\udp.cpp", "core\netproto\websocket.cpp",
+  "core\netproto\socket.cpp", "core\netproto\tcp.cpp", "core\netproto\udp.cpp", "core\netproto\websocket.cpp", "core\netproto\colyseus.cpp",
 
   "core\sysutil\config.cpp", "core\sysutil\eventlog.cpp", "core\sysutil\permissions.cpp", "core\sysutil\process.cpp",
 
@@ -180,7 +186,7 @@ $coreSrc = @(
 
   "core\deeplearn\weights.cpp", "core\apps\netlab.cpp", "core\apps\sysmon.cpp", "core\apps\repl.cpp", "core\apps\fsview.cpp",
 
-  "core\apps\rayview.cpp", "core\apps\compilerlab.cpp", "core\apps\gedemo.cpp", "core\apps\deepviz.cpp"
+  "core\apps\rayview.cpp", "core\apps\compilerlab.cpp", "core\apps\gedemo.cpp", "core\apps\deepviz.cpp",
 
   "third_party\stb_image_wrap.cpp"
 )
@@ -250,9 +256,18 @@ foreach ($q in $qjSrc) {
 }
 # Write response file to avoid Windows 32K command-line limit
 $respFile = Join-Path $bareOut "host_sources.rsp"
-$allSrc = $coreSrc + @("backends\win32\win32.cpp", "backends\win32\media_win32.cpp") + $lvglHostObjs
+$allSrc = $coreSrc + @("backends\win32\win32.cpp", "backends\win32\ws_win32.cpp", "backends\win32\media_win32.cpp") + $lvglHostObjs
 $respContent = ($allSrc | ForEach-Object { '"' + $_ + '"' }) -join "`r`n"
 [IO.File]::WriteAllText($respFile, $respContent, (New-Object Text.UTF8Encoding $false))
-& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party @lvglInclude -o $hostExe "@$respFile" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32
-if ($LASTEXITCODE -ne 0) { throw "host build failed" }
+# Native compilers write diagnostics (warnings) to stderr. With
+# $ErrorActionPreference="Stop" PowerShell 5.1 turns each stderr line into a
+# terminating NativeCommandError even when g++ exits 0, so one harmless
+# warning aborts the link before it starts. Relax it for this single call;
+# $LASTEXITCODE below still catches real compile/link failures.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation -I core -I third_party @lvglInclude -o $hostExe "@$respFile" "-Wl,--stack,268435456" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinhttp -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32
+$linkExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($linkExit -ne 0) { throw "host build failed" }
 Write-Output "host exe OK: $((Get-Item $hostExe).Length) bytes -> $hostExe"

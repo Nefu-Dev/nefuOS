@@ -309,3 +309,4 @@ static void anim_timeline_exec_cb(void * var, int32_t v)
     lv_anim_timeline_t * at = var;
     anim_timeline_set_act_time(at, v);
 }
+

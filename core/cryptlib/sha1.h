@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — SHA-1 (sha1)
 // SHA-1：160 位散列（2017 年 Google 给出首个公开碰撞，不再用于安全场景；
 // 教学/校验场景仍常见）。80 轮压缩 + 5 个状态字。
@@ -16,3 +21,4 @@ int sha1_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

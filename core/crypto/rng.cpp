@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 随机数生成器实现
 #include "rng.h"
 #include "cipher.h"
@@ -189,3 +194,4 @@ int rng_self_test() {
 
 } // namespace crypto
 } // namespace nefu
+

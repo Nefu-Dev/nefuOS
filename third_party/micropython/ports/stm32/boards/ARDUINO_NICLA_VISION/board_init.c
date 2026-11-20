@@ -220,3 +220,4 @@ void NICLAV_board_low_power(int mode) {
         RCC->APB4RSTR = 0x0020DEAAU;
     }
 }
+

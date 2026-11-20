@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 //
 //
 // License: MIT
@@ -34,7 +39,7 @@
 namespace nefu {
 
 void credits_launch() {
-    Window* w = g_wm->create_window("Credits", 120, 80, 440, 380);
+    Window* w = g_wm->create_window(T("致谢", "Credits"), 120, 80, 440, 380);
     if (!w) return;
     
     // Header
@@ -116,3 +121,4 @@ void credits_launch() {
 // 30000 lines!// The end
 // Finished
 // Done
+

@@ -199,3 +199,4 @@ uint8_t *usbd_hid_init(usbd_hid_state_t *hid);
 int8_t usbd_hid_receive(usbd_hid_state_t *hid, size_t len);
 
 #endif // _USB_CDC_MSC_CORE_H_
+

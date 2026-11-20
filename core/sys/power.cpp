@@ -1,6 +1,12 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #include "power.h"
 #include "settings.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/i18n_zh.h"
 #include "../gui/gfx.h"
 #include "../klib/klib.h"
 #include "../apps/apps.h"
@@ -19,7 +25,7 @@ static lv_obj_t* s_pwd_input = nullptr;
 void boot_splash_show(int progress) {
     if (!g_settings.boot_splash) return;
     if (!s_splash_win) {
-        s_splash_win = lvgl_win_create("nefuOS Boot", 0, 0, 800, 600);
+        s_splash_win = lvgl_win_create(T("nefuOS 启动", "nefuOS Boot"), 0, 0, 800, 600);
         lv_obj_set_style_bg_color(s_splash_win->content, lv_color_hex(0x1E293B), 0);
         // Centered logo
         lv_obj_t* logo = lv_label_create(s_splash_win->content);
@@ -28,7 +34,7 @@ void boot_splash_show(int progress) {
         lv_obj_align(logo, LV_ALIGN_CENTER, 0, -60);
         // Loading text
         lv_obj_t* sub = lv_label_create(s_splash_win->content);
-        lv_label_set_text(sub, "Loading system components...");
+        lv_label_set_text(sub, nefu::zh_ui("Loading system components..."));
         lv_obj_set_style_text_color(sub, lv_color_hex(0x94A3B8), 0);
         lv_obj_align(sub, LV_ALIGN_CENTER, 0, -20);
         // Progress bar control
@@ -46,11 +52,11 @@ static void on_unlock_click(lv_event_t* e);
 void lock_screen() {
     g_locked = true;
     if (!s_lock_win) {
-        s_lock_win = lvgl_win_create("nefuOS Lock", 0, 0, 800, 600);
+        s_lock_win = lvgl_win_create(T("nefuOS 锁屏", "nefuOS Lock"), 0, 0, 800, 600);
         lv_obj_set_style_bg_color(s_lock_win->content, lv_color_hex(0x0F172A), 0);
         // Screen title
         lv_obj_t* title = lv_label_create(s_lock_win->content);
-        lv_label_set_text(title, "nefuOS Lock Screen");
+        lv_label_set_text(title, nefu::zh_ui("nefuOS Lock Screen"));
         lv_obj_set_style_text_color(title, lv_color_hex(0xF8FAFC), 0);
         lv_obj_align(title, LV_ALIGN_CENTER, 0, -100);
         // Welcome username
@@ -71,7 +77,7 @@ void lock_screen() {
         lv_obj_set_size(btn, 160, 36);
         lv_obj_align(btn, LV_ALIGN_CENTER, 0, 60);
         lv_obj_t* lbl = lv_label_create(btn);
-        lv_label_set_text(lbl, "Unlock");
+        lv_label_set_text(lbl, nefu::zh_ui("Unlock"));
         lv_obj_center(lbl);
         lv_obj_add_event_cb(btn, on_unlock_click, LV_EVENT_CLICKED, NULL);
     }
@@ -288,3 +294,4 @@ void bsod_handle_mouse(int x, int y, uint8_t buttons) {
 }
 
 }
+

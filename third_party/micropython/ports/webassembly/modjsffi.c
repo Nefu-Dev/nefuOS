@@ -119,3 +119,4 @@ const mp_obj_module_t mp_module_jsffi = {
 MP_REGISTER_MODULE(MP_QSTR_jsffi, mp_module_jsffi);
 
 #endif // MICROPY_PY_JSFFI
+

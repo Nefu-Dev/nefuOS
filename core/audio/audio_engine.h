@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audio engine - integer-only facade over the real sound-card drivers.
 // The heavy lifting (mixer math) lives in audio_manager.h / audio_driver.cpp,
 // which are compiled with the FPU ABI; this module exposes a pure integer API
@@ -41,3 +46,4 @@ bool media_get_info(uint32_t* rate, uint32_t* total_frames); // for progress/wav
 
 } // namespace audio
 } // namespace nefu
+

@@ -192,3 +192,4 @@ static WEBP_INLINE void VP8L32bToPlanar_SSE2(__m128i* const in0,
 #endif
 
 #endif  // WEBP_DSP_COMMON_SSE2_H_
+

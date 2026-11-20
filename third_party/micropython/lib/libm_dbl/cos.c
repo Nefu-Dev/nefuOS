@@ -75,3 +75,4 @@ double cos(double x)
 		return  __sin(y[0], y[1], 1);
 	}
 }
+

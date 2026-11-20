@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS search algorithm library
 // (1) classic array searches: linear, binary, ternary, interpolation,
 //     exponential — with documented complexity and integer semantics;
@@ -60,3 +65,4 @@ int search_self_test();
 
 } // namespace algo
 } // namespace nefu
+

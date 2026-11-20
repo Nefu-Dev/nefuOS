@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS JSON library — parse + serialize
 // Portable: no STL, no exceptions, no dynamic allocation beyond String/List.
 // Numbers are stored as int64; fractional numbers keep their raw text in
@@ -81,3 +86,4 @@ void       i64_to_str(long long v, String& out);
 
 } // namespace json
 } // namespace nefu
+

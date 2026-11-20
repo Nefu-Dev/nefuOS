@@ -1001,3 +1001,4 @@ _i16 sl_WlanGet(const _u16 ConfigId, _u16 *pConfigOpt,_u16 *pConfigLen, _u8 *pVa
     return (_i16)Msg.Rsp.Status;
 }
 #endif
+

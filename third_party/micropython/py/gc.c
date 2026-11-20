@@ -1275,3 +1275,4 @@ void gc_dump_alloc_table(const mp_print_t *print) {
 }
 
 #endif // MICROPY_ENABLE_GC
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 迷你编译器实验室（compilerlab.cpp）
 // ----------------------------------------------------------------------------
@@ -149,7 +154,7 @@ static void lab_close(Window* w) {
 void compilerlab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Compiler Lab", x, y, LAB_W, LAB_H);
+    Window* w = g_wm->create_window(T("编译器实验室", "Compiler Lab"), x, y, LAB_W, LAB_H);
     if (!w) return;
     Lab* L = new Lab();
     L->rebuild();
@@ -161,3 +166,4 @@ void compilerlab_launch() {
 }
 
 } // namespace nefu
+

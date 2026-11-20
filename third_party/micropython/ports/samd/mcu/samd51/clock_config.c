@@ -367,3 +367,4 @@ void enable_sercom_clock(int id) {
         #endif
     }
 }
+

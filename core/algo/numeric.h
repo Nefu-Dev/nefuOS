@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS numeric algorithm library
 // (1) Complex arithmetic and a recursive Cooley-Tukey FFT;
 // (2) dense Matrix ops: multiply / transpose / trace / determinant /
@@ -132,3 +137,4 @@ int numeric_self_test();
 
 } // namespace num
 } // namespace nefu
+

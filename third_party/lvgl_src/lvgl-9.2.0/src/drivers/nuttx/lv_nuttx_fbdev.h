@@ -53,3 +53,4 @@ int lv_nuttx_fbdev_set_file(lv_display_t * disp, const char * file);
 #endif
 
 #endif /* LV_NUTTX_FBDEV_H */
+

@@ -797,3 +797,4 @@ int VP8LBackwardReferencesTraceBackwards(int xsize, int ysize,
   WebPSafeFree(dist_array);
   return ok;
 }
+

@@ -2553,3 +2553,4 @@ int main(int argc, char **argv)
     /* Signal that the error file is out of date. */
     return new_errors || changed_errors || fixed_errors;
 }
+

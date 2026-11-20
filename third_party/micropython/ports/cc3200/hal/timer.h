@@ -208,3 +208,4 @@ extern unsigned long TimerDMAEventGet(unsigned long ulBase);
 #endif
 
 #endif // __TIMER_H__
+

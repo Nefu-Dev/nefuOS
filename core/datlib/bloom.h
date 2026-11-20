@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — Bloom filter (bloom)
 // 布隆过滤器：用 k 个哈希函数映射到 m 位位图，用于"可能在集合中 /
 // 绝不在集合中"的快速判重。允许假阳性（误报在），绝不漏报。
@@ -84,3 +89,4 @@ int bloom_self_test();
 
 } // namespace dt
 } // namespace nefu
+

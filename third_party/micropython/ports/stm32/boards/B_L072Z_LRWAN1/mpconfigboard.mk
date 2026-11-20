@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = l0
 CMSIS_MCU = STM32L072xx
 MICROPY_FLOAT_IMPL = none
@@ -12,3 +17,4 @@ FROZEN_MANIFEST ?=
 
 # LTO reduces final binary size, may be slower to build depending on gcc version and hardware
 LTO ?= 1
+

@@ -168,3 +168,4 @@ static unsigned int __stdcall lv_windows_display_thread_entrypoint(
 }
 
 #endif // LV_USE_WINDOWS
+

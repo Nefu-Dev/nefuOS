@@ -140,3 +140,4 @@ void runtime_init_clocks_optional_usb(bool init_usb) {
     // The ticks use clk_ref so now that is configured we can start them
     start_all_ticks();
 }
+

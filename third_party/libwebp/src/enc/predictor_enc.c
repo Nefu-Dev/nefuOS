@@ -1109,3 +1109,4 @@ int VP8LColorSpaceTransform(int width, int height, int bits, int quality,
                        best_bits);
   return 1;
 }
+

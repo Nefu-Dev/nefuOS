@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS HTML5 Parser - based on Hubbub (NetSurf, MIT License) design
 // Simplified for bare-metal OS with minimal dependencies
 // Original Hubbub: Copyright 2007-2010, NetSurf Project, MIT License
@@ -101,3 +106,4 @@ bool html_is_skip_tag(const char* tag);
 } // namespace nefu
 
 #endif // NEFU_HTML_PARSER_H
+

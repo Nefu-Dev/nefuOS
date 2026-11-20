@@ -180,3 +180,4 @@ struct lv_display_t {
 #endif
 
 #endif /*LV_DISPLAY_PRIVATE_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— 内存表格 table
 // 教学版：内存表（列名 + 行），支持插入/删除/排序/过滤/统计。
 #pragma once
@@ -61,3 +66,4 @@ private:
 
 } // namespace dbx
 } // namespace nefu
+

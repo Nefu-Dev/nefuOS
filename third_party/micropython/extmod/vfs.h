@@ -119,3 +119,4 @@ MP_DECLARE_CONST_FUN_OBJ_1(mp_vfs_stat_obj);
 MP_DECLARE_CONST_FUN_OBJ_1(mp_vfs_statvfs_obj);
 
 #endif // MICROPY_INCLUDED_EXTMOD_VFS_H
+

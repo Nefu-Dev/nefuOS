@@ -69,3 +69,4 @@ void mp_stack_check(void) {
 #endif // MICROPY_STACK_CHECK
 
 #endif // !MICROPY_PREVIEW_VERSION_2
+

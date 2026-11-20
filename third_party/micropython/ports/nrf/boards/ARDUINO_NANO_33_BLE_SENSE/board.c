@@ -65,3 +65,4 @@ void NANO33_board_enter_bootloader(void) {
     NRF_POWER->GPREGRET = DFU_MAGIC_SERIAL_ONLY_RESET;
     NVIC_SystemReset();
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // minijvm_test.cpp - headless functional tests for the nefuOS mini JVM
 // (core/apps/minijvm.cpp). Compiles real Java with javac, embeds the .class
 // bytes (tests/minijvm_cases.h) and verifies the interpreter output against
@@ -59,3 +64,4 @@ int main() {
     printf("checks=%d fails=%d\n", checks, fails);
     return fails ? 1 : 0;
 }
+

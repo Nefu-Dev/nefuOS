@@ -135,3 +135,4 @@ int uzlib_parse_zlib_gzip_header(uzlib_uncomp_t *d, int *wbits)
         return UZLIB_HEADER_ZLIB;
     }
 }
+

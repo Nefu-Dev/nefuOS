@@ -60,3 +60,4 @@ extern void SOCKETFIFO_Flush (void);
 extern unsigned int SOCKETFIFO_Count (void);
 
 #endif // MICROPY_INCLUDED_CC3200_UTIL_SOCKETFIFO_H
+

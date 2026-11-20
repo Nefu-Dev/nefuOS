@@ -278,3 +278,4 @@ static mp_obj_t mp_obj_new_str_iterator(mp_obj_t str, mp_obj_iter_buf_t *iter_bu
 }
 
 #endif // MICROPY_PY_BUILTINS_STR_UNICODE
+

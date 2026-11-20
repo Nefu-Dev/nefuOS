@@ -696,3 +696,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 MP_REGISTER_ROOT_POINTER(struct _pyb_uart_obj_t *pyb_uart_objs[2]);
+

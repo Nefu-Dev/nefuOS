@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 嵌入式数据库 —— 独立宿主测试 main
 //
 // 用法(在 nefuOS 根目录下):
@@ -82,3 +87,4 @@ int main() {
     printf("\nDATABASE TESTS FAILED\n");
     return 1;
 }
+

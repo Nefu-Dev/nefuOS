@@ -41,3 +41,4 @@ lv_indev_t * lv_sdl_mousewheel_create(void);
 #endif
 
 #endif /* LV_DEV_SDL_MOUSEWHEEL_H */
+

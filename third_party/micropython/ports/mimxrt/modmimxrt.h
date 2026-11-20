@@ -32,3 +32,4 @@ extern const mp_obj_type_t mimxrt_flash_type;
 extern const mp_obj_module_t mp_module_mimxrt;
 
 #endif // MICROPY_INCLUDED_MIMXRT_MODMIMXRT_H
+

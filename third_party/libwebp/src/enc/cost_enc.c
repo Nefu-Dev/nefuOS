@@ -340,3 +340,4 @@ int VP8RecordCoeffs(int ctx, const VP8Residual* const res) {
 }
 
 //------------------------------------------------------------------------------
+

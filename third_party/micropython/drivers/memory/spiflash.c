@@ -553,3 +553,4 @@ int mp_spiflash_cached_write(mp_spiflash_t *self, uint32_t addr, size_t len, con
 }
 
 #endif // MICROPY_HW_SPIFLASH_ENABLE_CACHE
+

@@ -148,3 +148,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 MP_REGISTER_ROOT_POINTER(mp_obj_t pyb_switch_callback);
 
 #endif // MICROPY_HW_HAS_SWITCH
+

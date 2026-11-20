@@ -235,3 +235,4 @@ static mp_obj_t machine_disable_irq(void) {
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_0(machine_disable_irq_obj, machine_disable_irq);
+

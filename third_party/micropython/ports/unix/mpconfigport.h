@@ -226,3 +226,4 @@ static inline unsigned long mp_random_seed_init(void) {
 #ifndef MICROPY_PY_BLUETOOTH_ENABLE_L2CAP_CHANNELS
 #define MICROPY_PY_BLUETOOTH_ENABLE_L2CAP_CHANNELS (MICROPY_BLUETOOTH_NIMBLE)
 #endif
+

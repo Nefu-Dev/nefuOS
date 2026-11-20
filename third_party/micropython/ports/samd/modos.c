@@ -99,3 +99,4 @@ bool mp_os_dupterm_is_builtin_stream(mp_const_obj_t stream) {
     return type == &machine_uart_type;
 }
 #endif
+

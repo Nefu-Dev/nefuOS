@@ -1,4 +1,4 @@
-﻿# nefuOS ：/
+# nefuOS ：/
 param(
     [string]$Exe = "D:\mycppos1\nefuOS\dist\nefuOS.exe",
     [string]$Out = "D:\mycppos1\nefuOS\dist\shots"

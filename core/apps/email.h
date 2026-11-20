@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Email Client - Professional Mail Application
 // ---------------------------------------------------------------------------
 // Views : list / read / compose / account
@@ -15,6 +20,7 @@
 #include "../gui/wm.h"
 #include "../klib/klib.h"
 #include "../net/net.h"
+#include "../net/tls13.h"
 
 #if defined(_WIN32) && !defined(NEFU_BARE)
 #include <winsock2.h>
@@ -1346,7 +1352,33 @@ static void compose_discard(EmailState* st) {
     st->status[0] = 0;
 }
 
-// ============================== live SMTP / POP3 (host build) ==============================
+// ============================== live SMTP / POP3 (TLS 1.3) ==============================
+// One socket abstraction for both targets: WinSock on the host build, the
+// bare-metal TCP stack (net.h) under NEFU_BARE. Both are wrapped with the
+// kernel-native TLS 1.3 client (core/net/tls13.h) through recv/send callbacks.
+// TLS modes: implicit (465 SMTP / 995 POP3), STARTTLS / STLS upgrade
+// (587 / 110) when the server advertises the capability, else plaintext.
+
+struct MailConn {
+#if defined(_WIN32) && !defined(NEFU_BARE)
+    SOCKET s;
+#else
+    int fd;
+#endif
+    nefu::tls::Tls13Conn* tls;   // 0 = plaintext connection
+    int mode;                    // 0 = plain, 1 = implicit TLS, 2 = STARTTLS/STLS
+    MailConn() {
+        tls = 0;
+        mode = 0;
+#if defined(_WIN32) && !defined(NEFU_BARE)
+        s = INVALID_SOCKET;
+#else
+        fd = -1;
+#endif
+    }
+};
+
+// ---- platform socket primitives ----
 
 #if defined(_WIN32) && !defined(NEFU_BARE)
 
@@ -1359,35 +1391,174 @@ static bool mail_net_started() {
     return started;
 }
 
-static SOCKET mail_net_connect(const char* host, int port) {
-    if (!mail_net_started()) return INVALID_SOCKET;
+static bool mail_sock_open(MailConn& mc, const char* host, int port, char* err, int errsz) {
+    if (!mail_net_started()) {
+        strncpy(err, "network not initialized", errsz - 1); err[errsz - 1] = 0;
+        return false;
+    }
     struct addrinfo hints, *res = 0;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     char pbuf[16];
     ksprintf(pbuf, sizeof(pbuf), "%d", port);
-    if (getaddrinfo(host, pbuf, &hints, &res) != 0) return INVALID_SOCKET;
+    if (getaddrinfo(host, pbuf, &hints, &res) != 0) {
+        strncpy(err, "DNS lookup failed", errsz - 1); err[errsz - 1] = 0;
+        return false;
+    }
     SOCKET s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (s == INVALID_SOCKET) { freeaddrinfo(res); return INVALID_SOCKET; }
+    if (s == INVALID_SOCKET) {
+        freeaddrinfo(res);
+        strncpy(err, "socket() failed", errsz - 1); err[errsz - 1] = 0;
+        return false;
+    }
     DWORD tmo = 8000;
     setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tmo, sizeof(tmo));
     setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tmo, sizeof(tmo));
     if (::connect(s, res->ai_addr, (int)res->ai_addrlen) == SOCKET_ERROR) {
         closesocket(s);
         freeaddrinfo(res);
-        return INVALID_SOCKET;
+        strncpy(err, "connect failed", errsz - 1); err[errsz - 1] = 0;
+        return false;
     }
     freeaddrinfo(res);
-    return s;
+    mc.s = s;
+    return true;
+}
+
+static int mail_sock_recv(MailConn& mc, char* buf, int max, int timeout_ms) {
+    if (timeout_ms > 0) {
+        fd_set f; FD_ZERO(&f); FD_SET(mc.s, &f);
+        timeval tv; tv.tv_sec = timeout_ms / 1000; tv.tv_usec = (timeout_ms % 1000) * 1000;
+        if (select(0, &f, 0, 0, &tv) <= 0) return -1;   // timeout = no data yet
+    }
+    int r = recv(mc.s, buf, max, 0);
+    return r == SOCKET_ERROR ? -2 : r;                   // 0 = peer closed
+}
+
+static int mail_sock_send(MailConn& mc, const char* buf, int len) {
+    int r = send(mc.s, buf, len, 0);
+    return r == SOCKET_ERROR ? -1 : r;
+}
+
+static void mail_sock_close(MailConn& mc) {
+    if (mc.s != INVALID_SOCKET) { closesocket(mc.s); mc.s = INVALID_SOCKET; }
+}
+
+#else  // bare-metal TCP (net.h)
+
+// bare resolver: dotted-quad IPs only (the bare stack has no UDP DNS yet)
+static bool mail_bare_resolve(const char* host, uint32_t& ip) {
+    ip = 0;
+    int oct[4];
+    for (int i = 0; i < 4; i++) {
+        if (!*host) return false;
+        int v = 0, nd = 0;
+        while (*host >= '0' && *host <= '9') {
+            v = v * 10 + (*host - '0');
+            if (v > 255) return false;
+            host++;
+            nd++;
+        }
+        if (nd == 0) return false;
+        oct[i] = v;
+        if (i < 3) { if (*host != '.') return false; host++; }
+    }
+    if (*host) return false;
+    ip = ((uint32_t)oct[0] << 24) | ((uint32_t)oct[1] << 16) |
+         ((uint32_t)oct[2] << 8) | (uint32_t)oct[3];
+    return true;
+}
+
+static bool mail_sock_open(MailConn& mc, const char* host, int port, char* err, int errsz) {
+    uint32_t ip = 0;
+    if (!mail_bare_resolve(host, ip)) {
+        strncpy(err, "cannot resolve host (bare build: set the server to an IP)", errsz - 1);
+        err[errsz - 1] = 0;
+        return false;
+    }
+    int fd = nefu::tcp_connect(ip, (uint16_t)port, 10000);
+    if (fd < 0) {
+        strncpy(err, "TCP connect failed", errsz - 1); err[errsz - 1] = 0;
+        return false;
+    }
+    mc.fd = fd;
+    return true;
+}
+
+static int mail_sock_recv(MailConn& mc, char* buf, int max, int timeout_ms) {
+    // bare tcp_recv: >0 data, 0 peer closed, -1 timeout (no data yet)
+    return nefu::tcp_recv(mc.fd, buf, max, timeout_ms);
+}
+
+static int mail_sock_send(MailConn& mc, const char* buf, int len) {
+    return nefu::tcp_send(mc.fd, buf, len);
+}
+
+static void mail_sock_close(MailConn& mc) {
+    if (mc.fd >= 0) { nefu::tcp_close(mc.fd); mc.fd = -1; }
+}
+
+#endif
+
+// ---- TLS 1.3 (the MailConn itself is the callback context) ----
+
+static int mail_tls_recv_cb(void* ctx, uint8_t* buf, int maxlen, int timeout_ms) {
+    return mail_sock_recv(*(MailConn*)ctx, (char*)buf, maxlen, timeout_ms);
+}
+
+static int mail_tls_send_cb(void* ctx, const uint8_t* buf, int len) {
+    return mail_sock_send(*(MailConn*)ctx, (const char*)buf, len);
+}
+
+// wrap the current connection with TLS 1.3 (SNI/ALPN uses the server hostname)
+static bool mail_conn_wrap(MailConn& mc, const char* hostname, char* err, int errsz) {
+    char terr[160];
+    mc.tls = nefu::tls::tls13_connect(mail_tls_recv_cb, mail_tls_send_cb, &mc,
+                                      hostname, terr, sizeof(terr));
+    if (!mc.tls) {
+        strncpy(err, terr, errsz - 1);
+        err[errsz - 1] = 0;
+        return false;
+    }
+    return true;
+}
+
+static void mail_conn_close(MailConn& mc) {
+    if (mc.tls) { nefu::tls::tls13_close(mc.tls); mc.tls = 0; }
+    mail_sock_close(mc);
+}
+
+// open a TCP connection; wrap with implicit TLS immediately when requested
+static bool mail_conn_open(MailConn& mc, const char* host, int port,
+                           bool implicit_tls, char* err, int errsz) {
+    if (!mail_sock_open(mc, host, port, err, errsz)) return false;
+    if (implicit_tls) {
+        if (!mail_conn_wrap(mc, host, err, errsz)) {
+            mail_conn_close(mc);
+            return false;
+        }
+        mc.mode = 1;
+    }
+    return true;
+}
+
+static int mail_conn_recv(MailConn& mc, char* buf, int max, int timeout_ms) {
+    if (mc.tls) return nefu::tls::tls13_recv(mc.tls, (uint8_t*)buf, max, timeout_ms);
+    return mail_sock_recv(mc, buf, max, timeout_ms);
+}
+
+static int mail_conn_send(MailConn& mc, const char* buf, int len) {
+    if (mc.tls) return nefu::tls::tls13_send(mc.tls, (const uint8_t*)buf, len);
+    return mail_sock_send(mc, buf, len);
 }
 
 // read one response line (\r\n terminated, \r stripped)
-static bool mail_net_line(SOCKET s, char* out, int max) {
+static bool mail_net_line(MailConn& mc, char* out, int max) {
     int n = 0;
     while (n < max - 1) {
         char c;
-        int r = recv(s, &c, 1, 0);
+        int r = mail_conn_recv(mc, &c, 1, 8000);
         if (r <= 0) break;
         if (c == '\n') break;
         if (c != '\r') out[n++] = c;
@@ -1397,34 +1568,74 @@ static bool mail_net_line(SOCKET s, char* out, int max) {
 }
 
 // send a command and read a single-line response (POP3 style, "+OK"/"-ERR")
-static bool mail_net_expect_pop(SOCKET s, const char* cmd, char* resp, int rsz) {
+static bool mail_net_expect_pop(MailConn& mc, const char* cmd, char* resp, int rsz) {
     int cl = (int)strlen(cmd);
-    if (send(s, cmd, cl, 0) != cl) return false;
-    if (send(s, "\r\n", 2, 0) != 2) return false;
-    return mail_net_line(s, resp, rsz);
+    if (mail_conn_send(mc, cmd, cl) != cl) return false;
+    if (mail_conn_send(mc, "\r\n", 2) != 2) return false;
+    return mail_net_line(mc, resp, rsz);
 }
 
-// send a command and read the (possibly multi-line) response; returns final code
-static bool mail_net_cmd_code(SOCKET s, const char* cmd, int& code) {
+// send a command (or nothing when cmd == 0) and read the full (possibly
+// multi-line) reply; every line is appended to buf, the final code returned
+static bool mail_net_reply(MailConn& mc, const char* cmd, char* buf, int cap, int& code) {
+    buf[0] = 0;
     if (cmd) {
         int cl = (int)strlen(cmd);
-        if (send(s, cmd, cl, 0) != cl) return false;
-        if (send(s, "\r\n", 2, 0) != 2) return false;
+        if (mail_conn_send(mc, cmd, cl) != cl) return false;
+        if (mail_conn_send(mc, "\r\n", 2) != 2) return false;
     }
-    char line[1024];
+    int used = 0;
     for (;;) {
-        if (!mail_net_line(s, line, sizeof(line))) return false;
-        if ((int)strlen(line) < 4) { code = atoi(line); return true; }
+        char line[1024];
+        if (!mail_net_line(mc, line, sizeof(line))) return false;
+        int ln = (int)strlen(line);
+        if (used + ln + 2 < cap) {
+            memcpy(buf + used, line, (size_t)ln);
+            used += ln;
+            buf[used++] = '\n';
+            buf[used] = 0;
+        }
+        if (ln < 4) { code = atoi(line); return true; }
         if (line[3] == '-') continue;      // multi-line continuation
         code = atoi(line);
         return true;
     }
 }
 
-static bool mail_net_expect(SOCKET s, const char* cmd, int want) {
+static bool mail_net_cmd_code(MailConn& mc, const char* cmd, int& code) {
+    char tmp[1024];
+    return mail_net_reply(mc, cmd, tmp, sizeof(tmp), code);
+}
+
+static bool mail_net_expect(MailConn& mc, const char* cmd, int want) {
     int code;
-    if (!mail_net_cmd_code(s, cmd, code)) return false;
+    if (!mail_net_cmd_code(mc, cmd, code)) return false;
     return code == want || (want == 250 && (code == 250 || code == 251));
+}
+
+// POP3 CAPA-style multiline response: header line, capability lines, a lone
+// "." terminator. buf receives all lines; true on +OK.
+static bool mail_net_pop_capa(MailConn& mc, const char* cmd, char* buf, int cap) {
+    buf[0] = 0;
+    int cl = (int)strlen(cmd);
+    if (mail_conn_send(mc, cmd, cl) != cl) return false;
+    if (mail_conn_send(mc, "\r\n", 2) != 2) return false;
+    int used = 0;
+    for (;;) {
+        char line[512];
+        if (!mail_net_line(mc, line, sizeof(line))) return false;
+        if (strcmp(line, ".") == 0) break;                          // end marker
+        if (line[0] == '-' && line[1] == 'E' && line[2] == 'R' && line[3] == 'R') return false;
+        int ln = (int)strlen(line);
+        if (used + ln + 2 < cap) {
+            memcpy(buf + used, line, (size_t)ln);
+            used += ln;
+            buf[used++] = '\n';
+            buf[used] = 0;
+        }
+        if (strncmp(line, "+OK", 3) == 0 && ln < 20) break;         // single-line reply
+    }
+    return true;
 }
 
 static bool mail_b64(const char* in, char* out, int outsz) {
@@ -1471,11 +1682,11 @@ static void mail_hdrval(const char* line, int ln, char* out, int outsz) {
 }
 
 // read a POP3 message body (until \r\n.\r\n / \n.\n terminator)
-static bool mail_net_data(SOCKET s, char* buf, int max) {
+static bool mail_net_data(MailConn& mc, char* buf, int max) {
     int n = 0;
     while (n < max - 1) {
         char c;
-        int r = recv(s, &c, 1, 0);
+        int r = mail_conn_recv(mc, &c, 1, 8000);
         if (r <= 0) break;
         buf[n++] = c;
         if (n >= 5 && buf[n - 5] == '\r' && buf[n - 4] == '\n' &&
@@ -1698,26 +1909,58 @@ static void mail_parse_pop(EmailMessage& m, const char* raw) {
     if (!m.date[0]) mail_now(m.date, sizeof(m.date));
 }
 
-// POP3 receive: returns number fetched, -1 on connection error
-static int mail_pop3_fetch(EmailState* st, char* err, int errsz) {
+// POP3 receive: returns number fetched, -1 on connection error.
+// TLS: port 995 = implicit TLS; otherwise STLS is negotiated when the server
+// advertises it in CAPA. tls_out (optional) receives "TLS 1.3" or "plain".
+static int mail_pop3_fetch(EmailState* st, char* err, int errsz, const char** tls_out) {
     const EmailAccount& a = st->acct;
-    SOCKET s = mail_net_connect(a.pop_host, a.pop_port);
-    if (s == INVALID_SOCKET) {
-        ksprintf(err, errsz, "POP3: cannot reach %s:%d", a.pop_host, a.pop_port);
+    if (tls_out) *tls_out = "plain";
+    bool implicit = (a.pop_port == 995);
+    MailConn mc;
+    if (!mail_conn_open(mc, a.pop_host, a.pop_port, implicit, err, errsz)) {
+        char b[192];
+        ksprintf(b, sizeof(b), "POP3: %s", err);
+        strncpy(err, b, errsz - 1);
+        err[errsz - 1] = 0;
         return -1;
     }
     char line[512];
-    if (!mail_net_line(s, line, sizeof(line)) || strncmp(line, "+OK", 3) != 0) {
-        closesocket(s);
+    if (!mail_net_line(mc, line, sizeof(line)) || strncmp(line, "+OK", 3) != 0) {
+        mail_conn_close(mc);
         strcpy(err, "POP3: server rejected connection");
         return -1;
     }
+    if (!implicit) {
+        // capability probe: upgrade to STLS when the server supports it
+        char cap[2048];
+        if (mail_net_pop_capa(mc, "CAPA", cap, sizeof(cap)) && strstr(cap, "STLS")) {
+            if (!mail_net_expect_pop(mc, "STLS", line, sizeof(line)) || strncmp(line, "+OK", 3) != 0) {
+                mail_conn_close(mc);
+                strcpy(err, "POP3: STLS rejected");
+                return -1;
+            }
+            char terr[192];
+            if (!mail_conn_wrap(mc, a.pop_host, terr, sizeof(terr))) {
+                char b[240];
+                ksprintf(b, sizeof(b), "POP3: TLS handshake failed: %s", terr);
+                strncpy(err, b, errsz - 1);
+                err[errsz - 1] = 0;
+                mail_conn_close(mc);
+                return -1;
+            }
+            mc.mode = 2;
+            // some servers send a fresh +OK greeting inside TLS after STLS
+            char tmp[256];
+            mail_conn_recv(mc, tmp, (int)sizeof(tmp) - 1, 400);
+        }
+    }
+    if (tls_out) *tls_out = mc.mode ? "TLS 1.3" : "plain";
     char cmd[256];
     ksprintf(cmd, sizeof(cmd), "USER %s", a.username);
-    if (!mail_net_expect_pop(s, cmd, line, sizeof(line)) || strncmp(line, "-ERR", 4) == 0) { closesocket(s); strcpy(err, "POP3: USER rejected"); return -1; }
+    if (!mail_net_expect_pop(mc, cmd, line, sizeof(line)) || strncmp(line, "-ERR", 4) == 0) { mail_conn_close(mc); strcpy(err, "POP3: USER rejected"); return -1; }
     ksprintf(cmd, sizeof(cmd), "PASS %s", a.password);
-    if (!mail_net_expect_pop(s, cmd, line, sizeof(line)) || strncmp(line, "-ERR", 4) == 0) { closesocket(s); strcpy(err, "POP3: authentication failed"); return -1; }
-    if (!mail_net_expect_pop(s, "STAT", line, sizeof(line)) || strncmp(line, "-ERR", 4) == 0) { closesocket(s); strcpy(err, "POP3: STAT failed"); return -1; }
+    if (!mail_net_expect_pop(mc, cmd, line, sizeof(line)) || strncmp(line, "-ERR", 4) == 0) { mail_conn_close(mc); strcpy(err, "POP3: authentication failed"); return -1; }
+    if (!mail_net_expect_pop(mc, "STAT", line, sizeof(line)) || strncmp(line, "-ERR", 4) == 0) { mail_conn_close(mc); strcpy(err, "POP3: STAT failed"); return -1; }
     const char* sp = strchr(line, ' ');
     int total = sp ? atoi(sp + 1) : 0;
     if (total > 99) total = 99;
@@ -1725,9 +1968,9 @@ static int mail_pop3_fetch(EmailState* st, char* err, int errsz) {
     for (int n = 1; n <= total && fetched < 20; n++) {
         char raw[24576];
         ksprintf(cmd, sizeof(cmd), "RETR %d", n);
-        if (!mail_net_expect_pop(s, cmd, line, sizeof(line))) continue;
+        if (!mail_net_expect_pop(mc, cmd, line, sizeof(line))) continue;
         if (strncmp(line, "-ERR", 4) == 0) continue;
-        if (!mail_net_data(s, raw, sizeof(raw))) continue;
+        if (!mail_net_data(mc, raw, sizeof(raw))) continue;
         EmailMessage m;
         mail_parse_pop(m, raw);
         if (!m.subject[0] && !m.from[0]) continue;
@@ -1747,37 +1990,79 @@ static int mail_pop3_fetch(EmailState* st, char* err, int errsz) {
         in.unread_count++;
         fetched++;
     }
-    mail_net_expect_pop(s, "QUIT", line, sizeof(line));
-    closesocket(s);
+    mail_net_expect_pop(mc, "QUIT", line, sizeof(line));
+    mail_conn_close(mc);
     return fetched;
 }
 
 // SMTP send: full AUTH LOGIN + DATA exchange with response-code checks.
 // Supports To/Cc/Bcc recipient expansion, RFC 2047 subject encoding and
 // MIME multipart/mixed attachments read from the VFS.
-static bool mail_smtp_send(EmailState* st, char* err, int errsz) {
+// TLS: port 465 = implicit TLS; otherwise STARTTLS is negotiated when the
+// server advertises it in EHLO (then a fresh EHLO inside TLS per RFC 3207).
+// tls_out (optional) receives "TLS 1.3" or "plain".
+static bool mail_smtp_send(EmailState* st, char* err, int errsz, const char** tls_out) {
     const EmailAccount& a = st->acct;
-    SOCKET s = mail_net_connect(a.smtp_host, a.smtp_port);
-    if (s == INVALID_SOCKET) {
-        ksprintf(err, errsz, "SMTP: cannot reach %s:%d", a.smtp_host, a.smtp_port);
+    if (tls_out) *tls_out = "plain";
+    bool implicit = (a.smtp_port == 465);
+    MailConn mc;
+    if (!mail_conn_open(mc, a.smtp_host, a.smtp_port, implicit, err, errsz)) {
+        char b[192];
+        ksprintf(b, sizeof(b), "SMTP: %s", err);
+        strncpy(err, b, errsz - 1);
+        err[errsz - 1] = 0;
         return false;
     }
     char line[1024];
-    if (!mail_net_line(s, line, sizeof(line))) { closesocket(s); strcpy(err, "SMTP: no greeting"); return false; }
+    if (!mail_net_line(mc, line, sizeof(line))) { mail_conn_close(mc); strcpy(err, "SMTP: no greeting"); return false; }
     int code = atoi(line);
-    if (code != 220) { closesocket(s); strcpy(err, "SMTP: server rejected greeting"); return false; }
-    if (!mail_net_expect(s, "EHLO nefuos.local", 250)) { closesocket(s); strcpy(err, "SMTP: EHLO failed"); return false; }
-    if (!mail_net_expect(s, "AUTH LOGIN", 334)) { closesocket(s); strcpy(err, "SMTP: server does not allow AUTH LOGIN"); return false; }
+    if (code != 220) { mail_conn_close(mc); strcpy(err, "SMTP: server rejected greeting"); return false; }
+    if (!implicit) {
+        // read the full EHLO response so the STARTTLS capability is visible
+        char ehlo[2048];
+        int ccode = 0;
+        if (!mail_net_reply(mc, "EHLO nefuos.local", ehlo, sizeof(ehlo), ccode) ||
+            !(ccode == 250 || ccode == 251)) {
+            mail_conn_close(mc);
+            strcpy(err, "SMTP: EHLO failed");
+            return false;
+        }
+        if (strstr(ehlo, "STARTTLS")) {
+            if (!mail_net_expect(mc, "STARTTLS", 220)) {
+                mail_conn_close(mc);
+                strcpy(err, "SMTP: STARTTLS rejected");
+                return false;
+            }
+            char terr[192];
+            if (!mail_conn_wrap(mc, a.smtp_host, terr, sizeof(terr))) {
+                char b[240];
+                ksprintf(b, sizeof(b), "SMTP: TLS handshake failed: %s", terr);
+                strncpy(err, b, errsz - 1);
+                err[errsz - 1] = 0;
+                mail_conn_close(mc);
+                return false;
+            }
+            mc.mode = 2;
+            // RFC 3207: full EHLO exchange again inside TLS
+            if (!mail_net_expect(mc, "EHLO nefuos.local", 250)) {
+                mail_conn_close(mc);
+                strcpy(err, "SMTP: EHLO (TLS) failed");
+                return false;
+            }
+        }
+    }
+    if (tls_out) *tls_out = mc.mode ? "TLS 1.3" : "plain";
+    if (!mail_net_expect(mc, "AUTH LOGIN", 334)) { mail_conn_close(mc); strcpy(err, "SMTP: server does not allow AUTH LOGIN"); return false; }
     char b1[160], b2[160];
-    if (!mail_b64(a.username, b1, sizeof(b1))) { closesocket(s); strcpy(err, "SMTP: auth error"); return false; }
-    if (!mail_net_expect(s, b1, 334)) { closesocket(s); strcpy(err, "SMTP: username rejected"); return false; }
-    if (!mail_b64(a.password, b2, sizeof(b2))) { closesocket(s); strcpy(err, "SMTP: auth error"); return false; }
-    if (!mail_net_expect(s, b2, 235)) { closesocket(s); strcpy(err, "SMTP: password rejected"); return false; }
+    if (!mail_b64(a.username, b1, sizeof(b1))) { mail_conn_close(mc); strcpy(err, "SMTP: auth error"); return false; }
+    if (!mail_net_expect(mc, b1, 334)) { mail_conn_close(mc); strcpy(err, "SMTP: username rejected"); return false; }
+    if (!mail_b64(a.password, b2, sizeof(b2))) { mail_conn_close(mc); strcpy(err, "SMTP: auth error"); return false; }
+    if (!mail_net_expect(mc, b2, 235)) { mail_conn_close(mc); strcpy(err, "SMTP: password rejected"); return false; }
 
     // ---- expand To/Cc/Bcc into individual RCPT commands ----
     char cmd[320];
     ksprintf(cmd, sizeof(cmd), "MAIL FROM:<%s>", a.email);
-    if (!mail_net_expect(s, cmd, 250)) { closesocket(s); strcpy(err, "SMTP: MAIL FROM rejected"); return false; }
+    if (!mail_net_expect(mc, cmd, 250)) { mail_conn_close(mc); strcpy(err, "SMTP: MAIL FROM rejected"); return false; }
     int rcpt_total = 0;
     const char* rcpt_groups[3] = { st->comp_to, st->comp_cc, st->comp_bcc };
     for (int g = 0; g < 3; g++) {
@@ -1796,9 +2081,9 @@ static bool mail_smtp_send(EmailState* st, char* err, int errsz) {
             mail_addr_only(one, only, sizeof(only));
             if (only[0]) {
                 ksprintf(cmd, sizeof(cmd), "RCPT TO:<%s>", only);
-                if (!mail_net_expect(s, cmd, 250)) {
+                if (!mail_net_expect(mc, cmd, 250)) {
                     ksprintf(err, errsz, "SMTP: recipient rejected <%s>", only);
-                    closesocket(s);
+                    mail_conn_close(mc);
                     return false;
                 }
                 rcpt_total++;
@@ -1806,8 +2091,8 @@ static bool mail_smtp_send(EmailState* st, char* err, int errsz) {
             gs = *e ? e + 1 : e;
         }
     }
-    if (rcpt_total == 0) { closesocket(s); strcpy(err, "SMTP: no recipients"); return false; }
-    if (!mail_net_expect(s, "DATA", 354)) { closesocket(s); strcpy(err, "SMTP: DATA rejected"); return false; }
+    if (rcpt_total == 0) { mail_conn_close(mc); strcpy(err, "SMTP: no recipients"); return false; }
+    if (!mail_net_expect(mc, "DATA", 354)) { mail_conn_close(mc); strcpy(err, "SMTP: DATA rejected"); return false; }
 
     // ---- build the MIME message ----
     char date[32];
@@ -1901,18 +2186,16 @@ static bool mail_smtp_send(EmailState* st, char* err, int errsz) {
         q = nl + 1;
     }
     out += ".\r\n";
-    if (send(s, out.c_str(), (int)out.len(), 0) != (int)out.len()) {
-        closesocket(s); strcpy(err, "SMTP: data send failed"); return false;
+    if (mail_conn_send(mc, out.c_str(), (int)out.len()) != (int)out.len()) {
+        mail_conn_close(mc); strcpy(err, "SMTP: data send failed"); return false;
     }
-    if (!mail_net_line(s, line, sizeof(line))) { closesocket(s); strcpy(err, "SMTP: no data reply"); return false; }
+    if (!mail_net_line(mc, line, sizeof(line))) { mail_conn_close(mc); strcpy(err, "SMTP: no data reply"); return false; }
     code = atoi(line);
-    if (code != 250) { closesocket(s); strcpy(err, "SMTP: message rejected by server"); return false; }
-    mail_net_cmd_code(s, "QUIT", code);
-    closesocket(s);
+    if (code != 250) { mail_conn_close(mc); strcpy(err, "SMTP: message rejected by server"); return false; }
+    mail_net_cmd_code(mc, "QUIT", code);
+    mail_conn_close(mc);
     return true;
 }
-
-#endif // host build
 
 // ============================== local mailbox (no SMTP needed) ==============================
 
@@ -2014,13 +2297,12 @@ static void mail_send_current(EmailState* st) {
     char smtp_err[96];
     smtp_err[0] = 0;
     bool smtp_ok = false;
-#if defined(_WIN32) && !defined(NEFU_BARE)
+    const char* tls_mode = "plain";
     // live SMTP only when an external server is actually configured;
     // local accounts (username@nefuos.dev) deliver via the local mailbox.
     if (st->acct.configured && st->acct.smtp_host[0]) {
-        if (mail_smtp_send(st, smtp_err, sizeof(smtp_err))) smtp_ok = true;
+        if (mail_smtp_send(st, smtp_err, sizeof(smtp_err), &tls_mode)) smtp_ok = true;
     }
-#endif
     EmailFolder& sn = st->folders[EF_SENT];
     if (sn.msg_count < MAX_MSGS) {
         EmailMessage m;
@@ -2056,7 +2338,12 @@ static void mail_send_current(EmailState* st) {
     // local-domain recipients get it via local.mail on the next Refresh.
     mail_local_deliver(st);
     if (smtp_ok) {
-        strcpy(st->status, "Sent via SMTP");
+        if (strcmp(tls_mode, "plain") == 0) strcpy(st->status, "Sent via SMTP (plaintext)");
+        else {
+            char sb[192];
+            ksprintf(sb, sizeof(sb), "Sent via SMTP (%s)", tls_mode);
+            strcpy(st->status, sb);
+        }
     } else if (smtp_err[0]) {
         char sb[192];
         ksprintf(sb, sizeof(sb), "%s - saved to Sent (local)", smtp_err);
@@ -2079,16 +2366,15 @@ static void mail_refresh(EmailState* st) {
     char msg[160];
     msg[0] = 0;
     int total = 0;
-#if defined(_WIN32) && !defined(NEFU_BARE)
     if (st->acct.configured && st->acct.pop_host[0]) {
         char err[96];
-        int n = mail_pop3_fetch(st, err, sizeof(err));
+        const char* tls_mode = "plain";
+        int n = mail_pop3_fetch(st, err, sizeof(err), &tls_mode);
         if (n >= 0) {
             total += n;
-            ksprintf(msg, sizeof(msg), "POP3: %d new", n);
+            ksprintf(msg, sizeof(msg), "POP3: %d new (%s)", n, tls_mode);
         } else strncpy(msg, err, sizeof(msg) - 1);
     }
-#endif
     // locally delivered mail needs no network: pick it up on every Refresh
     int ln = mail_local_pickup(st);
     if (ln > 0) {
@@ -2864,17 +3150,18 @@ static void email_mouse(Window* w, int mx, int my, uint8_t buttons) {
             if (mail_in(mx, my, x, 5, 62, 22)) { st->view = EV_LIST; break; }
             x += 68;
             if (mail_in(mx, my, x, 5, 108, 22)) {
-#if defined(_WIN32) && !defined(NEFU_BARE)
                 if (!st->acct.pop_host[0]) { strcpy(st->status, "Enter a POP3 host first"); break; }
-                SOCKET t = mail_net_connect(st->acct.pop_host, st->acct.pop_port);
-                if (t == INVALID_SOCKET) { strcpy(st->status, "Connection failed"); break; }
+                MailConn tc;
+                char terr[128];
+                if (!mail_conn_open(tc, st->acct.pop_host, st->acct.pop_port,
+                                    st->acct.pop_port == 995, terr, sizeof(terr))) {
+                    strcpy(st->status, terr);
+                    break;
+                }
                 char cl[512];
-                bool ok = mail_net_line(t, cl, sizeof(cl)) && strncmp(cl, "+OK", 3) == 0;
-                closesocket(t);
-                strcpy(st->status, ok ? "POP3 server reachable" : "Reached, but no POP3 greeting");
-#else
-                strcpy(st->status, "Live test is host-build only");
-#endif
+                bool ok = mail_net_line(tc, cl, sizeof(cl)) && strncmp(cl, "+OK", 3) == 0;
+                mail_conn_close(tc);
+                strcpy(st->status, ok ? (tc.mode ? "POP3 server reachable (TLS 1.3)" : "POP3 server reachable (plaintext)") : "Reached, but no POP3 greeting");
                 break;
             }
             x += 114;
@@ -3188,3 +3475,4 @@ Window* open_email() {
 }
 
 }} // namespace nefu::apps
+

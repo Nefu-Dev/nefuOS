@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS AudioLab —— 音频DSP 实验室窗口应用
 // 参考 algoviz.cpp 的 create_window + userdata + on_paint/on_key/on_close 模式。
 // 功能：波形选择 + 频率 + ADSR + 低通滤波，按 G 生成波形并写 WAV 到 /tmp。
@@ -191,7 +196,7 @@ static void lab_close(Window* w) {
 void audiolab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("AudioLab", x, y, LAB_W, LAB_H);
+    Window* w = g_wm->create_window(T("音频实验室", "AudioLab"), x, y, LAB_W, LAB_H);
     if (!w) return;
     LabState* s = new LabState();
     s->generate();
@@ -203,3 +208,4 @@ void audiolab_launch() {
 }
 
 } // namespace nefu
+

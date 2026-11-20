@@ -6341,3 +6341,4 @@ lv_font_t font_multilang_small = {
 };
 
 #endif /*#if FONT_MULTILANG_SMALL*/
+

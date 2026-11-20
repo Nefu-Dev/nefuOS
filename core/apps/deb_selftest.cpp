@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/apps/deb_selftest.cpp
 //
 // Boot-time check of the nefuOS .deb environment on the bare-metal backend.
@@ -164,3 +169,4 @@ extern "C" void nefu_deb_selftest(void) {
 } // namespace deb
 } // namespace nefu
 #endif // NEFU_BARE
+

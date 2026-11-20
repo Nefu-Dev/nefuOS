@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS DEFLATE / zlib library — compress & decompress
 // Self-contained RFC 1950 (zlib) + RFC 1951 (DEFLATE).
 // Decompress supports stored/fixed/dynamic blocks;
@@ -29,3 +34,4 @@ int raw_compress(const uint8_t* src, size_t src_len, uint8_t* dst, size_t dst_ca
 
 } // namespace deflate
 } // namespace nefu
+

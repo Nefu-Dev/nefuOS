@@ -14,3 +14,4 @@ void lv_example_image_1(void)
 }
 
 #endif
+

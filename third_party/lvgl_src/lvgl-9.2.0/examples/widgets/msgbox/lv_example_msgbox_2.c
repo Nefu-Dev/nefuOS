@@ -61,3 +61,4 @@ void lv_example_msgbox_2(void)
     lv_obj_set_style_bg_opa(footer, LV_OPA_100, 0);
 }
 #endif
+

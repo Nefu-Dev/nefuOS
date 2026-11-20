@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS music player - LVGL GUI (real synthesized WAV playback via waveOut)
 #include "apps.h"
 #include "../gui/wm.h"
@@ -419,7 +424,7 @@ void music_launch() {
     ensure_music_lib();
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Music Player", x, y, 480, 460);
+    Window* w = g_wm->create_window(T("音乐播放器", "Music Player"), x, y, 480, 460);
     if (!w) return;
     MusicLvState* st = new MusicLvState();
     st->cur_song = 0;

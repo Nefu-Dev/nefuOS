@@ -272,3 +272,4 @@ _wrap_wrapped_WebPGetInfo(void *swig_v)
 }
 #endif
 
+

@@ -29,3 +29,4 @@
 extern const mp_obj_type_t mp_network_cyw43_type;
 
 #endif // MICROPY_INCLUDED_EXTMOD_NETWORK_CYW43_H
+

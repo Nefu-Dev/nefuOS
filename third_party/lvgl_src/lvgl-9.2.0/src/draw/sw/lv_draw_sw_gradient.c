@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_gradient.c
  *
  */
@@ -666,3 +666,4 @@ void lv_grad_radial_set_focal(lv_grad_dsc_t * dsc, int32_t center_x, int32_t cen
 #endif /* LV_USE_DRAW_SW_COMPLEX_GRADIENTS */
 
 #endif /*LV_USE_DRAW_SW*/
+

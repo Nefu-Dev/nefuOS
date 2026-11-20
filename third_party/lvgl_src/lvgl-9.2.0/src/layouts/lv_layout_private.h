@@ -56,3 +56,4 @@ void lv_layout_apply(lv_obj_t * obj);
 #endif
 
 #endif /*LV_LAYOUT_PRIVATE_H*/
+

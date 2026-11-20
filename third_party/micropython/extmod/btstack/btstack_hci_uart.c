@@ -210,3 +210,4 @@ void mp_bluetooth_btstack_hci_uart_process(void) {
 }
 
 #endif // MICROPY_PY_BLUETOOTH && MICROPY_BLUETOOTH_BTSTACK
+

@@ -286,3 +286,4 @@ lv_calendar_chinese_t lv_calendar_gregorian_to_chinese(lv_calendar_date_t * greg
  **********************/
 
 #endif /*LV_USE_CALENDAR_CHINESE*/
+

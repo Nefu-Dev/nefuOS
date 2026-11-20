@@ -77,3 +77,4 @@ struct lv_libinput_t {
 #endif
 
 #endif /*LV_LIBINPUT_PRIVATE_H*/
+

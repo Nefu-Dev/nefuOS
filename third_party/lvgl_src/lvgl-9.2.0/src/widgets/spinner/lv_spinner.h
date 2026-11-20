@@ -61,3 +61,4 @@ void lv_spinner_set_anim_params(lv_obj_t * obj, uint32_t t, uint32_t angle);
 #endif
 
 #endif /*LV_SPINNER_H*/
+

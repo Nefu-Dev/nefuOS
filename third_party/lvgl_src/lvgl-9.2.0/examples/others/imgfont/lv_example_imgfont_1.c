@@ -58,3 +58,4 @@ void lv_example_imgfont_1(void)
 
 #endif
 #endif
+

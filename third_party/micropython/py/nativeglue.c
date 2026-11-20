@@ -359,3 +359,4 @@ const mp_fun_table_t mp_fun_table = {
 const int mp_fun_table;
 
 #endif // MICROPY_EMIT_NATIVE
+

@@ -316,3 +316,4 @@ int main(int argc, const char* argv[]) {
   ClearAnimatedImage(&images[1]);
   FREE_WARGV_AND_RETURN(return_code);
 }
+

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_style.h
  *
  */
@@ -630,3 +630,4 @@ LV_ATTRIBUTE_EXTERN_DATA extern const lv_style_prop_t lv_style_const_prop_id_inv
 #endif
 
 #endif /*LV_STYLE_H*/
+

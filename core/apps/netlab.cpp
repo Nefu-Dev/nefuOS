@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈实验室 (netlab) -- 展示全部协议模块
 // 参考 algoviz.cpp 模式：cascade_pos + g_wm->create_window + on_paint/on_key/on_close。
 // 展示 nefu::netproto 各模块的真实结构：以太网帧、ARP 缓存、路由表、
@@ -372,7 +377,7 @@ static void lab_close(Window* w) {
 void netlab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("netlab", x, y, netlab::LAB_W, netlab::LAB_H);
+    Window* w = g_wm->create_window(T("网络实验室", "netlab"), x, y, netlab::LAB_W, netlab::LAB_H);
     if (!w) return;
     netlab::LabState* st = new netlab::LabState();
     st->init();
@@ -384,3 +389,4 @@ void netlab_launch() {
 }
 
 } // namespace nefu
+

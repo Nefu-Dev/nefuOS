@@ -265,3 +265,4 @@ void asm_xtensa_call_ind_win(asm_xtensa_t *as, uint idx) {
 }
 
 #endif // MICROPY_EMIT_XTENSA || MICROPY_EMIT_INLINE_XTENSA || MICROPY_EMIT_XTENSAWIN
+

@@ -198,3 +198,4 @@ static lv_indev_t * touchscreen_init(int fd)
 #endif /*LV_USE_NUTTX_TOUCHSCREEN*/
 
 #endif /* LV_USE_NUTTX*/
+

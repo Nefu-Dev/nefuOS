@@ -303,3 +303,4 @@ bool ble_uart_enabled(void) {
 #endif // MICROPY_PY_BLE_NUS
 
 #endif // BLUETOOTH_SD
+

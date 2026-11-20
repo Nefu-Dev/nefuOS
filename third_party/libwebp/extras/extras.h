@@ -108,3 +108,4 @@ WEBP_EXTERN int SharpYuvEstimate420Risk(
 #endif
 
 #endif  // WEBP_EXTRAS_EXTRAS_H_
+

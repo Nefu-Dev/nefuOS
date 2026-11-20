@@ -300,3 +300,4 @@ static int property_name_compare(const void * ref, const void * element)
 }
 
 #endif /*LV_USE_OBJ_PROPERTY*/
+

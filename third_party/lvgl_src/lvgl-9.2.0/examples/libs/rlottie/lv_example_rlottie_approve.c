@@ -28,3 +28,4 @@ const uint8_t lv_example_rlottie_approve[] = {
 };
 
 #endif
+

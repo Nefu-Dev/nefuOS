@@ -367,3 +367,4 @@ const WebPWorkerInterface* WebPGetWorkerInterface(void) {
 }
 
 //------------------------------------------------------------------------------
+

@@ -60,3 +60,4 @@ void lv_theme_mono_deinit(void);
 #endif
 
 #endif /* LV_THEME_MONO_H */
+

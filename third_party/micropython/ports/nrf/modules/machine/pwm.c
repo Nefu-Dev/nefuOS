@@ -389,3 +389,4 @@ static void machine_hard_pwm_start(const machine_pwm_obj_t *self) {
         0, // Loop disabled.
         0);
 }
+

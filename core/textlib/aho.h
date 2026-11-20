@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — Aho-Corasick multi-pattern matching
 // 多模式匹配：一次扫描同时查找所有模式串（自动机 = Trie + fail 指针）。
 // 用于敏感词过滤、关键词高亮等。本实现是确定性自动机（完整 goto 表），
@@ -46,3 +51,4 @@ int aho_self_test();
 
 } // namespace text
 } // namespace nefu
+

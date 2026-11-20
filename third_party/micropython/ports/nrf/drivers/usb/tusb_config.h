@@ -32,3 +32,4 @@
 #define CFG_TUSB_MCU                OPT_MCU_NRF5X
 
 #endif // MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
+

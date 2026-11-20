@@ -1,7 +1,13 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS built-in apps
 #pragma once
 #include "../gui/wm.h"
 #include "../vfs/vfs.h"
+#include "../sys/settings.h"   // T("中文","English") so window titles can be localized
 
 namespace nefu {
 
@@ -197,6 +203,43 @@ void video_player_autoplay(const char* host_path);   // test hook (--media)
 void monitor_launch();
 void browser_launch();
 void browser_launch_url(const char* url);
+
+// Open the browser full screen (no title bar, fills the framebuffer).
+// A game site wants the whole screen, and on the bare kernel nothing else
+// may cover the page.
+void browser_launch_fullscreen(const char* url);
+
+// Test hook: dispatch a DOM click on the element with data-nfu="N"
+// in the active browser tab (used by the --nfuclick shot harness).
+void browser_debug_nfu_click(int nfu_idx);
+
+// Ask the page to click the element with the given visible text ("Agree",
+// "Play", ...). Delivered once the page is live; retried for a while since a
+// React tree renders its buttons asynchronously.
+void browser_click_text(const char* text);
+
+// Send a key press to the page ("Escape", "Enter", "w", ...). The page only
+// receives keys while it owns the keyboard, so this bypasses the address bar
+// on purpose: a dialog that listens on document.documentElement (the
+// floating-ui dismiss handler) can only be closed this way.
+void browser_send_key(const char* key);
+
+// Type a string into the focused <input>/<textarea> of the active page. Starts
+// as soon as a field has focus and feeds one character per ~90 ms through the
+// normal key path, so both the native renderer and the page's JS see it.
+void browser_send_text(const char* text);
+
+// Press Enter in the focused field after the queued text has been typed. The
+// page-side key event cannot submit a form, so the native path has to do it.
+void browser_send_enter();
+
+// Run a sequence of page actions, one per call, in order:
+//   "key:Escape"        - press a key
+//   "text:Play"         - click the element showing that text
+//   "class:PromptGenericPopupBodyButton" - click by CSS class fragment
+// Each action is retried until it hits or the queue expires, so a dialog that
+// only appears after the previous one was dismissed still gets its turn.
+void browser_page_action(const char* action);
 void netcfg_launch();
 void nefud_launch();
 void fontview_launch();
@@ -266,3 +309,4 @@ String node_path(FSNode* n);
 void file_to_lines(FSNode* f, List<String>& out, int max_lines);
 
 } // namespace nefu
+

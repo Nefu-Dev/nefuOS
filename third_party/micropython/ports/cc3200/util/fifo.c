@@ -124,3 +124,4 @@ void FIFO_Flush (FIFO_t *fifo) {
         fifo->uiLast = fifo->uiElementsMax - 1;
     }
 }
+

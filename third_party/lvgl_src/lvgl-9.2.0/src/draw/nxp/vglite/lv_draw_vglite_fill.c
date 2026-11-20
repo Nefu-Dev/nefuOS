@@ -235,3 +235,4 @@ static void _vglite_draw_rect(const lv_area_t * coords, const lv_area_t * clip_a
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

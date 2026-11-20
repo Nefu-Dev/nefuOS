@@ -417,3 +417,4 @@ const byte *qstr_data(qstr q, size_t *len) {
     *len = 0;
     return NULL;
 }
+

@@ -457,3 +457,4 @@ static void arc_set_end_angle_anim(void * obj, int32_t v)
 }
 
 #endif /* LV_USE_DEMO_STRESS */
+

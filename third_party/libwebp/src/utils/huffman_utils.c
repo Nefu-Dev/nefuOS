@@ -297,3 +297,4 @@ void VP8LHuffmanTablesDeallocate(HuffmanTables* const huffman_tables) {
     current = next;
   }
 }
+

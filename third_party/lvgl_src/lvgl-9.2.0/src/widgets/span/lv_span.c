@@ -1087,3 +1087,4 @@ static void refresh_self_size(lv_obj_t * obj)
 }
 
 #endif
+

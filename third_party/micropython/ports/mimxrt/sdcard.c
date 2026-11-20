@@ -1038,3 +1038,4 @@ bool sdcard_detect(mimxrt_sdcard_obj_t *card) {
 }
 
 #endif // MICROPY_PY_MACHINE_SDCARD
+

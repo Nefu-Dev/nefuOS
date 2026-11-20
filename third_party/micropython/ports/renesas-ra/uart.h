@@ -136,3 +136,4 @@ size_t uart_tx_data(machine_uart_obj_t *self, const void *src_in, size_t num_cha
 void uart_tx_strn(machine_uart_obj_t *uart_obj, const char *str, uint len);
 
 #endif // MICROPY_INCLUDED_RA_UART_H
+

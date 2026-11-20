@@ -80,3 +80,4 @@ void mp_irq_init(mp_irq_obj_t *self, const mp_irq_methods_t *methods, mp_obj_t p
 void mp_irq_handler(mp_irq_obj_t *self);
 
 #endif // MICROPY_INCLUDED_LIB_UTILS_MPIRQ_H
+

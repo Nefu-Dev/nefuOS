@@ -166,3 +166,4 @@ static void ctrl_pad_btn_event_attach(view_t * ui)
 }
 
 #endif
+

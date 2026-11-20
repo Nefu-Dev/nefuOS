@@ -440,3 +440,4 @@ uint8_t lv_style_prop_lookup_flags(lv_style_prop_t prop)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

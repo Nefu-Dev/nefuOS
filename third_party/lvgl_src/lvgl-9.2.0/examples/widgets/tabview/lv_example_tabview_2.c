@@ -46,3 +46,4 @@ void lv_example_tabview_2(void)
     lv_obj_remove_flag(lv_tabview_get_content(tabview), LV_OBJ_FLAG_SCROLLABLE);
 }
 #endif
+

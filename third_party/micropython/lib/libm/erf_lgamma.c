@@ -253,3 +253,4 @@ static float zero=  0.0000000000e+00f;
 	if(hx<0) r = nadj - r;
 	return r;
 }
+

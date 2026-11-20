@@ -28,3 +28,4 @@
 #define DEBUG_CH    7
 
 #endif /* VK_RA6M5_CONF_H */
+

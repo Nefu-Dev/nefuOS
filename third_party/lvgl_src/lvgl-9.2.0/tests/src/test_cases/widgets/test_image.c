@@ -456,3 +456,4 @@ void test_image_properties(void)
 }
 
 #endif
+

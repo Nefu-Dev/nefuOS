@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — LZW implementation
 #include "lzw.h"
 #include "bitio.h"
@@ -154,3 +159,4 @@ int lzw_self_test() {
 
 } // namespace comp
 } // namespace nefu
+

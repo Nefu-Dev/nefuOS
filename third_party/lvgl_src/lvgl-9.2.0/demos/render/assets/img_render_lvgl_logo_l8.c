@@ -69,3 +69,4 @@ const lv_image_dsc_t img_render_lvgl_logo_l8 = {
   .data = img_render_lvgl_logo_l8_map,
 };
 
+

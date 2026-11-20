@@ -1316,3 +1316,4 @@ const lv_image_dsc_t img_png_demo = {
 };
 
 #endif /*LV_USE_LIBPNG && LV_BUILD_EXAMPLES*/
+

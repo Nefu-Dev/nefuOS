@@ -163,3 +163,4 @@ void test_line_point_array_getters_and_setters(void)
 }
 
 #endif
+

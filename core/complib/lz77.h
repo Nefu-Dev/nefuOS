@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — LZ77 滑动窗口 (lz77)
 // LZ77（1977）：用"历史窗口"做字典压缩。编码时在窗口中查找最长
 // 匹配串，输出三元组 (distance, length, next_char)。解码只需窗口
@@ -19,3 +24,4 @@ int lz77_self_test();
 
 } // namespace comp
 } // namespace nefu
+

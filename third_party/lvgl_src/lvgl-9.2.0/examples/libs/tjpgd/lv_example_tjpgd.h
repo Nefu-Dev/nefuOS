@@ -36,3 +36,4 @@ void lv_example_tjpgd_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_TJPGD_H*/
+

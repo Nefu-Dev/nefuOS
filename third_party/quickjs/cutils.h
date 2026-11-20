@@ -455,3 +455,4 @@ static inline int isfp16zero(uint16_t v)
 }
 
 #endif  /* CUTILS_H */
+

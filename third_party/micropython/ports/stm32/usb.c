@@ -1155,3 +1155,4 @@ MP_REGISTER_ROOT_POINTER(mp_obj_t pyb_hid_report_desc);
 MP_REGISTER_ROOT_POINTER(mp_obj_t pyb_usb_vcp_irq[MICROPY_HW_USB_CDC_NUM]);
 
 #endif // MICROPY_HW_ENABLE_USB
+

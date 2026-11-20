@@ -35,3 +35,4 @@ int ReadPNM(const uint8_t* const data, size_t data_size,
 #endif
 
 #endif  // WEBP_IMAGEIO_PNMDEC_H_
+

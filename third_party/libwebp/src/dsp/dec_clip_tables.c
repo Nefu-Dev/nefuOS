@@ -367,3 +367,4 @@ WEBP_TSAN_IGNORE_FUNCTION void VP8InitClipTables(void) {
   }
 #endif    // USE_STATIC_TABLES
 }
+

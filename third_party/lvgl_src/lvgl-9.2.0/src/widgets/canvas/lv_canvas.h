@@ -183,3 +183,4 @@ uint32_t lv_canvas_buf_size(int32_t w, int32_t h, uint8_t bpp, uint8_t stride);
 #endif
 
 #endif /*LV_CANVAS_H*/
+

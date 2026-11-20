@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 自动微分（动态计算图 + 磁带反向）
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 自动微分（动态计算图 + 磁带反向）
 // 设计：
 //   * 每次前向 op 创建一个 FnNode 派生对象，记录"输出 -> 输入"的反向闭包；
 //   * 所有节点推入全局磁带 g_tape（List<FnNode*>）；
@@ -52,3 +57,4 @@ int autograd_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

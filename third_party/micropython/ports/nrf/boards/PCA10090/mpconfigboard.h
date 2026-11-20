@@ -86,3 +86,4 @@
 #define MICROPY_HW_SPI0_MISO        (12)
 
 #define HELP_TEXT_BOARD_LED         "1,2,3,4"
+

@@ -236,3 +236,4 @@ static void display_release_cb(lv_event_t * e)
 #endif /*LV_USE_NUTTX_LCD*/
 
 #endif /* LV_USE_NUTTX*/
+

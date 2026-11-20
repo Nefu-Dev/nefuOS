@@ -736,3 +736,4 @@ const mp_obj_module_t mp_module_uctypes = {
 MP_REGISTER_MODULE(MP_QSTR_uctypes, mp_module_uctypes);
 
 #endif
+

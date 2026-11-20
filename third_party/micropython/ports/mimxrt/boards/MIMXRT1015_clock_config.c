@@ -357,3 +357,4 @@ void BOARD_BootClockRUN(void) {
     /* Set SystemCoreClock variable. */
     SystemCoreClock = BOARD_BOOTCLOCKRUN_CORE_CLOCK;
 }
+

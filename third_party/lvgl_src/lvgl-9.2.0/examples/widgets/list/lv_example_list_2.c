@@ -164,3 +164,4 @@ void lv_example_list_2(void)
 }
 
 #endif
+

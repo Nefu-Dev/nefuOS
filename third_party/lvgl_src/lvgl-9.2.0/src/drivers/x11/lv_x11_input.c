@@ -322,3 +322,4 @@ void lv_x11_inputs_create(lv_display_t * disp, lv_image_dsc_t const * mouse_img)
 }
 
 #endif /*LV_USE_X11*/
+

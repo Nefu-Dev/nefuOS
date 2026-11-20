@@ -11970,3 +11970,4 @@ const uint8_t test_ubuntu_font[] = {
 
 size_t test_ubuntu_font_size = sizeof(test_ubuntu_font);
 #endif /*LV_BUILD_TEST*/
+

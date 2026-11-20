@@ -139,3 +139,4 @@ static mp_int_t mp_machine_adc_read_u16(machine_adc_obj_t *self) {
     #endif
     return adc_config_and_read_u16(self->channel);
 }
+

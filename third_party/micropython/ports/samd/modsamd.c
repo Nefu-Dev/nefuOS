@@ -89,3 +89,4 @@ const mp_obj_module_t mp_module_samd = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_samd, mp_module_samd);
+

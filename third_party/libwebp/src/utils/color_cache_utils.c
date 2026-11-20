@@ -47,3 +47,4 @@ void VP8LColorCacheCopy(const VP8LColorCache* const src,
   memcpy(dst->colors_, src->colors_,
          ((size_t)1u << dst->hash_bits_) * sizeof(*dst->colors_));
 }
+

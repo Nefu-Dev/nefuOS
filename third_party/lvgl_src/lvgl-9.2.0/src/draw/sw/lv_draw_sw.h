@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw.h
  *
  */
@@ -202,3 +202,4 @@ void lv_draw_sw_rotate(const void * src, void * dest, int32_t src_width, int32_t
 #endif
 
 #endif /*LV_DRAW_SW_H*/
+

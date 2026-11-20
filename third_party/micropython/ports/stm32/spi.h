@@ -75,3 +75,4 @@ void spi_print(const mp_print_t *print, const spi_t *spi_obj, bool legacy);
 const spi_t *spi_from_mp_obj(mp_obj_t o);
 
 #endif // MICROPY_INCLUDED_STM32_SPI_H
+

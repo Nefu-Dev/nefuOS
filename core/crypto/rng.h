@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 随机数生成器 (RNG) 模块
 // 覆盖常见伪随机算法：MT19937、xorshift128+、xoshiro256**、LCG、PCG32、
 // SplitMix64、AES-CTR_DRBG（基于 AES-256）、Well512a。
@@ -56,3 +61,4 @@ int rng_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

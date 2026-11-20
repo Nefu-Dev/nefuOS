@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // games2_ai.h —— 棋类 AI 的纯逻辑实现（inline，无 gfx 依赖，可被单测直接链接）
 //
 // 包含：
@@ -233,3 +238,4 @@ inline int best_move(const int in[ROWS][COLS], int depth) {
 } // namespace c4
 
 } // namespace nefu
+

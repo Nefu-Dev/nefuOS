@@ -35,3 +35,4 @@ int main(int argc, char **argv) {
     JS_FreeContext(ctx); JS_FreeRuntime(rt); free(buf);
     return 0;
 }
+

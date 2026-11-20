@@ -1,6 +1,12 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS notepad - LVGL GUI (lv_textarea, saves to /home/user/Documents/notes.txt)
 #include "apps.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/i18n_zh.h"
 #include "../gui/desktop.h"
 #include <cstring>
 
@@ -38,14 +44,14 @@ static void note_lv_ta_cb(lv_event_t* e) {
     NoteLvState* st = (NoteLvState*)lv_event_get_user_data(e);
     if (st) {
         st->dirty = true;
-        lv_label_set_text(st->status, "edited - click Save or press Ctrl+S");
+        lv_label_set_text(st->status, nefu::zh_ui("edited - click Save or press Ctrl+S"));
     }
 }
 
 void notepad_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Notepad", x, y, 560, 380);
+    LvglWin* lw = lvgl_win_create(T("记事本", "Notepad"), x, y, 560, 380);
     if (!lw) return;
     NoteLvState* st = new NoteLvState();
     st->lw = lw;
@@ -61,14 +67,14 @@ void notepad_launch() {
     lv_obj_set_style_bg_color(save_btn, lv_color_hex(0x3D4B66), 0);
     lv_obj_add_event_cb(save_btn, note_lv_save_btn, LV_EVENT_CLICKED, st);
     lv_obj_t* sl = lv_label_create(save_btn);
-    lv_label_set_text(sl, "Save");
+    lv_label_set_text(sl, nefu::zh_ui("Save"));
     lv_obj_center(sl);
     lv_obj_set_style_text_color(sl, lv_color_hex(0xFFFFFF), 0);
 
     st->status = lv_label_create(lw->content);
     lv_obj_set_pos(st->status, 84, 10);
     lv_obj_set_style_text_color(st->status, lv_color_hex(0x667788), 0);
-    lv_label_set_text(st->status, "click Save to store");
+    lv_label_set_text(st->status, nefu::zh_ui("click Save to store"));
 
     // editor area
     st->ta = lv_textarea_create(lw->content);

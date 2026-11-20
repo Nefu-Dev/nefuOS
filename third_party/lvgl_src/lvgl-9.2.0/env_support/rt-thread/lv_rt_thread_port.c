@@ -103,3 +103,4 @@ static int lvgl_thread_init(void)
 INIT_ENV_EXPORT(lvgl_thread_init);
 
 #endif /*__RTTHREAD__*/
+

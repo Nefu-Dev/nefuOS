@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈独立测试主程序
 // 编译（在 nefuOS 根目录下）：
 //   D:\CLion\bin\mingw\bin\g++.exe -std=c++17 -fno-exceptions -fno-rtti
@@ -30,3 +35,4 @@ int main() {
            fails == 0 ? "ALL PASS" : "SOME FAILURES", fails);
     return fails == 0 ? 0 : 1;
 }
+

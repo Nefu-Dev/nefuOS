@@ -193,3 +193,4 @@ const lv_image_dsc_t animimg001 = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

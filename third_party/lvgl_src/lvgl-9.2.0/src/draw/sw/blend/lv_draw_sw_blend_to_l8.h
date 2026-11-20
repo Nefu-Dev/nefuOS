@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_blend_to_l8.h
  *
  */
@@ -43,3 +43,4 @@ void /* LV_ATTRIBUTE_FAST_MEM */ lv_draw_sw_blend_image_to_l8(lv_draw_sw_blend_i
 #endif
 
 #endif /*LV_DRAW_SW_BLEND_TO_L8_H*/
+

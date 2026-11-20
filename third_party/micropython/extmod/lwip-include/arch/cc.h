@@ -39,3 +39,4 @@ typedef u32_t mem_ptr_t;
 #define PACK_STRUCT_END
 
 #endif // MICROPY_INCLUDED_EXTMOD_LWIP_INCLUDE_ARCH_CC_H
+

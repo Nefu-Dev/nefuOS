@@ -298,3 +298,4 @@ uint32_t rosc_random_u32(void) {
     }
     return value;
 }
+

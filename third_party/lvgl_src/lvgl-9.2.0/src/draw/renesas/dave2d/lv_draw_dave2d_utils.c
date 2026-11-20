@@ -138,3 +138,4 @@ void d2_framebuffer_from_layer(d2_device * handle, lv_layer_t * layer)
  **********************/
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

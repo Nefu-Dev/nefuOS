@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /**
  * @file lv_blend_neon.S
  *
@@ -683,3 +688,4 @@ export_set xrgb8888, argb8888, 31, 32, normal
 export_set argb8888, argb8888, 32, 32, normal
 
 #endif /*LV_USE_DRAW_SW_ASM == LV_DRAW_SW_ASM_NEON*/
+

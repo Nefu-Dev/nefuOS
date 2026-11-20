@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Win32 media engine — REAL audio/video playback for the host backend.
 //
 // Uses Windows Media Foundation (Source Reader) to decode whatever the OS
@@ -659,3 +664,4 @@ bool platform_host_file_dialog(char* out_path, int max, const char* filter_desc,
 }
 
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = wl
 CMSIS_MCU = STM32WL55xx
 AF_FILE = boards/stm32wl55_af.csv
@@ -12,3 +17,4 @@ MICROPY_HW_ENABLE_ISR_UART_FLASH_FUNCS_IN_RAM = 1
 
 # Board-specific manifest (doesn't include default modules, adds LoRa driver).
 FROZEN_MANIFEST ?= $(BOARD_DIR)/manifest.py
+

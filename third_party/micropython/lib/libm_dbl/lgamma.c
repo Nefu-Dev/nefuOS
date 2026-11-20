@@ -6,3 +6,4 @@ double lgamma(double x) {
     int sign;
     return __lgamma_r(x, &sign);
 }
+

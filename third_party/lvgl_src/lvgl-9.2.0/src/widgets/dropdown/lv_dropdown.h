@@ -244,3 +244,4 @@ bool lv_dropdown_is_open(lv_obj_t * obj);
 #endif
 
 #endif /*LV_DROPDOWN_H*/
+

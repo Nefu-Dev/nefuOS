@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 复数模块
 // 纯 double 实现，无 STL / 异常 / RTTI，可在宿主(Win32)与裸机环境分别编译。
 // 设计目标：作为矩阵特征值、多项式求根、统计回归等模块的底层支撑。
@@ -93,3 +98,4 @@ int complex_self_test();
 
 } // namespace mathext
 } // namespace nefu
+

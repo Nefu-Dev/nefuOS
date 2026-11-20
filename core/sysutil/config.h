@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 配置管理模块
 // 支持 INI 与一个子集 JSON 的读写、类型化取值、默认值、配置校验、热重载。
 // 配置在内部表示为 (section, key, value) 三元组列表；序列化回 INI 文本。
@@ -97,3 +102,4 @@ extern ConfigStore g_config;
 
 } // namespace sysutil
 } // namespace nefu
+

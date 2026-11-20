@@ -47,3 +47,4 @@ void set_fmode_binary(void) {
 void set_fmode_text(void) {
     set_fmode_impl(O_TEXT);
 }
+

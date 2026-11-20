@@ -364,3 +364,4 @@ DEF( typeof_is_function, 1, 1, 1, none)
 #undef DEF
 #undef def
 #endif  /* DEF */
+

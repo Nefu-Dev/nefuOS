@@ -96,3 +96,4 @@ void lv_tiny_ttf_destroy(lv_font_t * font);
 #endif
 
 #endif /*LV_TINY_TTF_H*/
+

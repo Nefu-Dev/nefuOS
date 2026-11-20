@@ -47,3 +47,4 @@ lv_obj_t * lv_calendar_header_arrow_create(lv_obj_t * parent);
 #endif
 
 #endif /*LV_CALENDAR_HEADER_ARROW_H*/
+

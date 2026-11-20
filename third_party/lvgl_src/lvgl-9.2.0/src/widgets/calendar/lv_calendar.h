@@ -158,3 +158,4 @@ lv_result_t lv_calendar_get_pressed_date(const lv_obj_t * calendar, lv_calendar_
 #endif
 
 #endif /*LV_CALENDAR_H*/
+

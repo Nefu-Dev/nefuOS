@@ -542,3 +542,4 @@ void VP8FiltersInit(void);
 #endif
 
 #endif  // WEBP_DSP_DSP_H_
+

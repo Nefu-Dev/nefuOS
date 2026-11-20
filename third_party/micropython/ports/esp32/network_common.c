@@ -345,3 +345,4 @@ _Static_assert(WIFI_AUTH_MAX == 11, "Synchronize WIFI_AUTH_XXX constants with th
 #else
 _Static_assert(WIFI_AUTH_MAX == 10, "Synchronize WIFI_AUTH_XXX constants with the ESP-IDF. Look at esp-idf/components/esp_wifi/include/esp_wifi_types.h");
 #endif
+

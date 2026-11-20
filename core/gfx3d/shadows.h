@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 3D 图形库 —— shadows: 实时阴影
 // ----------------------------------------------------------------------------
@@ -43,3 +48,4 @@ int shadows_self_test();
 
 } // namespace gfx3d
 } // namespace nefu
+

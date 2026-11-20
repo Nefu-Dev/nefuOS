@@ -52,3 +52,4 @@ uint32_t lv_demo_music_get_track_length(uint32_t track_id);
 #endif
 
 #endif /*LV_DEMO_MUSIC_H*/
+

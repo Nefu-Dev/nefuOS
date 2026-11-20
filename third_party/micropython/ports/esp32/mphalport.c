@@ -266,3 +266,4 @@ void mp_hal_wake_main_task_from_isr(void) {
         portYIELD_FROM_ISR();
     }
 }
+

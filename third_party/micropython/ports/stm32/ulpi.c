@@ -192,3 +192,4 @@ int ulpi_leave_low_power(void) {
 }
 
 #endif // MICROPY_HW_USB_HS_ULPI3320
+

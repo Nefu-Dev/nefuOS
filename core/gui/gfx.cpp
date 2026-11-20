@@ -1,9 +1,15 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfx primitive implementation
 #include "gfx.h"
 #include "font.h"
 #include "font16.h"
 #include "../platform.h"   // platform_ttf_text / platform_ttf_free
 #include "../apps/cjk_font.h"  // full GB2312 16x16 table (3848 glyphs)
+#include "i18n_zh.h"           // draw-time EN -> ZH table (Chinese UI)
 
 namespace nefu {
 namespace gfx {
@@ -101,38 +107,10 @@ static uint32_t utf8_next(const char*& p) {
     p++; return 0xFFFD;
 }
 
-// The full CJK table (cjk_font.h) is stored in GB2312 qu order, which is
-// NOT sorted by Unicode code point, so a plain binary search misses most
-// glyphs. Build a sorted index (uni + bitmap pointer) once and reuse it.
-static uint16_t*        s_cjk_sorted_uni  = 0;
-static const uint8_t**  s_cjk_sorted_bits = 0;
-static int              s_cjk_sorted_n    = 0;
-
-static void cjk_ensure_index() {
-    if (s_cjk_sorted_uni) return;
-    s_cjk_sorted_n = g_cjk_count;
-    s_cjk_sorted_uni = (uint16_t*)kalloc(sizeof(uint16_t) * (size_t)g_cjk_count);
-    s_cjk_sorted_bits = (const uint8_t**)kalloc(sizeof(const uint8_t*) * (size_t)g_cjk_count);
-    if (!s_cjk_sorted_uni || !s_cjk_sorted_bits) { s_cjk_sorted_n = 0; return; }
-    for (int i = 0; i < g_cjk_count; i++) {
-        s_cjk_sorted_uni[i] = g_cjk_uni[i];
-        s_cjk_sorted_bits[i] = &g_cjk_bits[i * 32];
-    }
-    // insertion sort both arrays by Unicode code point (done once at first use)
-    for (int i = 1; i < g_cjk_count; i++) {
-        uint16_t v = s_cjk_sorted_uni[i];
-        const uint8_t* b = s_cjk_sorted_bits[i];
-        int j = i - 1;
-        while (j >= 0 && s_cjk_sorted_uni[j] > v) {
-            s_cjk_sorted_uni[j + 1] = s_cjk_sorted_uni[j];
-            s_cjk_sorted_bits[j + 1] = s_cjk_sorted_bits[j];
-            j--;
-        }
-        s_cjk_sorted_uni[j + 1] = v;
-        s_cjk_sorted_bits[j + 1] = b;
-    }
-}
-
+// The complete CJK table (cjk_font.h) is generated in Unicode order, so a
+// plain binary search resolves any GB2312 code point directly - no sorted
+// index copy, no insertion sort, nothing allocated at runtime (this matters
+// on the bare kernel, where the old build-time index cost 74 KB of heap).
 const uint8_t* glyph16(uint32_t uc) {
     int lo = 0, hi = nefu::font16_count - 1;
     while (lo <= hi) {
@@ -140,13 +118,12 @@ const uint8_t* glyph16(uint32_t uc) {
         if (nefu::font16[mid].uc == uc) return nefu::font16[mid].data;
         if (nefu::font16[mid].uc < uc) lo = mid + 1; else hi = mid - 1;
     }
-    // fallback: full GB2312 CJK bitmap table (browser and GUI share it)
-    cjk_ensure_index();
-    lo = 0; hi = s_cjk_sorted_n - 1;
-    while (lo <= hi && s_cjk_sorted_uni) {
+    // full GB2312 table (browser and GUI share it), ascending by unicode
+    lo = 0; hi = g_cjk_count - 1;
+    while (lo <= hi) {
         int mid = (lo + hi) / 2;
-        if (s_cjk_sorted_uni[mid] == uc) return s_cjk_sorted_bits[mid];
-        if (s_cjk_sorted_uni[mid] < uc) lo = mid + 1; else hi = mid - 1;
+        if (g_cjk_uni[mid] == uc) return &g_cjk_bits[(size_t)mid * 32];
+        if (g_cjk_uni[mid] < uc) lo = mid + 1; else hi = mid - 1;
     }
     return 0;
 }
@@ -175,6 +152,7 @@ void char16x16(Surface& s, int x, int y, uint32_t uc, uint32_t fg, uint32_t bg) 
 
 void text(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg) {
     if (!str) return;
+    str = zh_ui(str);   // exact-match dictionary when the UI language is Chinese
     int ox = x;
     while (*str) {
         if (*str == '\n') { y += 16; x = ox; str++; continue; }
@@ -191,6 +169,7 @@ void text(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg) {
 // the requested color over the background.
 void text_ttf(Surface& s, int x, int y, const char* str, uint32_t fg, uint32_t bg, int px) {
     if (!str || !*str) return;
+    str = zh_ui(str);
     int w = 0, h = 0;
     uint8_t* rgba = 0;
     if (!platform_ttf_text(str, px, w, h, rgba)) { text(s, x, y, str, fg, bg); return; }
@@ -313,6 +292,7 @@ int sqrti(int v) {
 
 int text_width(const char* s) {
     if (!s) return 0;
+    s = zh_ui(s);
     int n = 0;
     while (*s) {
         uint32_t uc = utf8_next(s);
@@ -323,3 +303,4 @@ int text_width(const char* s) {
 
 } // namespace gfx
 } // namespace nefu
+

@@ -802,3 +802,4 @@ void lv_vector_for_each_destroy_tasks(lv_ll_t * task_list, vector_draw_task_cb c
     lv_free(task_list);
 }
 #endif /* LV_USE_VECTOR_GRAPHIC */
+

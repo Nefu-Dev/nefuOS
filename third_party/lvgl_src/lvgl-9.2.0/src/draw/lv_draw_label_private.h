@@ -66,3 +66,4 @@ struct lv_draw_glyph_dsc_t {
 #endif
 
 #endif /*LV_DRAW_LABEL_PRIVATE_H*/
+

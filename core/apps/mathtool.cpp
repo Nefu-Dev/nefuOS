@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学工具箱 —— mathext 库的窗口演示应用
 // 参考 algoviz.cpp 模式：单窗口 + on_paint/on_key/on_close 回调。
 // 三页演示：
@@ -167,7 +172,7 @@ static void mt_close(Window* w) {
 void mathtool_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Math Toolbox", x, y, MT_W, MT_H);
+    Window* w = g_wm->create_window(T("数学工具箱", "Math Toolbox"), x, y, MT_W, MT_H);
     if (!w) return;
     MathTool* t = new MathTool();
     t->page = 0;
@@ -180,3 +185,4 @@ void mathtool_launch() {
 }
 
 } // namespace nefu
+

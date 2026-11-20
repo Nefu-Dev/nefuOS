@@ -188,3 +188,4 @@ static void next_frame_task_cb(lv_timer_t * t)
 }
 
 #endif /*LV_USE_GIF*/
+

@@ -272,3 +272,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 
 
 #endif // defined(IOMUX_TABLE_ENET)
+

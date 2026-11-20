@@ -63,3 +63,4 @@ void lv_indev_scroll_get_snap_dist(lv_obj_t * obj, lv_point_t * p);
 #endif
 
 #endif /*LV_INDEV_SCROLL_H*/
+

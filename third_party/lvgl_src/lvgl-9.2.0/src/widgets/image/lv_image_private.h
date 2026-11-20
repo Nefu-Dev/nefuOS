@@ -64,3 +64,4 @@ struct lv_image_t {
 #endif
 
 #endif /*LV_IMAGE_PRIVATE_H*/
+

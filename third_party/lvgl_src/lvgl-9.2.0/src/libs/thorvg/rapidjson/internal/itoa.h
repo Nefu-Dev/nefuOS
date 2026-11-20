@@ -306,3 +306,4 @@ inline char* i64toa(int64_t value, char* buffer) {
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_ITOA_
+

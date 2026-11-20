@@ -70,3 +70,4 @@ static void lv_button_constructor(const lv_obj_class_t * class_p, lv_obj_t * obj
 }
 
 #endif
+

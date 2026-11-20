@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS HTML5 Parser implementation
 // Based on Hubbub (NetSurf, MIT License) design principles
 // Simplified for bare-metal OS
@@ -91,6 +96,10 @@ static const TagInfo g_tag_table[] = {
     { "noscript",   HTML_FLAG_SKIP },
     { "title",      HTML_FLAG_SKIP },
     { "head",       HTML_FLAG_SKIP },
+    // <template> content is inert in real browsers: never rendered, its
+    // scripts never run. bloxd.io hides a huge obfuscated honeypot blob in
+    // one (venatusAdBlockRecovery); rendering it used to bury the page.
+    { "template",   HTML_FLAG_SKIP },
 
     // Media
     { "video",      HTML_FLAG_INLINE },
@@ -607,3 +616,4 @@ const char* html5_get_title(HtmlNode* root) {
 }
 
 } // namespace nefu
+

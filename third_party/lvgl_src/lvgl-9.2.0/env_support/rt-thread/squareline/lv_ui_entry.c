@@ -17,3 +17,4 @@ void lv_user_gui_init(void)
 }
 
 #endif /* __RTTHREAD__ */
+

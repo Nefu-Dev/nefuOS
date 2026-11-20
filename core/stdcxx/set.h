@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - <set>
 // Ordered set backed by an AVL tree (mapped value is unused, V = bool).
 #pragma once
@@ -50,3 +55,4 @@ public:
 
 } // namespace stdx
 } // namespace nefu
+

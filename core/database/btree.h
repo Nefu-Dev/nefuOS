@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 嵌入式数据库 —— B+ 树(BPlus Tree)
 //
 // B+ 树是关系型数据库索引的经典结构:
@@ -132,3 +137,4 @@ int btree_self_test();
 
 } // namespace database
 } // namespace nefu
+

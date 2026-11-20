@@ -45,3 +45,4 @@ void lv_example_gridnav_4(void)
 }
 
 #endif
+

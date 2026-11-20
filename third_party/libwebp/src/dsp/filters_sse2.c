@@ -319,3 +319,4 @@ WEBP_TSAN_IGNORE_FUNCTION void VP8FiltersInitSSE2(void) {
 WEBP_DSP_INIT_STUB(VP8FiltersInitSSE2)
 
 #endif  // WEBP_USE_SSE2
+

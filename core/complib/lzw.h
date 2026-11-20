@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — LZW 字典编码 (lzw)
 // LZW（1984，Lempel–Ziv–Welch）：动态字典，边压缩边建表。
 // 初始化 256 个单字符码，随后把"前缀+字符"逐步加入字典，
@@ -19,3 +24,4 @@ int lzw_self_test();
 
 } // namespace comp
 } // namespace nefu
+

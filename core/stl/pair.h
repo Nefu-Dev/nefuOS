@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS STL - pair
 #pragma once
 
@@ -59,3 +64,4 @@ pair<T1, T2> make_pair(const T1& a, const T2& b) {
 
 } // namespace stl
 } // namespace nefu
+

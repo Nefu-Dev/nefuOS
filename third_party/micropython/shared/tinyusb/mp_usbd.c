@@ -74,3 +74,4 @@ void mp_usbd_hex_str(char *out_str, const uint8_t *bytes, size_t bytes_len) {
 }
 
 #endif // MICROPY_HW_ENABLE_USBDEV
+

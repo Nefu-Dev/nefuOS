@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/apps/electron.cpp
 //
 // nefuOS Electron-style runtime (main / renderer model).
@@ -136,7 +141,7 @@ void electron_launch_deb(const char* path) {
 
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Electron", x, y, 880, 660);
+    Window* w = g_wm->create_window(T("电子应用", "Electron"), x, y, 880, 660);
     if (!w) return;
     ElState* st = new ElState();
     st->w = w;
@@ -163,3 +168,4 @@ void electron_launch_deb(const char* path) {
 
 } // namespace electron
 } // namespace nefu
+

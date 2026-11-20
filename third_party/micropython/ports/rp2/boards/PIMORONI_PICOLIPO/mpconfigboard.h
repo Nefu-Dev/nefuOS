@@ -12,3 +12,4 @@
 #define MICROPY_HW_UART1_RX  (9)
 #define MICROPY_HW_UART1_CTS (10)
 #define MICROPY_HW_UART1_RTS (11)
+

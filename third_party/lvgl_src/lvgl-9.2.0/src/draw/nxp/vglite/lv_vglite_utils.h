@@ -177,3 +177,4 @@ static inline void vglite_set_scissor(const lv_area_t * clip_area)
 #endif
 
 #endif /*LV_VGLITE_UTILS_H*/
+

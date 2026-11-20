@@ -117,3 +117,4 @@ const lv_img_dsc_t img_transform_avatar_15 = {
   .data_size = 25600,
   .data = img_transform_avatar_15_map,
 };
+

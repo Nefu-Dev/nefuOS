@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Complete Terminal Commands Library
 // All Unix-like commands implemented: text processing, file management, system info, etc.
 // This file provides comprehensive command implementations
@@ -827,3 +832,4 @@ void register_all_commands() {
 
 } // namespace term
 } // namespace nefu
+

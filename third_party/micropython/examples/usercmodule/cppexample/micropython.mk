@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 CPPEXAMPLE_MOD_DIR := $(USERMOD_DIR)
 
 # Add our source files to the respective variables.
@@ -10,3 +15,4 @@ CXXFLAGS_USERMOD += -I$(CPPEXAMPLE_MOD_DIR) -std=c++11
 
 # We use C++ features so have to link against the standard library.
 LDFLAGS_USERMOD += -lstdc++
+

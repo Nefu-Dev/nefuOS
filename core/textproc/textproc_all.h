@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 聚合头(STL 风格单 include)
 //   #include "textproc/textproc_all.h"
 // 暴露 nefu::textproc 下全部子模块，并提供 textproc_self_test()。
@@ -25,3 +30,4 @@ inline int textproc_self_test() {
 }
 
 }} // namespace
+

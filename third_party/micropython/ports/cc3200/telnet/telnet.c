@@ -493,3 +493,4 @@ static void telnet_reset_buffer (void) {
     telnet_data.rxBuffer[telnet_data.rxWindex++] = '\r';
 }
 
+

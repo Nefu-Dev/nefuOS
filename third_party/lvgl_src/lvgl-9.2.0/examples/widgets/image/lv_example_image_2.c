@@ -61,3 +61,4 @@ static lv_obj_t * create_slider(lv_color_t color)
 }
 
 #endif
+

@@ -168,3 +168,4 @@ void test_rgb565(void)
 }
 
 #endif
+

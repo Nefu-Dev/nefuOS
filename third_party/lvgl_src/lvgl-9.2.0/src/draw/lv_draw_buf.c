@@ -657,3 +657,4 @@ static void draw_buf_get_full_area(const lv_draw_buf_t * draw_buf, lv_area_t * f
     const lv_image_header_t * header = &draw_buf->header;
     lv_area_set(full_area, 0, 0, header->w - 1, header->h - 1);
 }
+

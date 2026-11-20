@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS NVFS - nefu Virtual File System
 // - Journaling filesystem
 // - System files baked into kernel
@@ -139,6 +144,26 @@ void recover();
 void vfs_to_nvfs();
 void nvfs_to_vfs();
 
+// ---- incremental write-back (autosave) ----
+// vfs_to_nvfs() rebuilds the whole image, which is right for a shutdown or a
+// structural change but far too expensive four times a second. sync_path()
+// mirrors one VFS path (parents included) into the image instead, so a normal
+// session only ever dirties the handful of files it touched. Returns false
+// when the path cannot be mirrored (missing node, bad path); the caller then
+// falls back to vfs_to_nvfs().
+bool sync_path(const char* path);
+
+// Mark every block of the image as needing a write-back (used after a rebuild).
+void mark_all_dirty();
+
+// Push the blocks changed since the last call to the platform store and clear
+// their dirty bits. Returns the number of 512-byte blocks written, or -1 when
+// the image is not mounted / not persistent.
+int flush();
+
+// Blocks waiting for the next flush().
+uint32_t dirty_blocks();
+
 // Get free space
 uint64_t free_space();
 
@@ -168,3 +193,4 @@ int used_inode_count();
 
 } // namespace nvfs
 } // namespace nefu
+

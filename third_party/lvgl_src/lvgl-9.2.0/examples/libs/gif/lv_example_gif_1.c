@@ -21,3 +21,4 @@ void lv_example_gif_1(void)
 }
 
 #endif
+

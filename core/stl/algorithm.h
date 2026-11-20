@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS STL - algorithms
 #pragma once
 
@@ -146,3 +151,4 @@ Iterator1 search(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 
 
 } // namespace stl
 } // namespace nefu
+

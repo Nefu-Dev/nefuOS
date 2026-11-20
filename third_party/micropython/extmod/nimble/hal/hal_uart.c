@@ -129,3 +129,4 @@ void mp_bluetooth_nimble_hci_uart_process(bool run_events) {
 }
 
 #endif // MICROPY_PY_BLUETOOTH && MICROPY_BLUETOOTH_NIMBLE
+

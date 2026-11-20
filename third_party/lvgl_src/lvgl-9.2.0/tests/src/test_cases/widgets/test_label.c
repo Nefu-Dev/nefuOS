@@ -616,3 +616,4 @@ void test_label_max_width(void)
 }
 
 #endif
+

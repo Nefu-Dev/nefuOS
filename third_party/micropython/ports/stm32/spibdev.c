@@ -121,3 +121,4 @@ int spi_bdev_eraseblocks_raw(spi_bdev_t *bdev, uint32_t block_num, uint32_t num_
 }
 
 #endif
+

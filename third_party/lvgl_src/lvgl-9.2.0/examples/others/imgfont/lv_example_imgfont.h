@@ -36,3 +36,4 @@ void lv_example_imgfont_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_IMGFONT_H*/
+

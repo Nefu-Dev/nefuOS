@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // Standalone unit test for the big-int algorithms used by core/apps/bigint.cpp
 // (copied verbatim so the math is tested without the GUI). Compile:
 //   g++ -std=c++17 -O2 -o bigint_test.exe tools/bigint_test.cpp && bigint_test.exe
@@ -343,3 +348,4 @@ int main() {
     else printf("%d FAILURES\n", failures);
     return failures ? 1 : 0;
 }
+

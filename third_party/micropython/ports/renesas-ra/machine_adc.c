@@ -121,3 +121,4 @@ static mp_int_t mp_machine_adc_read_u16(machine_adc_obj_t *self) {
     mp_uint_t u16 = raw << (16 - bits) | raw >> (2 * bits - 16);
     return u16;
 }
+

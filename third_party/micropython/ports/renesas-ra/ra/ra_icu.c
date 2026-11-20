@@ -922,3 +922,4 @@ __WEAK void r_icu_isr(void) {
     R_BSP_IrqStatusClear(irq);
     ra_icu_callback(irq_no);
 }
+

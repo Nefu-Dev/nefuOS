@@ -161,3 +161,4 @@ extern long SPITransfer(unsigned long ulBase, unsigned char *ucDout,
 #endif
 
 #endif //  __SPI_H__
+

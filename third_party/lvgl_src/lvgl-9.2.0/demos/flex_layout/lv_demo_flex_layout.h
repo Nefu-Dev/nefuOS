@@ -36,3 +36,4 @@ void lv_demo_flex_layout(void);
 #endif
 
 #endif /*LV_DEMO_FLEX_LAYOUT_H*/
+

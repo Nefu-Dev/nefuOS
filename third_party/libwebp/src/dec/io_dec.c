@@ -660,3 +660,4 @@ void WebPInitCustomIo(WebPDecParams* const params, VP8Io* const io) {
 }
 
 //------------------------------------------------------------------------------
+

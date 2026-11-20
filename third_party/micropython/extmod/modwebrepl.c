@@ -367,3 +367,4 @@ const mp_obj_module_t mp_module_webrepl = {
 MP_REGISTER_MODULE(MP_QSTR__webrepl, mp_module_webrepl);
 
 #endif // MICROPY_PY_WEBREPL
+

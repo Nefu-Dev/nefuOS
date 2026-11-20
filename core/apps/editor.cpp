@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Built-in Text Editor
 // Simple code editor with syntax highlighting basics
 // Based on neditor design (separate repo)
@@ -511,7 +516,7 @@ void editor_launch_file(const char* path) {
         }
     }
 
-    Window* w = g_wm->create_window("Text Editor", 80, 60, 600, 450);
+    Window* w = g_wm->create_window(T("代码编辑器", "Text Editor"), 80, 60, 600, 450);
     w->userdata = st;
     w->on_paint = editor_paint;
     w->on_key = editor_key;
@@ -539,3 +544,4 @@ void app_show_editor(FSNode* file) {
 }
 
 } // namespace nefu
+

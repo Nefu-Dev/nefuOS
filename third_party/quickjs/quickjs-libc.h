@@ -64,3 +64,4 @@ void js_std_set_worker_new_context_func(JSContext *(*func)(JSRuntime *rt));
 #endif
 
 #endif /* QUICKJS_LIBC_H */
+

@@ -218,3 +218,4 @@ void asm_arm_bx_reg(asm_arm_t *as, uint reg_src);
 #endif // GENERIC_ASM_API
 
 #endif // MICROPY_INCLUDED_PY_ASMARM_H
+

@@ -5204,3 +5204,4 @@ static const uint8_t unicode_rgi_emoji_zwj_sequence[2392] = {
 
 #endif /* CONFIG_ALL_UNICODE */
 /* 71 tables / 36659 bytes, 5 index / 357 bytes */
+

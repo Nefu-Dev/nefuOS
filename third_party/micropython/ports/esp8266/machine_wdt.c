@@ -56,3 +56,4 @@ static void mp_machine_wdt_feed(machine_wdt_obj_t *self) {
     (void)self;
     system_soft_wdt_feed();
 }
+

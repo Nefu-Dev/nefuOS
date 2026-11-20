@@ -33,3 +33,4 @@ uint32_t ticks_ms32(void);
 void ticks_delay_us64(uint64_t us);
 
 #endif // MICROPY_INCLUDED_MIMXRT_TICKS_H
+

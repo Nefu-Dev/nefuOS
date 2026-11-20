@@ -43,3 +43,4 @@ void test_render_to_rgb565(void)
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS
 #include "vfs.h"
 #include "../platform.h"
@@ -7,12 +12,74 @@ namespace nefu {
 
 VFS* g_vfs = 0;
 
-VFS::VFS() {
+VFS::VFS() : dirty_n_(0), dirty_all_(false) {
     root_.name = "/";
     root_.is_dir = true;
     root_.parent = 0;
     root_.expanded = true;
     cwd = &root_;
+    for (int i = 0; i < DIRTY_MAX; i++) dirty_paths_[i][0] = 0;
+}
+
+// ---- write-back tracking (see vfs.h) ----
+void VFS::touch(const char* path) {
+    if (!path || !*path) return;
+    if (dirty_all_) return;
+    int len = (int)strlen(path);
+    if (len <= 0) return;
+    if (len >= (int)sizeof(dirty_paths_[0])) {     // too long to mirror by path
+        dirty_reset();
+        dirty_all_ = true;
+        return;
+    }
+    for (int i = 0; i < dirty_n_; i++) {
+        if (strcmp(dirty_paths_[i], path) == 0) return;
+    }
+    if (dirty_n_ >= DIRTY_MAX) {                   // table full: rebuild instead
+        dirty_reset();
+        dirty_all_ = true;
+        return;
+    }
+    memcpy(dirty_paths_[dirty_n_], path, (size_t)len + 1);
+    dirty_n_++;
+}
+
+void VFS::touch_node(FSNode* n) {
+    if (!n || n == &root_) return;
+    char path[96];
+    int len = 0;
+    path[0] = 0;
+    // walk up collecting names, then prepend from the root down
+    FSNode* stack[16];
+    int depth = 0;
+    FSNode* cur = n;
+    while (cur && cur != &root_ && depth < 16) { stack[depth++] = cur; cur = cur->parent; }
+    for (int i = depth - 1; i >= 0; i--) {
+        int nl = (int)strlen(stack[i]->name.c_str());
+        if (len + 1 + nl >= (int)sizeof(path)) {   // deep/odd name: full rebuild
+            dirty_reset();
+            dirty_all_ = true;
+            return;
+        }
+        path[len++] = '/';
+        memcpy(path + len, stack[i]->name.c_str(), (size_t)nl);
+        len += nl;
+        path[len] = 0;
+    }
+    touch(path);
+}
+
+void VFS::dirty_drop(int n) {
+    if (n <= 0) return;
+    if (n > dirty_n_) n = dirty_n_;
+    for (int i = n; i < dirty_n_; i++) memmove(dirty_paths_[i - n], dirty_paths_[i], sizeof(dirty_paths_[0]));
+    dirty_n_ -= n;
+    if (dirty_n_ < 0) dirty_n_ = 0;
+}
+
+void VFS::dirty_reset() {
+    dirty_n_ = 0;
+    dirty_all_ = false;
 }
 
 VFS::~VFS() {
@@ -104,6 +171,7 @@ FSNode* VFS::mkdir(const char* path) {
     n->is_dir = true;
     n->parent = parent;
     parent->children.push(n);
+    touch_node(n);
     return n;
 }
 
@@ -134,6 +202,7 @@ FSNode* VFS::create_file(const char* path) {
     n->is_dir = false;
     n->parent = parent;
     parent->children.push(n);
+    touch_node(n);
     log_event("create", path);
     return n;
 }
@@ -150,6 +219,7 @@ bool VFS::write_file(FSNode* f, const uint8_t* data, uint32_t size) {
     f->data = buf;
     f->size = size;
     f->mtime = platform_tick_ms() / 1000;
+    touch_node(f);                       // autosave will mirror this file
     return true;
 }
 
@@ -179,6 +249,9 @@ bool VFS::remove_node(FSNode* n) {
             n->parent->children.remove(i);
             log_event("rm", n->name.c_str());
             free_tree(n);
+            // deletions are not mirrored one path at a time: rebuild at next save
+            dirty_reset();
+            dirty_all_ = true;
             return true;
         }
     }
@@ -247,6 +320,9 @@ FSNode* VFS::move_node(FSNode* n, FSNode* dst_dir, const char* new_name) {
     n->parent = dst_dir;
     n->name = nn;
     dst_dir->children.push(n);
+    // a move rewrites two directories: rebuild at next save
+    dirty_reset();
+    dirty_all_ = true;
     return n;
 }
 
@@ -274,14 +350,22 @@ int VFS::node_count() {
 }
 
 // ---------------- ----------------
+// Both writers are idempotent: a file that already holds exactly this content is
+// left alone. Without that guard every boot rewrote the whole default tree and
+// marked it dirty, so the autosave rebuilt ~480 blocks of an unchanged image.
 static void put_text(VFS* v, const char* path, const char* text) {
     FSNode* f = v->create_file(path);
-    if (f) v->write_file(f, (const uint8_t*)text, (uint32_t)strlen(text));
+    if (!f) return;
+    uint32_t n = (uint32_t)strlen(text);
+    if (f->data && f->size == n && memcmp(f->data, text, (size_t)n) == 0) return;
+    v->write_file(f, (const uint8_t*)text, n);
 }
 
 static void put_bytes(VFS* v, const char* path, const uint8_t* bytes, uint32_t n) {
     FSNode* f = v->create_file(path);
-    if (f) v->write_file(f, bytes, n);
+    if (!f) return;
+    if (f->data && f->size == n && memcmp(f->data, bytes, (size_t)n) == 0) return;
+    v->write_file(f, bytes, n);
 }
 
 // Remove legacy nodes created by an older browser_save_page that flattened
@@ -433,12 +517,74 @@ void VFS::ensure_default_files() {
           "Third-party packages are installed here.\n" },
         { "/var/log/lastlog",
           "nefuOS last login log (empty on fresh boot)\n" },
+        { "/etc/init.d/rcS",
+          "#!/bin/sh\n"
+          "# nefuOS boot script (started by /sbin/init)\n"
+          "echo \"nefuOS: starting services\"\n"
+          "mkdir -p /var/run /var/log /tmp\n"
+          "echo \"nefuOS: ready\"\n" },
+        { "/etc/sudoers",
+          "root ALL=(ALL:ALL) ALL\n"
+          "nefu ALL=(ALL:ALL) ALL\n"
+          "Defaults env_reset\n" },
+        { "/run/utmp", "nefuOS utmp: no login sessions yet\n" },
+        { "/usr/local/bin/hello.sh",
+          "#!/bin/sh\n"
+          "# sample script installed under /usr/local (FHS local software)\n"
+          "echo \"hello from /usr/local/bin\"\n" },
+        { "/usr/downloads/README",
+          "Files fetched by the browser and npkg land in this directory.\n" },
         { "/README.txt",
           "nefuOS v0.2 - dual-backend hobby OS (host exe + bootable ISO)\n" },
     };
     for (unsigned i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
         if (!resolve(files[i].path)) put_text(this, files[i].path, files[i].text);
     }
+}
+
+// Ubuntu's starting tree has something in every directory (/run/utmp,
+// /var/spool/..., /usr/games). Ours should too: any directory that would
+// otherwise show up empty gets a README naming itself, so `ls` never displays a
+// blank folder and the on-disk NVFS image carries real files everywhere.
+void VFS::seed_empty_dirs() {
+    struct Walk {
+        static bool path_of(FSNode* n, char* out, int cap) {
+            int len = 0;
+            out[0] = 0;
+            FSNode* stack[16];
+            int depth = 0;
+            FSNode* cur = n;
+            while (cur && cur->parent && depth < 16) { stack[depth++] = cur; cur = cur->parent; }
+            for (int i = depth - 1; i >= 0; i--) {
+                const char* nm = stack[i]->name.c_str();
+                int nl = (int)strlen(nm);
+                if (len + 1 + nl >= cap) return false;
+                out[len++] = '/';
+                memcpy(out + len, nm, (size_t)nl);
+                len += nl;
+                out[len] = 0;
+            }
+            return depth > 0;
+        }
+        static void go(VFS* v, FSNode* n) {
+            if (!n || !n->is_dir) return;
+            for (int i = 0; i < n->children.size(); i++)
+                if (n->children[i]->is_dir) go(v, n->children[i]);
+            if (n == v->root() || n->children.size() > 0) return;
+            char path[192];
+            if (!path_of(n, path, (int)sizeof(path))) return;
+            char text[256];
+            int tn = ksprintf(text, sizeof(text),
+                "# %s\n#\n# Part of the nefuOS filesystem hierarchy (FHS layout).\n"
+                "# This README only exists so the directory is not empty;\n"
+                "# it is safe to delete.\n", path);
+            String readme = path;
+            readme += "/README";
+            FSNode* f = v->create_file(readme.c_str());
+            if (f && tn > 0) v->write_file(f, (const uint8_t*)text, (uint32_t)tn);
+        }
+    };
+    Walk::go(this, &root_);
 }
 
 void VFS::create_default_tree() {
@@ -897,3 +1043,4 @@ bool VFS::load(const uint8_t* data, uint32_t size) {
 }
 
 } // namespace nefu
+

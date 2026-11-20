@@ -18,3 +18,4 @@
 #define MICROPY_HW_WIZNET_PIN_RST           (20)
 // Connecting the INTN pin enables RECV interrupt handling of incoming data.
 #define MICROPY_HW_WIZNET_PIN_INTN          (21)
+

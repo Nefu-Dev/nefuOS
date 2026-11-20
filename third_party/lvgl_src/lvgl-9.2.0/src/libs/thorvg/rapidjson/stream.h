@@ -221,3 +221,4 @@ typedef GenericInsituStringStream<UTF8<> > InsituStringStream;
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_STREAM_H_
+

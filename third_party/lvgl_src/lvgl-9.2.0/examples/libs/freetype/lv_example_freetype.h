@@ -36,3 +36,4 @@ void lv_example_freetype_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_FREETYPE_H*/
+

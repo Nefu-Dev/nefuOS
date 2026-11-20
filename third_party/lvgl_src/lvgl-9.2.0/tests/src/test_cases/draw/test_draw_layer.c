@@ -71,3 +71,4 @@ void test_draw_layer_bitmap_mask_from_image_not_found(void)
 
 
 #endif
+

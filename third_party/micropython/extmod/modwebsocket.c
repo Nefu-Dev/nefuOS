@@ -324,3 +324,4 @@ const mp_obj_module_t mp_module_websocket = {
 MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_websocket, mp_module_websocket);
 
 #endif // MICROPY_PY_WEBSOCKET
+

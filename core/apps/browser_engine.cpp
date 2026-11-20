@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS browser engine - upgraded HTML/CSS rendering core
 // Reference: LibHubbub (HTML5 tokenizer), LibCSS (CSS selection), Ladybird (layout)
 // This is a lightweight reimplementation, not a direct port.
@@ -437,3 +442,4 @@ void parse_html_to_dom(const char* html, int len, DOMNode*& out_root) {
 
 } // namespace browser_eng
 } // namespace nefu
+

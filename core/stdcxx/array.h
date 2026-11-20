@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - <array>
 #pragma once
 #include "_core.h"
@@ -39,3 +44,4 @@ inline bool operator!=(const array<T, N>& a, const array<T, N>& b) { return !(a 
 
 } // namespace stdx
 } // namespace nefu
+

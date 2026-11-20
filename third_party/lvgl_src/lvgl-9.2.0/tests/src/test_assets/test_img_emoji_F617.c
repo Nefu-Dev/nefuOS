@@ -251,3 +251,4 @@ const lv_image_dsc_t emoji_F617 = {
 };
 
 #endif /*LV_BUILD_TEST*/
+

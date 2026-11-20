@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 交通流模拟 traffic
 // 教学版：一维道路跟车模型（Nagel-Schreckenberg 元胞自动机）。
 // 每辆车一个格点，规则：加速 -> 保持 -> 随机减速 -> 制动防撞。
@@ -44,3 +49,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

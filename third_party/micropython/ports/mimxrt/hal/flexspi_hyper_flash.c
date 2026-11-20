@@ -251,3 +251,4 @@ status_t flexspi_nor_hyperflash_cfi(FLEXSPI_Type *base) {
 
     return status;
 }
+

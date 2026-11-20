@@ -81,3 +81,4 @@ void lv_vg_lite_pending_remove_all(lv_vg_lite_pending_t * pending);
 #endif
 
 #endif /*LV_VG_LITE_PENDING_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // compiler 宿主测试主程序：跑全部模块 self_test，并做端到端流水线集成测试。
 // 编译：
 //   g++ -std=c++17 -fno-exceptions -fno-rtti -fno-builtin -O2 -I core ^
@@ -142,3 +147,4 @@ int main() {
     printf("== compiler result: %s ==\n", g_fails == 0 ? "ALL PASSED" : "FAILURES");
     return g_fails ? 1 : 0;
 }
+

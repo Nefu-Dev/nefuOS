@@ -113,3 +113,4 @@ const mp_spi_proto_t mp_soft_spi_proto = {
     .ioctl = mp_soft_spi_ioctl,
     .transfer = mp_soft_spi_transfer,
 };
+

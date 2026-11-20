@@ -126,3 +126,4 @@ static const uint8_t font_petme128_8x8[] = {
 };
 
 #endif // MICROPY_INCLUDED_STM32_FONT_PETME128_8X8_H
+

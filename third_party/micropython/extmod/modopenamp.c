@@ -425,3 +425,4 @@ MP_REGISTER_ROOT_POINTER(struct _virtio_dev_obj_t *virtio_device);
 MP_REGISTER_MODULE(MP_QSTR_openamp, openamp_module);
 
 #endif // MICROPY_PY_OPENAMP
+

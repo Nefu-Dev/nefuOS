@@ -245,3 +245,4 @@ extern void  _SlDrvResetCmdExt(_SlCmdExt_t* pCmdExt);
                                                      (_SL_PROTOCOL_ALIGN_SIZE(pCmdCtrl->TxDescLen) + _SL_PROTOCOL_ALIGN_SIZE(pCmdExt->TxPayloadLen)) : \
                                                      (_SL_PROTOCOL_ALIGN_SIZE(pCmdCtrl->TxDescLen)))
 #endif /* __DRIVER_INT_H__ */
+

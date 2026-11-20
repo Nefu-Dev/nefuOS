@@ -164,3 +164,4 @@ const lv_image_dsc_t img_multilang_avatar_13 = {
 };
 
 #endif
+

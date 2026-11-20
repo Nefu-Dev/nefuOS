@@ -52,3 +52,4 @@ static mp_obj_t mp_time_time_get(void) {
     // get date and time
     return mp_obj_new_int(pyb_rtc_get_us_since_epoch() / 1000 / 1000);
 }
+

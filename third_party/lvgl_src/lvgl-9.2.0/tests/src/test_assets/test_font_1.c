@@ -1373,3 +1373,4 @@ lv_font_t test_font_1 = {
 
 #endif /*#if FONT_1*/
 #endif
+

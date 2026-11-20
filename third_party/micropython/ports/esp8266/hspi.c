@@ -335,3 +335,4 @@ inline void spi_tx8fast(uint8_t spi_no, uint8_t dout_data) {
 // Begin SPI Transaction
     SET_PERI_REG_MASK(SPI_CMD(spi_no), SPI_USR);
 }
+

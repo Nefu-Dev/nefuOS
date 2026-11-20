@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 模拟库 simlib —— STL 风格聚合头
 // 一次 include 全部模拟模块。自测：sim_all_self_test() 汇总各模块失败数。
 // 教学版：全部用 class / do-while / switch / std 模板 / cmath 实现，中文注释。
@@ -25,3 +30,4 @@ inline int sim_all_self_test() {
 
 } // namespace simx
 } // namespace nefu
+

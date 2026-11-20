@@ -302,3 +302,4 @@ int WebPPictureRescale(WebPPicture* pic, int width, int height) {
   return 0;
 }
 #endif  // !defined(WEBP_REDUCE_SIZE)
+

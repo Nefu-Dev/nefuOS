@@ -105,3 +105,4 @@ void vApplicationTickHook (void)
 {
     HAL_IncrementTick();
 }
+

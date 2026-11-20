@@ -83,3 +83,4 @@ lv_result_t lv_qrcode_update(lv_obj_t * obj, const void * data, uint32_t data_le
 #endif
 
 #endif /*LV_QRCODE_H*/
+

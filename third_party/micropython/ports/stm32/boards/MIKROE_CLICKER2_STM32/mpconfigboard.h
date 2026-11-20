@@ -84,3 +84,4 @@
 #define MBOOT_BOOTPIN_ACTIVE        (0)
 #define MBOOT_FSLOAD                (1)
 #define MBOOT_VFS_FAT               (1)
+

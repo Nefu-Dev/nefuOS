@@ -68,3 +68,4 @@ void pyb_usb_host_process(void);
 uint pyb_usb_host_get_keyboard(void);
 
 #endif // MICROPY_INCLUDED_STM32_USB_H
+

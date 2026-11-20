@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— HTTP/1.1（RFC 7230/7231）
 //
 // 请求行：  METHOD SP PATH SP "HTTP/1.1" CRLF
@@ -112,3 +117,4 @@ int  http_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

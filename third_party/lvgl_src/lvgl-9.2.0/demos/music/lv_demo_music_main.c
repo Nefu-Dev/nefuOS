@@ -1032,3 +1032,4 @@ static void album_fade_anim_cb(void * var, int32_t v)
     lv_obj_set_style_image_opa(var, v, 0);
 }
 #endif /*LV_USE_DEMO_MUSIC*/
+

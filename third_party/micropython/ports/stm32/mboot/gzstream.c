@@ -111,3 +111,4 @@ int gz_stream_read(size_t len, uint8_t *buf) {
 }
 
 #endif // MBOOT_FSLOAD || MBOOT_ENABLE_PACKING
+

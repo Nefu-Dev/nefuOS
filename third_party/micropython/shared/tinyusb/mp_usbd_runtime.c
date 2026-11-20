@@ -574,3 +574,4 @@ static void mp_usbd_task_inner(void) {
 }
 
 #endif // MICROPY_HW_ENABLE_USB_RUNTIME_DEVICE
+

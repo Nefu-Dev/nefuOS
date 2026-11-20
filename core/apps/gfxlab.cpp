@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS graphics laboratory — 8 live demos for the gfxlib library
 // Controls:
 //   1..8  : pick a demo      Space : run / pause animation
@@ -348,7 +353,7 @@ static void lab_close(Window* w) {
 void gfxlab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Graphics Lab", x, y, LAB_W, LAB_H);
+    Window* w = g_wm->create_window(T("图形实验室", "Graphics Lab"), x, y, LAB_W, LAB_H);
     if (!w) return;
     GfxLab* l = new GfxLab();
     l->buf = new uint32_t[(size_t)LAB_W * LAB_H];
@@ -362,3 +367,4 @@ void gfxlab_launch() {
 }
 
 } // namespace nefu
+

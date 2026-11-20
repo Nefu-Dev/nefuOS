@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 光线追踪引擎 —— 独立测试主程序
 // ----------------------------------------------------------------------------
@@ -74,3 +79,4 @@ int main() {
     std::printf(t == 0 ? "ALL SELF TESTS PASSED\n" : "SOME TESTS FAILED\n");
     return t ? 1 : 0;
 }
+

@@ -449,3 +449,4 @@ int VP8EncDeleteAlpha(VP8Encoder* const enc) {
   enc->has_alpha_ = 0;
   return ok;
 }
+

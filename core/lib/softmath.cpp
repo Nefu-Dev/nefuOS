@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS fixed-point math library — implementation (Q16.16, integer only)
 #include "softmath.h"
 
@@ -209,3 +214,4 @@ fix fx_rad2deg(fix rad) { return fx_div(fx_mul(rad, itofix(180)), FX_PI); }
 
 } // namespace fx
 } // namespace nefu
+

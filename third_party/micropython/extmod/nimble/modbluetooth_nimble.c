@@ -2037,3 +2037,4 @@ MP_REGISTER_ROOT_POINTER(struct _mp_bluetooth_nimble_malloc_t *bluetooth_nimble_
 MP_REGISTER_ROOT_POINTER(struct _mp_bluetooth_nimble_root_pointers_t *bluetooth_nimble_root_pointers);
 
 #endif // MICROPY_PY_BLUETOOTH && MICROPY_BLUETOOTH_NIMBLE
+

@@ -38,3 +38,4 @@ extern void modusocket_enter_sleep (void);
 extern void modusocket_close_all_user_sockets (void);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_MODSOCKET_H
+

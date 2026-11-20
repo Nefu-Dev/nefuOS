@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Wallpaper Settings
 // Change desktop wallpaper and lock screen
 #include "apps.h"
@@ -128,7 +133,7 @@ static void on_wallpaper_mouse(Window* w, int mx, int my, uint8_t buttons) {
 }
 
 void wallpaper_launch() {
-    Window* w = g_wm->create_window("Wallpaper Settings", 80, 80, 520, 380);
+    Window* w = g_wm->create_window(T("壁纸设置", "Wallpaper Settings"), 80, 80, 520, 380);
     if (!w) return;
     
     paint_wallpaper(w);
@@ -139,3 +144,4 @@ void wallpaper_launch() {
 }
 
 } // namespace nefu
+

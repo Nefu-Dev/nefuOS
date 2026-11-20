@@ -82,3 +82,4 @@ const mp_obj_module_t example_package_user_cmodule = {
 // Register the module to make it available in Python.
 // Note: subpackages should not be registered with MP_REGISTER_MODULE.
 MP_REGISTER_MODULE(MP_QSTR_example_package, example_package_user_cmodule);
+

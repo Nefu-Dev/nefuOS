@@ -417,3 +417,4 @@ uint16_t SharpYuvLinearToGamma(uint32_t v, int bit_depth,
   }
   return (uint16_t)Roundf(linear * ((1 << bit_depth) - 1));
 }
+

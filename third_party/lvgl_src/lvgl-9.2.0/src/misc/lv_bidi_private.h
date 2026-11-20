@@ -96,3 +96,4 @@ void lv_bidi_process_paragraph(const char * str_in, char * str_out, uint32_t len
 #endif
 
 #endif /*LV_BIDI_PRIVATE_H*/
+

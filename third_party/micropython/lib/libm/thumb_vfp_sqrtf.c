@@ -9,3 +9,4 @@ float sqrtf(float x) {
             : [x] "t"  (x));
     return x;
 }
+

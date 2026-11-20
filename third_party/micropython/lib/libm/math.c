@@ -824,3 +824,4 @@ float truncf(float x)
 	u.i &= ~m;
 	return u.f;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据存储库 dblib —— STL 风格聚合头
 // 一次 include 全部数据模块。自测：db_all_self_test()。
 // 教学版：class / std 模板 / do-while / switch / cmath，中文注释。
@@ -22,3 +27,4 @@ inline int db_all_self_test() {
 
 } // namespace dbx
 } // namespace nefu
+

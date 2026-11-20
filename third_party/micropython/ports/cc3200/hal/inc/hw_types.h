@@ -74,3 +74,4 @@ typedef unsigned char tBoolean;
 
 
 #endif // __HW_TYPES_H__
+

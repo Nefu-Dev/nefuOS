@@ -74,3 +74,4 @@ static inline uint8_t mp_spi_set_addr_buff(uint8_t *buf, uint32_t addr) {
 }
 
 #endif // MICROPY_INCLUDED_DRIVERS_BUS_QSPI_H
+

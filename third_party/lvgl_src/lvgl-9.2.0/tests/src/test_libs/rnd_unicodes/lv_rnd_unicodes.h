@@ -57,3 +57,4 @@ int lv_random_utf8_chars(uint8_t * buf, int buf_len, const uint32_t * ranges, ui
 #endif /*LV_RND_UNICODES_H*/
 
 #endif /*LV_BUILD_TEST*/
+

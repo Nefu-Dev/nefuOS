@@ -1187,3 +1187,4 @@ int main(int argc, const char* argv[]) {
   FREE_WARGV_AND_RETURN((webp_info_status == WEBP_INFO_OK) ? EXIT_SUCCESS
                                                            : EXIT_FAILURE);
 }
+

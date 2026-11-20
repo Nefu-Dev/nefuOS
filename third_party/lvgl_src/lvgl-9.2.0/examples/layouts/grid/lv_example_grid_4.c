@@ -38,3 +38,4 @@ void lv_example_grid_4(void)
 }
 
 #endif
+

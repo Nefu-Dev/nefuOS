@@ -119,3 +119,4 @@ const lv_pinyin_dict_t * lv_ime_pinyin_get_dict(lv_obj_t * obj);
 #endif
 
 #endif /*LV_USE_IME_PINYIN*/
+

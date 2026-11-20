@@ -68,3 +68,4 @@ WebPImageReader WebPGuessImageReader(const uint8_t* const data,
 #endif
 
 #endif  // WEBP_IMAGEIO_IMAGE_DEC_H_
+

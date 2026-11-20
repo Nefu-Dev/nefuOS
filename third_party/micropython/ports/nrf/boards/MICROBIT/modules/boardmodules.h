@@ -30,3 +30,4 @@
 #include "modmicrobit.h"
 
 #endif // MICROPY_INCLUDED_NRF_BOARD_MICROBIT_BOARD_MODULES_H
+

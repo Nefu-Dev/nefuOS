@@ -1617,3 +1617,4 @@ double js_atod(const char *str, const char **pnext, int radix, int flags,
     dval = NAN;
     goto done1;
 }
+

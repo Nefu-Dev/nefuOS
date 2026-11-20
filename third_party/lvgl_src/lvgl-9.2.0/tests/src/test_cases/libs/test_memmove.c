@@ -52,3 +52,4 @@ void test_memmove(void)
 }
 
 #endif
+

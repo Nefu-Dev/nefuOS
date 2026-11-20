@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS NEFVM implementation (bare-metal safe: no floats, bounded steps)
 #include "nefvm.h"
 #include "../klib/klib.h"
@@ -103,3 +108,4 @@ int nefvm_run(const uint8_t* code, uint32_t len, void (*out)(const char*, void*)
 }
 
 } // namespace nefu
+

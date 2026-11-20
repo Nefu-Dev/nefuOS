@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— 流体仿真 (Fluid)
 // 包含：
 //   - LBM D2Q9 简化格子玻尔兹曼 (9 个离散速度方向)
@@ -79,3 +84,4 @@ int fluid_self_test();
 
 } // namespace simulate
 } // namespace nefu
+

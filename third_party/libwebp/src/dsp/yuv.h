@@ -226,3 +226,4 @@ static WEBP_INLINE int VP8RGBToV(int r, int g, int b, int rounding) {
 #endif
 
 #endif  // WEBP_DSP_YUV_H_
+

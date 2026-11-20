@@ -96,3 +96,4 @@ const uint8_t test_kern_one_otf[] = {
 const size_t test_kern_one_otf_size = sizeof(test_kern_one_otf);
 
 #endif /*LV_BUILD_TEST*/
+

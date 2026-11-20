@@ -134,3 +134,4 @@ void test_switch_should_state_change_when_event_bubbling_is_enabled(void)
 }
 
 #endif
+

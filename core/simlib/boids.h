@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 鸟群模拟 boids
 // 教学版：Craig Reynolds 经典鸟群（Boids）三规则：
 //   1) 分离 Separation：与邻居保持距离
@@ -57,3 +62,4 @@ private:
 
 } // namespace simx
 } // namespace nefu
+

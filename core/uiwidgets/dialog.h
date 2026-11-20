@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— 对话框组件
 // MessageDialog(信息/警告/错误/确认)、InputDialog、FileDialog(文件浏览)、
 // ColorDialog(调色板)、ProgressDialog、自定义对话框基类
@@ -123,3 +128,4 @@ int dialog_self_test();
 
 } // namespace ui
 } // namespace nefu
+

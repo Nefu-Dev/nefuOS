@@ -74,3 +74,4 @@ void lv_example_bar_6(void)
 }
 
 #endif
+

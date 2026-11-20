@@ -81,3 +81,4 @@ void esp_hosted_hal_free(void *user, void *ptr);
 void *esp_hosted_hal_calloc(size_t nmemb, size_t size);
 void *esp_hosted_hal_realloc(void *ptr, size_t size);
 #endif // MICROPY_INCLUDED_DRIVERS_ESP_HOSTED_HAL_H
+

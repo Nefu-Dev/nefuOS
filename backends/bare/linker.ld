@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* nefuOS kernel linker script - flat binary, load base 0x100000 */
 /* Note: mingw ld (PE output) recomputes section RVAs itself; keep the
    layout fully relative (no explicit . =) so the __bss_start/__bss_end
@@ -27,3 +32,4 @@ SECTIONS
         __bss_end = .;
     }
 }
+

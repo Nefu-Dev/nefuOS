@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // Standalone test for the Gregorian date algorithms used by datecalc.cpp.
 // Covers: leap/dim, validity, JDN, weekday, day-of-year and the JDN->date
 // inverse (used by "Add Days"). Compile: g++ -std=c++17 -O2 datecalc_test.cpp
@@ -99,3 +104,4 @@ int main() {
     else printf("%d FAILURES\n", failures);
     return failures ? 1 : 0;
 }
+

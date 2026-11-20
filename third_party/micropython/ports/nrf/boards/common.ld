@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 ENTRY(Reset_Handler)
 
 /* define output sections */
@@ -83,3 +88,4 @@ _ram_end = ORIGIN(RAM) + LENGTH(RAM);
 _estack = ORIGIN(RAM) + LENGTH(RAM);
 _unused_flash_start = (_sidata + (_edata - _sdata));
 _unused_flash_len = (ORIGIN(FLASH_TEXT) + LENGTH(FLASH_TEXT)) - _unused_flash_start;
+

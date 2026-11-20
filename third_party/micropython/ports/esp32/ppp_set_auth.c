@@ -33,3 +33,4 @@ void pppapi_set_auth(ppp_pcb *pcb, u8_t authtype, const char *user, const char *
 }
 
 #endif
+

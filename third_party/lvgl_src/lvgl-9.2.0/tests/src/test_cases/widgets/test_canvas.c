@@ -133,3 +133,4 @@ void test_canvas_fill_and_set_px(void)
 }
 
 #endif
+

@@ -105,3 +105,4 @@ const mp_obj_t *mp_obj_property_get(mp_obj_t self_in) {
 }
 
 #endif // MICROPY_PY_BUILTINS_PROPERTY
+

@@ -342,3 +342,4 @@ static lv_lru_item_t * lv_lru_pop_or_create_item(lv_lru_t * cache)
 
     return item;
 }
+

@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 激活函数（全定点 Q16.16）
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 激活函数（全定点 Q16.16）
 //
 // 全部定点实现：
 //   ReLU:      max(0,x)
@@ -45,3 +50,4 @@ int activations_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

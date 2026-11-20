@@ -316,3 +316,4 @@ void test_invert(void)
 }
 
 #endif
+

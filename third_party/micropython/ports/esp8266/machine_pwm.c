@@ -187,3 +187,4 @@ static void mp_machine_pwm_duty_set_ns(machine_pwm_obj_t *self, mp_int_t duty) {
     pwm_set_duty(duty * freq / 976562, self->channel); // 1e9/1024 = 976562.5
     pwm_start();
 }
+

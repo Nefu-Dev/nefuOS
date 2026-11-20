@@ -214,3 +214,4 @@ void test_textarea_properties(void)
 }
 
 #endif
+

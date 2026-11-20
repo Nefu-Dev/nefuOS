@@ -594,3 +594,4 @@ void dave2d_execute_dlist_and_flush(void)
 }
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 多项式 polynomial
 // 教学版：系数数组（低次在前），支持求值/加减乘/求导/综合除法。
 #pragma once
@@ -29,3 +34,4 @@ int polynomial_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

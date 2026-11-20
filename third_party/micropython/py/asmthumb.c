@@ -574,3 +574,4 @@ void asm_thumb_bl_ind(asm_thumb_t *as, uint fun_id, uint reg_temp) {
 }
 
 #endif // MICROPY_EMIT_THUMB || MICROPY_EMIT_INLINE_THUMB
+

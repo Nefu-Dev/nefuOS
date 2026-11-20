@@ -5,3 +5,4 @@
 #include "r_ioport_api.h"
 extern const ioport_cfg_t g_bsp_pin_cfg; /* R7FA4M1AB3CFM.pincfg */
 #endif /* BSP_PIN_CFG_H_ */
+

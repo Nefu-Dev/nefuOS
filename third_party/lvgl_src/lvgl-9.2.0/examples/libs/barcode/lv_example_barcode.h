@@ -36,3 +36,4 @@ void lv_example_barcode_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_BARCODE_H*/
+

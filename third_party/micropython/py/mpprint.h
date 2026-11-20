@@ -80,3 +80,4 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_MPPRINT_H
+

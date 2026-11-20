@@ -1,4 +1,4 @@
-﻿#include "../../lv_conf_internal.h"
+#include "../../lv_conf_internal.h"
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
 
 #ifndef LV_TLSF_H
@@ -95,3 +95,4 @@ int lv_tlsf_check_pool(lv_pool_t pool);
 #endif /*LV_TLSF_H*/
 
 #endif /*LV_STDLIB_BUILTIN*/
+

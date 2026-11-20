@@ -37,3 +37,4 @@ void lv_example_grid_6(void)
 }
 
 #endif
+

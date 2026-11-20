@@ -36,3 +36,4 @@ void lv_example_switch_1(void)
 }
 
 #endif
+

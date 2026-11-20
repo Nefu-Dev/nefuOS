@@ -323,3 +323,4 @@ void mp_emitter_warning(pass_kind_t pass, const char *msg);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_EMIT_H
+

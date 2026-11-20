@@ -77,3 +77,4 @@ void test_libpng_1(void)
 }
 
 #endif
+

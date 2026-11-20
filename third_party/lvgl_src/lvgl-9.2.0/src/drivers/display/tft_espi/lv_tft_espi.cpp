@@ -108,3 +108,4 @@ static void resolution_changed_event_cb(lv_event_t * e)
 }
 
 #endif /*LV_USE_TFT_ESPI*/
+

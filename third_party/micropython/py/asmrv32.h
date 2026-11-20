@@ -494,3 +494,4 @@ void asm_rv32_emit_store_reg_reg_offset(asm_rv32_t *state, mp_uint_t source, mp_
 #endif
 
 #endif // MICROPY_INCLUDED_PY_ASMRV32_H
+

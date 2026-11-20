@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 APP_INC =  -I.
 APP_INC += -I$(TOP)
 APP_INC += -Ifatfs/src
@@ -234,3 +239,4 @@ $(GEN_PINS_SRC) $(GEN_PINS_HDR): $(BOARD_PINS) $(MAKE_PINS) $(AF_FILE) $(PREFIX_
 	$(ECHO) "Create $@"
 	$(Q)$(PYTHON) $(MAKE_PINS) --board-csv $(BOARD_PINS) --af-csv $(AF_FILE) --prefix $(PREFIX_FILE) \
 	    --output-source $(GEN_PINS_SRC) --output-header $(GEN_PINS_HDR)
+

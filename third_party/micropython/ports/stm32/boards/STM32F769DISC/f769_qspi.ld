@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     Custom linker script for STM32F769DISC board with external memory-mapped QSPI flash
 
     Memory layout:
@@ -65,3 +70,4 @@ SECTIONS
     INCLUDE common_extratext_data_in_flash.ld
     INCLUDE common_bss_heap_stack.ld
 }
+

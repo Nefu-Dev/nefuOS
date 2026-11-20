@@ -640,3 +640,4 @@ __WEAK void spi_tei_isr(void) {
 __WEAK void spi_eri_isr(void) {
     // dummy
 }
+

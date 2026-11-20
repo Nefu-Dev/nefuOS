@@ -112,3 +112,4 @@ WEBP_NODISCARD int VP8LBuildHuffmanTable(HuffmanTables* const root_table,
 #endif
 
 #endif  // WEBP_UTILS_HUFFMAN_UTILS_H_
+

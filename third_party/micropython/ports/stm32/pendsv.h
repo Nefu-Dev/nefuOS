@@ -54,3 +54,4 @@ void pendsv_init(void);
 void pendsv_schedule_dispatch(size_t slot, pendsv_dispatch_t f);
 
 #endif // MICROPY_INCLUDED_STM32_PENDSV_H
+

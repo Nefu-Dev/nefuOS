@@ -19,3 +19,4 @@
 extern const mdio_operations_t enet_ops;
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 滤波器 filter
 // 教学版：一阶低通/高通与双二阶（biquad）带通滤波器，数字音频滤波。
 // 用于音色塑形、去噪、效果器教学。class / STL / cmath / 中文注释。
@@ -53,3 +58,4 @@ private:
 
 } // namespace audx
 } // namespace nefu
+

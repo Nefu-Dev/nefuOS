@@ -32,3 +32,4 @@ const lv_image_dsc_t img_hand = {
 };
 
 #endif /* LV_BUILD_EXAMPLES */
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS built-in help app
 // User guide and documentation
 #include "apps.h"
@@ -104,7 +109,7 @@ static void help_paint(Window* win) {
 void app_help_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Help", x, y, 340, 400);
+    Window* w = g_wm->create_window(T("帮助", "Help"), x, y, 340, 400);
     if (!w) return;
     HelpState* st = new HelpState();
     st->w = w->content_w;
@@ -116,3 +121,4 @@ void app_help_launch() {
 }
 
 } // namespace nefu
+

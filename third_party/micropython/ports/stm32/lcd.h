@@ -29,3 +29,4 @@
 extern const mp_obj_type_t pyb_lcd_type;
 
 #endif // MICROPY_INCLUDED_STM32_LCD_H
+

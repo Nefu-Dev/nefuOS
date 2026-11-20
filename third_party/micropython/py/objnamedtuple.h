@@ -44,3 +44,4 @@ size_t mp_obj_namedtuple_find_field(const mp_obj_namedtuple_type_t *type, qstr n
 mp_obj_namedtuple_type_t *mp_obj_new_namedtuple_base(size_t n_fields, mp_obj_t *fields);
 
 #endif // MICROPY_INCLUDED_PY_OBJNAMEDTUPLE_H
+

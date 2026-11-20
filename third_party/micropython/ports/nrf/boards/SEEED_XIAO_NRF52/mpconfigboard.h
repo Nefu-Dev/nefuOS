@@ -80,3 +80,4 @@
 void XIAO_board_early_init(void);
 void XIAO_board_deinit(void);
 void XIAO_board_enter_bootloader(void);
+

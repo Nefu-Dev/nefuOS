@@ -100,3 +100,4 @@ int WebPRescalerHasPendingOutput(const WebPRescaler* const rescaler) {
 #endif
 
 #endif  // WEBP_UTILS_RESCALER_UTILS_H_
+

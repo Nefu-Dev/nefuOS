@@ -32,3 +32,4 @@ float atanhf(float x)
 	}
 	return s ? -y : y;
 }
+

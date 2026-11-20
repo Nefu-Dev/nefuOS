@@ -45,3 +45,4 @@ void test_render_to_l8(void)
 }
 
 #endif
+

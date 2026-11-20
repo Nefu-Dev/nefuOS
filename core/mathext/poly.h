@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 多项式模块
 // 系数按低次到高次存储：p(x) = c[0] + c[1]*x + ... + c[n-1]*x^(n-1)。
 // 长度 n 即 degree+1；零多项式用长度 0 表示。
@@ -59,3 +64,4 @@ int poly_self_test();
 
 } // namespace mathext
 } // namespace nefu
+

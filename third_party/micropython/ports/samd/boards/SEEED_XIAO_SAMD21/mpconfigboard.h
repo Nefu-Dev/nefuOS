@@ -3,3 +3,4 @@
 
 #define MICROPY_HW_XOSC32K  (1)
 #define MICROPY_HW_ADC_VREF (2)
+

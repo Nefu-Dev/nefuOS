@@ -85,3 +85,4 @@ void gc_dump_info(const mp_print_t *print);
 void gc_dump_alloc_table(const mp_print_t *print);
 
 #endif // MICROPY_INCLUDED_PY_GC_H
+

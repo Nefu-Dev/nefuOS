@@ -9,3 +9,4 @@
 #define BSP_PACKAGE_QFN
 #define BSP_PACKAGE_PINS (56)
 #endif /* BSP_MCU_DEVICE_PN_CFG_H_ */
+

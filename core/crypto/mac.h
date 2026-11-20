@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 消息认证码 (MAC) 模块
 // 覆盖：HMAC(MD5/SHA1/SHA256/SHA512/SHA3-256)、CMAC-AES、Poly1305、CBC-MAC。
 // HMAC 基于 lib/hash.h 的 MD5/SHA1 与本库的 SHA-256/SHA-512/SHA-3 实现。
@@ -40,3 +45,4 @@ int mac_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

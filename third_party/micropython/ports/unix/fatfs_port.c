@@ -11,3 +11,4 @@ DWORD get_fattime(void) {
            | (tm->tm_min << 5)
            | (tm->tm_sec / 2);
 }
+

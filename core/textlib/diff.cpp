@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — line diff implementation
 // 算法：完整 LCS 回溯（n*m 表，n/m 为行数）。对行数较大的输入
 // 内存会涨，但本实现面向教学与中小规模文本，清晰优先。
@@ -121,3 +126,4 @@ int diff_self_test() {
 
 } // namespace text
 } // namespace nefu
+

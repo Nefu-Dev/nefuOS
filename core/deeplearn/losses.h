@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 损失函数（全定点）
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 损失函数（全定点）
 //
 // 所有损失返回标量张量（size=1），可直接 backward。
 // 典型用法：Tensor l = loss_mse(pred, target); backward(l);
@@ -42,3 +47,4 @@ int losses_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

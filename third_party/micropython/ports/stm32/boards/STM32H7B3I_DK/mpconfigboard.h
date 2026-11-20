@@ -94,3 +94,4 @@
 #define MICROPY_HW_SDMMC_D3                 (pin_C11)
 #define MICROPY_HW_SDMMC_CK                 (pin_C12)
 #define MICROPY_HW_SDMMC_CMD                (pin_D2)
+

@@ -80,3 +80,4 @@
 #endif /*__RTTHREAD__*/
 
 #endif /*LV_CONF_H*/
+

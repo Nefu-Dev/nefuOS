@@ -67,3 +67,4 @@
 #endif // MICROPY_INCLUDED_STM32_USBD_CONF_H
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

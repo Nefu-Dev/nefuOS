@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— 元胞自动机实现
 #include "ca.h"
 #include <string.h>
@@ -647,3 +652,4 @@ int ca_self_test() {
 
 } // namespace simulate
 } // namespace nefu
+

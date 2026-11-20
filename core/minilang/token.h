@@ -1,4 +1,9 @@
-﻿// ============================================================================
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ============================================================================
 // nefu::minilang —— 词法分析器（token.h）
 // ----------------------------------------------------------------------------
 // 把源代码字符串切成 token 序列。支持：
@@ -91,4 +96,5 @@ int token_self_test();
 
 } // namespace minilang
 } // namespace nefu
+
 

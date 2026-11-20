@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simulation laboratory — 仿真引擎可视化实验台
 // Controls:
 //   1..5  : 选择仿真 (Life / 粒子 / 单摆 / L-系统 / Boids)
@@ -217,7 +222,7 @@ static void sim_close(Window* w) {
 void simlab_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Simulation Lab", x, y, LAB_W, LAB_H);
+    Window* w = g_wm->create_window(T("模拟实验室", "Simulation Lab"), x, y, LAB_W, LAB_H);
     if (!w) return;
     SimLab* l = new SimLab();
     l->buf = new uint32_t[(size_t)LAB_W * LAB_H];
@@ -232,3 +237,4 @@ void simlab_launch() {
 }
 
 } // namespace nefu
+

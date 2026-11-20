@@ -50,3 +50,4 @@ void lv_demo_widgets_start_slideshow(void);
 #endif
 
 #endif /*LV_DEMO_WIDGETS_H*/
+

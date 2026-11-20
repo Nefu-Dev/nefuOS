@@ -2072,3 +2072,4 @@ int unicode_prop(CharRange *cr, const char *prop_name)
     }
     return ret;
 }
+

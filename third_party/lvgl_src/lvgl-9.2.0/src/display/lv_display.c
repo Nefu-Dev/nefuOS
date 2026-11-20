@@ -1132,3 +1132,4 @@ static void disp_event_cb(lv_event_t * e)
             break;
     }
 }
+

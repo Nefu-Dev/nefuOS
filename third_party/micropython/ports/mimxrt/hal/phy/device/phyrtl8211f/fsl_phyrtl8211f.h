@@ -161,3 +161,4 @@ status_t PHY_RTL8211F_EnableLoopback(phy_handle_t *handle, phy_loop_t mode, phy_
 /*! @}*/
 
 #endif /* _FSL_PHY_H_ */
+

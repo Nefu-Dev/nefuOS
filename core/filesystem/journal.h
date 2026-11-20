@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— 日志文件系统(Write-Ahead Logging)
 //
 // 实现经典 WAL(写前日志):所有对块设备的修改先记入日志,再落盘。
@@ -84,3 +89,4 @@ int journal_self_test();
 
 } // namespace filesystem
 } // namespace nefu
+

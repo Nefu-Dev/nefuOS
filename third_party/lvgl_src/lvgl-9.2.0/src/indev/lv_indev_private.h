@@ -132,3 +132,4 @@ lv_obj_t * lv_indev_find_scroll_obj(lv_indev_t * indev);
 #endif
 
 #endif /*LV_INDEV_PRIVATE_H*/
+

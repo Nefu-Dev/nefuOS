@@ -289,3 +289,4 @@ const mp_obj_module_t mp_module_thread = {
 MP_REGISTER_MODULE(MP_QSTR__thread, mp_module_thread);
 
 #endif // MICROPY_PY_THREAD
+

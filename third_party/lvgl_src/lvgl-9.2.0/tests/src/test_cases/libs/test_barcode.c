@@ -86,3 +86,4 @@ void test_barcode_normal(void)
 #endif
 
 #endif
+

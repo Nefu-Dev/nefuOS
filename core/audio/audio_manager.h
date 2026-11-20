@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Audio System - Full Implementation (with real sound-card output)
 #pragma once
 
@@ -371,3 +376,4 @@ inline AudioMixer g_audio;
 
 } // namespace audio
 } // namespace nefu
+

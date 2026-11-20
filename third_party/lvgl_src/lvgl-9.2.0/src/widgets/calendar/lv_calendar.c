@@ -501,3 +501,4 @@ static void chinese_calendar_set_day_name(lv_obj_t * obj, uint8_t index, uint8_t
 #endif
 
 #endif  /*LV_USE_CALENDAR*/
+

@@ -239,3 +239,4 @@ void mp_hal_pin_config_speed(uint32_t port_pin, uint32_t speed);
 #define pin_J13 (GPIOJ_BASE | 13)
 #define pin_J14 (GPIOJ_BASE | 14)
 #define pin_J15 (GPIOJ_BASE | 15)
+

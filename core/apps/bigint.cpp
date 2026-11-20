@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS big-integer calculator (arbitrary precision decimals).
 // Stores numbers as little-endian uint32 chunks in base 10^9, so up to
 // ~9000 digits fit. Modes: A+B, A-B, A*B, A/B (quotient+remainder), A^B,
@@ -562,3 +567,4 @@ void bigint_launch() {
 }
 
 } // namespace nefu
+

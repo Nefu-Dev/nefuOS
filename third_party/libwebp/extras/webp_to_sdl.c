@@ -95,3 +95,4 @@ int WebPToSDL(const char* data, unsigned int data_size) {
 //------------------------------------------------------------------------------
 
 #endif  // WEBP_HAVE_SDL
+

@@ -36,3 +36,4 @@ int esp_hosted_netif_input(esp_hosted_state_t *state, uint32_t itf, const void *
 err_t esp_hosted_netif_output(struct netif *netif, struct pbuf *p);
 
 #endif // MICROPY_INCLUDED_DRIVERS_ESP_HOSTED_NETIF_H
+

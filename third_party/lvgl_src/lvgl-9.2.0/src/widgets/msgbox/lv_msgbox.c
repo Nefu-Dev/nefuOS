@@ -292,3 +292,4 @@ static void msgbox_size_changed_event_cb(lv_event_t * e)
 }
 
 #endif /*LV_USE_MSGBOX*/
+

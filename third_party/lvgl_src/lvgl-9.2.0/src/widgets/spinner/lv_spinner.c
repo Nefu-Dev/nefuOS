@@ -104,3 +104,4 @@ static void arc_anim_end_angle(void * obj, int32_t v)
 }
 
 #endif /*LV_USE_SPINNER*/
+

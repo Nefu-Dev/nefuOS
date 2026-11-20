@@ -76,3 +76,4 @@ void lv_obj_destruct(lv_obj_t * obj);
 #endif
 
 #endif /*LV_OBJ_CLASS_PRIVATE_H*/
+

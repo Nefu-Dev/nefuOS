@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mini JVM - core helpers: VM ops, GC, strings, throwables, class
 // parsing, call/exception plumbing.  See minijvm.h for the overall scope.
 #include "minijvm_internal.h"
@@ -641,3 +646,4 @@ int propagate_exc(VM* vm) {
 }
 
 } // namespace nefu
+

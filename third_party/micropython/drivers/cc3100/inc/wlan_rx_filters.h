@@ -930,3 +930,4 @@ _i16 sl_WlanRxFilterGet(const SLrxFilterOperation_t RxFilterOperation,
 #endif /* RX_FILTERS_PREPROCESSOR_CLI_IF_H_ */
 
 
+

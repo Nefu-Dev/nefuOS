@@ -41,3 +41,4 @@ int WebPAnimEncoderRefineRect(
 #endif
 
 #endif  // WEBP_MUX_ANIMI_H_
+

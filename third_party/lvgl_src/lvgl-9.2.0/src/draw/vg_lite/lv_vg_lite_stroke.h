@@ -82,3 +82,4 @@ void lv_vg_lite_stroke_drop(struct lv_draw_vg_lite_unit_t * unit, lv_cache_entry
 #endif
 
 #endif /*LV_VG_LITE_STROKE_H*/
+

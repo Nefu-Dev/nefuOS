@@ -1,6 +1,12 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text viewer - LVGL GUI
 #include "apps.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/lv_cjk_font.h"
 
 namespace nefu {
 
@@ -43,7 +49,7 @@ void app_show_textview(FSNode* file) {
     if (txt.empty()) txt = "(empty file)";
     lv_label_set_text(st->label, txt.c_str());
     lv_obj_set_style_text_color(st->label, lv_color_hex(0x15181E), 0);
-    lv_obj_set_style_text_font(st->label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(st->label, &nefu::lv_font_cjk_16, 0);
     lv_obj_set_style_text_line_space(st->label, 3, 0);
     int lh = cap * 17 + 12;
     if (lh < 320) lh = 320;

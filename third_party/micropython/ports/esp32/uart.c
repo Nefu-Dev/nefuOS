@@ -122,3 +122,4 @@ static void IRAM_ATTR uart_irq_handler(void *arg) {
 }
 
 #endif // MICROPY_HW_ENABLE_UART_REPL
+

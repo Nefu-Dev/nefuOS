@@ -363,3 +363,4 @@ static void _pxp_blit(uint8_t * dest_buf, const lv_area_t * dest_area, int32_t d
 }
 
 #endif /*LV_USE_DRAW_PXP*/
+

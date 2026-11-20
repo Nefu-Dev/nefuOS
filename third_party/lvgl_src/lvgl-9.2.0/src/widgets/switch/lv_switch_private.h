@@ -52,3 +52,4 @@ struct lv_switch_t {
 #endif
 
 #endif /*LV_SWITCH_PRIVATE_H*/
+

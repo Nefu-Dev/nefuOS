@@ -1,4 +1,9 @@
-﻿// scene.cpp —— 场景管理纯逻辑：节点树遍历、世界矩阵、自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// scene.cpp —— 场景管理纯逻辑：节点树遍历、世界矩阵、自测
 #include "scene.h"
 
 
@@ -189,3 +194,4 @@ int scene_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

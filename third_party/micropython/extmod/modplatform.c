@@ -78,3 +78,4 @@ const mp_obj_module_t mp_module_platform = {
 MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_platform, mp_module_platform);
 
 #endif // MICROPY_PY_PLATFORM
+

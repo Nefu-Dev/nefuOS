@@ -140,3 +140,4 @@ void test_txt_next_line_should_handle_empty_string(void)
 }
 
 #endif
+

@@ -33,3 +33,4 @@ void lv_example_canvas_6(void)
     lv_canvas_finish_layer(canvas, &layer);
 }
 #endif
+

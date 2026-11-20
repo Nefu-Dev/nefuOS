@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS minimal ZIP reader for .nefud Linux .deb payloads.
 // Reads via the central directory (EOCD + PK\x01\x02 entries). Supports only
 // stored (method 0) and raw-DEFLATE (method 8) entries. No ZIP64, no
@@ -39,3 +44,4 @@ long read(const uint8_t* d, size_t n, const Entry& e, uint8_t* dst, size_t cap);
 
 } // namespace zip
 } // namespace nefu
+

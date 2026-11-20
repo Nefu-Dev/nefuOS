@@ -110,3 +110,4 @@ void PORTENTA_C33_board_enter_bootloader(void);
 // ESP hosted control pins
 #define MICROPY_HW_ESP_HOSTED_RESET     (pin_P804)
 #define MICROPY_HW_ESP_HOSTED_GPIO0     (pin_P803)
+

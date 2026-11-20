@@ -119,3 +119,4 @@ void test_checkbox_rtl(void)
 }
 
 #endif
+

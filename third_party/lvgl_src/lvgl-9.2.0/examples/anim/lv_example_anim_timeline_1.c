@@ -169,3 +169,4 @@ void lv_example_anim_timeline_1(void)
 }
 
 #endif
+

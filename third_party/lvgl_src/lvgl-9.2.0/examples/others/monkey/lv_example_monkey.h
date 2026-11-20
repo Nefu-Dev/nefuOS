@@ -38,3 +38,4 @@ void lv_example_monkey_3(void);
 #endif
 
 #endif /*LV_EXAMPLE_MONKEY_H*/
+

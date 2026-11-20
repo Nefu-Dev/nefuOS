@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Graphics System - Full Implementation
 #pragma once
 
@@ -475,3 +480,4 @@ GraphicsManager g_graphics;
 
 } // namespace gfx
 } // namespace nefu
+

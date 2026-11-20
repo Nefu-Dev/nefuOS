@@ -83,3 +83,4 @@ void test_tiny_ttf_kerning(void)
 }
 
 #endif
+

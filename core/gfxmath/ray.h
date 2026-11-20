@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 射线 ray 与平面 plane
 // 教学版：射线（起点+方向）与平面（点+法线）的求交，用于光线追踪与拾取。
 // 两个小类放同一个头，均为纯几何教学实现。
@@ -61,3 +66,4 @@ struct Plane {
 
 } // namespace gfx
 } // namespace nefu
+

@@ -22,3 +22,4 @@ void lv_example_line_1(void)
 }
 
 #endif
+

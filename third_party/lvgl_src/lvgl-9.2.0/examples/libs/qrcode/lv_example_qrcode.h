@@ -36,3 +36,4 @@ void lv_example_qrcode_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_QRCODE_H*/
+

@@ -411,3 +411,4 @@ lv_result_t lv_indev_send_event(lv_indev_t * indev, lv_event_code_t code, void *
 #endif
 
 #endif /*LV_INDEV_H*/
+

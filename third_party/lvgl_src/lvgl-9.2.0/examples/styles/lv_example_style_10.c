@@ -38,3 +38,4 @@ void lv_example_style_10(void)
 }
 
 #endif
+

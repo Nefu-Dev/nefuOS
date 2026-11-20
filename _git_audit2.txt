@@ -1,0 +1,3 @@
+tracked tools/qemu files: 0
+tracked a/ files: 0
+== biggest untracked (>20MB, excluding verify_out/a/ventoy) ==

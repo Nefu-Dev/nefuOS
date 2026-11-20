@@ -33,3 +33,4 @@ typedef uint32_t sys_prot_t;
 #define sys_now mp_hal_ticks_ms
 
 #endif // MICROPY_INCLUDED_EXTMOD_LWIP_INCLUDE_LWIPOPTS_H
+

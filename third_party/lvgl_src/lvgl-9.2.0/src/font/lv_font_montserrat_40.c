@@ -9246,3 +9246,4 @@ lv_font_t lv_font_montserrat_40 = {
 };
 
 #endif /*#if LV_FONT_MONTSERRAT_40*/
+

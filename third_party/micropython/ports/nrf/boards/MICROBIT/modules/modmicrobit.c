@@ -158,3 +158,4 @@ const mp_obj_module_t microbit_module = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_microbit, microbit_module);
+

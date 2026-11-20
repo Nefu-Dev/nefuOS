@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = MIMXRT1052
 MCU_VARIANT = MIMXRT1052DVL6B
 
@@ -15,3 +20,4 @@ MICROPY_SSL_MBEDTLS = 1
 FROZEN_MANIFEST ?= $(BOARD_DIR)/manifest.py
 
 CFLAGS += -DSPI_RETRY_TIMES=1000000
+

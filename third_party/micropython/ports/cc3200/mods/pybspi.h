@@ -30,3 +30,4 @@
 extern const mp_obj_type_t pyb_spi_type;
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBSPI_H
+

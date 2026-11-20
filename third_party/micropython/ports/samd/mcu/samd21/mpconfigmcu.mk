@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 CFLAGS_MCU += -mtune=cortex-m0plus -mcpu=cortex-m0plus -msoft-float
 
 CFLAGS_MCU += -DCFG_TUSB_MCU=OPT_MCU_SAMD21
@@ -15,3 +20,4 @@ MICROPY_VFS_LFS1 ?= 1
 SRC_S += shared/runtime/gchelper_thumb1.s
 
 UF2CONV_FLAGS += -f 0x68ed2b88
+

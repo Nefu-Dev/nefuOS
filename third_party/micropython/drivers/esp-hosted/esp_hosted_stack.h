@@ -61,3 +61,4 @@ static inline void *esp_hosted_stack_pop(esp_hosted_stack_t *stack, bool peek) {
     return data;
 }
 #endif // MICROPY_INCLUDED_DRIVERS_ESP_HOSTED_STACK_H
+

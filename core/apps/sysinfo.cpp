@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS System Info App
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -91,7 +96,7 @@ static void sysinfo_close(Window* w) {
 
 void sysinfo_launch() {
     SysInfoState* st = new SysInfoState();
-    Window* w = g_wm->create_window("System Info", 200, 150, 350, 450);
+    Window* w = g_wm->create_window(T("系统信息", "System Info"), 200, 150, 350, 450);
     w->userdata = st;
     w->on_paint = sysinfo_paint;
     w->on_close = sysinfo_close;

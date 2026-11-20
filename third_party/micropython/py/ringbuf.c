@@ -96,3 +96,4 @@ int ringbuf_put_bytes(ringbuf_t *r, const uint8_t *data, size_t data_len) {
     ringbuf_memcpy_put_internal(r, data, data_len);
     return 0;
 }
+

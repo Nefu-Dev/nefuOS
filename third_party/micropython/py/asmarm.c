@@ -397,3 +397,4 @@ void asm_arm_bx_reg(asm_arm_t *as, uint reg_src) {
 }
 
 #endif // MICROPY_EMIT_ARM
+

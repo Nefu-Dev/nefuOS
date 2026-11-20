@@ -1,4 +1,9 @@
-﻿#include "datlib/lru.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "datlib/lru.h"
 #include <cstdio>
 namespace nefu { namespace dt { int lru_page_faults(const int* pages, int n, int frames); }}
 int main(){
@@ -10,3 +15,4 @@ int main(){
     printf("DONE\n");
     return 0;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS File Search app
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -71,7 +76,7 @@ static void search_on_key(Window* win, const KeyEvent* e) {
 void app_search_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("File Search", x, y, 350, 280);
+    Window* w = g_wm->create_window(T("文件搜索", "File Search"), x, y, 350, 280);
     if (!w) return;
     SearchState* st = new SearchState();
     st->w = w->content_w;
@@ -85,3 +90,4 @@ void app_search_launch() {
 }
 
 } // namespace nefu
+

@@ -72,3 +72,4 @@ void mp_irq_handler (mp_obj_t self_in);
 uint mp_irq_translate_priority (uint priority);
 
 #endif // MICROPY_INCLUDED_CC3200_MISC_MPIRQ_H
+

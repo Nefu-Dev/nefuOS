@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // socket.h - 轻量级 socket 抽象 (面向 UDP/TCP 简化版)
 // 不做实际收发，仅维护连接五元组与发送缓冲队列
 #ifndef NEFU_NETPROTO_SOCKET_H
@@ -81,3 +86,4 @@ int socket_self_test();
 } // namespace nefu
 
 #endif // NEFU_NETPROTO_SOCKET_H
+

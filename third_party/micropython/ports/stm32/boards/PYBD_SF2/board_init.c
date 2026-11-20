@@ -87,3 +87,4 @@ void mp_hal_get_mac(int idx, uint8_t buf[6]) {
 }
 
 #endif
+

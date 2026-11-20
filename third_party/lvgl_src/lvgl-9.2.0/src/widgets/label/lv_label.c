@@ -1331,3 +1331,4 @@ static void calculate_x_coordinate(int32_t * x, const lv_text_align_t align, con
 }
 
 #endif
+

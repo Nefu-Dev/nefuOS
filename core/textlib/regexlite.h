@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — lightweight regex engine
 // 迷你正则引擎：递归下降解析 + 回溯匹配。支持：
 //   . 任意字符   [abc] 字符类   [^abc] 取反   a|b 或
@@ -24,3 +29,4 @@ int regex_self_test();
 
 } // namespace text
 } // namespace nefu
+

@@ -89,3 +89,4 @@ int mp_bluetooth_hci_controller_deinit(void) {
 }
 
 #endif
+

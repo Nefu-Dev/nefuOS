@@ -61,3 +61,4 @@ inline static void mp_cstack_check(void) {
 #endif
 
 #endif // MICROPY_INCLUDED_PY_CSTACK_H
+

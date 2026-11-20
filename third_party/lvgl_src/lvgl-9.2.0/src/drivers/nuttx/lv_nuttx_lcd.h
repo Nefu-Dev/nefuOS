@@ -47,3 +47,4 @@ lv_display_t * lv_nuttx_lcd_create(const char * dev_path);
 #endif
 
 #endif /* LV_NUTTX_LCD_H */
+

@@ -99,3 +99,4 @@ lv_result_t lv_snapshot_take_to_buf(lv_obj_t * obj, lv_color_format_t cf, lv_ima
 #endif
 
 #endif
+

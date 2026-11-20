@@ -205,3 +205,4 @@ static void machine_soft_pwm_start(machine_pwm_obj_t *self) {
         pwm_set_duty_cycle(self->pwm_pin, duty_width);
     }
 }
+

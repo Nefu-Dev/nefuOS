@@ -31,3 +31,4 @@ void lv_example_style_8(void)
 }
 
 #endif
+

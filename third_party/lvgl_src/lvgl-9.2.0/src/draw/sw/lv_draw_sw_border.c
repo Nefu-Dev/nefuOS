@@ -334,3 +334,4 @@ static void draw_border_simple(lv_draw_unit_t * draw_unit, const lv_area_t * out
 }
 
 #endif /*LV_USE_DRAW_SW*/
+

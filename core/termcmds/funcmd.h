@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  funcmd.h —— 趣味命令: cowsay/fortune/sl/figlet/random/joke/quote
 // =============================================================================
@@ -23,3 +28,4 @@ int funcmd_self_test();
 
 } // namespace termcmds
 } // namespace nefu
+

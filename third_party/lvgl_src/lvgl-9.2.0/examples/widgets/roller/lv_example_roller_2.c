@@ -64,3 +64,4 @@ void lv_example_roller_2(void)
 }
 
 #endif
+

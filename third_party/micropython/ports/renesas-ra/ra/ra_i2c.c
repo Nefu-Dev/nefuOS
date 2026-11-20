@@ -688,3 +688,4 @@ bool ra_i2c_action_execute(R_IIC0_Type *i2c_inst, xaction_t *action, bool repeat
 
     return flag;
 }
+

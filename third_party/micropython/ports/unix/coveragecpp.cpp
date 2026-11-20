@@ -36,3 +36,4 @@ extern const mp_obj_fun_builtin_fixed_t extra_cpp_coverage_obj = {{&mp_type_fun_
 }
 
 #endif
+

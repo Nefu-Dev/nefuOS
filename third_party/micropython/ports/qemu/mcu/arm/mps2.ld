@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* This file is part of the MicroPython project, http://micropython.org/
  * The MIT License (MIT)
  * Copyright (c) 2018 Damien P. George
@@ -41,3 +46,4 @@ SECTIONS
         _ebss = .;
     } >RAM
 }
+

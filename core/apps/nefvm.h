@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS NEFVM: tiny stack-based VM that executes .bin applications.
 // A .bin file is a real binary app package (not a text manifest like .nefud):
 // [0..7] magic "NEFBIN01"
@@ -18,3 +23,4 @@ namespace nefu {
 int nefvm_run(const uint8_t* code, uint32_t len, void (*out)(const char*, void*), void* ud);
 
 } // namespace nefu
+

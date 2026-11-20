@@ -64,3 +64,4 @@ const machine_pin_obj_t *machine_pin_find(mp_obj_t user_obj);
 const machine_pin_obj_t *pin_find_named_pin(const mp_obj_dict_t *named_pins, mp_obj_t name);
 
 #endif // MICROPY_INCLUDED_RA_PIN_H
+

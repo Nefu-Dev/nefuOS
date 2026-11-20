@@ -36,3 +36,4 @@ void lv_example_snapshot_1(void);
 #endif
 
 #endif /*LV_EX_GET_STARTED_H*/
+

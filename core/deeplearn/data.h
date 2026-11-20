@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 微型数据集工具
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 微型数据集工具
 // 典型用法：
 //   DataSet ds = make_regression(N, D);
 //   ds.shuffle();
@@ -50,3 +55,4 @@ int data_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

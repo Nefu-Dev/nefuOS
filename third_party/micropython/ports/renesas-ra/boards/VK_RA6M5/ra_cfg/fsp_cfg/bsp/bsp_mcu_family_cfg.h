@@ -384,3 +384,4 @@ extern "C" {
 }
 #endif
 #endif /* BSP_MCU_FAMILY_CFG_H_ */
+

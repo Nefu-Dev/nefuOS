@@ -214,3 +214,4 @@ mp_obj_t mp_seq_count_obj(const mp_obj_t *items, size_t len, mp_obj_t value) {
     // Common sense says this cannot overflow small int
     return MP_OBJ_NEW_SMALL_INT(count);
 }
+

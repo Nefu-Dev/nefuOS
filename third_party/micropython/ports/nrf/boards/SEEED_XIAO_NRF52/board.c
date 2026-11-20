@@ -66,3 +66,4 @@ void XIAO_board_enter_bootloader(void) {
     NRF_POWER->GPREGRET = DFU_MAGIC_UF2_RESET;
     NVIC_SystemReset();
 }
+

@@ -36,3 +36,4 @@ void lv_example_bmp_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_BMP_H*/
+

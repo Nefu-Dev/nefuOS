@@ -81,3 +81,4 @@ void mp_unix_free_exec(void *ptr, size_t size) {
 MP_REGISTER_ROOT_POINTER(void *mmap_region_head);
 
 #endif // MICROPY_EMIT_NATIVE
+

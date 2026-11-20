@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 仿真引擎库 —— 群体行为 (Flocking / Boids)
 // 包含：
 //   - Boids 三规则：分离(separation) / 对齐(alignment) / 聚合(cohesion)
@@ -84,3 +89,4 @@ int flocking_self_test();
 
 } // namespace simulate
 } // namespace nefu
+

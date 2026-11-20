@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 相机 camera
 // 教学版：透视相机（位置、朝向、视锥参数）与视图矩阵、投影矩阵。
 // 用于把 3D 场景变换到 2D 屏幕。class / STL / cmath / 中文注释。
@@ -52,3 +57,4 @@ private:
 
 } // namespace gfx
 } // namespace nefu
+

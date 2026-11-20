@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // mail_logic_test.cpp - headless functional tests for the nefuOS mail app
 // (core/apps/email.h). Exercises persistence round-trip, wrap, message ops,
 // compose ops, and visible-list mapping against a real in-memory VFS.
@@ -232,3 +237,4 @@ int main() {
     printf("\n%d checks, %d failures\n", s_checks, s_fails);
     return s_fails == 0 ? 0 : 1;
 }
+

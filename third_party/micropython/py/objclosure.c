@@ -111,3 +111,4 @@ mp_obj_t mp_obj_new_closure(mp_obj_t fun, size_t n_closed_over, const mp_obj_t *
     memcpy(o->closed, closed, n_closed_over * sizeof(mp_obj_t));
     return MP_OBJ_FROM_PTR(o);
 }
+

@@ -77,3 +77,4 @@ const char * lv_checkbox_get_text(const lv_obj_t * obj);
 #endif
 
 #endif /*LV_CHECKBOX_H*/
+

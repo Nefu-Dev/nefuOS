@@ -105,3 +105,4 @@ void iic_master_eri_isr(void);
 bool ra_i2c_action_execute(R_IIC0_Type *i2c_inst, xaction_t *action, bool repeated_start, uint32_t timeout_ms);
 
 #endif /* RA_RA_I2C_H_ */
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库独立编译测试
 // 编译：
 //   D:\CLion\bin\mingw\bin\g++.exe -std=c++17 -fno-exceptions -fno-rtti -O2 -I core ^
@@ -41,3 +46,4 @@ int main() {
     printf("\n=== RESULT: %s (total failures=%d) ===\n", total==0?"ALL PASS":"SOME FAILURES", total);
     return total==0 ? 0 : 1;
 }
+

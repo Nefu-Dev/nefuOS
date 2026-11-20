@@ -97,3 +97,4 @@ const bsp_interrupt_event_t g_interrupt_event_link_select[BSP_ICU_VECTOR_MAX_ENT
     [43] = BSP_PRV_IELS_ENUM(EVENT_IIC2_ERI),         /* IIC2 ERI (Transfer error) */
 };
 #endif
+

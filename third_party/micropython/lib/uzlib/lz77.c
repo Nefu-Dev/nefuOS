@@ -89,3 +89,4 @@ void uzlib_lz77_compress(uzlib_lz77_state_t *state, const uint8_t *src, unsigned
         }
     }
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* This linker script fragment is intended to be included in SECTIONS. */
 
 /* For C++ exception handling */
@@ -20,3 +25,4 @@ _sidata = LOADADDR(.data);
     . = ALIGN(4);
     _edata = .;
 } >RAM AT> FLASH_COMMON
+

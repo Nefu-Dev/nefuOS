@@ -29,3 +29,4 @@ void ra_init(void);
 void ra_deinit(void);
 
 #endif /* PORTS_RA_RA_RA_INIT_H_ */
+

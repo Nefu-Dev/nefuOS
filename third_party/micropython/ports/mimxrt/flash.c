@@ -121,3 +121,4 @@ __attribute__((section(".ram_functions"))) status_t flash_write_block(uint32_t d
 __attribute__((section(".ram_functions"))) void flash_read_block(uint32_t src_addr, uint8_t *dest, uint32_t length) {
     memcpy(dest, (const uint8_t *)(BOARD_FLEX_SPI_ADDR_BASE + src_addr), length);
 }
+

@@ -233,3 +233,4 @@ void VP8AdjustFilterStrength(VP8EncIterator* const it) {
 }
 
 // -----------------------------------------------------------------------------
+

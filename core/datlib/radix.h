@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — radix trie (radix)
 // 基数树：以二进制位（或字符）分层的字典树，字符串键共享前缀。
 // 本实现为字符级前缀树（trie），支持插入/查找/删除/前缀查询/
@@ -130,3 +135,4 @@ int radix_self_test();
 
 } // namespace dt
 } // namespace nefu
+

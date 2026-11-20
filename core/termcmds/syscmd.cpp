@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  syscmd.cpp —— 系统命令实现
 // =============================================================================
@@ -302,3 +307,4 @@ int syscmd_self_test() {
 
 } // namespace termcmds
 } // namespace nefu
+

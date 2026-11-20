@@ -80,3 +80,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     call, pyb_switch_call,
     locals_dict, &pyb_switch_locals_dict
     );
+

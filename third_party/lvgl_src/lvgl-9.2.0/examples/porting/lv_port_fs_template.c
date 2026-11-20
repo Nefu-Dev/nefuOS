@@ -259,3 +259,4 @@ static lv_fs_res_t fs_dir_close(lv_fs_drv_t * drv, void * rddir_p)
 /*This dummy typedef exists purely to silence -Wpedantic.*/
 typedef int keep_pedantic_happy;
 #endif
+

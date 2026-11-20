@@ -477,3 +477,4 @@ void WebPAnimDecoderDelete(WebPAnimDecoder* dec) {
     WebPSafeFree(dec);
   }
 }
+

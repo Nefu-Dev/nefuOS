@@ -289,3 +289,4 @@ int WebPDequantizeLevels(uint8_t* const data, int width, int height, int stride,
   }
   return 1;
 }
+

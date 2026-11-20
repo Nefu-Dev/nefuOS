@@ -1045,3 +1045,4 @@ static lv_result_t lv_obj_get_any(const lv_obj_t * obj, lv_prop_id_t id, lv_prop
     }
 }
 #endif
+

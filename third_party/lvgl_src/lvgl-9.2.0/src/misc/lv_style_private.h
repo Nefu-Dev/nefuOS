@@ -37,3 +37,4 @@ extern "C" {
 #endif
 
 #endif /*LV_STYLE_PRIVATE_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS native TLS 1.3 client (RFC 8446) - implementation
 // X25519 (RFC 7748) + HKDF-SHA256 + AES-128-GCM / ChaCha20-Poly1305
 // Chrome-style ClientHello fingerprint. No certificate validation (NoVerify).
@@ -9,9 +14,29 @@
 #include "../klib/klib.h"
 #include <string.h>
 #include <stdio.h>
+#ifndef NEFU_BARE
+#include <stdlib.h>   // getenv: opt-in key dump on the host build
+#endif
 
 namespace nefu {
 namespace tls {
+
+// The handshake key dump below is dozens of hex lines per connection. On the
+// bare build it is the COM1 reference tls_keychain.py compares against, so it
+// stays on there; on the host it buried every other log line (a single baidu
+// load printed tens of KB of keys), so it is opt-in via NF_TLS_DUMP.
+static bool tls_key_dump_enabled() {
+#ifdef NEFU_BARE
+    return true;
+#else
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("NF_TLS_DUMP");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v == 1;
+#endif
+}
 
 // ============================================================
 // ============================================================
@@ -486,6 +511,15 @@ struct Tls13Conn {
     uint8_t rbuf[16384 + 256];
     uint8_t dec[65536 + 256];
     int dec_len, dec_pos;
+    // Partial-record state: lets a record read survive a socket timeout.
+    // rec_hdr_have counts bytes already consumed of the 5-byte record header,
+    // rec_len is the announced payload length of the record being read and
+    // rec_buf_have counts payload bytes already stored in rbuf. Without this a
+    // single timeout in the middle of a record would discard the bytes read so
+    // far and permanently desynchronise the TLS stream.
+    int rec_hdr_have;
+    int rec_len;
+    int rec_buf_have;
     int hs_encrypted;    // 0: ServerHello still plaintext, 1: encrypted handshake
     int keylen;          // 16 (AES-128-GCM) or 32 (ChaCha20)
     char alpn[16];       // server-selected ALPN protocol ("" if none)
@@ -546,33 +580,79 @@ static int tls_send_encrypted_rec(Tls13Conn* c, const uint8_t key[32], const uin
     return tls_send_record(c, TLS_RT_APP, out, ptlen + 16);
 }
 
-static int tls_read_exact(Tls13Conn* c, uint8_t* buf, int n, int timeout_ms) {
-    int got = 0;
-    while (got < n) {
-        int r = c->rf(c->ctx, buf + got, n - got, timeout_ms);
-        if (r <= 0) {
-            snprintf(c->err, sizeof(c->err), "recv short: got %d want %d (rf=%d)", got, n, r);
-            return -1;
-        }
-        got += r;
-    }
-    return got;
-}
+// ---------------------------------------------------------------------------
+// Record reading with timeout resilience.
+//
+// A socket read can time out in the middle of a record (the peer is simply
+// slow). Treating that as a fatal error truncates the response, so instead the
+// partially consumed bytes are kept in the connection state and the next call
+// resumes where the previous one stopped.
+//
+// Return codes of the recv callback (tls_recv_fn):
+//   > 0 : bytes received
+//     0 : peer closed the connection (clean EOF)
+//    -1 : no data available within the timeout (retry later)
+//    -2 : hard error (connection lost)
+//
+// tls_read_record maps them to:
+//    1 : a complete record was read (type/payload/plen are set)
+//    0 : peer closed the connection (EOF)
+//   -1 : timed out, no data yet (caller may retry; state preserved)
+//   -2 : fatal error
+// ---------------------------------------------------------------------------
+#define TLS_REC_READY    1
+#define TLS_REC_EOF      0
+#define TLS_REC_TIMEOUT (-1)
+#define TLS_REC_ERROR   (-2)
 
 static int tls_read_record(Tls13Conn* c, int* type, uint8_t** payload, int* plen, int timeout_ms) {
-    uint8_t hdr[5];
-    if (tls_read_exact(c, hdr, 5, timeout_ms) < 0) return -1;
-#ifdef NEFU_DUMP_REC
-    fprintf(stderr, "[rec] hdr=%02x %02x%02x %02x%02x\n", hdr[0], hdr[1], hdr[2], hdr[3], hdr[4]);
-#endif
-    memcpy(c->rec_hdr, hdr, 5);
-    *type = hdr[0];
-    int len = (hdr[3] << 8) | hdr[4];
-    if (len < 0 || len > (int)sizeof(c->rbuf)) {
-        snprintf(c->err, sizeof(c->err), "bad record len %d type %d", len, hdr[0]);
-        return -1;
+    // ---- record header (5 bytes), resumable across timeouts ----
+    while (c->rec_hdr_have < 5) {
+        int r = c->rf(c->ctx, c->rec_hdr + c->rec_hdr_have, 5 - c->rec_hdr_have, timeout_ms);
+        if (r > 0) {
+            c->rec_hdr_have += r;
+            continue;
+        }
+        if (r == 0) return TLS_REC_EOF;          // peer closed
+        if (r == -2) {
+            snprintf(c->err, sizeof(c->err), "recv error in record header");
+            return TLS_REC_ERROR;
+        }
+        return TLS_REC_TIMEOUT;                   // no data yet, retry later
     }
-    if (tls_read_exact(c, c->rbuf, len, timeout_ms) < 0) return -1;
+#ifdef NEFU_DUMP_REC
+    fprintf(stderr, "[rec] hdr=%02x %02x%02x %02x%02x\n", c->rec_hdr[0], c->rec_hdr[1], c->rec_hdr[2],
+            c->rec_hdr[3], c->rec_hdr[4]);
+#endif
+    *type = c->rec_hdr[0];
+    int len = (c->rec_hdr[3] << 8) | c->rec_hdr[4];
+    if (len < 0 || len > (int)sizeof(c->rbuf)) {
+        snprintf(c->err, sizeof(c->err), "bad record len %d type %d", len, c->rec_hdr[0]);
+        c->rec_hdr_have = 0;
+        return TLS_REC_ERROR;
+    }
+    c->rec_len = len;
+    // ---- record payload, resumable across timeouts ----
+    while (c->rec_buf_have < len) {
+        int r = c->rf(c->ctx, c->rbuf + c->rec_buf_have, len - c->rec_buf_have, timeout_ms);
+        if (r > 0) {
+            c->rec_buf_have += r;
+            continue;
+        }
+        if (r == 0) {
+            snprintf(c->err, sizeof(c->err), "peer closed mid-record");
+            c->rec_hdr_have = 0;
+            c->rec_buf_have = 0;
+            return TLS_REC_EOF;
+        }
+        if (r == -2) {
+            snprintf(c->err, sizeof(c->err), "recv error in record payload");
+            c->rec_hdr_have = 0;
+            c->rec_buf_have = 0;
+            return TLS_REC_ERROR;
+        }
+        return TLS_REC_TIMEOUT;                   // resume on the next call
+    }
 #ifdef NEFU_DUMP_REC
     {
         int dn = len < 16 ? len : 16;
@@ -583,7 +663,11 @@ static int tls_read_record(Tls13Conn* c, int* type, uint8_t** payload, int* plen
 #endif
     *payload = c->rbuf;
     *plen = len;
-    return 0;
+    // record fully consumed: reset for the next one
+    c->rec_hdr_have = 0;
+    c->rec_buf_have = 0;
+    c->rec_len = 0;
+    return TLS_REC_READY;
 }
 
 static int tls_decrypt_into(Tls13Conn* c, const uint8_t key[32], const uint8_t iv[12],
@@ -623,7 +707,13 @@ static int tls_fill_plain(Tls13Conn* c, uint8_t* dst, int n, int timeout_ms) {
             c->dec_len = rem; c->dec_pos = 0;
         }
         int type; uint8_t* pl; int plen;
-        if (tls_read_record(c, &type, &pl, &plen, timeout_ms) < 0) return -1;
+        int rr = tls_read_record(c, &type, &pl, &plen, timeout_ms);
+        if (rr == TLS_REC_TIMEOUT) return -1;   // caller retries; record state preserved
+        if (rr == TLS_REC_EOF) {
+            snprintf(c->err, sizeof(c->err), "peer closed during handshake");
+            return -1;
+        }
+        if (rr != TLS_REC_READY) return -1;
         if (c->hs_encrypted) {
             if (type == TLS_RT_CCS) continue;   // TLS 1.3 compat: skip ChangeCipherSpec
             if (type != TLS_RT_APP) {
@@ -847,16 +937,19 @@ static int build_client_hello(uint8_t* out, int outsz, const char* hostname,
         e = q;
     }
     // ALPN (RFC 7301 3.3.1): ProtocolNameList len = 2 bytes, each ProtocolName len = 1 byte
+    // Only "http/1.1" is advertised: the bare-metal HTTP client is HTTP/1.1 only.
+    // Offering "h2" as well would let the server pick HTTP/2, whose binary framing
+    // this client cannot parse -> guaranteed protocol breakage on CDNs such as
+    // Cloudflare that prefer h2 by default.
     {
         uint8_t* q = e;
         put16(q, 0x0010);
         uint8_t* t = q;
         uint8_t* u = t + 2;
-        u[0] = 0; u[1] = 12;                    // ProtocolNameList length = 12
-        u[2] = 2; memcpy(u + 3, "h2", 2);       // ProtocolName: len 2 + "h2"
-        u[5] = 8; memcpy(u + 6, "http/1.1", 8); // ProtocolName: len 8 + "http/1.1"
-        u += 14;                                // 2 + 1 + 2 + 1 + 8
-        put16(q, (int)(u - (t + 2)));           // ext len = 14
+        u[0] = 0; u[1] = 9;                     // ProtocolNameList length = 9
+        u[2] = 8; memcpy(u + 3, "http/1.1", 8); // ProtocolName: len 8 + "http/1.1"
+        u += 11;                                // 2 + 1 + 8
+        put16(q, (int)(u - (t + 2)));           // ext len = 9
         e = u;
     }
     int extlen = (int)(e - ext);
@@ -1035,6 +1128,7 @@ Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
     derive_secret(hs_secret, "s hs traffic", c, c->s_hs_sec);
     derive_traffic_keys(c, c->c_hs_sec, c->c_hs_key, c->c_hs_iv);
     derive_traffic_keys(c, c->s_hs_sec, c->s_hs_key, c->s_hs_iv);
+    if (tls_key_dump_enabled()) {
     // full-key diagnostic: on the host build stdout is lossless, so this is the
     // reference for cross-checking the bare COM1 dumps with tls_keychain.py
     klogf("[tls] alg=%d keylen=%d\n", c->alg, c->keylen);
@@ -1081,6 +1175,7 @@ Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
     klogf("[tls] s_hs_sec=\n");
     for (int rep = 0; rep < 2; rep++) {
         for (int i = 0; i < 32; i++) { klogf("%02x", c->s_hs_sec[i]); if (i % 16 == 15) klogf("\n"); }
+    }
     }
 #ifdef NEFU_DUMP_KEY
     { FILE* fp = fopen("keys_dump.bin", "wb");
@@ -1158,6 +1253,27 @@ Tls13Conn* tls13_connect(tls_recv_fn rf, tls_send_fn sf, void* ctx,
         th_append(c, msg, 36);
     }
 
+    // Handshake and application data share c->dec as one scratch stream.
+    // tls_fill_plain() appends a WHOLE decrypted record to c->dec while
+    // tls_read_hs_msg() consumes only the handshake message it needs, so the
+    // tail of the last handshake record (extra NewSessionTickets, padding, or
+    // the head of the next handshake message) can remain with dec_len > dec_pos.
+    // tls13_recv() serves c->dec first and would hand those binary handshake
+    // bytes to the caller as if they were HTTP application data - injecting
+    // control bytes into a JS chunk and producing random QuickJS errors such as
+    // "SyntaxError: unexpected token in expression: '^E'", even though hb
+    // reports the exact Content-Length (the body loop just pads back to cl).
+    // Nothing application-data can legitimately be in c->dec here: the server
+    // only starts sending app records after our client Finished, and no
+    // tls_fill_plain() call runs after that. Discard the handshake remainder
+    // before switching to application traffic keys.
+    if (c->dec_len - c->dec_pos > 0) {
+        klogf("[tls] drop %d bytes of handshake leftover before app data\n",
+              c->dec_len - c->dec_pos);
+    }
+    c->dec_len = 0;
+    c->dec_pos = 0;
+
     return c;
 
 fail:
@@ -1182,6 +1298,16 @@ int tls13_send(Tls13Conn* c, const uint8_t* data, int len) {
     return len;
 }
 
+// ---------------------------------------------------------------------------
+// Read decrypted application data.
+//
+// Return codes:
+//   > 0 : bytes delivered into buf
+//     0 : peer closed the connection (clean EOF)
+//    -1 : no data available yet (socket timeout) - the caller may retry, the
+//         connection state (including a partially read record) is preserved
+//    -2 : fatal error (protocol violation or lost connection)
+// ---------------------------------------------------------------------------
 int tls13_recv(Tls13Conn* c, uint8_t* buf, int maxlen, int timeout_ms) {
     // serve from leftover decrypted stream first
     if (c->dec_len - c->dec_pos > 0) {
@@ -1192,23 +1318,31 @@ int tls13_recv(Tls13Conn* c, uint8_t* buf, int maxlen, int timeout_ms) {
         return n;
     }
     int type; uint8_t* pl; int plen;
-    if (tls_read_record(c, &type, &pl, &plen, timeout_ms) < 0) return -1;
-    if (type != TLS_RT_APP) return -1;
+    int rr = tls_read_record(c, &type, &pl, &plen, timeout_ms);
+    if (rr == TLS_REC_TIMEOUT) return -1;   // retry later; record state preserved
+    if (rr == TLS_REC_EOF) return 0;       // peer closed
+    if (rr != TLS_REC_READY) return -2;
+    if (type == 21) return 0;   // alert (close_notify etc): treat as EOF after body
+    if (type != TLS_RT_APP) return -2;
     uint8_t plain[16384 + 256];
     int olen;
     int ct = tls_decrypt_into(c, c->s_ap_key, c->s_ap_iv, c->ap_recv_seq++, pl, plen, plain, &olen);
-    if (ct < 0) return -1;
+    if (ct < 0) return -2;   // decryption failed: fatal
     if (ct == TLS_RT_APP) {
         int n = olen;
         if (n > maxlen) n = maxlen;
+        // plain[] is a stack array, never the caller's buf, so always copy.
         memcpy(buf, plain, (size_t)n);
-        if (n < olen) {
-            // stash remainder
-            if (olen - n <= (int)sizeof(c->dec)) {
-                memcpy(c->dec, plain + n, (size_t)(olen - n));
-                c->dec_len = olen - n; c->dec_pos = 0;
-            }
+        // stash remainder
+        if (olen - n > (int)sizeof(c->dec)) {
+            // Cannot happen with the current record limits (a TLS record
+            // carries at most 16 KB of plaintext and c->dec is larger),
+            // but silently dropping data would corrupt the stream.
+            snprintf(c->err, sizeof(c->err), "dec overflow (%d > %d)", olen - n, (int)sizeof(c->dec));
+            return -2;
         }
+        memcpy(c->dec, plain + n, (size_t)(olen - n));
+        c->dec_len = olen - n; c->dec_pos = 0;
         return n;
     }
     // handshake inside app record (e.g. NewSessionTicket): skip, retry
@@ -1227,3 +1361,4 @@ const char* tls13_alpn(Tls13Conn* c) {
 
 } // namespace tls
 } // namespace nefu
+

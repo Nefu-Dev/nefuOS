@@ -67,3 +67,4 @@ void zephyr_getchar_init(void) {
     // All NULLs because we're interested only in the callback above
     uart_register_input(NULL, NULL, NULL);
 }
+

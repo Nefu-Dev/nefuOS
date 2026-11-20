@@ -358,3 +358,4 @@ static void enable_dave2d_drw_interrupt(void)
 #endif /*_RENESAS_RX_*/
 
 #endif /*LV_USE_RENESAS_GLCDC*/
+

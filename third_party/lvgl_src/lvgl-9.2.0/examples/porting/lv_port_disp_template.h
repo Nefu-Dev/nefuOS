@@ -55,3 +55,4 @@ void disp_disable_update(void);
 #endif /*LV_PORT_DISP_TEMPL_H*/
 
 #endif /*Disable/Enable content*/
+

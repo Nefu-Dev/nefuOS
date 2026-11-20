@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # setjmp.S — freestanding x86-64 setjmp/longjmp for the nefuOS kernel.
 # jmp_buf layout (8 x 8 bytes): rbx, rbp, r12, r13, r14, r15, rsp, rip
 # SysV AMD64 calling convention: arg0 = jmp_buf* in rdi, arg1 (longjmp val) in rsi.
@@ -30,3 +35,4 @@ longjmp:
     movq 48(%rdi), %rsp
     movl %esi, %eax               # return value = val
     jmp *56(%rdi)
+

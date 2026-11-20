@@ -290,3 +290,4 @@ void set_interrupt_table(void) {
         : "memory"
         );
 }
+

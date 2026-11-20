@@ -367,3 +367,4 @@ static void freetype_outline_event_cb(lv_event_t * e)
 #endif /* LV_USE_FREETYPE */
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

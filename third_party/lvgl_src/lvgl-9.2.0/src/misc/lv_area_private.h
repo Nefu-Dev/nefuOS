@@ -113,3 +113,4 @@ bool lv_area_is_equal(const lv_area_t * a, const lv_area_t * b);
 #endif
 
 #endif /*LV_AREA_PRIVATE_H*/
+

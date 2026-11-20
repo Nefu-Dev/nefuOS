@@ -255,3 +255,4 @@ sb7  = -2.2440952301e+01f; /* 0xc1b38712 */
 }
 
 #endif /* defined(_DOUBLE_IS_32BITS) */
+

@@ -165,3 +165,4 @@ void lv_cache_entry_delete(lv_cache_entry_t * entry)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

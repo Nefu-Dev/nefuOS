@@ -182,3 +182,4 @@ void samd_get_unique_id(samd_unique_id_t *id) {
         }
     }
 }
+

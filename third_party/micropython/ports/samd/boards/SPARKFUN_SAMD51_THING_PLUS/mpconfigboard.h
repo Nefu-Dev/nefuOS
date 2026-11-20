@@ -13,3 +13,4 @@
 // the board's external flash.
 #define MICROPY_HW_SPIFLASH         (1)
 #define MICROPY_HW_SPIFLASH_ID      (0)
+

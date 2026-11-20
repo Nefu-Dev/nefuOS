@@ -31,3 +31,4 @@ int nefu_webp_decode(const unsigned char* data, unsigned len,
     *rgba = out;
     return 1;
 }
+

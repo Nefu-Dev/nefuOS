@@ -105,3 +105,4 @@ void test_grid(void)
 #undef N
 }
 #endif
+

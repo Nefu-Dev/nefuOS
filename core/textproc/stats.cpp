@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 统计 / 向量 / 可读性(实现)
 #include "stats.h"
 #include "../klib/klib.h"
@@ -428,3 +433,4 @@ int stats_self_test() {
 
 } // namespace textproc
 } // namespace nefu
+

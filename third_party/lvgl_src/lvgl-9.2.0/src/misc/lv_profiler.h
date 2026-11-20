@@ -50,3 +50,4 @@ extern "C" {
 #endif
 
 #endif /*LV_PROFILER_H*/
+

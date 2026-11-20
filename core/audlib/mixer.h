@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 混音器 mixer 与效果 delay/reverb
 // 教学版：多轨混音（增益/淡入淡出/混音）与延时/混响效果器。
 #pragma once
@@ -66,3 +71,4 @@ private:
 
 } // namespace audx
 } // namespace nefu
+

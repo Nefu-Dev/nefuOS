@@ -117,3 +117,4 @@ bool nsvg_decode_mem(const uint8_t* data, int len, int max_px, int* w, int* h, u
     return true;
 }
 } // namespace nefu
+

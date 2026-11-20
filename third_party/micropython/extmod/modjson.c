@@ -384,3 +384,4 @@ const mp_obj_module_t mp_module_json = {
 MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_json, mp_module_json);
 
 #endif // MICROPY_PY_JSON
+

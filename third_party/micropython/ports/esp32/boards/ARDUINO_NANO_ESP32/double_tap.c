@@ -87,3 +87,4 @@ void double_tap_invalidate() {
 bool double_tap_check_match() {
     return memcmp(magic_area, MAGIC_TOKENS, sizeof(MAGIC_TOKENS)) == 0;
 }
+

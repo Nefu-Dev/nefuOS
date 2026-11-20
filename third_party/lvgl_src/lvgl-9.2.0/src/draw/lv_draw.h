@@ -270,3 +270,4 @@ void lv_draw_task_get_area(const lv_draw_task_t * t, lv_area_t * area);
 #endif
 
 #endif /*LV_DRAW_H*/
+

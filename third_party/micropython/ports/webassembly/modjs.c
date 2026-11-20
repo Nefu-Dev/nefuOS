@@ -53,3 +53,4 @@ MP_REGISTER_MODULE(MP_QSTR_js, mp_module_js);
 MP_REGISTER_MODULE_DELEGATION(mp_module_js, mp_module_js_attr);
 
 #endif // MICROPY_PY_JS
+

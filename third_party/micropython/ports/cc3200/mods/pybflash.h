@@ -33,3 +33,4 @@ extern const mp_obj_type_t pyb_flash_type;
 void pyb_flash_init_vfs(fs_user_mount_t *vfs);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBFLASH_H
+

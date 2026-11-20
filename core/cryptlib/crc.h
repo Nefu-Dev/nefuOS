@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — CRC (crc)
 // CRC：循环冗余校验。把数据视为多项式，模 2 除法求余。
 // CRC32（IEEE 802.3，多项式 0xEDB88320，初始 0xFFFFFFFF，异或输出）
@@ -22,3 +27,4 @@ int crc_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

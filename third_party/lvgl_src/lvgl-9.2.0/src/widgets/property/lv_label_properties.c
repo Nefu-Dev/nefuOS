@@ -24,3 +24,4 @@ const lv_property_name_t lv_label_property_names[4] = {
 
 /* *INDENT-ON* */
 #endif
+

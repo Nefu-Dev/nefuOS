@@ -850,3 +850,4 @@ static uint32_t tick_get_cb(void)
 }
 
 #endif /*LV_USE_LINUX_DRM*/
+

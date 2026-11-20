@@ -248,3 +248,4 @@ mp_obj_t mp_make_closure_from_proto_fun(mp_proto_fun_t proto_fun, const mp_modul
     // wrap function in closure object
     return mp_obj_new_closure(ffun, n_closed_over & 0xff, args + ((n_closed_over >> 7) & 2));
 }
+

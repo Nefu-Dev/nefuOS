@@ -56,3 +56,4 @@ int lv_vsnprintf(char * buffer, size_t count, const char * format, va_list va)
  **********************/
 
 #endif
+

@@ -406,3 +406,4 @@ static lv_cache_compare_res_t cache_node_cache_compare_cb(const lv_freetype_cach
 }
 
 #endif /*LV_USE_FREETYPE*/
+

@@ -70,3 +70,4 @@ void test_bmp_align_tile(void)
 }
 
 #endif
+

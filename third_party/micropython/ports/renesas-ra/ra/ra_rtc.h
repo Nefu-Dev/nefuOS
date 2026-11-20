@@ -68,3 +68,4 @@ void rtc_alarm_periodic_isr(void);
 void rtc_carry_isr(void);
 
 #endif /* RA_RTC_H_ */
+

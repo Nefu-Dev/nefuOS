@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - <string>
 // A std::string-like dynamic string on the nefuOS kernel heap. Built on the
 // same underlying char buffer approach as nefu::String (but self-contained).
@@ -95,3 +100,4 @@ inline string operator+(const char* a, const string& b)   { string r(a); r += b;
 
 } // namespace stdx
 } // namespace nefu
+

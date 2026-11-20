@@ -81,3 +81,4 @@ const pin_af_obj_t *pin_find_af_by_index(const machine_pin_obj_t *pin, mp_uint_t
 const pin_af_obj_t *pin_find_af_by_name(const machine_pin_obj_t *pin, const char *name);
 
 #endif // MICROPY_INCLUDED_STM32_PIN_H
+

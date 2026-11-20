@@ -82,3 +82,4 @@ void lv_test_assert_fail(void)
 }
 
 #endif
+

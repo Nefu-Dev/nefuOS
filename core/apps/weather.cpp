@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS built-in weather app
 // Shows simulated weather information
 #include "apps.h"
@@ -59,7 +64,7 @@ static void weather_paint(Window* win) {
 void app_weather_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Weather", x, y, 350, 380);
+    Window* w = g_wm->create_window(T("天气", "Weather"), x, y, 350, 380);
     if (!w) return;
     WeatherState* st = new WeatherState();
     st->w = w->content_w;
@@ -70,3 +75,4 @@ void app_weather_launch() {
 }
 
 } // namespace nefu
+

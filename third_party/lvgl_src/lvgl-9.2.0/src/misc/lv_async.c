@@ -106,3 +106,4 @@ static void lv_async_timer_cb(lv_timer_t * timer)
 
     info_save.cb(info_save.user_data);
 }
+

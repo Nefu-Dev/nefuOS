@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # nefuOS boot stub — 32-bit protected-mode, position-independent.
 # Ping-pong loader partner of boot.s: runs first at 0x20000 (window 1), then,
 # after copying itself out of the load window, at 0xB00000 for every later
@@ -39,12 +44,13 @@
 .equ WIN_SZ,        0x80000      # 512KB load window
 .equ WIN_BASE,      0x20000
 # Staging sits ABOVE the kernel image: the inflate destination is
-# 0x100000..0x100000+kSize (kSize ~9.3MB, ends ~0xA52000), so a staging base
+# 0x100000..0x100000+kSize (kSize ~10.4MB, ends ~0xB6A000), so a staging base
 # below that would let the decompressor overwrite the not-yet-consumed
-# compressed source (observed as inflate error -24).  0xB00000 clears the
-# kernel end (enforced by the build's memmap check); windows of 512KB end well
-# below the 0x2000000 stacks (stub + entry).
-.equ STAGE_BASE,    0xB00000
+# compressed source (observed as inflate error -24).  0x1400000 clears the
+# kernel end with room for the built-in demo clip (enforced by the build's
+# memmap check); a 2.6MB payload ends at ~0x1690000, well below the 0x2000000
+# stacks (stub + entry).
+.equ STAGE_BASE,    0x1400000
 .equ STAGE_STACK,   0x2000000
 
 .code32
@@ -238,3 +244,4 @@ dump_hex:
     movw $0xE9, %dx
     outb %al, %dx
     ret
+

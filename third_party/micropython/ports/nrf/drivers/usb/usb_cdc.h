@@ -38,3 +38,4 @@ void usb_cdc_write_char(char c);
 void usb_cdc_sd_event_handler(uint32_t soc_evt);
 
 #endif // NRF_DRIVERS_USB_CDC_H__
+

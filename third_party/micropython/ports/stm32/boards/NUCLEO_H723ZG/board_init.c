@@ -5,3 +5,4 @@ void NUCLEO_H723ZG_board_early_init(void) {
     mp_hal_pin_output(pyb_pin_OTG_FS_POWER);
     mp_hal_pin_low(pyb_pin_OTG_FS_POWER);
 }
+

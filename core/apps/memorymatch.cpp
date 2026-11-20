@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Memory Match — flip cards, find pairs
 #include "apps.h"
 #include "../gui/wm.h"
@@ -140,7 +145,7 @@ void mm_close(Window* w) {
 void memorymatch_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Memory Match", x, y, 380, 360);
+    Window* w = g_wm->create_window(T("记忆翻牌", "Memory Match"), x, y, 380, 360);
     if (!w) return;
     MemMatch* g = new MemMatch();
     g->w = w->content_w;
@@ -157,3 +162,4 @@ void memorymatch_launch() {
 }
 
 } // namespace nefu
+

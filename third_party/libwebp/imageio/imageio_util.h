@@ -62,3 +62,4 @@ int ImgIoUtilCheckSizeArgumentsOverflow(uint64_t stride, size_t height);
 #endif
 
 #endif  // WEBP_IMAGEIO_IMAGEIO_UTIL_H_
+

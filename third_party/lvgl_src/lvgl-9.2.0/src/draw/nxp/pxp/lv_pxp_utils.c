@@ -143,3 +143,4 @@ bool pxp_buf_aligned(const void * buf, uint32_t stride)
  **********************/
 
 #endif /*LV_USE_DRAW_PXP*/
+

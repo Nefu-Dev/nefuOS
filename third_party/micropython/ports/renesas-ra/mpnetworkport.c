@@ -72,3 +72,4 @@ void mod_network_lwip_init(void) {
     timer_started = true;
 }
 #endif // MICROPY_PY_LWIP
+

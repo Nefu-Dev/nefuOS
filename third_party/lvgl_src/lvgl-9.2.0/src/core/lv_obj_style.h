@@ -316,3 +316,4 @@ lv_opa_t lv_obj_get_style_opa_recursive(const lv_obj_t * obj, lv_part_t part);
 #endif
 
 #endif /*LV_OBJ_STYLE_H*/
+

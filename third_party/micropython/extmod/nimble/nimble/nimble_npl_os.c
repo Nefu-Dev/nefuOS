@@ -518,3 +518,4 @@ void ble_npl_hw_exit_critical(uint32_t atomic_state) {
     MICROPY_PY_BLUETOOTH_EXIT
     DEBUG_CRIT_printf("ble_npl_hw_exit_critical(%u)\n", (uint)atomic_state);
 }
+

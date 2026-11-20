@@ -43,3 +43,4 @@ void microbit_display_tick(void);
 bool microbit_display_active_animation(void);
 
 #endif // __MICROPY_INCLUDED_MICROBIT_DISPLAY_H__
+

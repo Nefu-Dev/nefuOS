@@ -168,3 +168,4 @@ void netutils_ethernet_trace(const mp_print_t *print, size_t len, const uint8_t 
         mp_printf(print, "\n");
     }
 }
+

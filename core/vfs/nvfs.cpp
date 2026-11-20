@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS NVFS - nefu Virtual File System (implementation)
 //
 // On-disk layout (single-partition image, 512-byte blocks, 4 MiB default):
@@ -59,6 +64,37 @@ static uint32_t u32_max(uint32_t a, uint32_t b) { return a > b ? a : b; }
 
 static uint8_t* jptr() { return s_image + (size_t)JRN_START_BLOCK * BLOCK_SIZE; }
 
+// ---------------- write-back bookkeeping ----------------
+// One bit per 512-byte image block. A block becomes dirty the moment its new
+// content is journaled and stays dirty until flush() has copied it to the
+// platform store. The bare-metal kernel commits four times a second, which is
+// only affordable because a flush writes the (usually tiny) dirty set instead
+// of the whole 4 MiB image.
+static uint8_t  s_dirty[TOTAL_BLOCKS / 8];
+static uint32_t s_dirty_n = 0;
+// True once the persistent store is known to carry a valid NVFS header (the
+// image was loaded from disk, or a full save wrote it). Until then the first
+// flush must go through platform_fs_save() instead of the range-only writer.
+static bool s_disk_has_header = false;
+
+static bool dirty_test(uint32_t b) {
+    if (b >= TOTAL_BLOCKS) return false;
+    return ((s_dirty[b / 8] >> (b % 8)) & 1) != 0;
+}
+
+static void mark_block_dirty(uint32_t b) {
+    if (b >= TOTAL_BLOCKS) return;
+    uint8_t bit = (uint8_t)(1u << (b % 8));
+    if (s_dirty[b / 8] & bit) return;
+    s_dirty[b / 8] |= bit;
+    s_dirty_n++;
+}
+
+static void clear_dirty_all() {
+    memset(s_dirty, 0, sizeof(s_dirty));
+    s_dirty_n = 0;
+}
+
 // FNV-1a 32-bit checksum over a journal payload.
 static uint32_t fnv1a(const uint8_t* d, uint32_t n) {
     uint32_t h = 2166136261u;
@@ -107,6 +143,11 @@ static bool jrec_append(uint8_t type, uint32_t block, const uint8_t* payload, ui
     memcpy(dst, &e, sizeof(JournalEntry));            // 17 bytes
     memset(dst + sizeof(JournalEntry), 0, JREC_HDR - sizeof(JournalEntry));
     if (size > 0 && payload) memcpy(dst + JREC_HDR, payload, size);
+    // The record itself lives inside the image's journal region, so the flip
+    // from "pending" to "on disk" happens block by block in flush().
+    uint32_t first_blk = (uint32_t)((dst - s_image) / BLOCK_SIZE);
+    uint32_t last_blk  = (uint32_t)((dst + JREC_HDR + size - 1 - s_image) / BLOCK_SIZE);
+    for (uint32_t b = first_blk; b <= last_blk; b++) mark_block_dirty(b);
     s_journal_pos += JREC_HDR + size;
     return true;
 }
@@ -136,6 +177,10 @@ static void replay_and_clear() {
         pos += JREC_HDR + e.size;
     }
     memset(j, 0, jsz);
+    // the cleared region must reach the disk too - a stale record left there
+    // by an earlier boot would be replayed by the next mount()
+    for (uint32_t b = JRN_START_BLOCK; b < JRN_START_BLOCK + JOURNAL_BLOCKS; b++)
+        mark_block_dirty(b);
     s_journal_pos = 0;
     s_journal_writes = 0;
 }
@@ -153,7 +198,11 @@ void journal_write_block(uint32_t block, const void* data, uint32_t size) {
     if (!is_mounted() || !data) return;
     if (size == 0 || size > BLOCK_SIZE || block >= TOTAL_BLOCKS) return;
     if (s_journal_pos + JREC_MAX > JOURNAL_BLOCKS * BLOCK_SIZE) replay_and_clear();
-    if (jrec_append(JOURNAL_WRITE, block, (const uint8_t*)data, size)) s_journal_writes++;
+    if (jrec_append(JOURNAL_WRITE, block, (const uint8_t*)data, size)) {
+        s_journal_writes++;
+        // the block carries new content: it must reach the disk on the next flush
+        mark_block_dirty(block);
+    }
 }
 
 void journal_commit() {
@@ -171,6 +220,57 @@ void sync() {
 }
 
 uint32_t journal_pending() { return s_journal_writes; }
+
+// ---------------- incremental write-back ----------------
+uint32_t dirty_blocks() { return s_dirty_n; }
+
+void mark_all_dirty() {
+    for (uint32_t b = 0; b < TOTAL_BLOCKS; b++) mark_block_dirty(b);
+}
+
+int flush() {
+    if (!s_image || s_image_size == 0) return -1;
+    if (!is_mounted()) return -1;
+    if (s_dirty_n == 0) return 0;
+    // The on-disk image starts with a header (the size word at FS_HEADER_LBA);
+    // save_range only fills data blocks. On a blank disk the first save must be
+    // a full one, otherwise the next boot finds no image and rebuilds a fresh
+    // tree — which silently threw away everything written since.
+    if (!s_disk_has_header) {
+        platform_fs_save(s_image, s_image_size);
+        s_disk_has_header = true;
+        int n = (int)s_dirty_n;
+        clear_dirty_all();
+        return n;
+    }
+    // Ascending block order is also the crash-safe order: the journal region
+    // (225..352) is written before any user data block, so a power cut in the
+    // middle leaves records on disk that replay into the intended new state.
+    uint32_t max_blocks = s_image_size / BLOCK_SIZE;
+    if (max_blocks > TOTAL_BLOCKS) max_blocks = TOTAL_BLOCKS;
+    uint32_t b = 0;
+    int written = 0;
+    while (b < TOTAL_BLOCKS) {
+        while (b < TOTAL_BLOCKS && !dirty_test(b)) b++;
+        if (b >= TOTAL_BLOCKS) break;
+        uint32_t end = b + 1;
+        while (end < TOTAL_BLOCKS && dirty_test(end)) end++;
+        bool ok = true;
+        if (b < max_blocks) {
+            uint32_t cnt = end - b;
+            if (b + cnt > max_blocks) cnt = max_blocks - b;
+            ok = platform_fs_save_range(s_image, s_image_size, b, cnt);
+        }
+        if (!ok) return -1;                 // keep the bits: retry next flush
+        for (uint32_t k = b; k < end; k++) {
+            s_dirty[k / 8] &= (uint8_t)~(1u << (k % 8));
+            if (s_dirty_n > 0) s_dirty_n--;
+        }
+        written += (int)(end - b);
+        b = end;
+    }
+    return written;
+}
 
 // ---------------- block allocation (journaled; call inside a transaction) ----------------
 static int alloc_block() {
@@ -506,9 +606,13 @@ bool load_image(uint8_t* data, uint32_t size) {
     g_nvfs.mounted = false;
     memset(&g_nvfs.sb, 0, sizeof(Superblock));
     s_journal_seq = 0; s_journal_pos = 0; s_journal_writes = 0; s_journal_depth = 0;
+    clear_dirty_all();
     if (!data || size < BLOCK_SIZE) return false;
     s_image = data;
     s_image_size = size;
+    // The bytes came from the platform store, so that store already carries the
+    // header — incremental saves from here on are safe.
+    s_disk_has_header = true;
     return true;
 }
 
@@ -557,6 +661,10 @@ static void format_image() {
         sb.free_blocks--;              // the root dir block is now used
     }
     memcpy(s_image, &sb, sizeof(Superblock));
+    // A fresh format replaces every metadata block, so the whole metadata
+    // region plus the root directory must be pushed to the disk next flush.
+    for (uint32_t m = 0; m < USER_DATA_START; m++) mark_block_dirty(m);
+    if (b >= 0) mark_block_dirty((uint32_t)b);
     s_journal_seq = 0; s_journal_pos = 0; s_journal_writes = 0; s_journal_depth = 0;
 }
 
@@ -567,6 +675,9 @@ bool init() {
     if (!s_image) return false;
     s_image_size = (uint32_t)TOTAL_BLOCKS * BLOCK_SIZE;
     memset(s_image, 0, s_image_size);
+    // Brand-new in-memory image: nothing is on the disk yet, so the next save
+    // has to be a full one that also lays down the image header.
+    s_disk_has_header = false;
     format_image();
     g_nvfs.mounted = true;
     g_nvfs.mount_point_inode = g_nvfs.sb.root_inode;
@@ -594,6 +705,7 @@ void unmount() {
     g_nvfs.mounted = false;
     memset(&g_nvfs.sb, 0, sizeof(Superblock));
     s_journal_seq = 0; s_journal_pos = 0; s_journal_writes = 0; s_journal_depth = 0;
+    clear_dirty_all();
 }
 
 void recover() {
@@ -749,6 +861,93 @@ int read_dir(int inode_num, DirEntry* entries, int max_entries) {
     return n;
 }
 
+// Create every missing directory component of an absolute path ("mkdir -p").
+static bool ensure_dir_path(const char* path) {
+    if (!path || path[0] != '/') return false;
+    char prefix[192];
+    int n = 0;
+    prefix[0] = 0;
+    const char* p = path;
+    while (*p == '/') p++;
+    while (*p) {
+        const char* start = p;
+        while (*p && *p != '/') p++;
+        int clen = (int)(p - start);
+        if (clen <= 0 || n + clen + 2 >= (int)sizeof(prefix)) return false;
+        prefix[n++] = '/';
+        memcpy(prefix + n, start, (size_t)clen);
+        n += clen;
+        prefix[n] = 0;
+        if (lookup(prefix) < 0) {
+            if (mkdir(prefix, 0755) < 0) return false;   // -1 = already there or bad parent
+        }
+        while (*p == '/') p++;
+    }
+    return true;
+}
+
+// Mirror one VFS path into the image. Parents are created on demand, an
+// existing file only rewrites the 512-byte blocks whose bytes really differ,
+// and a size change rewrites the file from scratch (blocks are given back
+// first so the image cannot leak them).
+bool sync_path(const char* path) {
+    if (!is_mounted() || !g_vfs || !path || path[0] != '/') return false;
+    FSNode* n = g_vfs->resolve(path);
+    if (!n) return false;                        // deleted: caller rebuilds
+    char parent[192], base[64];
+    split_parent(path, parent, sizeof(parent), base, sizeof(base));
+    if (!base[0]) return false;                  // "/" itself
+    if (parent[0] && !ensure_dir_path(parent)) return false;
+    int pino = lookup(parent[0] ? parent : "/");
+    if (pino < 0) return false;
+    Inode* pin = inode_ptr((uint32_t)pino);
+    if (!pin || pin->type != INODE_DIR) return false;
+
+    if (n->is_dir) {
+        if (dir_find((uint32_t)pino, base) < 0) {
+            if (mkdir(path, 0755) < 0) return false;
+        }
+        return true;
+    }
+
+    int ino = dir_find((uint32_t)pino, base);
+    if (ino < 0) {
+        ino = create_file(path, 0644);
+        if (ino < 0) return false;
+    }
+    Inode* in = inode_ptr((uint32_t)ino);
+    if (!in || in->type == INODE_DIR) return false;
+
+    uint32_t size = n->data ? n->size : 0;
+    journal_start();
+    if (in->size != size) {
+        bmap_free_all(in);
+        in->size = 0;
+        if (size > 0 && write_bytes_at(in, 0, n->data, size) < 0) {
+            journal_commit();
+            return false;
+        }
+        in->size = size;
+    } else {
+        uint32_t off = 0;
+        while (off < size) {
+            uint32_t chunk = u32_min(BLOCK_SIZE, size - off);
+            uint8_t old[BLOCK_SIZE];
+            bool same = (read_bytes_at(in, off, old, chunk) == (int)chunk) &&
+                        (memcmp(old, n->data + off, chunk) == 0);
+            if (!same && write_bytes_at(in, off, n->data + off, chunk) < 0) {
+                journal_commit();
+                return false;
+            }
+            off += chunk;
+        }
+    }
+    in->mtime = n->mtime;
+    jrn_inode(in);
+    journal_commit();
+    return true;
+}
+
 void vfs_to_nvfs() {
     if (!is_mounted() || !g_vfs) return;
     // Rebuild the image from the current VFS tree (fresh format keeps the
@@ -819,6 +1018,11 @@ void nvfs_to_vfs() {
         }
     };
     Rebuild::go(g_nvfs.sb.root_inode, "");
+    // Loading the image into the VFS goes through mkdir()/create_file(), which
+    // records every node as dirty. Nothing here needs writing back — the tree in
+    // RAM is exactly what is on disk — and leaving ~124 paths in a 64-entry
+    // table escalated to dirty_all(), so every boot rewrote the whole image.
+    if (g_vfs) g_vfs->dirty_reset();
 }
 
 uint64_t free_space() {
@@ -843,3 +1047,4 @@ int used_inode_count() {
 
 } // namespace nvfs
 } // namespace nefu
+

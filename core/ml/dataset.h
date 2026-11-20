@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 数据集管理
 // 负责：特征矩阵 / 标签的持有、训练-测试集划分、归一化（min-max / z-score）、
 //       one-hot 编码、类别计数与分层抽样辅助。
@@ -79,3 +84,4 @@ int dataset_self_test();
 
 } // namespace ml
 } // namespace nefu
+

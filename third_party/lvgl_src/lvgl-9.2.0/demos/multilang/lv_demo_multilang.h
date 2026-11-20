@@ -49,3 +49,4 @@ void lv_demo_multilang(void);
 #endif
 
 #endif /*LV_DEMO_MULTILANG_H*/
+

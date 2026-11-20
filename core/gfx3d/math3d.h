@@ -1,4 +1,9 @@
-﻿// ============================================================================
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ============================================================================
 // nefuOS 3D 图形库 —— math3d: 3D 数学基础
 // ----------------------------------------------------------------------------
 // 本文件提供软件渲染器所需的全部线性代数工具：
@@ -332,3 +337,4 @@ int math3d_self_test();
 
 } // namespace gfx3d
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— 聚合头
 //
 // 一次性引入整个文件系统子系统:
@@ -134,3 +139,4 @@ inline int filesystem_integration_smoke() {
 
 } // namespace filesystem
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Makefile directives for BlueKitchen BTstack
 
 ifeq ($(MICROPY_BLUETOOTH_BTSTACK),1)
@@ -88,3 +93,4 @@ $(BUILD)/lib/btstack/platform/%.o: CFLAGS += $(BTSTACK_WARNING_CFLAGS)
 
 endif
 endif
+

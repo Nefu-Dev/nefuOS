@@ -256,3 +256,4 @@ static inline status_t PHY_EnableLoopback(phy_handle_t *handle, phy_loop_t mode,
 
 /*! @}*/
 #endif
+

@@ -1393,3 +1393,4 @@ static WEBP_INLINE uint32_t func_hadd_uh_u32(v8u16 in) {
 
 #endif  // WEBP_USE_MSA
 #endif  // WEBP_DSP_MSA_MACRO_H_
+

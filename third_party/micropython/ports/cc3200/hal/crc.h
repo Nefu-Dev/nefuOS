@@ -96,3 +96,4 @@ extern void CRCSeedSet(uint32_t ui32Base, uint32_t ui32Seed);
 #endif
 
 #endif // __DRIVERLIB_CRC_H__
+

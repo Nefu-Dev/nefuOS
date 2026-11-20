@@ -94,3 +94,4 @@ static void flush_cache(const lv_draw_buf_t * draw_buf, const lv_area_t * area)
 }
 
 #endif /* LV_USE_NUTTX */
+

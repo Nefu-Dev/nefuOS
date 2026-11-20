@@ -178,3 +178,4 @@ void hub_display_off(void) {
     mp_hal_pin_config(pyb_pin_TLC_GS_CLK, MP_HAL_PIN_MODE_ANALOG, MP_HAL_PIN_PULL_NONE, 0);
     hub_display_init = false;
 }
+

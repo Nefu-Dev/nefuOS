@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS base library:memory,string,list,format
 // supports both host(Win32)and bare(freestanding)compile
 #pragma once
@@ -86,6 +91,11 @@ public:
     }
     int size() const { return size_; }
     bool empty() const { return size_ == 0; }
+    // Shrink-only truncation: drops elements past n WITHOUT calling their
+    // destructors (plain-array storage). Callers must release any heap the
+    // dropped elements own first (e.g. clear String members), or the
+    // buffers leak. Used by the layout engine to undo a measuring pass.
+    void truncate(int n) { if (n >= 0 && n < size_) size_ = n; }
     T& operator[](int i) { return data_[i]; }
     const T& operator[](int i) const { return data_[i]; }
     void push(const T& v) { if (size_ >= cap_) grow(); data_[size_++] = v; }
@@ -136,3 +146,4 @@ void klogf(const char* fmt, ...);   // format then output to debug channel
 int  kvsnprintf(char* buf, size_t bufsz, const char* fmt, va_list ap);
 
 } // namespace nefu
+

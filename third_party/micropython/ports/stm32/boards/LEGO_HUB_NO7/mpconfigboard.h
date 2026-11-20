@@ -150,3 +150,4 @@ void board_mboot_led_state(int led, int state);
 int board_mboot_get_reset_mode(uint32_t *initial_r0);
 void board_mboot_state_change(int state, uint32_t arg);
 void *btstack_chipset_cc256x_instance(void);
+

@@ -256,3 +256,4 @@ int WebPPictureDistortion(const WebPPicture* src, const WebPPicture* ref,
 }
 
 #endif  // !defined(WEBP_DISABLE_STATS)
+

@@ -295,3 +295,4 @@ WEBP_DSP_INIT_STUB(WebPInitYUV444ConvertersMIPSdspR2)
 #if !(defined(FANCY_UPSAMPLING) && defined(WEBP_USE_MIPS_DSP_R2))
 WEBP_DSP_INIT_STUB(WebPInitUpsamplersMIPSdspR2)
 #endif
+

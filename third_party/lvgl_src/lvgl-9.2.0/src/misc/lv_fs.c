@@ -693,3 +693,4 @@ static lv_fs_res_t lv_fs_seek_cached(lv_fs_file_t * file_p, uint32_t pos, lv_fs_
 
     return res;
 }
+

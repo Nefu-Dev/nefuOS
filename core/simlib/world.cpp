@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS simlib —— 2D 格子世界实现 + 自测
 #include "simlib/world.h"
 #include <cstdio>
@@ -168,3 +173,4 @@ int World2D::self_test() {
 
 } // namespace simx
 } // namespace nefu
+

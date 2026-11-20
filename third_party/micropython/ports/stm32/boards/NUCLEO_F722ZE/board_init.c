@@ -6,3 +6,4 @@ void board_early_init(void) {
     mp_hal_pin_output(USB_PowerSwitchOn);
     mp_hal_pin_low(USB_PowerSwitchOn);
 }
+

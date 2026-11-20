@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— Minix 文件系统(V1/V2 仿真)
 //
 // 在虚拟磁盘上仿真经典 Minix 文件系统:
@@ -134,3 +139,4 @@ int minixfs_self_test();
 
 } // namespace filesystem
 } // namespace nefu
+

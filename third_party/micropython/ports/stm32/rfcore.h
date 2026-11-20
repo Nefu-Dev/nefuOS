@@ -46,3 +46,4 @@ MP_DECLARE_CONST_FUN_OBJ_1(rfcore_fw_version_obj);
 MP_DECLARE_CONST_FUN_OBJ_VAR_BETWEEN(rfcore_sys_hci_obj);
 
 #endif // MICROPY_INCLUDED_STM32_RFCORE_H
+

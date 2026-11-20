@@ -1,4 +1,9 @@
-﻿// audio_engine.cpp —— 音频引擎实现：合成器 + 混音 + 自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// audio_engine.cpp —— 音频引擎实现：合成器 + 混音 + 自测
 #include "audio_engine.h"
 
 #include "../lib/softmath.h"
@@ -301,3 +306,4 @@ int audio_engine_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

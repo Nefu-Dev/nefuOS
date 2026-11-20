@@ -198,3 +198,4 @@ typedef enum _ubluepy_attr_t {
 } ubluepy_attr_t;
 
 #endif // UBLUEPY_H__
+

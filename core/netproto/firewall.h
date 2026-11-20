@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // firewall.h - 简单包过滤防火墙 (ACL)
 // 按五元组匹配规则，支持允许/拒绝
 #ifndef NEFU_NETPROTO_FIREWALL_H
@@ -92,3 +97,4 @@ int firewall_self_test();
 } // namespace nefu
 
 #endif // NEFU_NETPROTO_FIREWALL_H
+

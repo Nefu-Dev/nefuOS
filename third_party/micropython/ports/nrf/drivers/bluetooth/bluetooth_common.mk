@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 
 SOFTDEV_HEX_NAME ?=
 SOFTDEV_HEX_PATH ?=
@@ -47,3 +52,4 @@ SOFTDEV_HEX = $(SOFTDEV_HEX_PATH)/$(SOFTDEV_HEX_NAME)
 ifeq ($(shell test ! -e $(SOFTDEV_HEX) && echo -n no),no)
     $(error $(STACK_MISSING_ERROR))
 endif
+

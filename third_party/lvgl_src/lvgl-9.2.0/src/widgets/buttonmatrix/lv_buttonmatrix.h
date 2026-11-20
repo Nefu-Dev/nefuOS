@@ -200,3 +200,4 @@ bool lv_buttonmatrix_get_one_checked(const lv_obj_t * obj);
 #endif
 
 #endif /*LV_BUTTONMATRIX_H*/
+

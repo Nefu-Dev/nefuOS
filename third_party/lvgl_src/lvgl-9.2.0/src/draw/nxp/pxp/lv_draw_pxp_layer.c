@@ -154,3 +154,4 @@ void lv_draw_pxp_layer(lv_draw_unit_t * draw_unit, const lv_draw_image_dsc_t * d
 }
 
 #endif /*LV_USE_DRAW_PXP*/
+

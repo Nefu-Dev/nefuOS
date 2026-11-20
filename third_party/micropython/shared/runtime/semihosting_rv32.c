@@ -479,3 +479,4 @@ int mp_semihosting_tx_strn_cooked(const char *string, size_t length) {
 
     return mp_write_to_debug_console(string + current_offset, length - current_offset);
 }
+

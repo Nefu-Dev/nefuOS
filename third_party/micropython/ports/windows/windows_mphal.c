@@ -295,3 +295,4 @@ void mp_hal_get_random(size_t n, void *buf) {
         mp_raise_OSError(errno);
     }
 }
+

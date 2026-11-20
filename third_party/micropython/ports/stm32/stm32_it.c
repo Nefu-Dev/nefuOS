@@ -1100,3 +1100,4 @@ void I2C4_ER_IRQHandler(void) {
 #endif // defined(MICROPY_HW_I2C4_SCL)
 
 #endif // MICROPY_PY_PYB_LEGACY
+

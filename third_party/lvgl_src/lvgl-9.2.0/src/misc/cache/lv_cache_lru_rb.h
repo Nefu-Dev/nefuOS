@@ -42,3 +42,4 @@ LV_ATTRIBUTE_EXTERN_DATA extern const lv_cache_class_t lv_cache_class_lru_rb_siz
 #endif
 
 #endif /*LV_CACHE_LRU_RB_H*/
+

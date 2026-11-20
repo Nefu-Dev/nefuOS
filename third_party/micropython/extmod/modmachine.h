@@ -270,3 +270,4 @@ MP_DECLARE_CONST_FUN_OBJ_3(mp_machine_spi_write_readinto_obj);
 #endif
 
 #endif // MICROPY_INCLUDED_EXTMOD_MODMACHINE_H
+

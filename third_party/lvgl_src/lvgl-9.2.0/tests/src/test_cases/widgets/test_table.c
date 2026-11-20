@@ -314,3 +314,4 @@ void test_table_cell_select_should_not_allow_set_on_table_with_no_rows(void)
 }
 
 #endif
+

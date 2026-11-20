@@ -20,3 +20,4 @@ void lv_example_scroll_5(void)
 }
 
 #endif
+

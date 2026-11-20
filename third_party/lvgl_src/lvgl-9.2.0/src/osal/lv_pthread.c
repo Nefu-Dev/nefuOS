@@ -176,3 +176,4 @@ static void * generic_callback(void * user_data)
 }
 
 #endif /*LV_USE_OS == LV_OS_PTHREAD*/
+

@@ -155,3 +155,4 @@ const uint8_t *tud_descriptor_configuration_cb(uint8_t index) {
 #endif // !MICROPY_HW_ENABLE_USB_RUNTIME_DEVICE
 
 #endif // MICROPY_HW_ENABLE_USBDEV
+

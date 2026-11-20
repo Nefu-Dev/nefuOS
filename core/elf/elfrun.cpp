@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Linux static-ELF runtime (elfrun).
 #include "elfrun.h"
 #include "../klib/klib.h"      // memcpy/memset/strlen/strncpy/strcpy (nefu::)
@@ -295,3 +300,4 @@ int execute(Guest& g, SysCtx& ctx) {
 
 } // namespace elf
 } // namespace nefu
+

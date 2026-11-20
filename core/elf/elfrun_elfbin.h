@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #pragma once
 // hello-linux-elf (1024B, BASE=0x7800000, entry=0x7800000) embedded for bare boot selfcheck
 static const uint8_t NEFU_ELF_SELFCHECK_BIN[] = {
@@ -67,3 +72,4 @@ static const uint8_t NEFU_ELF_SELFCHECK_BIN[] = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
 #define NEFU_ELF_SELFCHECK_LEN 1024u
+

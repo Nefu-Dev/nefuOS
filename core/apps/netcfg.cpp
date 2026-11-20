@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Network Settings v3 - LVGL GUI
 // REAL adapter info (MAC/IP/gw) and, on the host backend, a REAL Wi-Fi scan.
 // Bare metal is a wired e1000 link, so the network list is empty there and
@@ -219,7 +224,7 @@ void net_wm_key(Window* w, const KeyEvent* e) {
 void netcfg_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Network", x, y, 460, 460);
+    Window* w = g_wm->create_window(T("网络设置", "Network"), x, y, 460, 460);
     if (!w) return;
     NetCfgState* st = new NetCfgState();
     st->net_count = platform_wifi_scan(st->nets, 16);

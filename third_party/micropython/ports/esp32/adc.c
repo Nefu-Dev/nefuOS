@@ -108,3 +108,4 @@ mp_int_t madcblock_read_uv_helper(machine_adc_block_obj_t *self, adc_channel_t c
 
     return (mp_int_t)uv * 1000;
 }
+

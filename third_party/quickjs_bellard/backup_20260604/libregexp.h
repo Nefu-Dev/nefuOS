@@ -63,3 +63,4 @@ int lre_check_timeout(void *opaque);
 void *lre_realloc(void *opaque, void *ptr, size_t size);
 
 #endif /* LIBREGEXP_H */
+

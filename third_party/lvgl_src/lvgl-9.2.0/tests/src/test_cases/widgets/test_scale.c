@@ -470,3 +470,4 @@ void test_scale_set_line_needle_value(void)
 }
 
 #endif
+

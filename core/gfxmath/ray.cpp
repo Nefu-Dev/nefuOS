@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 射线与平面实现 + 自测
 #include "gfxmath/ray.h"
 #include <cstdio>
@@ -97,3 +102,4 @@ int Plane::self_test() {
 
 } // namespace gfx
 } // namespace nefu
+

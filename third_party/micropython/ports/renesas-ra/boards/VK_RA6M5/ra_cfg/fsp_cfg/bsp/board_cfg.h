@@ -11,3 +11,4 @@ void bsp_init(void *p_args);
 }
 #endif
 #endif /* BOARD_CFG_H_ */
+

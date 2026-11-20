@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = m4
 MCU_VARIANT = nrf52
 MCU_SUB_VARIANT = nrf52840
@@ -11,3 +16,4 @@ NRF_DEFINES += -DNRF52840_XXAA
 OPENOCD_TARGET ?= boards/$(BOARD)/nrf52-particle.cfg
 
 MICROPY_VFS_LFS2 = 1
+

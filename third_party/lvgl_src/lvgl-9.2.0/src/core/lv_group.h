@@ -243,3 +243,4 @@ lv_group_t  * lv_group_by_index(uint32_t index);
 #endif
 
 #endif /*LV_GROUP_H*/
+

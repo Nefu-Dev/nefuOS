@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 混音器与效果器实现 + 自测
 #include "audlib/mixer.h"
 #include <cstdio>
@@ -230,3 +235,4 @@ int Reverb::self_test() {
 
 } // namespace audx
 } // namespace nefu
+

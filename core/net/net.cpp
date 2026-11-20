@@ -1,6 +1,12 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS network stack: e1000 (QEMU 82540EM) + RTL8139 + virtio-net + ARP + ICMP + minimal TCP
 // Pure integer, freestanding. Polled (no interrupts).
 #include "net.h"
+#include "dns.h"
 #include "../drivers/network.h"
 #include "../platform.h"
 #include "../klib/klib.h"
@@ -91,7 +97,13 @@ static int s_backend = drivers::NIC_NONE;   // NIC_E1000 / NIC_RTL8139 / NIC_VIR
 #define TCTL_COLD 0x003F0000u
 
 #define RX_RING   32
-#define TX_RING   16
+// 64 TX descriptors (must stay a power of two: eth_send_e1000 uses
+// "& (TX_RING-1)" for the ring-full test). The old 16-slot ring filled up
+// during a CDN burst because tcp_handle() emitted one ACK per received
+// segment from inside handle_frame(); once full, the 2,000,000-iteration
+// MMIO busy-wait expired and in-flight descriptors were overwritten, so
+// ACKs vanished and the peer fell back to RTO-paced retransmits.
+#define TX_RING   64
 #define RX_BUF    2048
 
 struct RxDesc {
@@ -119,6 +131,10 @@ static TxDesc* s_tx_desc = 0;
 static uint8_t* s_rx_buf[RX_RING];
 static uint8_t* s_tx_buf[TX_RING];
 static int s_tx_head = 0;   // next to use (TDT)
+// Set when eth_send_e1000() could not queue a frame because the TX ring was
+// still full. tcp_flush_acks() re-arms the connections so the ACK is retried
+// on the next poll instead of being silently lost.
+static volatile bool s_tx_dropped = false;
 
 static inline uint32_t mmio32(uint32_t reg) { return s_mmio[reg / 4]; }
 static inline void mmio_wr(uint32_t reg, uint32_t v) { s_mmio[reg / 4] = v; }
@@ -155,11 +171,27 @@ static void eth_send_e1000(const uint8_t* dst, uint16_t type, const void* payloa
     // is in flight, i.e. (TDT - TDH) mod TX_RING == TX_RING-1.
     int slot = s_tx_head % TX_RING;
     uint32_t wait = 0;
+    bool have_room = false;
     while (wait < 2000000u) {
         uint32_t tdh = mmio32(REG_TDH);
         uint32_t tdt = mmio32(REG_TDT);
-        if (((tdt + TX_RING - tdh) & (TX_RING - 1)) < TX_RING - 1) break;
+        if (((tdt + TX_RING - tdh) & (TX_RING - 1)) < TX_RING - 1) {
+            have_room = true;
+            break;
+        }
+        // A tight MMIO-read loop can keep a TCG vCPU inside one translation
+        // block, delaying QEMU's e1000 TX bottom half that advances TDH.
+        // Periodic port I/O gives the emulator a chance to catch up.
+        if ((wait & 1023u) == 0) io_wait_n();
         wait++;
+    }
+    if (!have_room) {
+        // NEVER overwrite an in-flight descriptor: doing so silently drops
+        // the frame (usually an ACK) and pushes the peer into RTO-paced
+        // retransmits. Drop this frame instead and let tcp_flush_acks()
+        // retry the ACK on the next poll batch.
+        s_tx_dropped = true;
+        return;
     }
     uint8_t* p = s_tx_buf[slot];
     EthHdr* eh = (EthHdr*)p;
@@ -197,6 +229,7 @@ static void arp_handle(const uint8_t* frame, int len);
 static void ip_send(uint32_t dst, uint8_t proto, const void* payload, int plen, uint16_t id);
 static void icmp_handle(const uint8_t* ip_pkt, int iplen);
 static void tcp_handle(const uint8_t* ip_pkt, int iplen);
+static void tcp_flush_acks();
 static void handle_frame(const uint8_t* frame, int len);
 static void net_send_frame(const uint8_t* dst, uint16_t type, const void* payload, int plen);
 
@@ -650,6 +683,304 @@ bool net_ping(uint32_t ip, int timeout_ms) {
     return s_icmp_done;
 }
 
+// ---------------- UDP (minimal, for DNS) ----------------
+// Single-slot receive buffer: the bare stack is polled, so the consumer
+// (dns_resolve_multi) drains it. Enough for DNS (one outstanding query).
+// A resolver may fan its query out to several servers and a CDN often
+// answers with more than one record, so a single slot made responses
+// overwrite each other before they were read. A small ring keeps them all.
+#define UDP_RX_SLOTS 4
+static struct {
+    uint32_t src_ip;
+    uint16_t src_port;
+    uint8_t  data[1500];
+    int      len;
+    bool     ready;
+} s_udp_rx[UDP_RX_SLOTS];
+static int s_udp_rx_head = 0;   // next slot to overwrite
+
+static void udp_handle(const uint8_t* ip_pkt, int iplen) {
+    const IpPkt* ip = (const IpPkt*)ip_pkt;
+    int hl = (ip->vihl & 0x0F) * 4;
+    int total = __builtin_bswap16(ip->total_len);
+    if (total < hl + 8 || total > iplen) return;
+    const uint8_t* u = ip_pkt + hl;
+    uint16_t srcp = __builtin_bswap16(*(const uint16_t*)(u + 0));
+    uint16_t ulen  = __builtin_bswap16(*(const uint16_t*)(u + 4));
+    int dlen = ulen - 8;
+    if (dlen < 0 || hl + 8 + dlen > total) return;
+    if (dlen > (int)sizeof(s_udp_rx[0].data)) dlen = (int)sizeof(s_udp_rx[0].data);
+    s_udp_rx[s_udp_rx_head].src_ip   = __builtin_bswap32(ip->src);
+    s_udp_rx[s_udp_rx_head].src_port = srcp;
+    memcpy(s_udp_rx[s_udp_rx_head].data, u + 8, (size_t)dlen);
+    s_udp_rx[s_udp_rx_head].len   = dlen;
+    s_udp_rx[s_udp_rx_head].ready = true;
+    s_udp_rx_head = (s_udp_rx_head + 1) % UDP_RX_SLOTS;
+}
+
+static void udp_send(uint32_t dst, uint16_t dst_port, uint16_t src_port,
+                     const uint8_t* data, int len) {
+    uint8_t pkt[1500];
+    if (len < 0 || len + 8 > (int)sizeof(pkt)) return;
+    uint8_t* u = pkt;
+    *(uint16_t*)(u + 0) = __builtin_bswap16(src_port);
+    *(uint16_t*)(u + 2) = __builtin_bswap16(dst_port);
+    *(uint16_t*)(u + 4) = __builtin_bswap16((uint16_t)(len + 8));
+    *(uint16_t*)(u + 6) = 0;   // UDP checksum: 0 is valid over IPv4 (RFC 768)
+    if (len > 0) memcpy(u + 8, data, (size_t)len);
+    ip_send(dst, 17, pkt, len + 8, (uint16_t)(src_port));
+}
+
+// Wait for a UDP datagram (polling the stack). Returns bytes copied or -1.
+static int udp_recv(uint32_t* src_ip, uint16_t* src_port,
+                    uint8_t* buf, int maxlen, int timeout_ms) {
+    uint32_t start = platform_tick_ms();
+    for (;;) {
+        for (int i = 0; i < UDP_RX_SLOTS; i++) {
+            if (!s_udp_rx[i].ready) continue;
+            int n = s_udp_rx[i].len;
+            if (n > maxlen) n = maxlen;
+            if (buf && n > 0) memcpy(buf, s_udp_rx[i].data, (size_t)n);
+            if (src_ip)   *src_ip   = s_udp_rx[i].src_ip;
+            if (src_port) *src_port = s_udp_rx[i].src_port;
+            s_udp_rx[i].ready = false;
+            return n;
+        }
+        net_poll();
+        if (platform_tick_ms() - start >= (uint32_t)timeout_ms) return -1;
+    }
+}
+
+// A records collected by the last DNS exchange. A CDN such as Cloudflare
+// answers with several addresses and only some of them are reachable from a
+// given network, so the resolver keeps them all and hands them out one by
+// one: a caller that retries then reaches a different edge node.
+#define DNS_MAX_IPS 8
+static uint32_t g_dns_ips[DNS_MAX_IPS];
+static int      g_dns_ips_n = 0;
+static uint32_t g_dns_rr = 0;      // round-robin cursor
+
+// Resolve <name> to an IPv4 address by querying every server in <servers>
+// (each on UDP/53) and returning the first A record received. Host order IP
+// or 0 on failure. Parallel fan-out keeps it fast: we fire one query at each
+// candidate, then drain whichever answers first.
+uint32_t dns_resolve_multi(const char* name, const uint32_t* servers, int ns) {
+    g_dns_ips_n = 0;
+    if (!name || !servers || ns <= 0) return 0;
+    uint8_t q[512];
+    uint16_t id = (uint16_t)(0x8000 | ((uint32_t)(uintptr_t)name & 0x7FFF));
+    int qn = dns::build_query(id, name, dns::T_A, q, (int)sizeof(q));
+    if (qn < 0) return 0;
+    uint16_t sport = (uint16_t)(0x4000 | (id & 0xFF));
+    uint8_t resp[1024];
+
+    // Retry: a resolver may drop or delay a datagram, and a single lost
+    // query used to fail the whole name resolution. Three attempts with a
+    // fresh query each time make the resolver reliable on a slow link.
+    for (int attempt = 0; attempt < 3; attempt++) {
+        for (int i = 0; i < ns; i++)
+            udp_send(servers[i], 53, sport, q, qn);
+
+        uint32_t start = platform_tick_ms();
+        while (platform_tick_ms() - start < 4000) {
+            uint32_t sip = 0;
+            uint16_t sp = 0;
+            int rn = udp_recv(&sip, &sp, resp, (int)sizeof(resp), 300);
+            if (rn <= 0) continue;
+            if (sp != 53) continue;
+            bool from_candidate = false;
+            for (int i = 0; i < ns; i++)
+                if (sip == servers[i]) { from_candidate = true; break; }
+            if (!from_candidate) continue;
+
+            dns::Header h;
+            List<dns::Question> qs;
+            List<dns::Record> rs;
+            if (!dns::parse_packet(resp, rn, h, qs, rs)) continue;
+            if (h.id != id) continue;   // not our answer (stale/duplicate)
+
+            for (int i = 0; i < rs.size(); i++) {
+                const dns::Record& r = rs[i];
+                if (r.type != dns::T_A || r.rclass != dns::C_IN) continue;
+                uint8_t a[4];
+                if (!r.rdata_a(a)) continue;
+                uint32_t ip = ((uint32_t)a[0] << 24) | ((uint32_t)a[1] << 16) |
+                              ((uint32_t)a[2] << 8)  | (uint32_t)a[3];
+                // Remember every A record: a CDN such as Cloudflare answers
+                // with several addresses and not all of them are reachable
+                // from every network. Returning the same first address every
+                // time would make the request fail for good.
+                if (g_dns_ips_n < DNS_MAX_IPS) {
+                    bool dup = false;
+                    for (int k = 0; k < g_dns_ips_n; k++)
+                        if (g_dns_ips[k] == ip) { dup = true; break; }
+                    if (!dup) g_dns_ips[g_dns_ips_n++] = ip;
+                }
+                break;
+            }
+            if (g_dns_ips_n > 0) break;   // answer found -> stop listening
+        }                                  // while (wait for a response)
+    }                                      // for (attempt)
+    return 0;
+}
+
+// Resolver cache. A page load resolves the same host several times (the
+// document, its bundles and every redirect), and every one of those queries
+// was a chance to fail on a lossy link. Keeping the answer for a while makes
+// the rest of the load deterministic.
+#define DNS_CACHE_SLOTS 8
+#define DNS_CACHE_TTL_MS 300000u
+static struct {
+    char     name[128];
+    uint32_t ips[DNS_MAX_IPS];
+    int      n;
+    uint32_t t;
+    bool     used;
+} g_dns_cache[DNS_CACHE_SLOTS];
+static int g_dns_cache_rr = 0;
+
+static bool dns_cache_get(const char* name, uint32_t* out, int max) {
+    uint32_t now = platform_tick_ms();
+    for (int i = 0; i < DNS_CACHE_SLOTS; i++) {
+        if (!g_dns_cache[i].used) continue;
+        if (strcmp(g_dns_cache[i].name, name) != 0) continue;
+        if (now - g_dns_cache[i].t > DNS_CACHE_TTL_MS) { g_dns_cache[i].used = false; return false; }
+        int n = g_dns_cache[i].n;
+        if (n > max) n = max;
+        for (int k = 0; k < n; k++) out[k] = g_dns_cache[i].ips[k];
+        return n > 0;
+    }
+    return false;
+}
+
+static void dns_cache_put(const char* name, const uint32_t* ips, int n) {
+    if (!name || !ips || n <= 0) return;
+    int slot = -1;
+    for (int i = 0; i < DNS_CACHE_SLOTS; i++) {
+        if (!g_dns_cache[i].used) { slot = i; break; }
+        if (strcmp(g_dns_cache[i].name, name) == 0) { slot = i; break; }
+    }
+    if (slot < 0) { slot = g_dns_cache_rr % DNS_CACHE_SLOTS; g_dns_cache_rr++; }
+    if (strlen(name) >= sizeof(g_dns_cache[slot].name)) return;
+    strcpy(g_dns_cache[slot].name, name);
+    int c = n > DNS_MAX_IPS ? DNS_MAX_IPS : n;
+    for (int i = 0; i < c; i++) g_dns_cache[slot].ips[i] = ips[i];
+    g_dns_cache[slot].n = c;
+    g_dns_cache[slot].t = platform_tick_ms();
+    g_dns_cache[slot].used = true;
+}
+
+// Resolve <name> to an IPv4 address. Static table first (offline-friendly
+// hosts), then the cache, then a real DNS query over UDP (gateway + public
+// resolvers).
+uint32_t dns_lookup(const char* name) {
+    static const struct { const char* n; uint32_t ip; } tbl[] = {
+        { "localhost",      0x7F000001u },
+        { "npkg.site.je",   185u<<24 | 27u<<16 | 134u<<8 | 202u },
+        { "nefuos.site.je", 185u<<24 | 27u<<16 | 134u<<8 | 202u },
+        { "gateway",        10u<<24 | 0u<<16 | 2u<<8 | 2u },
+        { "nefuos.dev",     10u<<24 | 0u<<16 | 0u<<8 | 2u },
+    };
+    if (name) {
+        for (unsigned i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++)
+            if (strcmp(tbl[i].n, name) == 0) return tbl[i].ip;
+    }
+    uint32_t servers[5];
+    int ns = 0;
+    if (g_net.gw) servers[ns++] = g_net.gw;
+    // 10.0.2.3 is QEMU's built-in slirp DNS forwarder. It is harmless on
+    // real hardware (the query just times out) and it is the only resolver
+    // reachable from inside a stock slirp guest, where direct UDP to the
+    // public resolvers is not forwarded.
+    servers[ns++] = 10u<<24 | 0u<<16 | 2u<<8 | 3u;   // slirp DNS
+    servers[ns++] = 0x01010101u;   // 1.1.1.1
+    servers[ns++] = 0x08080808u;   // 8.8.8.8
+
+    uint32_t cached[DNS_MAX_IPS];
+    int cn = dns_cache_get(name, cached, DNS_MAX_IPS);
+    if (cn > 0) {
+        for (int i = 0; i < cn; i++) g_dns_ips[i] = cached[i];
+        g_dns_ips_n = cn;
+    } else {
+        dns_resolve_multi(name, servers, ns);
+        if (g_dns_ips_n > 0) dns_cache_put(name, g_dns_ips, g_dns_ips_n);
+    }
+    if (g_dns_ips_n > 0) {
+        // Hand out a different address on every call so that a caller which
+        // retries after a failed connect reaches another edge node.
+        uint32_t ip = g_dns_ips[g_dns_rr % (uint32_t)g_dns_ips_n];
+        g_dns_rr++;
+        klogf("dns: %s -> %u.%u.%u.%u (%d addr%s)\n", name,
+              (ip>>24)&0xff, (ip>>16)&0xff, (ip>>8)&0xff, ip&0xff,
+              g_dns_ips_n, g_dns_ips_n == 1 ? "" : "s");
+        return ip;
+    }
+    klogf("dns: %s -> FAIL\n", name ? name : "(null)");
+    return 0;
+}
+
+// Resolve <name> and return every address the resolver saw (up to max).
+// Used by the HTTP client to try the next edge node when a connect fails.
+int dns_lookup_multi(const char* name, uint32_t* out_ips, int max) {
+    if (!out_ips || max <= 0) return 0;
+    static const struct { const char* n; uint32_t ip; } tbl[] = {
+        { "localhost",      0x7F000001u },
+        { "npkg.site.je",   185u<<24 | 27u<<16 | 134u<<8 | 202u },
+        { "nefuos.site.je", 185u<<24 | 27u<<16 | 134u<<8 | 202u },
+        { "gateway",        10u<<24 | 0u<<16 | 2u<<8 | 2u },
+        { "nefuos.dev",     10u<<24 | 0u<<16 | 0u<<8 | 2u },
+    };
+    if (name) {
+        for (unsigned i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++)
+            if (strcmp(tbl[i].n, name) == 0) { out_ips[0] = tbl[i].ip; return 1; }
+        // Dotted-quad literal (10.0.2.2, 127.0.0.1, ...): no resolver round
+        // trip. Sending a literal to the DNS server is not just slow - slirp
+        // answers for real names only, so the host escape address 10.0.2.2
+        // (and any IP-only URL) must parse here.
+        {
+            const char* p = name;
+            uint32_t v = 0;
+            int oct = 0;
+            bool ok4 = *p != 0;
+            while (ok4 && *p) {
+                int dv = 0, dn = 0;
+                while (*p >= '0' && *p <= '9') {
+                    dv = dv * 10 + (*p - '0');
+                    if (++dn > 3) { ok4 = false; break; }
+                    p++;
+                }
+                if (!ok4 || !dn || dv > 255) { ok4 = false; break; }
+                v = (v << 8) | (uint32_t)dv;
+                oct++;
+                if (oct < 4) {
+                    if (*p == '.') p++;
+                    else { ok4 = false; break; }
+                }
+            }
+            if (ok4 && oct == 4 && *p == 0) { out_ips[0] = v; return 1; }
+        }
+    }
+    uint32_t servers[5];
+    int ns = 0;
+    if (g_net.gw) servers[ns++] = g_net.gw;
+    servers[ns++] = 10u<<24 | 0u<<16 | 2u<<8 | 3u;   // slirp DNS
+    servers[ns++] = 0x01010101u;   // 1.1.1.1
+    servers[ns++] = 0x08080808u;   // 8.8.8.8
+    uint32_t cached[DNS_MAX_IPS];
+    int cn = dns_cache_get(name, cached, DNS_MAX_IPS);
+    if (cn > 0) {
+        for (int i = 0; i < cn; i++) g_dns_ips[i] = cached[i];
+        g_dns_ips_n = cn;
+    } else {
+        dns_resolve_multi(name, servers, ns);
+        if (g_dns_ips_n > 0) dns_cache_put(name, g_dns_ips, g_dns_ips_n);
+    }
+    int n = g_dns_ips_n;
+    if (n > max) n = max;
+    for (int i = 0; i < n; i++) out_ips[i] = g_dns_ips[i];
+    return n;
+}
+
 // ---------------- TCP (minimal) ----------------
 #define TCP_ESTABLISHED 1
 #define TCP_SYN_SENT    2
@@ -657,7 +988,13 @@ bool net_ping(uint32_t ip, int timeout_ms) {
 #define TCP_CLOSED      0
 
 #define MAX_TCPCONN 4
-#define TCP_RXBUFSZ 8192
+// Receive window per connection. It has to cover at least one TLS record plus
+// the segment burst a CDN may deliver: bloxd.io answers with a single ~64 KB
+// chunked chunk, and a buffer smaller than that silently dropped the tail of
+// every response (the TLS stream then desynchronised and the body came back
+// empty). 4 connections * 64 KB = 256 KB of .bss, which the arena has plenty
+// of room for.
+#define TCP_RXBUFSZ 65536
 
 struct TcpConn {
     int state;
@@ -669,6 +1006,7 @@ struct TcpConn {
     uint8_t rxbuf[TCP_RXBUFSZ];
     int rx_len;
     bool rx_closed;
+    bool ack_pending;   // data stored since the last ACK flush
 };
 
 static TcpConn s_conns[MAX_TCPCONN];
@@ -712,7 +1050,18 @@ static void tcp_send_seg(TcpConn* c, uint8_t flags, const void* data, int len, u
     t->ack = __builtin_bswap32(c->rcv_nxt);
     t->off_flags = 0x50;
     t->flags = flags;
-    t->win = __builtin_bswap16(0x4000);
+    // Advertised receive window = ACTUAL free space in rxbuf, capped at
+    // 0xC000 so we never promise more than the in-order buffer can absorb
+    // during one net_poll() burst. The old fixed 16 KB capped the sender's
+    // in-flight data to one TLS record per round trip; a fixed large window
+    // would instead keep sending while rxbuf is full, silently dropping
+    // segments that are never ACKed. tcp_recv() re-arms ack_pending after
+    // draining so a zero/shrunken window is always reopened promptly.
+    // No window-scaling option is negotiated, so the field stays <= 65535.
+    uint32_t room = (c->rx_len < TCP_RXBUFSZ)
+                  ? (uint32_t)(TCP_RXBUFSZ - c->rx_len) : 0u;
+    uint32_t win = room > 0xC000u ? 0xC000u : (room & ~1u);
+    t->win = __builtin_bswap16((uint16_t)win);
     if (len > 0) memcpy(buf + 20, data, (size_t)len);
     t->csum = 0;
     t->csum = tcp_checksum(g_net.ip, c->peer_ip, buf, 20 + len);
@@ -734,6 +1083,7 @@ int tcp_connect(uint32_t ip, uint16_t port, int timeout_ms) {
     c->rcv_nxt = 0;
     c->rx_len = 0;
     c->rx_closed = false;
+    c->ack_pending = false;   // connection slots are reused; clear stale ACK state
     int fd = (int)(c - s_conns);
     tcp_send_seg(c, 0x02, 0, 0, c->snd_nxt);   // SYN
     klogf("tcp: SYN sent to %u.%u.%u.%u:%u\n",
@@ -775,6 +1125,13 @@ int tcp_recv(int fd, void* buf, int maxlen, int timeout_ms) {
     memcpy(buf, c->rxbuf, (size_t)n);
     if (n < c->rx_len) memmove(c->rxbuf, c->rxbuf + n, (size_t)(c->rx_len - n));
     c->rx_len -= n;
+    // Draining rxbuf changes the advertised window. Re-arm and flush here
+    // (rather than waiting for the next net_poll) so a shrunken/zero window
+    // is reopened immediately instead of stalling the peer on its persist
+    // timer. tcp_flush_acks() clears the flag, so at most one ACK is emitted
+    // per recv/poll batch.
+    c->ack_pending = true;
+    tcp_flush_acks();
     return n;
 }
 
@@ -855,12 +1212,22 @@ static void tcp_handle(const uint8_t* ip_pkt, int iplen) {
         // stale number below the server's ISN, so the server retransmitted
         // the whole stream and the duplicates corrupted the TLS record
         // stream (kernel ct dump != pcap ct for the first encrypted record).
+        //
+        // Only bytes that are ACTUALLY stored may be acknowledged. When rxbuf
+        // is full, store and acknowledge the prefix that does fit instead of
+        // dropping the whole segment without any ACK: a silent drop leaves the
+        // peer waiting for an RTO, which is what collapsed large downloads to
+        // ~3-8 KB/s after the first megabyte. The unacknowledged tail is
+        // retransmitted by the peer, so the stream stays intact.
         if (seq == c->rcv_nxt) {
-            if (c->rx_len + data_len <= TCP_RXBUFSZ) {
-                memcpy(c->rxbuf + c->rx_len, data, (size_t)data_len);
-                c->rx_len += data_len;
+            uint32_t room = (c->rx_len < TCP_RXBUFSZ)
+                          ? (uint32_t)(TCP_RXBUFSZ - c->rx_len) : 0;
+            uint32_t take = (uint32_t)data_len < room ? (uint32_t)data_len : room;
+            if (take > 0) {
+                memcpy(c->rxbuf + c->rx_len, data, (size_t)take);
+                c->rx_len += (int)take;
+                c->rcv_nxt = seq + take;
             }
-            c->rcv_nxt = seq + (uint32_t)data_len;
         } else if (seq < c->rcv_nxt &&
                    (uint64_t)seq + (uint32_t)data_len > (uint64_t)c->rcv_nxt) {
             // Partial overlap (e.g. a retransmitted merged segment that starts
@@ -868,25 +1235,68 @@ static void tcp_handle(const uint8_t* ip_pkt, int iplen) {
             // bytes we have not seen yet, then advance rcv_nxt.
             uint32_t skip = c->rcv_nxt - seq;
             int new_len = data_len - (int)skip;
-            if (new_len > 0 && c->rx_len + new_len <= TCP_RXBUFSZ) {
-                memcpy(c->rxbuf + c->rx_len, data + skip, (size_t)new_len);
-                c->rx_len += new_len;
+            uint32_t room = (c->rx_len < TCP_RXBUFSZ)
+                          ? (uint32_t)(TCP_RXBUFSZ - c->rx_len) : 0;
+            uint32_t take = (uint32_t)new_len < room ? (uint32_t)new_len : room;
+            if (new_len > 0 && take > 0) {
+                memcpy(c->rxbuf + c->rx_len, data + skip, (size_t)take);
+                c->rx_len += (int)take;
+                c->rcv_nxt = seq + (uint32_t)skip + take;
             }
-            c->rcv_nxt = seq + (uint32_t)data_len;
         }
-        // ACK with our OWN send sequence in the seq field (tcp_send_seg writes
-        // param #5 into the TCP seq field and always fills the ack field with
-        // rcv_nxt). Passing rcv_nxt here mirrored the server's sequence number
-        // into our ACK segment, which the Linux peer rejected as out-of-window,
-        // so it never advanced its send window and only delivered the final
-        // TLS records via RTO backoff ~25s later (past our handshake timeout).
-        tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);
+        // Deferred ACK. Emitting one ACK per received segment from inside
+        // handle_frame() flooded the 16-slot e1000 TX ring during a CDN burst
+        // (net_poll can drain 32 RX descriptors in one call). Overwritten
+        // in-flight TX descriptors silently dropped ACKs, so the peer fell
+        // back to RTO-paced retransmits. net_poll() flushes ONE ACK per batch.
+        //
+        // Arm the ACK for EVERY inbound data segment, not just stored ones:
+        //   - in-order / partial-overlap -> cumulative ACK for the new bytes;
+        //   - pure duplicate (seq+len <= rcv_nxt) -> our earlier ACK was lost,
+        //     so re-ACK instead of making the peer wait out a full RTO;
+        //   - out-of-order (seq > rcv_nxt) -> duplicate ACK, giving the peer a
+        //     chance at fast retransmit rather than an RTO.
+        // tcp_flush_acks() coalesces all of these into one TX descriptor per
+        // poll batch, so this cannot flood the ring.
+        c->ack_pending = true;
     }
     if (flags & 0x01) {  // FIN
-        c->rcv_nxt = seq + (uint32_t)data_len + 1;
-        c->rx_closed = true;
-        tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);   // ACK (seq = our send seq)
+        // FIN consumes one sequence number only AFTER all data up to it has
+        // been received. The old unconditional advance skipped bytes that were
+        // dropped while rxbuf was full, and rx_closed then made tcp_recv()
+        // report EOF on a permanently truncated stream.
+        if ((uint64_t)seq + (uint32_t)data_len <= (uint64_t)c->rcv_nxt) {
+            c->rcv_nxt = seq + (uint32_t)data_len + 1;
+            c->rx_closed = true;
+            tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);   // ACK (seq = our send seq)
+        }
     }
+}
+
+// Emit one cumulative ACK per connection per net_poll() batch. Called after
+// all RX descriptors have been dispatched, so a burst of N segments costs
+// one TX descriptor instead of N (and the ACK covers the whole burst).
+static void tcp_flush_acks() {
+    bool dropped = s_tx_dropped;
+    s_tx_dropped = false;
+    for (int i = 0; i < MAX_TCPCONN; i++) {
+        TcpConn* c = &s_conns[i];
+        if (c->ack_pending && c->state == TCP_ESTABLISHED) {
+            c->ack_pending = false;
+            tcp_send_seg(c, 0x10, 0, 0, c->snd_nxt);
+        }
+    }
+    // A TX descriptor was unavailable (or a frame was dropped while filling
+    // this batch). Re-arm every established connection so the cumulative ACK
+    // is retried next time net_poll()/tcp_recv() flushes, instead of relying
+    // on the peer's retransmission timer.
+    if (dropped || s_tx_dropped) {
+        for (int i = 0; i < MAX_TCPCONN; i++) {
+            if (s_conns[i].state == TCP_ESTABLISHED)
+                s_conns[i].ack_pending = true;
+        }
+    }
+    s_tx_dropped = false;
 }
 
 // ---------------- RX dispatch ----------------
@@ -901,6 +1311,7 @@ static void handle_frame(const uint8_t* frame, int len) {
             if (ip->vihl == 0x45 && ip->dst == __builtin_bswap32(g_net.ip)) {
                 if (ip->proto == 1) icmp_handle(frame + 14, len - 14);
                 else if (ip->proto == 6) tcp_handle(frame + 14, len - 14);
+                else if (ip->proto == 17) udp_handle(frame + 14, len - 14);
             }
         }
     }
@@ -920,7 +1331,7 @@ void net_poll() {
         case drivers::NIC_RTL8139: rtl_poll(); break;
         case drivers::NIC_VIRTIO:  vio_poll(); break;
         default:
-            if (!s_mmio || !s_rx_desc) return;
+            if (!s_mmio || !s_rx_desc) break;   // still fall through to the ACK flush
             // NIC writes descriptors starting at RDH; software owns descs up to RDT.
             uint32_t rdh = mmio32(REG_RDH);
             uint32_t cur = (mmio32(REG_RDT) + 1) % RX_RING;
@@ -938,6 +1349,12 @@ void net_poll() {
             }
             break;
     }
+    // tcp_handle() only marks ack_pending; it must NOT send an ACK from
+    // inside handle_frame(), because a burst of N RX descriptors would then
+    // queue N TX descriptors and overrun the e1000 TX ring. Flush ONE
+    // cumulative ACK per connection after the whole batch has been stored,
+    // covering everything received in this poll. Runs for all backends.
+    tcp_flush_acks();
 }
 
 // ---------------- e1000 init ----------------
@@ -993,8 +1410,11 @@ static bool net_init_e1000(uint16_t vid, uint16_t did) {
     mmio_wr(REG_RDH, 0);
     mmio_wr(REG_RDT, RX_RING - 1);
 
-    // TX ring
-    s_tx_desc = (TxDesc*)kalloc(TX_RING * sizeof(TxDesc) + 64);
+    // TX ring (64 descriptors, TDLEN = 1024 = 8 * 128, a legal e1000 length).
+    // kalloc() returns a pointer 8 bytes past a 16-aligned block header, so
+    // align the descriptor base explicitly to the 16 bytes e1000 requires.
+    uint8_t* tx_raw = (uint8_t*)kalloc(TX_RING * sizeof(TxDesc) + 16);
+    s_tx_desc = (TxDesc*)(((uintptr_t)tx_raw + 15u) & ~(uintptr_t)15u);
     for (int i = 0; i < TX_RING; i++) {
         s_tx_buf[i] = (uint8_t*)kalloc(2048);
         s_tx_desc[i].addr = (uint64_t)(uintptr_t)s_tx_buf[i];
@@ -1050,3 +1470,4 @@ bool net_init() {
 }
 
 } // namespace nefu
+

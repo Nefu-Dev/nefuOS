@@ -335,3 +335,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 MP_REGISTER_ROOT_POINTER(struct _machine_spi_obj_t *mp_wifi_spi);
 
 #endif // #if MICROPY_PY_BLUETOOTH && MICROPY_PY_NETWORK_ESP_HOSTED
+

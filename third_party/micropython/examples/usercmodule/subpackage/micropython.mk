@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 SUBPACKAGE_EXAMPLE_MOD_DIR := $(USERMOD_DIR)
 
 # Add all C files to SRC_USERMOD.
@@ -8,3 +13,4 @@ SRC_USERMOD += $(SUBPACKAGE_EXAMPLE_MOD_DIR)/modexamplepackage.c
 CFLAGS_USERMOD += -I$(SUBPACKAGE_EXAMPLE_MOD_DIR) -DMICROPY_MODULE_BUILTIN_SUBPACKAGES=1
 
 QSTR_DEFS += $(SUBPACKAGE_EXAMPLE_MOD_DIR)/qstrdefsexamplepackage.h
+

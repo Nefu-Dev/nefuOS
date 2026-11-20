@@ -1376,3 +1376,4 @@ void LottieBuilder::build(LottieComposition* comp)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

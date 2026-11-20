@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 编码/解码实现
 #include "codec.h"
 #include <string.h>
@@ -379,3 +384,4 @@ int codec_self_test() {
 
 } // namespace crypto
 } // namespace nefu
+

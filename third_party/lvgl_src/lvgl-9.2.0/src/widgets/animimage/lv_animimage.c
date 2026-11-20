@@ -172,3 +172,4 @@ static void index_change(lv_obj_t * obj, int32_t idx)
 }
 
 #endif
+

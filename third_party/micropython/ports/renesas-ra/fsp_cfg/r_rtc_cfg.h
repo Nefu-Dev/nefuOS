@@ -11,3 +11,4 @@ extern "C" {
 }
 #endif
 #endif /* R_RTC_CFG_H_ */
+

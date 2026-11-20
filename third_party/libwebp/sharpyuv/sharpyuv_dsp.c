@@ -102,3 +102,4 @@ void SharpYuvInitDsp(void) {
   assert(SharpYuvUpdateRGB != NULL);
   assert(SharpYuvFilterRow != NULL);
 }
+

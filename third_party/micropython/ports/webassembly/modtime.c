@@ -49,3 +49,4 @@ static mp_obj_t mp_time_localtime_get(void) {
 static mp_obj_t mp_time_time_get(void) {
     return mp_obj_new_float((mp_float_t)mp_hal_time_ms() / 1000);
 }
+

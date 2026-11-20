@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 语音编码(实现)
 #include "phonetic.h"
 #include "../klib/klib.h"
@@ -200,3 +205,4 @@ int phonetic_self_test() {
 
 } // namespace textproc
 } // namespace nefu
+

@@ -70,3 +70,4 @@ void dma_init(void) {
         dma_initialized = true;
     }
 }
+

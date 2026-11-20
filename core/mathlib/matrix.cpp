@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 矩阵实现 + 自测
 #include "mathlib/matrix.h"
 #include <cstdio>
@@ -157,3 +162,4 @@ int matrix_self_test() {
 
 } // namespace mathx
 } // namespace nefu
+

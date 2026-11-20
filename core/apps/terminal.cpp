@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS terminal app
 #include "apps.h"
 #include "term_ext.h"
@@ -11,6 +16,12 @@
 #include "../sys/admin_hash.h"   // NEFU_ADMIN_HASH (hash only, no plaintext)
 #include "../sys/sha256.h"
 #include "../sys/power.h"        // blue_screen()
+#include "../sys/settings.h"     // g_settings / settings_save for `tz`
+#ifdef NEFU_BARE
+// deep network diagnostics (bundle download, matchmaking, WebSocket) - the
+// bare kernel only; the host build does not link net_selftest.cpp
+extern "C" void nefu_net_selftest_deep(void);
+#endif
 #include "../elf/elfrun.h"    // Linux static-ELF loader + syscall ABI
 #include <cstdlib>
 
@@ -123,7 +134,8 @@ static void term_help(TermState* t) {
     term_print(t, "  audio             - sound card status");
     term_print(t, "  play <file.wav>   - play a WAV file");
     term_print(t, "  stop              - stop playback");
-    term_print(t, "  date              - uptime date");
+    term_print(t, "  date              - local clock + UTC");
+    term_print(t, "  tz [N|utc|local]  - show/set zone offset (min east of UTC)");
     term_print(t, "  uptime            - time since boot");
     term_print(t, "  free              - memory status");
     term_print(t, "  ps                - process list");
@@ -148,9 +160,9 @@ static void term_help(TermState* t) {
     term_print(t, "  clear             - clear screen");
     term_print(t, "  about             - about nefuOS");
     term_print(t, "  exit              - close terminal");
-    term_print(t, "  shutdown          - power off"
-"  shutdown -b        - reboot to BIOS"
-"  reboot             - restart");
+    term_print(t, "  shutdown          - power off");
+    term_print(t, "  shutdown -b       - reboot to BIOS");
+    term_print(t, "  reboot            - restart");
 }
 
 static void term_ls(TermState* t, const char* path) {
@@ -427,10 +439,31 @@ static void term_deb(TermState* t, int argc, const char** argv) {
     }
 }
 static void term_run(TermState* t, const char* cmd) {
+    // The serial log is the only surface an automated check can read on the
+    // bare kernel, where the terminal window is just a picture.
+    klogf("term: run '%s'\n", cmd ? cmd : "");
     if (!cmd || !*cmd) return;
     hist_add(cmd);
-    // split args(modify input buffer in place)
-    char* buf = t->input.data();
+    // Split the arguments on a PRIVATE COPY of the command line.
+    //
+    // The argv pointers must stay valid for the whole command, but many
+    // commands print into the very buffer they parsed from:
+    //   ksprintf(obuf, sizeof(obuf), "opening %s", argv[1]);
+    // writes over the bytes argv[1] points at, so the argument turns into
+    // the tail of the message ("ng https://...") and the command then acts
+    // on garbage - opening a URL turned into a web search for "ng ...".
+    // Parsing a copy keeps argv and the output buffer separate.
+    char work[2048];
+    {
+        int n = 0;
+        while (cmd[n] && n < (int)sizeof(work) - 1) { work[n] = cmd[n]; n++; }
+        work[n] = 0;
+    }
+    char* buf = work;
+    // Output buffer: separate from the parse buffer, because
+    // ksprintf(dst, ..., src) with dst == src is undefined behaviour and the
+    // sources here are the argv pointers (which point into the parse buffer).
+    char obuf[2048];
     const char* argv[8];
     int argc = 0;
     char* p = buf;
@@ -577,13 +610,13 @@ static void term_run(TermState* t, const char* cmd) {
             for (int i = 0; i < dn; i++) {
                 char buf[96];
                 if (di[i].sectors > 0)
-                    ksprintf(buf, sizeof(buf), "%s  %5u MB  %s    %s",
+                    ksprintf(obuf, sizeof(obuf), "%s  %5u MB  %s    %s",
                              di[i].name,
                              (unsigned)(di[i].sectors / 2048),
                              di[i].removable ? "yes" : "no ",
                              di[i].model);
                 else
-                    ksprintf(buf, sizeof(buf), "%s  ?        %s    %s",
+                    ksprintf(obuf, sizeof(obuf), "%s  ?        %s    %s",
                              di[i].name,
                              di[i].removable ? "yes" : "no ",
                              di[i].model);
@@ -592,23 +625,76 @@ static void term_run(TermState* t, const char* cmd) {
         }
     }
     else if (strcmp(a0, "date") == 0) {
-        char buf[96];
         DateInfo di;
         if (platform_rtc_date(&di)) {
             static const char* WDN[7] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
-            ksprintf(buf, sizeof(buf), "%s %04d-%02d-%02d %02d:%02d:%02d",
-                     WDN[di.dow % 7], di.year, di.month, di.day, di.hour, di.min, di.sec);
+            int tz = platform_tz_offset_minutes();
+            // Two lines on purpose: local is what a human wants, UTC is what
+            // every log / HTTP Date / certificate check actually uses.
+            ksprintf(obuf, sizeof(obuf), "%s %04d-%02d-%02d %02d:%02d:%02d  local (tz=%d min, rtc=%s)",
+                     WDN[di.dow % 7], di.year, di.month, di.day, di.hour, di.min, di.sec,
+                     tz, platform_rtc_is_utc() ? "utc" : "local");
+            term_print(t, obuf);
+            int local_sod = di.hour * 3600 + di.min * 60 + di.sec;
+            int utc_sod = local_sod - tz * 60;
+            const char* daytag = "";
+            if (utc_sod < 0) { utc_sod += 86400; daytag = " (previous day)"; }
+            else if (utc_sod >= 86400) { utc_sod -= 86400; daytag = " (next day)"; }
+            ksprintf(obuf, sizeof(obuf), "utc %02d:%02d:%02d%s",
+                     utc_sod / 3600, (utc_sod / 60) % 60, utc_sod % 60, daytag);
+            term_print(t, obuf);
         } else {
             uint32_t s = nefuos_uptime_ms() / 1000;
-            ksprintf(buf, sizeof(buf), "uptime %u s (RTC unavailable)", s);
+            ksprintf(obuf, sizeof(obuf), "uptime %u s (RTC unavailable)", s);
+            term_print(t, obuf);
         }
-        term_print(t, buf);
+    }
+    else if (strcmp(a0, "tz") == 0) {
+        // The two facts platform_seconds_of_day() needs, made inspectable and
+        // settable from the shell: the zone offset and what the RTC stores.
+        if (argc >= 2 && (strcmp(argv[1], "utc") == 0 || strcmp(argv[1], "local") == 0)) {
+            bool utc = (strcmp(argv[1], "utc") == 0);
+            g_settings.rtc_is_utc = utc;
+            platform_set_rtc_is_utc(utc);
+            settings_save();
+            ksprintf(obuf, sizeof(obuf), "tz: the RTC now holds %s time",
+                     utc ? "UTC" : "local");
+            term_print(t, obuf);
+        } else if (argc >= 2) {
+            int v = 0, sign = 1;
+            const char* s = argv[1];
+            if (*s == '-') { sign = -1; s++; } else if (*s == '+') s++;
+            bool ok = (*s >= '0' && *s <= '9');
+            while (*s >= '0' && *s <= '9') { v = v * 10 + (*s - '0'); s++; }
+            if (!ok || *s) {
+                term_print(t, "tz: expected minutes east of UTC, e.g. 480 or -300");
+            } else {
+                int clamped = sign * v;
+                if (clamped < -720) clamped = -720;    // UTC-12 .. UTC+14
+                if (clamped >  840) clamped =  840;
+                g_settings.tz_offset_min = clamped;
+                platform_set_tz_offset_minutes(clamped);
+                settings_save();
+                int ah = clamped < 0 ? -clamped : clamped;
+                ksprintf(obuf, sizeof(obuf), "tz: offset now %s%d min (UTC%s%d:%02d)",
+                         clamped < 0 ? "-" : "+", ah,
+                         clamped < 0 ? "-" : "+", ah / 60, ah % 60);
+                term_print(t, obuf);
+            }
+        } else {
+            int tz = platform_tz_offset_minutes();
+            int ah = tz < 0 ? -tz : tz;
+            ksprintf(obuf, sizeof(obuf), "tz=%d min (UTC%s%d:%02d), rtc holds %s time",
+                     tz, tz < 0 ? "-" : "+", ah / 60, ah % 60,
+                     platform_rtc_is_utc() ? "UTC" : "local");
+            term_print(t, obuf);
+        }
     }
     else if (strcmp(a0, "free") == 0) {
         term_print(t, "              total        used        free");
         term_print(t, "Mem:         65536 KB     ~4096 KB    ~61440 KB");
         char buf[64];
-        ksprintf(buf, sizeof(buf), "VFS files:   %d nodes, %u bytes", g_vfs->node_count(), g_vfs->total_bytes());
+        ksprintf(obuf, sizeof(obuf), "VFS files:   %d nodes, %u bytes", g_vfs->node_count(), g_vfs->total_bytes());
         term_print(t, buf);
     }
     else if (strcmp(a0, "ps") == 0) {
@@ -621,28 +707,84 @@ static void term_run(TermState* t, const char* cmd) {
     }
     else if (strcmp(a0, "netstat") == 0) {
         char buf[96];
-        ksprintf(buf, sizeof(buf), "e1000 %s ip=10.0.2.15 gw=10.0.2.2",
+        ksprintf(obuf, sizeof(obuf), "e1000 %s ip=10.0.2.15 gw=10.0.2.2",
                  g_net.up ? "up" : "down");
         term_print(t, buf);
-        ksprintf(buf, sizeof(buf), "rx=%u tx=%u arp=%u icmp=%u tcp=%u",
+        ksprintf(obuf, sizeof(obuf), "rx=%u tx=%u arp=%u icmp=%u tcp=%u",
                  g_net.rx_count, g_net.tx_count, g_net.arp_reqs, g_net.icmp_reqs, g_net.tcp_conns);
         term_print(t, buf);
         if (!g_net.up) term_print(t, "note: no NIC on this backend");
     }
+    else if (strcmp(a0, "open") == 0) {
+        // Open a URL in the browser. An optional second argument names a
+        // visible label to press once the page is up ("Agree", "Play"), which
+        // is what a page like bloxd.io needs before it shows anything else.
+        //
+        // The remaining arguments are page actions, performed in order:
+        //   <label>       click the element showing that text
+        //   key:<Name>    press a key           ("key:Escape")
+        //   text:<Label>  click visible text    ("text:Play")
+        //   class:<Frag>  click by class name   ("class:SomeButtonClass")
+        if (argc < 2) {
+            term_print(t, "open <url> [action...] - open a URL in the browser");
+            term_print(t, "  actions: <label> | key:<Name> | text:<Label> | class:<Fragment> | type:<Text> | submit");
+        } else {
+            ksprintf(obuf, sizeof(obuf), "opening %s", argv[1]);
+            term_print(t, obuf);
+            browser_launch_fullscreen(argv[1]);
+            for (int i = 2; i < argc; i++) {
+                // type:<Text> goes to the native text-field editor (it types
+                // into the focused field, so it must follow a click action)
+                if (strncmp(argv[i], "type:", 5) == 0) browser_send_text(argv[i] + 5);
+                else if (strcmp(argv[i], "submit") == 0) browser_send_enter();
+                else browser_page_action(argv[i]);
+            }
+            // The browser window takes the screen. On the bare kernel the
+            // shell would sit right on top of the page and hide it, so the
+            // shell steps aside - the taskbar brings it back.
+            if (t->win && !t->win->minimized) g_wm->toggle_minimize(t->win);
+        }
+    }
+    else if (strcmp(a0, "key") == 0) {
+        // Send a key straight to the page in the browser. The page only
+        // receives keys while it owns the keyboard, so this bypasses the
+        // address bar: a dialog listening on document.documentElement (the
+        // floating-ui dismiss handler) can only be closed this way.
+        if (argc < 2) {
+            term_print(t, "key <name> - send a key to the page (Escape, Enter, w, ...)");
+        } else {
+            browser_send_key(argv[1]);
+            ksprintf(obuf, sizeof(obuf), "key %s sent to the page", argv[1]);
+            term_print(t, obuf);
+        }
+    }
     else if (strcmp(a0, "ping") == 0) {
         uint32_t ip = argc > 1 ? parse_ip(argv[1]) : g_net.gw;
         char buf[64];
-        ksprintf(buf, sizeof(buf), "ping %d.%d.%d.%d ...",
+        ksprintf(obuf, sizeof(obuf), "ping %d.%d.%d.%d ...",
                  (int)((ip >> 24) & 0xFF), (int)((ip >> 16) & 0xFF),
                  (int)((ip >> 8) & 0xFF), (int)(ip & 0xFF));
         term_print(t, buf);
         if (!g_net.up) { term_print(t, "network not available"); }
         else {
             bool ok = net_ping(ip, 1500);
-            ksprintf(buf, sizeof(buf), "ping %s (%u ms)", ok ? "OK" : "FAIL",
+            ksprintf(obuf, sizeof(obuf), "ping %s (%u ms)", ok ? "OK" : "FAIL",
                      (unsigned)(nefuos_uptime_ms() % 100000));
             term_print(t, buf);
         }
+    }
+    else if (strcmp(a0, "nettest") == 0) {
+        // The deep network diagnostics (3 MB bundle download, http->https
+        // redirect, Colyseus matchmaking + WebSocket). They are not part of
+        // the boot path: each one blocks the bare thread for seconds, and
+        // the bundle is downloaded again by the browser anyway.
+        term_print(t, "running the deep network self-test (this takes a while) ...");
+#ifdef NEFU_BARE
+        nefu_net_selftest_deep();
+        term_print(t, "nettest: done (see the serial log for details)");
+#else
+        term_print(t, "nettest: deep checks are bare-metal only");
+#endif
     }
     else if (strcmp(a0, "cp") == 0) {
         if (argc < 3) term_print(t, "usage: cp <src> <dst>");
@@ -715,7 +857,7 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "uptime") == 0) {
         char buf[64];
         uint32_t s = nefuos_uptime_ms() / 1000;
-        ksprintf(buf, sizeof(buf), "uptime: %u s (%u min)", s, s / 60);
+        ksprintf(obuf, sizeof(obuf), "uptime: %u s (%u min)", s, s / 60);
         term_print(t, buf);
     }
     else if (strcmp(a0, "grep") == 0) {
@@ -731,7 +873,7 @@ static void term_run(TermState* t, const char* cmd) {
                     if (ls[i].find(argv[1]) >= 0) { term_print(t, ls[i].c_str()); hits++; }
                 }
                 char buf[64];
-                ksprintf(buf, sizeof(buf), "%d match(es)", hits);
+                ksprintf(obuf, sizeof(obuf), "%d match(es)", hits);
                 term_print(t, buf);
             }
         }
@@ -755,7 +897,7 @@ static void term_run(TermState* t, const char* cmd) {
                     }
                 }
                 char buf[96];
-                ksprintf(buf, sizeof(buf), "lines %d  words %d  bytes %u  %s",
+                ksprintf(obuf, sizeof(obuf), "lines %d  words %d  bytes %u  %s",
                          ls.size(), words, (unsigned)f->size, f->name.c_str());
                 term_print(t, buf);
             }
@@ -817,16 +959,16 @@ static void term_run(TermState* t, const char* cmd) {
         if (argc < 2) term_print(t, "usage: which <command>");
         else {
             char buf[96];
-            ksprintf(buf, sizeof(buf), "/bin/%s", argv[1]);
+            ksprintf(obuf, sizeof(obuf), "/bin/%s", argv[1]);
             term_print(t, buf);
-            ksprintf(buf, sizeof(buf), "type: shell builtin or /usr/bin/%s", argv[1]);
+            ksprintf(obuf, sizeof(obuf), "type: shell builtin or /usr/bin/%s", argv[1]);
             term_print(t, buf);
         }
     }
     else if (strcmp(a0, "env") == 0) {
         for (int i = 0; i < 8; i++) {
             char buf[128];
-            ksprintf(buf, sizeof(buf), "%s=%s", s_env_names[i], s_env_vals[i]);
+            ksprintf(obuf, sizeof(obuf), "%s=%s", s_env_names[i], s_env_vals[i]);
             term_print(t, buf);
         }
     }
@@ -846,7 +988,7 @@ static void term_run(TermState* t, const char* cmd) {
                     strncpy(s_env_vals[idx], eq + 1, 95);
                     s_env_vals[idx][95] = 0;
                     char buf[128];
-                    ksprintf(buf, sizeof(buf), "%s=%s", name, s_env_vals[idx]);
+                    ksprintf(obuf, sizeof(obuf), "%s=%s", name, s_env_vals[idx]);
                     term_print(t, buf);
                 }
             }
@@ -855,7 +997,7 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "history") == 0) {
         for (int i = 0; i < s_hist_n; i++) {
             char buf[140];
-            ksprintf(buf, sizeof(buf), "%3d  %s", i + 1, s_history[i]);
+            ksprintf(obuf, sizeof(obuf), "%3d  %s", i + 1, s_history[i]);
             term_print(t, buf);
         }
     }
@@ -864,11 +1006,11 @@ static void term_run(TermState* t, const char* cmd) {
         uint32_t used = g_vfs->total_bytes();
         uint32_t size = 65536 * 1024;
         char buf[96];
-        ksprintf(buf, sizeof(buf), "/dev/vfs0       64M   %6uK   %6uK   %3u%%",
+        ksprintf(obuf, sizeof(obuf), "/dev/vfs0       64M   %6uK   %6uK   %3u%%",
                  (unsigned)(used / 1024), (unsigned)((size - used) / 1024),
                  (unsigned)(used * 100 / size));
         term_print(t, buf);
-        ksprintf(buf, sizeof(buf), "inodes: %d nodes in tree", g_vfs->node_count());
+        ksprintf(obuf, sizeof(obuf), "inodes: %d nodes in tree", g_vfs->node_count());
         term_print(t, buf);
     }
     else if (strcmp(a0, "du") == 0) {
@@ -883,7 +1025,7 @@ static void term_run(TermState* t, const char* cmd) {
         if (!d) term_print(t, "du: no such path");
         else {
             char buf[64];
-            ksprintf(buf, sizeof(buf), "%u bytes", (unsigned)DuWalk::go(d));
+            ksprintf(obuf, sizeof(obuf), "%u bytes", (unsigned)DuWalk::go(d));
             term_print(t, buf);
         }
     }
@@ -892,8 +1034,8 @@ static void term_run(TermState* t, const char* cmd) {
         else {
             FSNode* f = g_vfs->resolve(argv[2]);
             char buf[96];
-            if (f) ksprintf(buf, sizeof(buf), "chmod: %s mode %s (simulated)", f->name.c_str(), argv[1]);
-            else ksprintf(buf, sizeof(buf), "chmod: no such file: %s", argv[2]);
+            if (f) ksprintf(obuf, sizeof(obuf), "chmod: %s mode %s (simulated)", f->name.c_str(), argv[1]);
+            else ksprintf(obuf, sizeof(obuf), "chmod: no such file: %s", argv[2]);
             term_print(t, buf);
         }
     }
@@ -927,10 +1069,17 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "empty-trash") == 0) {
         int c = g_vfs->empty_trash();
         char buf[48];
-        ksprintf(buf, sizeof(buf), "trash emptied: %d file(s) removed", c);
+        ksprintf(obuf, sizeof(obuf), "trash emptied: %d file(s) removed", c);
         term_print(t, buf);
     }
     else if (strcmp(a0, "exit") == 0) { g_wm->close_window(t->win); }
+    else if (strcmp(a0, "hide") == 0 || strcmp(a0, "bg") == 0) {
+        // Shrink the shell to the taskbar and hand the screen to whatever is
+        // behind it. "open <url>" raises the browser window, so the shell
+        // ends up on top of the page; this puts the page back in view.
+        if (t->win && !t->win->minimized) g_wm->toggle_minimize(t->win);
+        term_print(t, "shell hidden - bring it back from the taskbar");
+    }
     else if (strcmp(a0, "su") == 0) {
         // su [user] <password>  (admin user is lbinm; password verified by hash)
         const char* pw = 0;
@@ -1005,7 +1154,7 @@ static void term_run(TermState* t, const char* cmd) {
                 for (int i = 0; i < d->children.size(); i++) {
                     if (d->children[i]->is_dir) continue;
                     char buf[128];
-                    ksprintf(buf, sizeof(buf), "table: %s (%u bytes)",
+                    ksprintf(obuf, sizeof(obuf), "table: %s (%u bytes)",
                              d->children[i]->name.c_str(), (unsigned)d->children[i]->size);
                     term_print(t, buf);
                 }
@@ -1081,9 +1230,9 @@ static void term_run(TermState* t, const char* cmd) {
                             char ok[96];
                             ksprintf(ok, sizeof(ok), "db: %s set (admin)", argv[2]);
                             term_print(t, ok);
-                        } else term_print(t, "db: out of memory");
+                        } else term_print(t, "db: obuf of memory");
                         kfree(buf);
-                    } else term_print(t, "db: out of memory");
+                    } else term_print(t, "db: obuf of memory");
                 }
             }
         }
@@ -1119,7 +1268,7 @@ static void term_run(TermState* t, const char* cmd) {
                         ksprintf(ok, sizeof(ok), "db: %s removed (admin)", argv[2]);
                         term_print(t, ok);
                         kfree(buf);
-                    } else term_print(t, "db: out of memory");
+                    } else term_print(t, "db: obuf of memory");
                 }
             }
         }
@@ -1160,7 +1309,7 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "history") == 0) {
         for (int i = 0; i < HIST_MAX && s_history[i][0]; i++) {
             char buf[128];
-            ksprintf(buf, sizeof(buf), "%3d  %s", i + 1, s_history[i]);
+            ksprintf(obuf, sizeof(obuf), "%3d  %s", i + 1, s_history[i]);
             term_print(t, buf);
         }
     }
@@ -1268,9 +1417,9 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, "  document.write, len, int arithmetic and string concat");
         } else {
             char out[512];
-            int rc = mini_js_run(argv[1], out, sizeof(out), 0, 0);
+            int rc = mini_js_run(argv[1], obuf, sizeof(obuf), 0, 0);
             if (rc) term_print(t, "js: error (syntax or undefined variable)");
-            else if (out[0]) term_print(t, out);
+            else if (obuf[0]) term_print(t, obuf);
         }
     }
     else if (strcmp(a0, "java") == 0) {
@@ -1341,18 +1490,18 @@ static void term_run(TermState* t, const char* cmd) {
                 FSNode* n = g_vfs->resolve(p);
                 return (n && g_vfs->remove_node(n)) ? 0 : -1;
             };
-            jvfs.list = [](void*, const char* p, char* out, int out_sz) -> int {
+            jvfs.list = [](void*, const char* p, char* obuf, int out_sz) -> int {
                 FSNode* n = g_vfs->resolve(p);
                 if (!n || !n->is_dir) return -1;
                 int k = 0;
                 for (int i = 0; i < n->children.size() && k < out_sz - 1; i++) {
                     FSNode* c = n->children[i];
                     for (const char* q = c->name.data(); *q; q++) {
-                        if (k < out_sz - 1) out[k++] = *q;
+                        if (k < out_sz - 1) obuf[k++] = *q;
                     }
-                    if (k < out_sz - 1) out[k++] = '\n';
+                    if (k < out_sz - 1) obuf[k++] = '\n';
                 }
-                if (k < out_sz) out[k] = 0;
+                if (k < out_sz) obuf[k] = 0;
                 return 0;
             };
             nefu::minijvm_set_vfs(&jvfs);
@@ -1407,6 +1556,9 @@ static void term_run(TermState* t, const char* cmd) {
             else if (strcmp(m, "cp") == 0) term_print(t, "cp <src> <dst>  - copy file");
             else if (strcmp(m, "mv") == 0) term_print(t, "mv <src> <dst>  - move file");
             else if (strcmp(m, "ping") == 0) term_print(t, "ping [host]  - ICMP echo (gateway by default)");
+            else if (strcmp(m, "nettest") == 0) term_print(t, "nettest  - deep network self-test (bundle download, matchmaking, WebSocket)");
+            else if (strcmp(m, "open") == 0) term_print(t, "open <url> [action...]  - open a URL; actions: <label> | key:<Name> | text:<Label> | class:<Fragment>");
+            else if (strcmp(m, "key") == 0) term_print(t, "key <name>  - send a key to the page (Escape, Enter, w, ...)");
             else if (strcmp(m, "grep") == 0) term_print(t, "grep <pattern> <file>  - search lines");
             else if (strcmp(m, "df") == 0) term_print(t, "df [-h]  - report file system usage");
             else if (strcmp(m, "free") == 0) term_print(t, "free  - show memory usage");
@@ -1452,7 +1604,7 @@ static void term_run(TermState* t, const char* cmd) {
             int h = (1 + (13 * (mm + 1)) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
             int dow1 = (h + 6) % 7;   // 0 = Sunday
             char buf[64];
-            ksprintf(buf, sizeof(buf), "%04d-%02d    Su Mo Tu We Th Fr Sa", di.year, di.month);
+            ksprintf(obuf, sizeof(obuf), "%04d-%02d    Su Mo Tu We Th Fr Sa", di.year, di.month);
             term_print(t, buf);
             char line[64];
             int n = 0;
@@ -1516,26 +1668,26 @@ static void term_run(TermState* t, const char* cmd) {
                     fp++;
                     char c = *fp;
                     if (c == 's') {
-                        if (ai < argc) { const char* a = argv[ai++]; while (*a && oi < 248) out[oi++] = *a++; }
+                        if (ai < argc) { const char* a = argv[ai++]; while (*a && oi < 248) obuf[oi++] = *a++; }
                     } else if (c == 'd' || c == 'i' || c == 'u') {
-                        if (ai < argc) { int v = atoi(argv[ai++]); char nb[16]; ksprintf(nb, sizeof(nb), "%d", v); for (char* q = nb; *q && oi < 248; q++) out[oi++] = *q; }
+                        if (ai < argc) { int v = atoi(argv[ai++]); char nb[16]; ksprintf(nb, sizeof(nb), "%d", v); for (char* q = nb; *q && oi < 248; q++) obuf[oi++] = *q; }
                     } else if (c == 'x' || c == 'X') {
-                        if (ai < argc) { unsigned v = (unsigned)atoi(argv[ai++]); char nb[16]; int ni = 0; int st = 0; for (int sh = 28; sh >= 0; sh -= 4) { int dg = (v >> sh) & 0xF; if (dg || st || sh == 0) { st = 1; nb[ni++] = dg < 10 ? (char)('0' + dg) : (char)((c == 'X' ? 'A' : 'a') + dg - 10); } } nb[ni] = 0; if (!st) nb[0] = '0', nb[1] = 0; for (char* q = nb; *q && oi < 248; q++) out[oi++] = *q; }
+                        if (ai < argc) { unsigned v = (unsigned)atoi(argv[ai++]); char nb[16]; int ni = 0; int st = 0; for (int sh = 28; sh >= 0; sh -= 4) { int dg = (v >> sh) & 0xF; if (dg || st || sh == 0) { st = 1; nb[ni++] = dg < 10 ? (char)('0' + dg) : (char)((c == 'X' ? 'A' : 'a') + dg - 10); } } nb[ni] = 0; if (!st) nb[0] = '0', nb[1] = 0; for (char* q = nb; *q && oi < 248; q++) obuf[oi++] = *q; }
                     } else if (c == 'c') {
-                        if (ai < argc) out[oi++] = argv[ai++][0];
+                        if (ai < argc) obuf[oi++] = argv[ai++][0];
                     } else if (c == '%') {
-                        out[oi++] = '%';
+                        obuf[oi++] = '%';
                     } else {
-                        out[oi++] = '%'; out[oi++] = c;
+                        obuf[oi++] = '%'; obuf[oi++] = c;
                     }
                 } else if (*fp == '\\' && fp[1] == 'n') {
-                    out[oi++] = '\n'; fp++;
+                    obuf[oi++] = '\n'; fp++;
                 } else {
-                    out[oi++] = *fp;
+                    obuf[oi++] = *fp;
                 }
             }
-            out[oi] = 0;
-            term_print(t, out);
+            obuf[oi] = 0;
+            term_print(t, obuf);
         }
     }
     else if (strcmp(a0, "basename") == 0) {
@@ -1570,11 +1722,11 @@ static void term_run(TermState* t, const char* cmd) {
             while (platform_tick_ms() - t0 < (uint32_t)secs * 1000u) {
                 // busy wait with progress dots
                 char buf[8];
-                ksprintf(buf, sizeof(buf), ".%u", (unsigned)((platform_tick_ms() - t0) / 1000));
+                ksprintf(obuf, sizeof(obuf), ".%u", (unsigned)((platform_tick_ms() - t0) / 1000));
                 (void)buf;
             }
             char buf[32];
-            ksprintf(buf, sizeof(buf), "sleep: %d s elapsed", secs);
+            ksprintf(obuf, sizeof(obuf), "sleep: %d s elapsed", secs);
             term_print(t, buf);
         }
     }
@@ -1584,13 +1736,13 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "ifconfig") == 0 || strcmp(a0, "ip") == 0) {
         char buf[128];
         if (g_net.up) {
-            ksprintf(buf, sizeof(buf), "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
+            ksprintf(obuf, sizeof(obuf), "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
             term_print(t, buf);
-            ksprintf(buf, sizeof(buf), "        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255");
+            ksprintf(obuf, sizeof(obuf), "        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255");
             term_print(t, buf);
-            ksprintf(buf, sizeof(buf), "        ether 52:54:00:12:34:56  txqueuelen 1000  (Ethernet)");
+            ksprintf(obuf, sizeof(obuf), "        ether 52:54:00:12:34:56  txqueuelen 1000  (Ethernet)");
             term_print(t, buf);
-            ksprintf(buf, sizeof(buf), "        RX packets %u  TX packets %u", g_net.rx_count, g_net.tx_count);
+            ksprintf(obuf, sizeof(obuf), "        RX packets %u  TX packets %u", g_net.rx_count, g_net.tx_count);
             term_print(t, buf);
         } else term_print(t, "eth0: flags=4098<NOARP,UP>  mtu 1500 (link down)");
     }
@@ -1603,7 +1755,7 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "arp") == 0) {
         term_print(t, "Address     HWtype  HWaddress           Flags Iface");
         char buf[96];
-        ksprintf(buf, sizeof(buf), "%d.%d.%d.%d   ether   52:54:00:12:34:56  C     eth0",
+        ksprintf(obuf, sizeof(obuf), "%d.%d.%d.%d   ether   52:54:00:12:34:56  C     eth0",
                  (int)((g_net.gw >> 24) & 0xFF), (int)((g_net.gw >> 16) & 0xFF),
                  (int)((g_net.gw >> 8) & 0xFF), (int)(g_net.gw & 0xFF));
         term_print(t, buf);
@@ -1625,12 +1777,12 @@ static void term_run(TermState* t, const char* cmd) {
             if (!f) term_print(t, "stat: no such file");
             else {
                 char buf[160];
-                ksprintf(buf, sizeof(buf), "  File: %s", f->name.c_str());
+                ksprintf(obuf, sizeof(obuf), "  File: %s", f->name.c_str());
                 term_print(t, buf);
-                ksprintf(buf, sizeof(buf), "  Size: %u          Type: %s",
+                ksprintf(obuf, sizeof(obuf), "  Size: %u          Type: %s",
                          (unsigned)f->size, f->is_dir ? "directory" : "regular file");
                 term_print(t, buf);
-                ksprintf(buf, sizeof(buf), "  Children: %d      Path: %s",
+                ksprintf(obuf, sizeof(obuf), "  Children: %d      Path: %s",
                          f->children.size(), node_path(f).c_str());
                 term_print(t, buf);
             }
@@ -1656,7 +1808,7 @@ static void term_run(TermState* t, const char* cmd) {
                 else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".wav")) ext = "WAV audio";
                 else if (l > 4 && !strcmp(f->name.c_str()+l-4, ".cfg")) ext = "config file";
                 char buf[128];
-                ksprintf(buf, sizeof(buf), "%s: %s (%u bytes)", f->name.c_str(), ext, (unsigned)f->size);
+                ksprintf(obuf, sizeof(obuf), "%s: %s (%u bytes)", f->name.c_str(), ext, (unsigned)f->size);
                 term_print(t, buf);
             }
         }
@@ -1677,7 +1829,7 @@ static void term_run(TermState* t, const char* cmd) {
         term_print(t, "      //   \\ \\       Host: nefuOS Virtual Machine");
         term_print(t, "     (|     | )      Kernel: 0.2.0-nefuOS");
         char buf[80];
-        ksprintf(buf, sizeof(buf), "    /'\\_   _/\\`\\      Uptime: %u mins", (unsigned)(nefuos_uptime_ms()/60000));
+        ksprintf(obuf, sizeof(obuf), "    /'\\_   _/\\`\\      Uptime: %u mins", (unsigned)(nefuos_uptime_ms()/60000));
         term_print(t, buf);
         term_print(t, "    \\___)=(___/      Shell: nefush 1.0");
         term_print(t, "                      DE: nefuOS Desktop");
@@ -1694,7 +1846,7 @@ static void term_run(TermState* t, const char* cmd) {
         if (argc < 2) term_print(t, "usage: man <command>");
         else {
             char buf[128];
-            ksprintf(buf, sizeof(buf), "nefuOS manual: %s", argv[1]);
+            ksprintf(obuf, sizeof(obuf), "nefuOS manual: %s", argv[1]);
             term_print(t, buf);
             term_print(t, "  Type 'help' for the list of builtin commands.");
             term_print(t, "  See /usr/share/banner.txt and /README.txt.");
@@ -1709,14 +1861,14 @@ static void term_run(TermState* t, const char* cmd) {
         term_print(t, "  5  shell           running     0%");
         term_print(t, "  6  browser         sleeping    0%");
         char buf[80];
-        ksprintf(buf, sizeof(buf), "Tasks: 6 total, Mem: %uK used", (unsigned)(g_vfs->total_bytes()/1024));
+        ksprintf(obuf, sizeof(obuf), "Tasks: 6 total, Mem: %uK used", (unsigned)(g_vfs->total_bytes()/1024));
         term_print(t, buf);
     }
     else if (strcmp(a0, "kill") == 0) {
         if (argc < 2) term_print(t, "usage: kill <pid> (simulated)");
         else {
             char buf[80];
-            ksprintf(buf, sizeof(buf), "kill: process %s signalled", argv[1]);
+            ksprintf(obuf, sizeof(obuf), "kill: process %s signalled", argv[1]);
             term_print(t, buf);
         }
     }
@@ -1725,7 +1877,7 @@ static void term_run(TermState* t, const char* cmd) {
         uint32_t used = g_vfs->total_bytes();
         uint32_t size = 65536 * 1024;
         char buf[96];
-        ksprintf(buf, sizeof(buf), "/dev/vfs0       64M  %4uK %4uK  %3u%% /",
+        ksprintf(obuf, sizeof(obuf), "/dev/vfs0       64M  %4uK %4uK  %3u%% /",
                  (unsigned)(used/1024), (unsigned)((size-used)/1024), (unsigned)(used*100/size));
         term_print(t, buf);
     }
@@ -1735,8 +1887,8 @@ static void term_run(TermState* t, const char* cmd) {
     else if (strcmp(a0, "which") == 0 && argc > 1 && strcmp(argv[1], "-a") == 0) {
         char buf[96];
         if (argc > 2) {
-            ksprintf(buf, sizeof(buf), "/bin/%s", argv[2]); term_print(t, buf);
-            ksprintf(buf, sizeof(buf), "/usr/bin/%s", argv[2]); term_print(t, buf);
+            ksprintf(obuf, sizeof(obuf), "/bin/%s", argv[2]); term_print(t, buf);
+            ksprintf(obuf, sizeof(obuf), "/usr/bin/%s", argv[2]); term_print(t, buf);
         } else term_print(t, "usage: which -a <command>");
     }
     else if (strcmp(a0, "history") == 0 && argc > 1 && strcmp(argv[1], "-c") == 0) {
@@ -1766,7 +1918,7 @@ static void term_run(TermState* t, const char* cmd) {
         if (argc == 2) end = atoi(argv[1]);
         else if (argc == 3) { start = atoi(argv[1]); end = atoi(argv[2]); }
         for (int i = start; i <= end; i++) {
-            char buf[16]; ksprintf(buf, sizeof(buf), "%d", i);
+            char buf[16]; ksprintf(obuf, sizeof(obuf), "%d", i);
             term_print(t, buf);
         }
     }
@@ -1849,7 +2001,7 @@ static void term_run(TermState* t, const char* cmd) {
                 for (int i = 0; i < show; i++) term_print(t, ls[i].c_str());
                 if (ls.size() > 20) {
                     char buf[64];
-                    ksprintf(buf, sizeof(buf), "... (%d more lines, use cat to see all)", ls.size() - 20);
+                    ksprintf(obuf, sizeof(obuf), "... (%d more lines, use cat to see all)", ls.size() - 20);
                     term_print(t, buf);
                 }
             }
@@ -1867,7 +2019,7 @@ static void term_run(TermState* t, const char* cmd) {
         if (argc < 2) term_print(t, "usage: whereis <cmd>");
         else {
             char buf[128];
-            ksprintf(buf, sizeof(buf), "%s: /bin/%s /usr/bin/%s", argv[1], argv[1], argv[1]);
+            ksprintf(obuf, sizeof(obuf), "%s: /bin/%s /usr/bin/%s", argv[1], argv[1], argv[1]);
             term_print(t, buf);
         }
     }
@@ -1909,7 +2061,7 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, "  nefucpp myapp.cpp myapp.nefud");
         } else {
             const char* src = argv[1];
-            const char* out = (argc >= 3) ? argv[2] : "output.nefud";
+            const char* obuf = (argc >= 3) ? argv[2] : "output.nefud";
             
             char msg[256];
             ksprintf(msg, sizeof(msg), "nefucpp: compiling %s...", src);
@@ -1931,9 +2083,9 @@ static void term_run(TermState* t, const char* cmd) {
             term_print(t, "  - including stdcxx/stdcxx_all.h");
             term_print(t, "  - linking nefuOS runtime");
             
-            ksprintf(msg, sizeof(msg), "nefucpp: successfully packed -> %s", out);
+            ksprintf(msg, sizeof(msg), "nefucpp: successfully packed -> %s", obuf);
             term_print(t, msg);
-            ksprintf(msg, sizeof(msg), "Run with: run %s", out);
+            ksprintf(msg, sizeof(msg), "Run with: run %s", obuf);
             term_print(t, msg);
         }
     }
@@ -2096,6 +2248,7 @@ static void term_key(Window* w, const KeyEvent* e) {
     } else if (e->keycode == KEY_HOME) t->cursor = 0;
     else if (e->keycode == KEY_END) t->cursor = t->input.len();
     else if (e->keycode == KEY_ENTER) {
+        klogf("term: enter key\n");
         String prompt = prompt_str();
         String full = prompt + t->input;
         term_add(t, full.c_str());
@@ -2141,7 +2294,7 @@ static void term_close(Window* w) {
 void term_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Terminal - nefuOS Shell", x, y, 640, 380);
+    Window* w = g_wm->create_window(T("终端 - nefuOS Shell", "Terminal - nefuOS Shell"), x, y, 640, 380);
     if (!w) return;
     TermState* t = new TermState();
     t->win = w;
@@ -2154,6 +2307,12 @@ void term_launch() {
     w->app_scroll = true;   // terminal paints its own scrolled viewport
     w->on_close = term_close;
     term_print(t, "nefuOS shell v0.1 - type 'help' for commands.");
+    // Raise (and focus) the new window: without it the shell keeps the
+    // keyboard focus on whatever was focused before, so the user has to
+    // click the terminal before typing works - on the bare kernel, where
+    // there is no mouse by default, that made the shell unusable.
+    g_wm->raise(w);
 }
 
 } // namespace nefu
+

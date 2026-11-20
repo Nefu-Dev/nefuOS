@@ -460,3 +460,4 @@ unsigned char const test_font_2_buf[7252] = {
     0,   0,   0,   0
 };
 #endif /*LV_BUILD_TEST*/
+

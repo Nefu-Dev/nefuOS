@@ -49,3 +49,4 @@ typedef LWSEM_STRUCT lv_thread_sync_t;
 #endif
 
 #endif /*LV_MQX_H*/
+

@@ -43,3 +43,4 @@ void lv_tjpgd_deinit(void);
 #endif
 
 #endif /* LV_TJPGD_H */
+

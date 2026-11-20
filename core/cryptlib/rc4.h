@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — RC4 流密码 (rc4)
 // RC4：经典流密码（1987 年 Ron Rivest）。256 字节状态 S 经 KSA
 // 密钥调度 + PRGA 伪随机生成，逐字节异或。历史用途：WEP/WPA、
@@ -17,3 +22,4 @@ int rc4_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

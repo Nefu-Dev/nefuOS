@@ -41,3 +41,4 @@ void VP8InitRandom(VP8Random* const rg, float dithering) {
 
 //------------------------------------------------------------------------------
 
+

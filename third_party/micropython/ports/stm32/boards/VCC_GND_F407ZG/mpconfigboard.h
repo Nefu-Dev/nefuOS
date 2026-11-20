@@ -177,3 +177,4 @@ extern struct _spi_bdev_t spi_bdev;
 #define MICROPY_HW_ETH_RMII_TX_EN   (pin_B11)
 #define MICROPY_HW_ETH_RMII_TXD0    (pin_B12)
 #define MICROPY_HW_ETH_RMII_TXD1    (pin_B13)
+

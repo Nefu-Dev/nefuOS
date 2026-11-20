@@ -411,3 +411,4 @@ int ReadPictureWithWIC(const char* const filename,
 #endif  // HAVE_WINCODEC_H
 
 // -----------------------------------------------------------------------------
+

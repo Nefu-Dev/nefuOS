@@ -55,3 +55,4 @@ lv_indev_t * lv_nuttx_touchscreen_create(const char * dev_path);
 #endif
 
 #endif /* LV_NUTTX_TOUCHSCREEN_H */
+

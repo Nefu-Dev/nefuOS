@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 前馈神经网络（全连接 MLP）
 // 架构：输入层 -> 若干隐藏层(ReLU) -> 输出层(softmax 分类)。
 // 训练：交叉熵损失 + 全批量梯度下降（反向传播）。带 L2 正则。
@@ -40,3 +45,4 @@ int neuralnet_self_test();
 
 } // namespace ml
 } // namespace nefu
+

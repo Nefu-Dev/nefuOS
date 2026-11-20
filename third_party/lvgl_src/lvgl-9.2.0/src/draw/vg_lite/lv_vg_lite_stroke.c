@@ -308,3 +308,4 @@ static lv_cache_compare_res_t stroke_compare_cb(const stroke_item_t * lhs, const
 }
 
 #endif /*LV_USE_DRAW_VG_LITE && LV_USE_VECTOR_GRAPHIC*/
+

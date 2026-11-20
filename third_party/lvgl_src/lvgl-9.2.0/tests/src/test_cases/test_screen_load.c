@@ -133,3 +133,4 @@ void test_screen_load_with_delete_event(void)
 }
 
 #endif
+

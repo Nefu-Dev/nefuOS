@@ -42,3 +42,4 @@ void lv_example_anim_2(void)
 }
 
 #endif
+

@@ -12,3 +12,4 @@ extern "C" {
 }
 #endif
 #endif /* R_IIC_MASTER_CFG_H_ */
+

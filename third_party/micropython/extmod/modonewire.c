@@ -166,3 +166,4 @@ const mp_obj_module_t mp_module_onewire = {
 MP_REGISTER_MODULE(MP_QSTR__onewire, mp_module_onewire);
 
 #endif // MICROPY_PY_ONEWIRE
+

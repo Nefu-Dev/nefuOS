@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS terminal extension commands interface
 // Implemented in term_ext.cpp; wired into terminal.cpp dispatch.
 #pragma once
@@ -16,3 +21,4 @@ const char* term_ext_name(int i);
 void term_ext_dispatch(TermState* t, int argc, const char** argv);
 
 } // namespace nefu
+

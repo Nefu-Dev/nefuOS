@@ -16,3 +16,4 @@
 #include "boards/stm32wlxx_hal_conf_base.h"
 
 #endif // MICROPY_INCLUDED_STM32WLXX_HAL_CONF_H
+

@@ -54,3 +54,4 @@ void mp_os_dupterm_stream_detached_attached(mp_obj_t stream_detached, mp_obj_t s
         --uart_attached_to_dupterm;
     }
 }
+

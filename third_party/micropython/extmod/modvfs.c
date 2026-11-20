@@ -65,3 +65,4 @@ const mp_obj_module_t mp_module_vfs = {
 MP_REGISTER_MODULE(MP_QSTR_vfs, mp_module_vfs);
 
 #endif // MICROPY_PY_VFS
+

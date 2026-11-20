@@ -50,3 +50,4 @@ void lv_linux_fbdev_set_force_refresh(lv_display_t * disp, bool enabled);
 #endif
 
 #endif /* LV_LINUX_FBDEV_H */
+

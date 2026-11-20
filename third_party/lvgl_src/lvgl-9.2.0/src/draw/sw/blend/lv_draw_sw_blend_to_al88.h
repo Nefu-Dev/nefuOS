@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_blend_to_al88.h
  *
  */
@@ -43,3 +43,4 @@ void /* LV_ATTRIBUTE_FAST_MEM */ lv_draw_sw_blend_image_to_al88(lv_draw_sw_blend
 #endif
 
 #endif /*LV_DRAW_SW_BLEND_TO_AL88_H*/
+

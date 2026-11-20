@@ -66,3 +66,4 @@ void flash_operation_finished(flash_state_t result);
 #endif
 
 #endif // __MICROPY_INCLUDED_LIB_FLASH_H__
+

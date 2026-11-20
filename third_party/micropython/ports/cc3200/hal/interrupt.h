@@ -118,3 +118,4 @@ extern unsigned long IntPriorityMaskGet(void);
 #endif
 
 #endif // __INTERRUPT_H__
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 公共基础原语
 // 本头文件被 ethernet/arp/ip/icmp/udp/tcp 等模块共同包含。
 // 提供：
@@ -132,3 +137,4 @@ int netproto_common_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

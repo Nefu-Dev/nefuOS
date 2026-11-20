@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // core/x11/xserver.h
 //
 // nefuOS embedded X11 protocol server (Xvfb-style core subset).
@@ -67,3 +72,4 @@ extern int xs_window_count;
 
 } // namespace x11
 } // namespace nefu
+

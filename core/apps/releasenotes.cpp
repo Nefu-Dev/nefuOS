@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Release Notes
 // Shows version history
 #include "apps.h"
@@ -9,7 +14,7 @@
 namespace nefu {
 
 void releasenotes_launch() {
-    Window* w = g_wm->create_window("Release Notes", 100, 80, 460, 380);
+    Window* w = g_wm->create_window(T("更新日志", "Release Notes"), 100, 80, 460, 380);
     if (!w) return;
     
     // Header
@@ -62,3 +67,4 @@ void releasenotes_launch() {
 }
 
 } // namespace nefu
+

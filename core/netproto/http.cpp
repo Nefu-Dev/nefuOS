@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— HTTP/1.1 实现
 #include "http.h"
 #include <stdio.h>
@@ -330,8 +335,9 @@ int http_build_request(char* out, int outsz, const char* method,
     return snprintf(out, (size_t)outsz,
         "%s %s HTTP/1.1\r\n"
         "Host: %s\r\n"
-        "User-Agent: nefuOS\r\n"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36\r\n"
         "Accept: */*\r\n"
+        "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8\r\n"
         "Connection: close\r\n"
         "\r\n",
         method ? method : "GET",
@@ -611,3 +617,4 @@ int http_self_test() {
 
 } // namespace netproto
 } // namespace nefu
+

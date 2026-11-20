@@ -73,3 +73,4 @@ float math_fast_inv_sqrtf(float number);
 #endif
 
 #endif /*LV_VG_LITE_MATH_H*/
+

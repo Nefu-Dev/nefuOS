@@ -818,3 +818,4 @@ const mp_obj_module_t mp_module_socket = {
 };
 
 MP_REGISTER_EXTENSIBLE_MODULE(MP_QSTR_socket, mp_module_socket);
+

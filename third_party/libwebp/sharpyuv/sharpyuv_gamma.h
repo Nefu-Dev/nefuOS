@@ -36,3 +36,4 @@ uint16_t SharpYuvLinearToGamma(uint32_t value, int bit_depth,
 #endif
 
 #endif  // WEBP_SHARPYUV_SHARPYUV_GAMMA_H_
+

@@ -1358,3 +1358,4 @@ static void new_points_alloc(lv_obj_t * obj, lv_chart_series_t * ser, uint32_t c
 }
 
 #endif
+

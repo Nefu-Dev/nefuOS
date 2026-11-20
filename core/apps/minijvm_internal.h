@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mini JVM - internal shared definitions.
 // Split across minijvm_core.cpp (parsing/GC/helpers), minijvm.cpp (interpreter
 // + entry) and minijvm_builtin.cpp (built-in class dispatch) so each TU stays
@@ -220,3 +225,4 @@ int invoke_builtin(VM* vm, const char* owner, const char* name, const char* desc
 extern const MiniJvmVfs* g_minijvm_vfs_hooks;
 
 } // namespace nefu
+

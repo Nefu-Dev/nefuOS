@@ -3141,3 +3141,4 @@ const emit_method_table_t EXPORT_FUN(method_table) = {
 };
 
 #endif
+

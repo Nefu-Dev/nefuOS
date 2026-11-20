@@ -140,3 +140,4 @@ static inline void mp_hal_pin_write(mp_hal_pin_obj_t pin, int v) {
 spi_host_device_t machine_hw_spi_get_host(mp_obj_t in);
 
 #endif // INCLUDED_MPHALPORT_H
+

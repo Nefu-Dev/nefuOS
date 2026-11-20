@@ -17822,6 +17822,43 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         call_func = rt->class_array[p->class_id].call;
         if (!call_func) {
         not_a_function:
+            /* name the callee when possible: obfuscated bundles (bloxd.io)
+               call engine APIs this build may not implement, and a bare
+               "not a function" gives no clue which one */
+            if (JS_VALUE_GET_TAG(func_obj) == JS_TAG_OBJECT) {
+                const char *nm = get_prop_string(caller_ctx, func_obj,
+                                                 JS_ATOM_name);
+                if (nm && nm[0]) {
+                    JS_ThrowTypeError(caller_ctx, "%s is not a function", nm);
+                    JS_FreeCString(caller_ctx, nm);
+                    return JS_EXCEPTION;
+                }
+                if (nm)
+                    JS_FreeCString(caller_ctx, nm);
+                /* unnamed object: the class id narrows down what the page
+                   tried to call (a stub, a plain object, ...) */
+                {
+                    JSObject *np = JS_VALUE_GET_OBJ(func_obj);
+                    JS_ThrowTypeError(caller_ctx,
+                                      "object(class %d) is not a function",
+                                      (int)np->class_id);
+                    return JS_EXCEPTION;
+                }
+            } else {
+                const char *tn = "value";
+                switch (JS_VALUE_GET_TAG(func_obj)) {
+                    case JS_TAG_UNDEFINED: tn = "undefined"; break;
+                    case JS_TAG_NULL:      tn = "null"; break;
+                    case JS_TAG_INT:       tn = "number"; break;
+                    case JS_TAG_FLOAT64:   tn = "number"; break;
+                    case JS_TAG_BOOL:      tn = "boolean"; break;
+                    case JS_TAG_STRING:    tn = "string"; break;
+                    case JS_TAG_SYMBOL:    tn = "symbol"; break;
+                    case JS_TAG_BIG_INT:   tn = "bigint"; break;
+                }
+                JS_ThrowTypeError(caller_ctx, "not a function (got %s)", tn);
+                return JS_EXCEPTION;
+            }
             return JS_ThrowTypeError(caller_ctx, "not a function");
         }
         return call_func(caller_ctx, func_obj, this_obj, argc,
@@ -61426,3 +61463,4 @@ int JS_AddIntrinsicWeakRef(JSContext *ctx)
     JS_FreeValue(ctx, obj);
     return 0;
 }
+

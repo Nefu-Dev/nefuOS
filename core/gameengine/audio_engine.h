@@ -1,4 +1,9 @@
-﻿// audio_engine.h —— 音频引擎：音效播放、混音、音量/声道、循环、淡入淡出、PCM 缓冲、合成器
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// audio_engine.h —— 音频引擎：音效播放、混音、音量/声道、循环、淡入淡出、PCM 缓冲、合成器
 //
 // 纯整数 PCM 运算（16-bit 有符号采样），不依赖 FPU。
 // 实际出声由 platform_play_wav_mem 负责；本模块负责合成与混音逻辑，可独立自测。
@@ -279,3 +284,4 @@ int audio_engine_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_fill.c
  *
  */
@@ -340,3 +340,4 @@ void lv_draw_sw_fill(lv_draw_unit_t * draw_unit, lv_draw_fill_dsc_t * dsc, const
 }
 
 #endif /*LV_USE_DRAW_SW*/
+

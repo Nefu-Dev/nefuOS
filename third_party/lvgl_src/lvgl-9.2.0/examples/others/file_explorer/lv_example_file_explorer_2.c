@@ -130,3 +130,4 @@ void lv_example_file_explorer_2(void)
 }
 
 #endif
+

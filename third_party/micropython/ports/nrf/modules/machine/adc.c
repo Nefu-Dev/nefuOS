@@ -278,3 +278,4 @@ mp_obj_t machine_adc_battery_level(void) {
     return MP_OBJ_NEW_SMALL_INT(batt_in_percent);
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mp_machine_adc_battery_level_obj, machine_adc_battery_level);
+

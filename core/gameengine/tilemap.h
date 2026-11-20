@@ -1,4 +1,9 @@
-﻿// tilemap.h —— 瓦片地图：图层 / 瓦片集 / 碰撞层 / 视口相机 / 自动拼贴
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// tilemap.h —— 瓦片地图：图层 / 瓦片集 / 碰撞层 / 视口相机 / 自动拼贴
 //
 // 设计：
 //   - 纯逻辑（瓦片存储、碰撞查询、相机夹取、自动拼贴索引）放在 tilemap.cpp；
@@ -287,3 +292,4 @@ int tilemap_self_test();
 
 } // namespace gameengine
 } // namespace nefu
+

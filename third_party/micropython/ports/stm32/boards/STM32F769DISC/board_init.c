@@ -24,3 +24,4 @@ void board_early_init(void) {
     qspi_init();
     qspi_memory_map();
 }
+

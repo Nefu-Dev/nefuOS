@@ -40,3 +40,4 @@ void BSP_PinConfigSecurityInit();
 FSP_FOOTER
 
 #endif /* BSP_PIN_CFG_H_ */
+

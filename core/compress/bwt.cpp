@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— Burrows-Wheeler 变换实现
 #include "bwt.h"
 #include "bitio.h"
@@ -215,3 +220,4 @@ int bwt_self_test() {
 
 } // namespace compress
 } // namespace nefu
+

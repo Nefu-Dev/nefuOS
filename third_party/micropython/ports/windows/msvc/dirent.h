@@ -52,3 +52,4 @@ struct dirent *readdir(DIR *dir);
 int dttoif(int d_type);
 
 #endif // MICROPY_INCLUDED_WINDOWS_MSVC_DIRENT_H
+

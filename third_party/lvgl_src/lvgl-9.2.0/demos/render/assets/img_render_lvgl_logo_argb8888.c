@@ -65,3 +65,4 @@ const lv_image_dsc_t img_render_lvgl_logo_argb8888 = {
   .data_size = sizeof(img_render_lvgl_logo_argb8888_map),
   .data = img_render_lvgl_logo_argb8888_map,
 };
+

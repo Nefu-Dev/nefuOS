@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS HTML5 Engine - based on Hubbub design (MIT License, NetSurf project)
 // Simplified for bare-metal environment
 #pragma once
@@ -100,3 +105,4 @@ void html5_parser_destroy(HtmlParser* p);
 void html5_render(HtmlNode* root, class List<struct Line>& out, const char* base_url);
 
 } // namespace nefu
+

@@ -72,3 +72,4 @@ static inline void metal_generic_default_poll(void) {
 }
 
 #endif // MICROPY_INCLUDED_MIMXRT_METAL_PORT_H
+

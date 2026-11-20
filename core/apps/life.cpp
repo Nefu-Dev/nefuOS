@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // life.cpp —— nefuOS 康威生命游戏（Game of Life）
 //
 // 玩法：
@@ -258,7 +263,7 @@ static void life_close(Window* w) {
 void life_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Life", x, y, PW, PH);
+    Window* w = g_wm->create_window(T("生命游戏", "Life"), x, y, PW, PH);
     if (!w) return;
     Life* g = new Life();
     g->reset();
@@ -271,3 +276,4 @@ void life_launch() {
 }
 
 } // namespace nefu
+

@@ -1,4 +1,4 @@
-﻿# nefuOS �?exe + + + ISO�?GrubEsp 閺冨爼顤傛径鏍晸閹?ESP+GRUB 绾句胶娲忛梹婊冨剼閿?
+# nefuOS �?exe + + + ISO�?GrubEsp 閺冨爼顤傛径鏍晸閹?ESP+GRUB 绾句胶娲忛梹婊冨剼閿?
 param(
     [switch]$GrubEsp
 )
@@ -142,8 +142,12 @@ $objs += "$bareOut\bare_barelibc.o"
 $qjSrc = @(
   "quickjs.c", "libregexp.c", "libunicode.c", "cutils.c", "dtoa.c"
 )
+# -O2 (was -Os): QuickJS's interpreter loop is the hot path for the 3.36 MB
+# bloxd.io bundle.  Under QEMU TCG every extra guest instruction is emulated,
+# so size-optimised code is measurably slower than the -O2 build used by the
+# Win32 host engine.  kernel.bin stays well below the 0xB00000 staging limit.
 $qjBareFlags = @("-std=gnu11", "-ffreestanding", "-fno-builtin", "-fno-stack-protector",
-                 "-fno-asynchronous-unwind-tables", "-Os", "-w", "-D_GNU_SOURCE",
+                 "-fno-asynchronous-unwind-tables", "-O2", "-w", "-D_GNU_SOURCE",
                  "-DCONFIG_DISABLE_ATOMICS", "-DNDEBUG",
                  "-I", "third_party\quickjs", "-I", "third_party", "-c")
 foreach ($q in $qjSrc) {
@@ -292,7 +296,7 @@ $stubLd = "D:\CLion\bin\mingw\bin\ld.exe"
 $stubGcc = "D:\CLion\bin\mingw\bin\gcc.exe"
 & $stubAs --32 "backends\bare\stub.s" -o "$bareOut\stub.o"
 if ($LASTEXITCODE -ne 0) { throw "stub.s failed" }
-& $g -m32 -ffreestanding -fno-builtin -Os -c "backends\bare\inflate.cpp" -o "$bareOut\inflate32.o"
+& $g -m32 -ffreestanding -fno-builtin -Os -c "core\net\inflate.cpp" -o "$bareOut\inflate32.o"
 if ($LASTEXITCODE -ne 0) { throw "inflate.c (m32) failed" }
 & $stubLd -mi386pe --image-base 0 -T "backends\bare\stub.ld" "$bareOut\stub.o" "$bareOut\inflate32.o" -o "$bareOut\stub.exe"
 if ($LASTEXITCODE -ne 0) { throw "stub link failed" }

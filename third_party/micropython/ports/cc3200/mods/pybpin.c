@@ -961,3 +961,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &pin_board_pins_locals_dict
     );
 
+

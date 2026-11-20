@@ -100,3 +100,4 @@ lv_anim_t * lv_lottie_get_anim(lv_obj_t * obj);
 #endif
 
 #endif /*LV_LOTTIE_H*/
+

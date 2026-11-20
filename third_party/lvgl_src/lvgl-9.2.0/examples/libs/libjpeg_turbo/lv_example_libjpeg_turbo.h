@@ -36,3 +36,4 @@ void lv_example_libjpeg_turbo_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_LIBJPEG_TURBO_H*/
+

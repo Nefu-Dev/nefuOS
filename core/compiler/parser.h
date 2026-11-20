@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefu::compiler —— 递归下降解析器（parser.h）
 // ----------------------------------------------------------------------------
@@ -67,3 +72,4 @@ int parser_self_test();
 
 } // namespace compiler
 } // namespace nefu
+

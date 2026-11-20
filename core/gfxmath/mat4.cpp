@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 4x4 矩阵实现 + 自测
 #include "gfxmath/mat4.h"
 #include <cstdio>
@@ -176,3 +181,4 @@ int Mat4::self_test() {
 
 } // namespace gfx
 } // namespace nefu
+

@@ -43,3 +43,4 @@ void lv_example_textarea_1(void)
 }
 
 #endif
+

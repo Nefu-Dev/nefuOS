@@ -1,4 +1,9 @@
-﻿#include "gfx3d/gfx3d_all.h"
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+#include "gfx3d/gfx3d_all.h"
 #include <cstdio>
 #include <cmath>
 #include <cstdlib>
@@ -15,3 +20,4 @@ int main(){
   std::printf("r2 %g %g %g\n", r2.x,r2.y,r2.z);
   std::printf("diff %g\n", (r1-r2).length());
 }
+

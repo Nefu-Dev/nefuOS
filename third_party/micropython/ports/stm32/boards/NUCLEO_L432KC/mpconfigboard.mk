@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = l4
 CMSIS_MCU = STM32L432xx
 AF_FILE = boards/stm32l432_af.csv
@@ -14,3 +19,4 @@ FROZEN_MANIFEST ?=
 
 # LTO reduces final binary size, may be slower to build depending on gcc version and hardware
 LTO ?= 1
+

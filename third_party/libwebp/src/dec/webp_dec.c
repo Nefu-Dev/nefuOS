@@ -869,3 +869,4 @@ int WebPIoInitFromOptions(const WebPDecoderOptions* const options,
 }
 
 //------------------------------------------------------------------------------
+

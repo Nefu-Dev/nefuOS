@@ -31,3 +31,4 @@ extern const mp_obj_type_t pyb_accel_type;
 void accel_init(void);
 
 #endif // MICROPY_INCLUDED_STM32_ACCEL_H
+

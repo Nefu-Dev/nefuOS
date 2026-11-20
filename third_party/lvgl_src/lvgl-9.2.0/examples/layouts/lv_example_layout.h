@@ -37,3 +37,4 @@ extern "C" {
 #endif
 
 #endif /*LV_EXAMPLE_LAYOUT_H*/
+

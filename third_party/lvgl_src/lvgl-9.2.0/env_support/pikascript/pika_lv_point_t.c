@@ -14,3 +14,4 @@ void pika_lvgl_point_t___init__(PikaObj* self) {
     obj_setPtr(self, "lv_point", args_getStruct(self->list, "lv_point_struct"));
 }
 #endif
+

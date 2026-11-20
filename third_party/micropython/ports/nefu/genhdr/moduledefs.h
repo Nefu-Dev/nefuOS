@@ -141,3 +141,4 @@ extern void mp_module_sys_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest);
 #define MICROPY_MODULE_DELEGATIONS \
     { MP_ROM_PTR(&mp_module_sys), mp_module_sys_attr }, \
 // MICROPY_MODULE_DELEGATIONS
+

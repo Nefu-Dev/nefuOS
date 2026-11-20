@@ -44,3 +44,4 @@ bool lv_demo_stress_finished(void);
 #endif
 
 #endif /*LV_DEMO_STRESS_H*/
+

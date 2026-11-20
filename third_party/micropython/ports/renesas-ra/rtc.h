@@ -66,3 +66,4 @@ void rtc_init_finalise(void);
 mp_obj_t machine_rtc_wakeup(size_t n_args, const mp_obj_t *args);
 
 #endif // MICROPY_INCLUDED_RA_RTC_H
+

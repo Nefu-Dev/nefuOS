@@ -48,3 +48,4 @@ void   lv_cache_entry_release_data(lv_cache_entry_t * entry, void * user_data);
 #endif
 
 #endif /* LV_CACHE_ENTRY_PRIVATE_H */
+

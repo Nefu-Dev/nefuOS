@@ -45,3 +45,4 @@ uint32_t RANDOM_CALL_PROCESS(void);
 int random_utf8_chars(utf8_t * buf, int buf_len, const unicode_t * ranges, uint32_t range_num, int char_num);
 
 #endif //RND_UNICODES_LIBRARY_H
+

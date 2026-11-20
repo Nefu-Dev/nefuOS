@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS arbitrary-precision integer library (unsigned/signed, base 2^32)
 // Portable: no STL, no exceptions.
 #pragma once
@@ -50,3 +55,4 @@ int    big_cmp(const BigInt& a, const BigInt& b);
 
 } // namespace bignum
 } // namespace nefu
+

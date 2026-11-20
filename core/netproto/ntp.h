@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ntp.h - NTP 客户端 (RFC 5905, 简化版)
 // 仅构造/解析 NTP 报文，用 Q16.16 定点计算偏移
 #ifndef NEFU_NETPROTO_NTP_H
@@ -70,3 +75,4 @@ int ntp_self_test();
 } // namespace nefu
 
 #endif // NEFU_NETPROTO_NTP_H
+

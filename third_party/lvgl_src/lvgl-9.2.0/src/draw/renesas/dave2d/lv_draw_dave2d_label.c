@@ -158,3 +158,4 @@ static void lv_draw_dave2d_draw_letter_cb(lv_draw_unit_t * u, lv_draw_glyph_dsc_
 }
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

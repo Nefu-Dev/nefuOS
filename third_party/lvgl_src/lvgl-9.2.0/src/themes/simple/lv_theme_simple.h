@@ -65,3 +65,4 @@ void lv_theme_simple_deinit(void);
 #endif
 
 #endif /*LV_THEME_SIMPLE_H*/
+

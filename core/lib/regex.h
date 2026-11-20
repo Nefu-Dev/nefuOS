@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS regex library — small backtracking regex engine
 // Portable: no STL, no exceptions. Supports:
 //   literals, '.', classes [abc] [a-z] [^...], escapes \d \D \w \W \s \S \t \n \r
@@ -41,3 +46,4 @@ bool match_full(const char* pattern, const char* text);
 
 } // namespace regex
 } // namespace nefu
+

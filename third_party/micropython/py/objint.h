@@ -64,3 +64,4 @@ mp_obj_t mp_obj_int_binary_op_extra_cases(mp_binary_op_t op, mp_obj_t lhs_in, mp
 mp_obj_t mp_obj_int_pow3(mp_obj_t base, mp_obj_t exponent,  mp_obj_t modulus);
 
 #endif // MICROPY_INCLUDED_PY_OBJINT_H
+

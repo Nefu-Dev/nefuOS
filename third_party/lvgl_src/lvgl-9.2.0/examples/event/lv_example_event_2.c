@@ -44,3 +44,4 @@ void lv_example_event_2(void)
 }
 
 #endif
+

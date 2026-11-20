@@ -72,3 +72,4 @@ void sci_uart_eri_isr(void);
 void sci_uart_tei_isr(void);
 
 #endif /* PORTS_RA_RA_RA_SCI_H_ */
+

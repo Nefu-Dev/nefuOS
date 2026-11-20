@@ -80,3 +80,4 @@ void lv_example_roller_3(void)
     lv_obj_set_style_bitmap_mask_src(roller1, &mask, 0);
 }
 #endif
+

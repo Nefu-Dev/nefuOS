@@ -892,3 +892,4 @@ WEBP_DSP_INIT_FUNC(VP8DspInit) {
   assert(VP8PredChroma8[6] != NULL);
   assert(VP8DitherCombine8x8 != NULL);
 }
+

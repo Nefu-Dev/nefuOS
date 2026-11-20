@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audio engine - integer facade over the real sound-card output.
 // Compiled with the normal (FPU) ABI, so it may use the float mixer freely;
 // every function it exports is integer-only.
@@ -199,3 +204,4 @@ bool media_get_info(uint32_t* rate, uint32_t* total_frames) {
 
 } // namespace audio
 } // namespace nefu
+

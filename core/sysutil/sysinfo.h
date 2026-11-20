@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 系统信息模块
 // 汇总 CPU / 内存 / 磁盘 / 运行时间 / 环境变量，并提供人类可读的格式化。
 // 真实环境下数据来自 platform 层（platform_hw_info / platform_mem_stats /
@@ -124,3 +129,4 @@ int sysinfo_self_test();
 
 } // namespace sysutil
 } // namespace nefu
+

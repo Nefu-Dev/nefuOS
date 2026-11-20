@@ -40,3 +40,4 @@ struct tm *localtime_r(const time_t *__restrict time, struct tm *__restrict loca
 time_t mktime(struct tm *__restrict tm) {
     return timeutils_mktime(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
+

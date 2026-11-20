@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # By default the filesystem is in external QSPI flash.  But by setting the
 # following option this board puts some code into external flash set in XIP mode.
 # USE_MBOOT must be enabled; see f769_qspi.ld for code that goes in QSPI flash
@@ -46,3 +51,4 @@ MICROPY_PY_SSL = 1
 MICROPY_SSL_MBEDTLS = 1
 
 FROZEN_MANIFEST = $(BOARD_DIR)/manifest.py
+

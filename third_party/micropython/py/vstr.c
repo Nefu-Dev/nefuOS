@@ -244,3 +244,4 @@ void vstr_vprintf(vstr_t *vstr, const char *fmt, va_list ap) {
     mp_print_t print = {vstr, (mp_print_strn_t)vstr_add_strn};
     mp_vprintf(&print, fmt, ap);
 }
+

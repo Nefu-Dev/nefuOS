@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — tokenizer (word segmentation)
 // 分词器：按 Unicode 字节流把文本切成词元（英文单词、连续数字、
 // 单个 CJK 字符、标点符号、空白）。返回 token 的起止位置，
@@ -34,3 +39,4 @@ int token_self_test();
 
 } // namespace text
 } // namespace nefu
+

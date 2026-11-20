@@ -56,3 +56,4 @@ static uint32_t width_to_stride(uint32_t w, lv_color_format_t color_format)
 }
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

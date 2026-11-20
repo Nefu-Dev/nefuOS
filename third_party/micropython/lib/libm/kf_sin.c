@@ -56,3 +56,4 @@ S6  =  1.5896910177e-10f; /* 0x2f2ec9d3 */
 	if(iy==0) return x+v*(S1+z*r);
 	else      return x-((z*(half*y-v*r)-y)-v*S1);
 }
+

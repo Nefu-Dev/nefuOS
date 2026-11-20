@@ -663,3 +663,4 @@ mp_obj_t mp_builtin___import___default(size_t n_args, const mp_obj_t *args) {
 #endif // MICROPY_ENABLE_EXTERNAL_IMPORT
 
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin___import___obj, 1, 5, mp_builtin___import__);
+

@@ -40,3 +40,4 @@ const lv_image_dsc_t img_demo_widgets_needle = {
     .data =  img_demo_widgets_needle_map,
     .data_size = sizeof(img_demo_widgets_needle_map),
 };
+

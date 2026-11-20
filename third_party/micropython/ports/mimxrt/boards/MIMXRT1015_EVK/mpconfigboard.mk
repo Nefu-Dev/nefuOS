@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = MIMXRT1015
 MCU_VARIANT = MIMXRT1015DAF5A
 
@@ -6,3 +11,4 @@ MICROPY_HW_FLASH_TYPE = qspi_nor_flash
 MICROPY_HW_FLASH_SIZE = 0x1000000  # 16MB
 
 MICROPY_BOOT_BUFFER_SIZE = (32 * 1024)
+

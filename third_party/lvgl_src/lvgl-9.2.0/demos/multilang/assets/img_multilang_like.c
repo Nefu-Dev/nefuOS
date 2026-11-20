@@ -53,3 +53,4 @@ const lv_image_dsc_t img_multilang_like = {
 };
 
 #endif
+

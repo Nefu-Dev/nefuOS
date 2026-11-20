@@ -49,3 +49,4 @@ void lv_demo_vector_graphic_not_buffered(void);
 #endif
 
 #endif /*LV_DEMO_VECTOR_GRAPHIC_H*/
+

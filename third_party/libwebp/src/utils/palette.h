@@ -60,3 +60,4 @@ int PaletteSort(PaletteSorting method, const struct WebPPicture* const pic,
                 uint32_t* const palette);
 
 #endif  // WEBP_UTILS_PALETTE_H_
+

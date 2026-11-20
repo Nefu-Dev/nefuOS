@@ -138,3 +138,4 @@ void lv_draw_label_iterate_characters(lv_draw_unit_t * draw_unit, const lv_draw_
 #endif
 
 #endif /*LV_DRAW_LABEL_H*/
+

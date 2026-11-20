@@ -75,3 +75,4 @@ struct lv_fragment_managed_states_t  {
 #endif
 
 #endif /*LV_FRAGMENT_PRIVATE_H*/
+

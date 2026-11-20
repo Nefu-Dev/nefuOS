@@ -52,3 +52,4 @@ void lv_example_menu_2(void)
 }
 
 #endif
+

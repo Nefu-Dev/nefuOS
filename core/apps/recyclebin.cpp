@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Recycle Bin app
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -53,7 +58,7 @@ static void recyclebin_on_mouse(Window* win, int mx, int my, uint8_t buttons) {
 void app_recyclebin_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Recycle Bin", x, y, 300, 250);
+    Window* w = g_wm->create_window(T("回收站", "Recycle Bin"), x, y, 300, 250);
     if (!w) return;
     RecycleBinState* st = new RecycleBinState();
     st->w = w->content_w;
@@ -66,3 +71,4 @@ void app_recyclebin_launch() {
 }
 
 } // namespace nefu
+

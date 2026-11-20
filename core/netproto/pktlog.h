@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 报文环形日志
 // 一个固定容量的环形缓冲，记录最近 N 条收发报文的摘要（方向/协议/长度/时间戳）。
 // 用于 netlab 窗口展示"最近在跑什么包"。不持有完整报文，只存摘要，无堆分配。
@@ -45,3 +50,4 @@ int pktlog_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

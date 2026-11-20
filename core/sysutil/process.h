@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 进程管理模块
 // 纯软件模拟的进程表 / 创建 / 终止 / 调度 / 优先级 / 进程间通信(IPC)。
 // 不依赖真实硬件与线程：调度器是一个可单步推进的状态机，时间由虚拟时钟驱动，
@@ -227,3 +232,4 @@ bool proc_recv(int pid, IpcMessage* out);
 
 } // namespace sysutil
 } // namespace nefu
+

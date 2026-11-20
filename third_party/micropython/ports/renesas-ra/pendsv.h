@@ -51,3 +51,4 @@ void pendsv_init(void);
 void pendsv_schedule_dispatch(size_t slot, pendsv_dispatch_t f);
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_PENDSV_H
+

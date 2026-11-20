@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 独立宿主测试主程序
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 独立宿主测试主程序
 // 编译：
 //   D:\CLion\bin\mingw\bin\g++.exe -std=c++17 -fno-exceptions -fno-rtti -fno-builtin -O2 ^
 //     -I core tests\deeplearn_test_main.cpp core\deeplearn\*.cpp ^
@@ -122,3 +127,4 @@ int main() {
     fflush(stdout);
     return total ? 1 : 0;
 }
+

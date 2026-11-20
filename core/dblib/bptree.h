@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS dblib —— B+ 树 bptree
 // 教学版：B+ 树（叶子存值、内部存键）插入/查找/删除 + 范围查询。
 #pragma once
@@ -62,3 +67,4 @@ private:
 
 } // namespace dbx
 } // namespace nefu
+

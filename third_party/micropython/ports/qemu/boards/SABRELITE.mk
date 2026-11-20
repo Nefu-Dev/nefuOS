@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 QEMU_ARCH = arm
 QEMU_MACHINE = sabrelite
 QEMU_ARGS += -m 128M
@@ -17,3 +22,4 @@ MPY_CROSS_FLAGS += -march=armv6
 
 # These tests don't work on Cortex-A9, so exclude them.
 RUN_TESTS_ARGS = --exclude '(asmdiv|asmspecialregs).py'
+

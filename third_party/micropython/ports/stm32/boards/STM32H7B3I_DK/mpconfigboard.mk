@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 USE_MBOOT ?= 0
 
 # MCU settings
@@ -16,3 +21,4 @@ LD_FILES = boards/stm32h7b3.ld boards/common_ifs.ld
 TEXT0_ADDR = 0x08000000
 TEXT1_ADDR = 0x08040000
 endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 ifneq ($(lastword a b),b)
 $(error These Makefiles require make 3.81 or newer)
 endif
@@ -74,3 +79,4 @@ all:
 .DELETE_ON_ERROR:
 
 MKENV_INCLUDED = 1
+

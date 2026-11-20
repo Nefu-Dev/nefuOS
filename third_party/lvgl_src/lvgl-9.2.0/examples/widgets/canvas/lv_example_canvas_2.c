@@ -45,3 +45,4 @@ void lv_example_canvas_2(void)
     }
 }
 #endif
+

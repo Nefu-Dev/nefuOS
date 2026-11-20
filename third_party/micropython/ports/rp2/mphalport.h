@@ -212,3 +212,4 @@ void mp_hal_get_mac_ascii(int idx, size_t chr_off, size_t chr_len, char *dest);
 void mp_hal_generate_laa_mac(int idx, uint8_t buf[6]);
 
 #endif // MICROPY_INCLUDED_RP2_MPHALPORT_H
+

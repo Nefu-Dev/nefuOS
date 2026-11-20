@@ -1,4 +1,9 @@
-﻿// tilemap.cpp —— 瓦片地图纯逻辑：自动拼贴 + 碰撞 + 自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// tilemap.cpp —— 瓦片地图纯逻辑：自动拼贴 + 碰撞 + 自测
 #include "tilemap.h"
 
 namespace nefu {
@@ -138,3 +143,4 @@ int tilemap_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

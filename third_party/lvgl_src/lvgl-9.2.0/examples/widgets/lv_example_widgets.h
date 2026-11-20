@@ -160,3 +160,4 @@ void lv_example_win_1(void);
 #endif
 
 #endif /*LV_EX_WIDGETS_H*/
+

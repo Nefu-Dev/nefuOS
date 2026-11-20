@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Enable/disable extra modules and features
 
 # wiznet5k module for ethernet support; valid values are:
@@ -13,3 +18,4 @@ MICROPY_VFS_FAT ?= 1
 MBOOT_ENABLE_PACKING ?= 0
 MBOOT_PACK_CHUNKSIZE ?= 16384
 MBOOT_PACK_KEYS_FILE ?= $(BOARD_DIR)/mboot_keys.h
+

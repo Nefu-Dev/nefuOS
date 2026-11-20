@@ -82,3 +82,4 @@ void mp_bluetooth_btstack_port_start(void) {
 }
 
 #endif // MICROPY_PY_BLUETOOTH && MICROPY_BLUETOOTH_BTSTACK && MICROPY_BLUETOOTH_BTSTACK_H4
+

@@ -636,3 +636,4 @@ int WebPSaveImage(const WebPDecBuffer* const buffer,
   }
   return ok;
 }
+

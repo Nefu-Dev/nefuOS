@@ -20781,3 +20781,4 @@ lv_font_t lv_font_simsun_14_cjk = {
 };
 
 #endif /*#if LV_FONT_SIMSUN_14_CJK*/
+

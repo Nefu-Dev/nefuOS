@@ -711,3 +711,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 MP_REGISTER_ROOT_POINTER(mp_obj_t pin_class_mapper);
 MP_REGISTER_ROOT_POINTER(mp_obj_t pin_class_map_dict);
 MP_REGISTER_ROOT_POINTER(mp_obj_t pin_irq_handlers[NUM_OF_PINS]);
+

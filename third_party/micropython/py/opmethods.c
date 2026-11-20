@@ -54,3 +54,4 @@ static mp_obj_t op_contains(mp_obj_t lhs_in, mp_obj_t rhs_in) {
     return MP_OBJ_TYPE_GET_SLOT(type, binary_op)(MP_BINARY_OP_CONTAINS, lhs_in, rhs_in);
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mp_op_contains_obj, op_contains);
+

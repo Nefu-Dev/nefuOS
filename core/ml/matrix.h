@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 定点稠密矩阵（Q16.16）
 // 行主序存储 m[i*cols+j]，元素类型 nefu::fx::fix（int32，值 = 原始值*65536）。
 // 覆盖：四则 / 转置 / 行列式(LU 部分选主元) / 求逆(Gauss-Jordan) / 解线性方程组 /
@@ -86,3 +91,4 @@ int matrix_self_test();
 
 } // namespace ml
 } // namespace nefu
+

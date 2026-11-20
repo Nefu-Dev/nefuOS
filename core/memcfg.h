@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 #pragma once
 // nefuOS memory budget model — logical system layout (4 GB).
 //   System total ............ 4096 MB  (SYS_MEM_TOTAL_MB)
@@ -15,3 +20,4 @@ const uint64_t RESERVE_MEM_MB        = 1536;   // 余量
 
 // Browser-arena accounting (bytes currently handed out via balloc/bfree).
 extern uint64_t browser_mem_used_bytes;
+

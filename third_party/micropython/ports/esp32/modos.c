@@ -51,3 +51,4 @@ static mp_obj_t mp_os_urandom(mp_obj_t num) {
     return mp_obj_new_bytes_from_vstr(&vstr);
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mp_os_urandom_obj, mp_os_urandom);
+

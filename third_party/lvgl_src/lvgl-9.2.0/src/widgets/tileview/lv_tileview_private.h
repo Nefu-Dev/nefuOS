@@ -56,3 +56,4 @@ struct lv_tileview_tile_t {
 #endif
 
 #endif /*LV_TILEVIEW_PRIVATE_H*/
+

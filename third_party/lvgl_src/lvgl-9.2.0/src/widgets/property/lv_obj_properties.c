@@ -91,3 +91,4 @@ const lv_property_name_t lv_obj_property_names[73] = {
 };
 /* *INDENT-ON* */
 #endif
+

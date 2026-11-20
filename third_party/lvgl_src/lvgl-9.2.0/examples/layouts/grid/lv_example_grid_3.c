@@ -42,3 +42,4 @@ void lv_example_grid_3(void)
 }
 
 #endif
+

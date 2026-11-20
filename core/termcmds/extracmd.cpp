@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  extracmd.cpp —— 扩展命令与真实算法实现
 // =============================================================================
@@ -949,3 +954,4 @@ int extracmd_self_test() {
 
 } // namespace termcmds
 } // namespace nefu
+

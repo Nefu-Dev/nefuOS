@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— Huffman 编码实现
 // 见 huffman.h。这里实现：
 //   - 由频率表建 Huffman 树 -> 每个符号的码长
@@ -355,3 +360,4 @@ int huffman_self_test() {
 
 } // namespace compress
 } // namespace nefu
+

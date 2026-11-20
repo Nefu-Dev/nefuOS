@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for STM32F439
 */
 
@@ -36,3 +41,4 @@ _micropy_hw_internal_flash_storage_start = ORIGIN(FLASH_FS);
 _micropy_hw_internal_flash_storage_end = ORIGIN(FLASH_FS) + LENGTH(FLASH_FS);
 _micropy_hw_internal_flash_storage2_start = ORIGIN(FLASH_FS2);
 _micropy_hw_internal_flash_storage2_end = ORIGIN(FLASH_FS2) + LENGTH(FLASH_FS2);
+

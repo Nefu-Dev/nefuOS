@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Recycle Bin App
 // Shows deleted files in /home/user/.recycle, allows restore or permanent delete
 
@@ -129,7 +134,7 @@ static void recycle_close(Window* w) {
 
 void recycle_launch() {
     RecycleState* st = new RecycleState();
-    Window* w = g_wm->create_window("Recycle Bin", 200, 150, 400, 350);
+    Window* w = g_wm->create_window(T("回收站", "Recycle Bin"), 200, 150, 400, 350);
     w->userdata = st;
     w->on_paint = recycle_paint;
     w->on_mouse = recycle_mouse;

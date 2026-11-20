@@ -44,3 +44,4 @@ long long mp_binary_get_int(size_t size, bool is_signed, bool big_endian, const 
 void mp_binary_set_int(size_t val_sz, bool big_endian, byte *dest, mp_uint_t val);
 
 #endif // MICROPY_INCLUDED_PY_BINARY_H
+

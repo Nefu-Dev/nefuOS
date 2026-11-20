@@ -97,3 +97,4 @@ void lv_vg_lite_pending_remove_all(lv_vg_lite_pending_t * pending)
  **********************/
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

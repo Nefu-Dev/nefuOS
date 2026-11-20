@@ -528,3 +528,4 @@ void test_observer_deinit(void)
 }
 
 #endif
+

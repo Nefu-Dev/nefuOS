@@ -99,3 +99,4 @@ static inline int lre_js_is_ident_next(int c)
 #endif
 
 #endif /* LIBREGEXP_H */
+

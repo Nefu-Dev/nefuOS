@@ -147,3 +147,4 @@ static void disp_flush(lv_display_t * disp_drv, const lv_area_t * area, uint8_t 
 /*This dummy typedef exists purely to silence -Wpedantic.*/
 typedef int keep_pedantic_happy;
 #endif
+

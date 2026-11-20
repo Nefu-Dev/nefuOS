@@ -2019,3 +2019,4 @@ static inline int js_thread_join(js_thread_t thrd)
 #endif
 
 #endif  /* CUTILS_H */
+

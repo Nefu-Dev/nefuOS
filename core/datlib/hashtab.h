@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — open-addressing hash table (hashtab)
 // 开放寻址哈希表：线性探测解决冲突，泛型键值对（int 键 -> 泛型值）。
 // 与链地址法（algo/ds 的 IntHashMap）不同，元素直接存在桶数组里，
@@ -144,3 +149,4 @@ int hashtab_self_test();
 
 } // namespace dt
 } // namespace nefu
+

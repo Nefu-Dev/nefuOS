@@ -93,3 +93,4 @@ void lv_obj_update_layer_type(lv_obj_t * obj);
 #endif
 
 #endif /*LV_OBJ_STYLE_PRIVATE_H*/
+

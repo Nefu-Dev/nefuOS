@@ -112,3 +112,4 @@ int vfs_raw_mount(vfs_raw_context_t *ctx, mboot_addr_t seg0_base_addr, mboot_add
 #endif
 
 #endif // MICROPY_INCLUDED_STM32_MBOOT_VFS_H
+

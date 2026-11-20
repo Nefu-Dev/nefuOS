@@ -23,3 +23,4 @@ uint32_t SPIWrite(uint32_t offset, const void *buf, uint32_t len);
 uint32_t SPIEraseSector(int sector);
 
 #endif // MICROPY_INCLUDED_ESP8266_ETSHAL_H
+

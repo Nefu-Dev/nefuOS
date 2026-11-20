@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统监视器 —— 窗口应用
 // 参考 algoviz.cpp 模式：自包含的状态机，不依赖线程/异常。
 // 展示：CPU/内存占用条、进程列表、服务状态。数据来自 core/sysutil。
@@ -241,7 +246,7 @@ static void sm_close(Window* w) {
 void sysmon_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("System Monitor", x, y, SM_W, SM_H);
+    Window* w = g_wm->create_window(T("系统监视器", "System Monitor"), x, y, SM_W, SM_H);
     if (!w) return;
     SysMon* m = new SysMon();
     m->init();
@@ -255,3 +260,4 @@ void sysmon_launch() {
 
 } // namespace nefu
 // sysmon 窗口应用结束
+

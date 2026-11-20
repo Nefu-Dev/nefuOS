@@ -65,3 +65,4 @@
 // Bluetooth config
 #define MICROPY_HW_BLE_UART_ID       (0)
 #define MICROPY_HW_BLE_UART_BAUDRATE (115200)
+

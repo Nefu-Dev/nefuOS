@@ -193,3 +193,4 @@ const lv_image_dsc_t test_animimg003 = {
 };
 
 #endif /* LV_BUILD_TEST */
+

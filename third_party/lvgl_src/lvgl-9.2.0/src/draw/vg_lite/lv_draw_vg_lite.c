@@ -277,3 +277,4 @@ static int32_t draw_delete(lv_draw_unit_t * draw_unit)
 }
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

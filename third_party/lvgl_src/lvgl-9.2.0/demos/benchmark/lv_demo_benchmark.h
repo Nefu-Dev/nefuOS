@@ -61,3 +61,4 @@ void lv_demo_benchmark(void);
 #endif
 
 #endif /*LV_DEMO_BENCHMARK_H*/
+

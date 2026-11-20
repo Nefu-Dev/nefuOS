@@ -284,3 +284,4 @@ int mp_bluetooth_hci_controller_wakeup(void) {
 }
 
 #endif // MICROPY_PY_BLUETOOTH && (MICROPY_BLUETOOTH_NIMBLE || (MICROPY_BLUETOOTH_BTSTACK && MICROPY_BLUETOOTH_BTSTACK_H4))
+

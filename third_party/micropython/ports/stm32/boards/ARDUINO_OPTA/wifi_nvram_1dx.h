@@ -47,3 +47,4 @@ static const uint8_t wifi_nvram_4343[] CYW43_RESOURCE_ATTRIBUTE =
     "swdiv_gpio=1\x00"
     "\x00\x00"
 ;
+

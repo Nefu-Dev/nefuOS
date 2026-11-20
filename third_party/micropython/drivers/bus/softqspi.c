@@ -207,3 +207,4 @@ const mp_qspi_proto_t mp_soft_qspi_proto = {
     .read_cmd = mp_soft_qspi_read_cmd,
     .read_cmd_qaddr_qdata = mp_soft_qspi_read_cmd_qaddr_qdata,
 };
+

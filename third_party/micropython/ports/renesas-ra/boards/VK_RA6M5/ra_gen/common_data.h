@@ -46,3 +46,4 @@ extern ioport_instance_ctrl_t g_ioport_ctrl;
 void g_common_init(void);
 FSP_FOOTER
 #endif /* COMMON_DATA_H_ */
+

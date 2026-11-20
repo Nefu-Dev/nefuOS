@@ -318,3 +318,4 @@ typedef struct _USBD_HandleTypeDef
 * @}
 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+

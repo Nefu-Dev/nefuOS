@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — bloom implementation & helpers
 #include "bloom.h"
 #include <stdio.h>
@@ -75,3 +80,4 @@ int bloom_self_test() {
 
 } // namespace dt
 } // namespace nefu
+

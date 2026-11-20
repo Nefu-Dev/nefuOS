@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - <memory> (unique_ptr / default_delete)
 #pragma once
 #include "_core.h"
@@ -41,3 +46,4 @@ unique_ptr<T> make_unique(Args&&... args) { return unique_ptr<T>(new T(forward<A
 
 } // namespace stdx
 } // namespace nefu
+

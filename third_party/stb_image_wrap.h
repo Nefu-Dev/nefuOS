@@ -1,4 +1,4 @@
-﻿// nefuOS stb_image + nanosvg (SVG) integration — declarations.
+// nefuOS stb_image + nanosvg (SVG) integration — declarations.
 // Implementation lives in stb_image_wrap.cpp + nanosvg_impl.c (C unit).
 #pragma once
 #include <stdint.h>
@@ -13,3 +13,4 @@ bool nsvg_decode_mem(const uint8_t* data, int len, int max_px, int* w, int* h, u
 extern "C" {
 int nefu_webp_decode(const unsigned char* data, unsigned len, int* w, int* h, unsigned char** rgba);
 }
+

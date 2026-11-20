@@ -265,3 +265,4 @@
 #define MICROPY_BOARD_ROOT_POINTERS \
     struct _machine_i2s_obj_t *machine_i2s_obj[MICROPY_HW_I2S_NUM];
 #endif
+

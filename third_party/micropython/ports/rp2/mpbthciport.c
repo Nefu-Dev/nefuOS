@@ -197,3 +197,4 @@ MP_WEAK int mp_bluetooth_hci_controller_wakeup(void) {
 }
 
 #endif // MICROPY_PY_BLUETOOTH
+

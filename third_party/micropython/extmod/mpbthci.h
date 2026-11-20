@@ -59,3 +59,4 @@ typedef void (*mp_bluetooth_hci_uart_readchar_t)(uint8_t chr);
 int mp_bluetooth_hci_uart_readpacket(mp_bluetooth_hci_uart_readchar_t handler);
 
 #endif // MICROPY_INCLUDED_EXTMOD_MPBTHCI_H
+

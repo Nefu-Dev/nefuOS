@@ -193,3 +193,4 @@ void   SCSI_SenseCode(USBD_HandleTypeDef  *pdev,
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 
+

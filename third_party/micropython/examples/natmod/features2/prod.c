@@ -7,3 +7,4 @@ float prod_array(int n, float *ar) {
     }
     return ans;
 }
+

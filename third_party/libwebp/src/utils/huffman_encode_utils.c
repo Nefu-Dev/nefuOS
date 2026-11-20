@@ -414,3 +414,4 @@ void VP8LCreateHuffmanTree(uint32_t* const histogram, int tree_depth_limit,
   // Create the actual bit codes for the bit lengths.
   ConvertBitDepthsToSymbols(huff_code);
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 任务调度器
 // 支持三类任务：
 //   1) 一次性任务(ONESHOT)：到点跑一次，然后移除；
@@ -113,3 +118,4 @@ extern Scheduler g_scheduler;
 
 } // namespace sysutil
 } // namespace nefu
+

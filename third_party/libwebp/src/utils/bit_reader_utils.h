@@ -195,3 +195,4 @@ static WEBP_INLINE void VP8LFillBitWindow(VP8LBitReader* const br) {
 #endif
 
 #endif  // WEBP_UTILS_BIT_READER_UTILS_H_
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS minimal IEEE-754 single-precision soft-float.
 // The bare kernel links without libgcc; a few code paths (stb_image
 // residual float math, future LVGL scalers) need these symbols.
@@ -170,3 +175,4 @@ int __gtsf2(float a, float b) { return sf_cmp(a, b); }
 int __gesf2(float a, float b) { int c = sf_cmp(a, b); return c < 0 ? -1 : 0; }
 
 } // extern "C"
+

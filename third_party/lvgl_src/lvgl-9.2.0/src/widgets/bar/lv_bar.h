@@ -160,3 +160,4 @@ bool lv_bar_is_symmetrical(lv_obj_t * obj);
 #endif
 
 #endif /*LV_BAR_H*/
+

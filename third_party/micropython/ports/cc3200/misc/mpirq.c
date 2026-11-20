@@ -199,3 +199,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 MP_REGISTER_ROOT_POINTER(mp_obj_list_t mp_irq_obj_list);
+

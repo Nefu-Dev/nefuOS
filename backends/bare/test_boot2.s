@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # bisection test: minimal boot + the same CHS division calculation as the main bootloader
 .code16
 .org 0
@@ -103,3 +108,4 @@ tmp_cyl: .word 0
 tmp_nsec: .word 0
 .org 508
 .word 0xAA55
+

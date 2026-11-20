@@ -1,4 +1,4 @@
-﻿/**
+/**
 * @file lv_test_assert.c
 *
 * Copyright 2002-2010 Guillaume Cottenceau.
@@ -515,3 +515,4 @@ static void create_folders_if_needed(const char * path)
 }
 
 #endif
+

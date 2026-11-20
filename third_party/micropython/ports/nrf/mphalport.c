@@ -445,3 +445,4 @@ const char *nrfx_error_code_lookup(uint32_t err_code) {
 }
 
 #endif // NRFX_LOG_ENABLED
+

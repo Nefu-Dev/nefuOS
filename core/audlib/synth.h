@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 波形合成器 synth
 // 教学版：生成正弦/方波/锯齿/三角波，支持频率、振幅、相位。
 // 用于电子音乐与合成器教学。class / STL / cmath / 中文注释。
@@ -49,3 +54,4 @@ private:
 
 } // namespace audx
 } // namespace nefu
+

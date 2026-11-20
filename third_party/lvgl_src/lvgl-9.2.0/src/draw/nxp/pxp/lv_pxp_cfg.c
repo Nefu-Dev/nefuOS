@@ -89,3 +89,4 @@ void lv_pxp_wait(void)
  **********************/
 
 #endif /*LV_USE_DRAW_PXP*/
+

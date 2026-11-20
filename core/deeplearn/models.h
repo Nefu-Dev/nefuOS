@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 高阶模型包装
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 高阶模型包装
 // 典型用法：
 //   MLP net({2,3,1});
 //   auto p = net.forward(x);  // 注意：跨函数 backward 会悬空
@@ -49,3 +54,4 @@ int models_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

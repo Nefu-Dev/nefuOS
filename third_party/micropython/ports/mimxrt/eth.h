@@ -57,3 +57,4 @@ enum {
 };
 
 #endif // MICROPY_INCLUDED_MIMXRT_ETH_H
+

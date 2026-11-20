@@ -82,3 +82,4 @@ struct lv_menu_page_t {
 #endif
 
 #endif /*LV_MENU_PRIVATE_H*/
+

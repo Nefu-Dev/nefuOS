@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 /* setjmp.h — freestanding x86-64 setjmp/longjmp shim for the nefuOS kernel.
    MicroPython's NLR (MICROPY_NLR_SETJMP) and GC regs capture (gchelper_generic)
    need setjmp/longjmp, which the hosted CRT does not provide in a freestanding
@@ -21,3 +26,4 @@ void longjmp(jmp_buf env, int val);
 #endif
 
 #endif /* NEFU_BARE_SETJMP_H */
+

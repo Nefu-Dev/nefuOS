@@ -1992,3 +1992,4 @@ __weak void USBH_AUDIO_FrequencySet(USBH_HandleTypeDef *phost)
 */
 
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
+

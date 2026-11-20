@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     GNU linker script for NRF9160 NS
 */
 
@@ -11,3 +16,4 @@ _fs_size = 80K;
 /* produce a link error if there is not this amount of RAM for these sections */
 _stack_size = 32K;
 _minimum_heap_size = 64K;
+

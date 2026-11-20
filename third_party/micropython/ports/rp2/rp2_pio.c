@@ -1019,3 +1019,4 @@ static const mp_irq_methods_t rp2_state_machine_irq_methods = {
 
 MP_REGISTER_ROOT_POINTER(void *rp2_pio_irq_obj[NUM_PIOS]);
 MP_REGISTER_ROOT_POINTER(void *rp2_state_machine_irq_obj[NUM_PIOS * 4]);
+

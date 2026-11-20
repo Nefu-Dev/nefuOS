@@ -423,3 +423,4 @@ const mp_qspi_proto_t qspi_proto = {
 };
 
 #endif // defined(MICROPY_HW_QSPIFLASH_SIZE_BITS_LOG2)
+

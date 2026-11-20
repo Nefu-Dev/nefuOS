@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_example_style.h
  *
  */
@@ -53,3 +53,4 @@ void lv_example_style_18(void);
 #endif
 
 #endif /*LV_EXAMPLE_STYLE_H*/
+

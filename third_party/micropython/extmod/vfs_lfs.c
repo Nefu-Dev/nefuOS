@@ -143,3 +143,4 @@ static void lfs_get_mtime(uint8_t buf[8]) {
 #endif // MICROPY_VFS_LFS2
 
 #endif // MICROPY_VFS && (MICROPY_VFS_LFS1 || MICROPY_VFS_LFS2)
+

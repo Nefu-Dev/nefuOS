@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 训练循环封装
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 训练循环封装
 // 典型用法：
 //   Trainer tr(epochs, print_every);
 //   tr.run([&](int ep){ /* 前向+反向+step */ });
@@ -49,3 +54,4 @@ int trainer_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

@@ -933,3 +933,4 @@ using LottieColor = LottieGenericProperty<RGB24>;
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

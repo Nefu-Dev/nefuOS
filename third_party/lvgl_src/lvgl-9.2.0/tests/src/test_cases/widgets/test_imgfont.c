@@ -56,3 +56,4 @@ void test_imgfont_creation(void)
 }
 
 #endif
+

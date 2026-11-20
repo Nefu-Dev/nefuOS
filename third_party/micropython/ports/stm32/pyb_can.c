@@ -1088,3 +1088,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
 MP_REGISTER_ROOT_POINTER(struct _pyb_can_obj_t *pyb_can_obj_all[MICROPY_HW_MAX_CAN]);
 
 #endif // MICROPY_HW_ENABLE_CAN
+

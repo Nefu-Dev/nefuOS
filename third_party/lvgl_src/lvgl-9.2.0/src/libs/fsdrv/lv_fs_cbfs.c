@@ -8,3 +8,4 @@ IS_NOT_USED static void nothing(void)
 {
     // do nothing
 }
+

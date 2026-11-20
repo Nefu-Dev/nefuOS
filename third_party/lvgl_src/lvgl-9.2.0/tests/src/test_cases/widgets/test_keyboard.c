@@ -74,3 +74,4 @@ void test_keyboard_properties(void)
 }
 
 #endif
+

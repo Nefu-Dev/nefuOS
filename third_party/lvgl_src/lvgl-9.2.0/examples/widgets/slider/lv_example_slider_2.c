@@ -53,3 +53,4 @@ void lv_example_slider_2(void)
 }
 
 #endif
+

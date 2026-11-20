@@ -1292,3 +1292,4 @@ const USBD_ClassTypeDef USBD_CDC_MSC_HID = {
 };
 
 #endif
+

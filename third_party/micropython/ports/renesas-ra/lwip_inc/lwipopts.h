@@ -54,3 +54,4 @@ extern uint32_t rng_read(void);
 typedef uint32_t sys_prot_t;
 
 #endif // MICROPY_INCLUDED_RA_LWIP_LWIPOPTS_H
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = wb
 CMSIS_MCU = STM32WB55xx
 AF_FILE = boards/stm32wb55_af.csv
@@ -17,3 +22,4 @@ endif
 MICROPY_PY_BLUETOOTH = 1
 MICROPY_BLUETOOTH_NIMBLE = 1
 MICROPY_VFS_LFS2 = 1
+

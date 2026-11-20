@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 压缩算法库 —— 聚合头
 //
 // 包含本库所有公开模块，并提供 compress_self_test() 一键汇总
@@ -19,3 +24,4 @@ int compress_self_test();
 
 } // namespace compress
 } // namespace nefu
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— 标准控件集
 // Button / Label / TextField / TextArea / CheckBox / RadioButton / Switch /
 // Slider / ProgressBar / Spinner / ComboBox / ListBox / TreeView
@@ -292,3 +297,4 @@ int controls_self_test();
 
 } // namespace ui
 } // namespace nefu
+

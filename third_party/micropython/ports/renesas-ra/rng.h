@@ -32,3 +32,4 @@
 uint32_t rng_read(void);
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_RNG_H
+

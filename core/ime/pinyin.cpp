@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS built-in Pinyin IME - generated data + engine (common-word dictionary)
 // Self-contained: works on both the Win32 host and the bare-metal kernel.
 #include "pinyin.h"
@@ -579,3 +584,4 @@ void paint(Surface& fb) {
 
 } // namespace ime
 } // namespace nefu
+

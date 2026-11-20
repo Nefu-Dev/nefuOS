@@ -84,3 +84,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &mp_obj_polymorph_iter_locals_dict
     );
 #endif
+

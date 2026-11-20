@@ -119,3 +119,4 @@ uint32_t lv_animimg_get_repeat_count(lv_obj_t * img);
 #endif
 
 #endif /*LV_ANIMIMAGE_H*/
+

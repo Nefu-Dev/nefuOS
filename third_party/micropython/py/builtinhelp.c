@@ -172,3 +172,4 @@ static mp_obj_t mp_builtin_help(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_builtin_help_obj, 0, 1, mp_builtin_help);
 
 #endif // MICROPY_PY_BUILTINS_HELP
+

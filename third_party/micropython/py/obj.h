@@ -1294,3 +1294,4 @@ mp_obj_t mp_seq_extract_slice(const mp_obj_t *seq, mp_bound_slice_t *indexes);
 #endif
 
 #endif // MICROPY_INCLUDED_PY_OBJ_H
+

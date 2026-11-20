@@ -236,3 +236,4 @@ uint32_t Picture::mesh(const Polygon** triangles) const noexcept
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

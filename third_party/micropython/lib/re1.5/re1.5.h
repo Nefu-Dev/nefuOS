@@ -154,3 +154,4 @@ int _re1_5_classmatch(const char *pc, const char *sp);
 int _re1_5_namedclassmatch(const char *pc, const char *sp);
 
 #endif /*_RE1_5_REGEXP__H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 随机数 random
 // 教学版：LCG 伪随机 + 洗牌 + 常见分布（均匀/正态/泊松）。
 #pragma once
@@ -25,3 +30,4 @@ int random_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

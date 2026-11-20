@@ -73,3 +73,4 @@ mp_obj_t mp_obj_new_getitem_iter(mp_obj_t *args, mp_obj_iter_buf_t *iter_buf) {
     o->args[2] = MP_OBJ_NEW_SMALL_INT(0);
     return MP_OBJ_FROM_PTR(o);
 }
+

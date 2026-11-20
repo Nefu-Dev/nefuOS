@@ -36,3 +36,4 @@ void lv_example_lodepng_1(void);
 #endif
 
 #endif /*LV_EXAMPLE_PNG_H*/
+

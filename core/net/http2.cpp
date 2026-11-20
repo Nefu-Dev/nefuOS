@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS HTTP/2.0 client subset (RFC 7540 / RFC 7541) - implementation
 // - connection preface + SETTINGS + GET on stream 1
 // - HPACK request encoding (static table + literal, no Huffman)
@@ -765,3 +770,4 @@ fail:
 
 } // namespace http2
 } // namespace nefu
+

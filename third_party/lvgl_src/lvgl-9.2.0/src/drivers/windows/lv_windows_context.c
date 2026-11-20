@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_windows_context.c
  *
  */
@@ -718,3 +718,4 @@ static LRESULT CALLBACK lv_windows_window_message_callback(
 }
 
 #endif // LV_USE_WINDOWS
+

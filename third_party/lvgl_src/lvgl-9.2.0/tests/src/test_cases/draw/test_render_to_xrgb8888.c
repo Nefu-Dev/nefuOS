@@ -43,3 +43,4 @@ void test_render_to_xrgb8888(void)
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 投影 proj 与渲染器 render
 // 教学版：把 3D 网格投影到 2D 屏幕坐标（顶点着色管线教学版），
 // 以及一个极简软件渲染器（画线框网格）。
@@ -77,3 +82,4 @@ private:
 
 } // namespace gfx
 } // namespace nefu
+

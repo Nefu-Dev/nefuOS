@@ -40,3 +40,4 @@ void powerctrl_enter_stop_mode(void);
 NORETURN void powerctrl_enter_standby_mode(void);
 
 #endif // MICROPY_INCLUDED_RA_POWERCTRL_H
+

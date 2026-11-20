@@ -242,3 +242,4 @@ void lv_evdev_delete(lv_indev_t * indev)
 }
 
 #endif /*LV_USE_EVDEV*/
+

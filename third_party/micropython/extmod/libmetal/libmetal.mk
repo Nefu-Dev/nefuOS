@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Makefile directives for libmetal
 
 # libmetal is intended to run through a pre-processor (as part of its CMake-based build system).
@@ -48,3 +53,4 @@ $(SRC_LIBMETAL_C): $(BUILD)/openamp/metal/config.h
 
 # Qstr processing will include the generated libmetal headers, so add them as a qstr requirement.
 QSTR_GLOBAL_REQUIREMENTS += $(BUILD)/openamp/metal/config.h
+

@@ -520,3 +520,4 @@ void WebPReplaceTransparentPixels(WebPPicture* const pic, uint32_t color);
 #endif
 
 #endif  // WEBP_ENC_VP8I_ENC_H_
+

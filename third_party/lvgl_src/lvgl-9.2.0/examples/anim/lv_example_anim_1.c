@@ -50,3 +50,4 @@ void lv_example_anim_1(void)
 }
 
 #endif
+

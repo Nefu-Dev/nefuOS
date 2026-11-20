@@ -338,3 +338,4 @@ static lv_lcd_generic_mipi_driver_t * get_driver(lv_display_t * disp)
 }
 
 #endif /*LV_USE_GENERIC_MIPI*/
+

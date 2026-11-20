@@ -166,3 +166,4 @@ void lv_file_explorer_open_dir(lv_obj_t * obj, const char * dir);
 #endif
 
 #endif /*LV_FILE_EXPLORER_H*/
+

@@ -81,3 +81,4 @@ void lv_lru_remove_lru_item(lv_lru_t * cache);
 #endif
 
 #endif /*LV_LRU_H*/
+

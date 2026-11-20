@@ -81,3 +81,4 @@ void lv_example_checkbox_2(void)
 }
 
 #endif
+

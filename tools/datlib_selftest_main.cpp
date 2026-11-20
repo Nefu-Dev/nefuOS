@@ -1,4 +1,9 @@
-﻿// datlib standalone self-test host
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// datlib standalone self-test host
 // 运行 datlib 全部 16 个模块的自检，打印每个模块失败数。
 #include "datlib/dat_all.h"
 #include <cstdio>
@@ -29,3 +34,4 @@ int main() {
     printf("TOTAL=%d\n", total);
     return total;
 }
+

@@ -108,3 +108,4 @@ lv_result_t lv_mem_test_core(void)
  **********************/
 
 #endif /*LV_STDLIB_MICROPYTHON*/
+

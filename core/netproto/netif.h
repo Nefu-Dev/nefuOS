@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 网络接口抽象
 // 一个"网卡"实例：持有 MAC/IPv4/掩码/网关，关联 ARP 缓存与统计计数器，
 // 并提供"收到一个 IP 包该往哪送"的路由决策。本模块不做真收发，
@@ -37,3 +42,4 @@ int netif_self_test();
 
 } // namespace netproto
 } // namespace nefu
+

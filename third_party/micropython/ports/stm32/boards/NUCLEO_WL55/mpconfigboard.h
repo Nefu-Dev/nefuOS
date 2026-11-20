@@ -72,3 +72,4 @@
 #define MICROPY_HW_LED3                         (pin_B11) // red
 #define MICROPY_HW_LED_ON(pin)                  (mp_hal_pin_high(pin))
 #define MICROPY_HW_LED_OFF(pin)                 (mp_hal_pin_low(pin))
+

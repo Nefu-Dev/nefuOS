@@ -460,3 +460,4 @@ static uint32_t size_get_data_size_cb(const void * data)
     lv_cache_slot_size_t * slot = (lv_cache_slot_size_t *)data;
     return slot->size;
 }
+

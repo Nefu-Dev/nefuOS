@@ -82,3 +82,4 @@ WebPImageReader WebPGuessImageReader(const uint8_t* const data,
                                      size_t data_size) {
   return WebPGetImageReader(WebPGuessImageType(data, data_size));
 }
+

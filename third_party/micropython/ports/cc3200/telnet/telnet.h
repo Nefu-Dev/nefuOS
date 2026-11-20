@@ -39,3 +39,4 @@ extern void telnet_disable (void);
 extern void telnet_reset (void);
 
 #endif // MICROPY_INCLUDED_CC3200_TELNET_TELNET_H
+

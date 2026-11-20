@@ -51,9 +51,13 @@ if (Test-Path $serial) {
     "NO SERIAL LOG"
 }
 
+$raw = if (Test-Path $serial) { Get-Content $serial -Raw } else { "" }
 $ok = $done -and (Test-Path $serial) -and
-      ((Get-Content $serial -Raw) -match "net-selftest: npkg registry OK") -and
-      ((Get-Content $serial -Raw) -match "net-selftest: update manifest OK")
-if ($ok) { Write-Output "RESULT: PASS - bare-metal HTTP(S) online" }
+      ($raw -match "net-selftest: npkg registry OK") -and
+      ($raw -match "net-selftest: update manifest OK") -and
+      ($raw -match "net-selftest: bloxd.io OK") -and
+      ($raw -match "net-selftest: bloxd bundle OK") -and
+      ($raw -match "net-selftest: websocket open OK")
+if ($ok) { Write-Output "RESULT: PASS - bare-metal HTTP(S) + WebSocket online" }
 else     { Write-Output "RESULT: FAIL - bare-metal network not verified" }
 exit $(if ($ok) { 0 } else { 1 })

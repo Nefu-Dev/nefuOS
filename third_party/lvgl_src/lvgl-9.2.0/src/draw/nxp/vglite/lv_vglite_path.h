@@ -95,3 +95,4 @@ void vglite_create_rect_path_data(int32_t * path_data, uint32_t * path_data_size
 #endif
 
 #endif /*LV_VGLITE_PATH_H*/
+

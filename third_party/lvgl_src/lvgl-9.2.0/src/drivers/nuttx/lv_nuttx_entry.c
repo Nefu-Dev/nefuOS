@@ -304,3 +304,4 @@ static void check_stack_size(void)
 
 #endif /*LV_USE_NUTTX*/
 
+

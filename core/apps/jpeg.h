@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS minimal baseline-JPEG decoder (bare-metal safe: integer only).
 // Supports SOF0 (baseline), 8-bit, YCbCr 4:4:4 / 4:2:2 / 4:2:0 and grayscale,
 // with optional restart markers. Everything runs with fixed-point math so the
@@ -13,3 +18,4 @@ struct Surface;
 bool jpeg_decode(const uint8_t* data, uint32_t size, Surface& out);
 
 } // namespace nefu
+

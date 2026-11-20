@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mini JVM - soft double math (header-only, no libm).
 //
 // The bare-metal kernel links GCC soft-float (no hardware FPU) and has no
@@ -181,3 +186,4 @@ static inline double mj_deg2rad(double d) { return d * MJ_PI / 180.0; }
 static inline double mj_rad2deg(double r) { return r * 180.0 / MJ_PI; }
 
 } // namespace nefu
+

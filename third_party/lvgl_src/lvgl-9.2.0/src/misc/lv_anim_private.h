@@ -54,3 +54,4 @@ void lv_anim_core_deinit(void);
 #endif
 
 #endif /*LV_ANIM_PRIVATE_H*/
+

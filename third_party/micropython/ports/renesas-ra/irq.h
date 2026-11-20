@@ -254,3 +254,4 @@ static inline void restore_irq_pri(uint32_t state) {
 #endif
 
 #endif // MICROPY_INCLUDED_RA_IRQ_H
+

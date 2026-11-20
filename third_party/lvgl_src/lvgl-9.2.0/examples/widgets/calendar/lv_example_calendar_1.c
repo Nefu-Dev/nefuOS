@@ -48,3 +48,4 @@ void lv_example_calendar_1(void)
 }
 
 #endif
+

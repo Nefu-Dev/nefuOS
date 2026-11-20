@@ -46,3 +46,4 @@
 #define MICROPY_SAFE_BOOT_PORT_PIN                  GPIO_PIN_4
 
 #define MICROPY_PORT_SFLASH_BLOCK_COUNT             96
+

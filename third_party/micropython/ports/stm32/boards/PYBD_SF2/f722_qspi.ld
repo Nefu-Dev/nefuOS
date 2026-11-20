@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     Linker script for PYBD with STM32F722/STM32F723/STM32F732/STM32F733
 
     Memory layout for mboot configuration (this here describes the app part):
@@ -55,3 +60,4 @@ SECTIONS
 }
 
 INCLUDE common_bl.ld
+

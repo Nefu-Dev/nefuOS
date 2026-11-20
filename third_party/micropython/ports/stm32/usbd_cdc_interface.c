@@ -462,3 +462,4 @@ int usbd_cdc_rx(usbd_cdc_itf_t *cdc, uint8_t *buf, uint32_t len, uint32_t timeou
 }
 
 #endif
+

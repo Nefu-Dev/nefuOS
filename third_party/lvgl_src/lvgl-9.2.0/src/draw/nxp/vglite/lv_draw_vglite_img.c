@@ -441,3 +441,4 @@ static vg_lite_color_t _vglite_recolor(const lv_draw_image_dsc_t * dsc)
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

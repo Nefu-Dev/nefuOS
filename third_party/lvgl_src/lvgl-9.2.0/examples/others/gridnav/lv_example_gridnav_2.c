@@ -41,3 +41,4 @@ void lv_example_gridnav_2(void)
 }
 
 #endif
+

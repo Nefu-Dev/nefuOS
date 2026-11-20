@@ -245,3 +245,4 @@ VP8CPUInfo VP8GetCPUInfo = mipsCPUInfo;
 WEBP_EXTERN VP8CPUInfo VP8GetCPUInfo;
 VP8CPUInfo VP8GetCPUInfo = NULL;
 #endif
+

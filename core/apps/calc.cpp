@@ -1,6 +1,12 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS calculator - LVGL GUI (integer arithmetic, no floats)
 #include "apps.h"
 #include "../gui/lvgl_win.h"
+#include "../gui/lv_cjk_font.h"
 
 namespace nefu {
 
@@ -130,7 +136,7 @@ void calc_launch() {
     };
     int x, y;
     cascade_pos(&x, &y);
-    LvglWin* lw = lvgl_win_create("Calculator", x, y, 264, 330);
+    LvglWin* lw = lvgl_win_create(T("计算器", "Calculator"), x, y, 264, 330);
     if (!lw) return;
     CalcLvState* st = new CalcLvState();
     st->lw = lw;
@@ -152,11 +158,11 @@ void calc_launch() {
     lv_obj_set_width(st->disp, 232);
     lv_label_set_text(st->disp, "0");
     lv_obj_set_style_text_color(st->disp, lv_color_hex(0x15181E), 0);
-    lv_obj_set_style_text_font(st->disp, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(st->disp, &nefu::lv_font_cjk_16, 0);
     st->eqdisp = lv_label_create(panel);
     lv_obj_align(st->eqdisp, LV_ALIGN_BOTTOM_LEFT, 8, 0);
     lv_obj_set_style_text_color(st->eqdisp, lv_color_hex(0x3366AA), 0);
-    lv_obj_set_style_text_font(st->eqdisp, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(st->eqdisp, &nefu::lv_font_cjk_16, 0);
 
     // key grid: 4x4
     int bw = 54, bh = 42, gap = 6, x0 = 8, y0 = 84;
@@ -179,7 +185,7 @@ void calc_launch() {
         lv_label_set_text(lbl, labels[i]);
         lv_obj_center(lbl);
         lv_obj_set_style_text_color(lbl, lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(lbl, &nefu::lv_font_cjk_16, 0);
     }
 }
 

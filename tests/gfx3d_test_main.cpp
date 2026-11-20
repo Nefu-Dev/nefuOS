@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // gfx3d 独立编译入口：不依赖 nefuOS 的 VFS/WM，直接跑所有模块 self_test
 // 编译命令（见任务说明）：
@@ -114,3 +119,4 @@ int main() {
     else           std::printf("FAILURES: %d\n", fail);
     return fail == 0 ? 0 : 1;
 }
+

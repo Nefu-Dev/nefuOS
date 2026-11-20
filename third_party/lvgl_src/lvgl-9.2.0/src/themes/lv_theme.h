@@ -106,3 +106,4 @@ lv_color_t lv_theme_get_color_secondary(lv_obj_t * obj);
 #endif
 
 #endif /*LV_THEME_H*/
+

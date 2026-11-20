@@ -60,3 +60,4 @@
 #define CMD_SEND_REL_ADDR    SDHOST_CMD_3|SDHOST_RESP_LEN_48
 
 #endif //__STDCMD_H__
+

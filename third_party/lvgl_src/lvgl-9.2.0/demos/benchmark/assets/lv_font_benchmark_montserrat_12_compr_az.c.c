@@ -316,3 +316,4 @@ lv_font_t lv_font_benchmark_montserrat_12_compr_az = {
 #endif /*#if LV_FONT_BENCHMARK_MONTSERRAT_12_COMPR_AZ*/
 
 #endif
+

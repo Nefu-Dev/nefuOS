@@ -37,3 +37,4 @@ extern const mp_obj_type_t mp_type_vfs_lfs2_fileio;
 extern const mp_obj_type_t mp_type_vfs_lfs2_textio;
 
 #endif // MICROPY_INCLUDED_EXTMOD_VFS_LFS_H
+

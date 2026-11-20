@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS application package viewer / launcher.
 // Handles two formats:
 // .nefud - text manifest that binds to a built-in app.
@@ -810,7 +815,7 @@ void app_show_nefud(FSNode* f) {
     if (!f) return;
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("App Package", x, y, 480, 250);
+    Window* w = g_wm->create_window(T("应用包管理器", "App Package"), x, y, 480, 250);
     if (!w) return;
     NefudState* st = new NefudState();
     st->file = f;
@@ -832,3 +837,4 @@ void nefud_launch() {
 }
 
 } // namespace nefu
+

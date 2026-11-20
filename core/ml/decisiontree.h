@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 决策树分类
 // 支持三种分裂准则：ID3 信息增益、C4.5 增益率、CART 基尼系数。
 // 连续特征二分裂（按阈值：<=thr 走左，>thr 走右）。
@@ -54,3 +59,4 @@ int decisiontree_self_test();
 
 } // namespace ml
 } // namespace nefu
+

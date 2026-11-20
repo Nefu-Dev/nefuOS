@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— TableView 实现
 #include "tableview.h"
 #include <string.h>
@@ -331,3 +336,4 @@ int tableview_self_test() {
 
 } // namespace ui
 } // namespace nefu
+

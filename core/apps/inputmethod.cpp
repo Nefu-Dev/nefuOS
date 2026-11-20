@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Input Method - Character Palette
 // Provides special characters, Greek letters, math symbols, etc.
 #include "apps.h"
@@ -59,7 +64,7 @@ static void draw_character_grid(Surface& s, int x, int y, int w, int h, const ch
 }
 
 void inputmethod_launch() {
-    Window* w = g_wm->create_window("Input Method", 100, 100, 400, 360);
+    Window* w = g_wm->create_window(T("输入法", "Input Method"), 100, 100, 400, 360);
     if (!w) return;
     
     // We use a simple immediate-mode approach for this app
@@ -97,3 +102,4 @@ void inputmethod_launch() {
 }
 
 } // namespace nefu
+

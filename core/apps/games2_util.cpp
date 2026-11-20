@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // games2_util.cpp —— 公共工具库的纯逻辑实现（不依赖 gfxlib，便于单测链接）
 #include "games2_util.h"
 
@@ -122,3 +127,4 @@ HighTable g_high;
 
 } // namespace games2
 } // namespace nefu
+

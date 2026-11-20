@@ -493,3 +493,4 @@ static void release_disp_cb(lv_event_t * e)
 }
 
 #endif /*LV_USE_SDL*/
+

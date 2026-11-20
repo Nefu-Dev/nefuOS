@@ -43,3 +43,4 @@ MP_DECLARE_CONST_FUN_OBJ_0(machine_disable_irq_obj);
 MP_DECLARE_CONST_FUN_OBJ_VAR_BETWEEN(machine_enable_irq_obj);
 
 #endif // MICROPY_INCLUDED_RENESAS_RA_MODMACHINE_H
+

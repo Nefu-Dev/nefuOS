@@ -114,3 +114,4 @@ double atan(double x)
 	z = atanhi[id] - (x*(s1+s2) - atanlo[id] - x);
 	return sign ? -z : z;
 }
+

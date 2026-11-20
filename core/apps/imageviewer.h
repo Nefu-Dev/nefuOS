@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Image Viewer Application
 // View JPEG, PNG, BMP, GIF images with zoom, pan, rotate
 #pragma once
@@ -194,3 +199,4 @@ Window* open_image_viewer(const char* path) {
 
 } // namespace apps
 } // namespace nefu
+

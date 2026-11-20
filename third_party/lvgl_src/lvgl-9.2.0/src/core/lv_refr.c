@@ -1237,3 +1237,4 @@ static void wait_for_flushing(lv_display_t * disp)
     LV_LOG_TRACE("end");
     LV_PROFILER_END;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS stdcxx - aggregate header (C++ standard library for nefuCpp)
 // usage: #include "stdcxx/stdcxx_all.h"
 //
@@ -28,3 +33,4 @@
 #include "stdcxx/cstdio.h"
 #include "stdcxx/cstdlib.h"
 #include "stdcxx/cctype.h"
+

@@ -179,3 +179,4 @@ SHARPYUV_EXTERN int SharpYuvConvertWithOptions(
 #endif
 
 #endif  // WEBP_SHARPYUV_SHARPYUV_H_
+

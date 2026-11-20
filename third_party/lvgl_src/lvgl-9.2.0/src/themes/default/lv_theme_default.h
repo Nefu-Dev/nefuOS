@@ -69,3 +69,4 @@ void lv_theme_default_deinit(void);
 #endif
 
 #endif /*LV_THEME_DEFAULT_H*/
+

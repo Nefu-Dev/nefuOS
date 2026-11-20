@@ -391,3 +391,4 @@ static void decoder_close(lv_image_decoder_t * decoder, lv_image_decoder_dsc_t *
 }
 
 #endif /*LV_USE_DRAW_VG_LITE*/
+

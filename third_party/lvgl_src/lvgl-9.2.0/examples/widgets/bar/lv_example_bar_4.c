@@ -25,3 +25,4 @@ void lv_example_bar_4(void)
 }
 
 #endif
+

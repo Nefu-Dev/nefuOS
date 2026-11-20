@@ -201,3 +201,4 @@ static void _vglite_draw_border(const lv_area_t * coords, const lv_area_t * clip
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

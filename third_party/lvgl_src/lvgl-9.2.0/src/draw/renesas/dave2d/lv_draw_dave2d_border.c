@@ -413,3 +413,4 @@ static void dave2d_draw_border_complex(lv_draw_dave2d_unit_t * u, const lv_area_
 }
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

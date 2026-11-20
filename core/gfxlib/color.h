@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS graphics library — color spaces & palettes (integer only)
 // RGB888 <-> HSL/HSV/YUV/YCbCr/CMYK, gamma/linear, luminance, gradient
 // and scientific palettes.  All arithmetic is integer (8-bit channels,
@@ -50,3 +55,4 @@ int color_self_test();
 
 } // namespace gfxlib
 } // namespace nefu
+

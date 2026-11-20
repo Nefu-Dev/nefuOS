@@ -17,3 +17,4 @@ extern ioport_instance_ctrl_t g_ioport_ctrl;
 
 FSP_FOOTER
 #endif /* COMMON_DATA_H_ */
+

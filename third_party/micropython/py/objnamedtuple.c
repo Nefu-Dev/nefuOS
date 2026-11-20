@@ -183,3 +183,4 @@ static mp_obj_t new_namedtuple_type(mp_obj_t name_in, mp_obj_t fields_in) {
 MP_DEFINE_CONST_FUN_OBJ_2(mp_namedtuple_obj, new_namedtuple_type);
 
 #endif // MICROPY_PY_COLLECTIONS
+

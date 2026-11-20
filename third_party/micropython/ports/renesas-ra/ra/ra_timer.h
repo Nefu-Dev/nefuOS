@@ -49,3 +49,4 @@ __WEAK void agt_int_isr(void);
 uint32_t mtick();
 
 #endif /* RA_RA_TIMER_H_ */
+

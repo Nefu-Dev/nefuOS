@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_draw_sw_transform.c
  *
  */
@@ -868,3 +868,4 @@ static void transform_point_upscaled(point_transform_dsc_t * t, int32_t xin, int
 }
 
 #endif /*LV_USE_DRAW_SW*/
+

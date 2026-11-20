@@ -48,3 +48,4 @@ static inline int mp_os_dupterm_tx_strn(const char *s, size_t l) {
 #endif
 
 #endif // MICROPY_INCLUDED_EXTMOD_MISC_H
+

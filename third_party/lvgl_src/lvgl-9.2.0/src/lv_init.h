@@ -53,3 +53,4 @@ bool lv_is_initialized(void);
 #endif
 
 #endif /*LV_INIT_H*/
+

@@ -20,4 +20,4 @@ if ($LASTEXITCODE -ne 0) { throw "mail test build failed" }
 Write-Output "mail test built -> $env:TEMP\mail_test.exe"
 & "$env:TEMP\mail_test.exe"
 if ($LASTEXITCODE -ne 0) { throw "mail test FAILED ($LASTEXITCODE failures)" }
-Write-Output "mail test PASSED (58 checks)"
+Write-Output "mail test PASSED"

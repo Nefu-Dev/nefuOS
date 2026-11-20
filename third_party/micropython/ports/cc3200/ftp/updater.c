@@ -200,3 +200,4 @@ void updater_finnish (void) {
     sl_LockObjUnlock (&updater_LockObj);
 }
 
+

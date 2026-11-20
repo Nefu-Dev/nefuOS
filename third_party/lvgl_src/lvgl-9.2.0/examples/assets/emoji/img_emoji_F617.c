@@ -252,3 +252,4 @@ const lv_image_dsc_t emoji_F617 = {
     .data = emoji_F617_map,
     .data_size = sizeof(emoji_F617_map),
 };
+

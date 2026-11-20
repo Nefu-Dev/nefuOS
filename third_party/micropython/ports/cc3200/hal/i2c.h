@@ -358,3 +358,4 @@ extern uint32_t I2CSlaveStatus(uint32_t ui32Base);
 #endif
 
 #endif // __DRIVERLIB_I2C_H__
+

@@ -23,3 +23,4 @@ void machine_timer_deinit_all(void);
 void machine_i2s_init0();
 
 #endif // MICROPY_INCLUDED_ESP32_MODMACHINE_H
+

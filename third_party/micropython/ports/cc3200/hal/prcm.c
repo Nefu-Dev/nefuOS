@@ -1951,3 +1951,4 @@ unsigned long PRCMCameraFreqSet(unsigned char ulDivider, unsigned char ulWidth)
 //! @}
 //
 //*****************************************************************************
+

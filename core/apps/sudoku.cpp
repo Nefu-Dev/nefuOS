@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS Sudoku — generate, solve, play
 #include "apps.h"
 #include "../gui/wm.h"
@@ -207,7 +212,7 @@ void sud_close(Window* w) {
 void sudoku_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Sudoku", x, y, 340, 420);
+    Window* w = g_wm->create_window(T("数独", "Sudoku"), x, y, 340, 420);
     if (!w) return;
     Sudoku* g = new Sudoku();
     g->w = w->content_w;
@@ -223,3 +228,4 @@ void sudoku_launch() {
 }
 
 } // namespace nefu
+

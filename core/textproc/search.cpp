@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 多模式搜索 / 回文 / 后缀结构(实现)
 // 见 search.h。所有结果数组用 new[] 分配，调用方 delete[]。
 #include "search.h"
@@ -628,3 +633,4 @@ int search_self_test() {
 
 } // namespace textproc
 } // namespace nefu
+

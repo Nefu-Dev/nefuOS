@@ -76,3 +76,4 @@ void lv_example_scale_5(void)
 }
 
 #endif
+

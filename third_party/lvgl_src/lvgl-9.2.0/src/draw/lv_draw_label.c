@@ -444,3 +444,4 @@ static void draw_letter(lv_draw_unit_t * draw_unit, lv_draw_glyph_dsc_t * dsc,  
 
     LV_PROFILER_END;
 }
+

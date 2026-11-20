@@ -33,3 +33,4 @@ void test_spinner_spinning(void)
 }
 
 #endif
+

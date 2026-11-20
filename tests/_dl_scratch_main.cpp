@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // 临时编译检查 main
 #include "../core/deeplearn/deeplearn_all.h"
 #include <cstdio>
@@ -20,3 +25,4 @@ int main() {
     int h = attention_self_test();     printf("attention=%d\n", h); fflush(stdout);
     return (a+b+c+d+e+f+g+h) ? 1 : 0;
 }
+

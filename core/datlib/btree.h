@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — B-tree (btree, order-4 demo)
 // B 树：多路平衡搜索树，节点可含多个键，广泛用于数据库与文件系统
 // （磁盘块对应节点，降低 IO 次数）。本实现为教学版：
@@ -80,3 +85,4 @@ int btree_self_test();
 
 } // namespace dt
 } // namespace nefu
+

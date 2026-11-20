@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— FAT16 文件系统
 //
 // 在一块虚拟磁盘(Disk)之上实现经典的 FAT16 文件系统。布局:
@@ -180,3 +185,4 @@ int fat16_self_test();
 
 } // namespace filesystem
 } // namespace nefu
+

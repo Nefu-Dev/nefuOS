@@ -56,3 +56,4 @@ void ra_icu_swint(uint8_t irq_no);
 void r_icu_isr(void);
 
 #endif /* RA_RA_ICU_H_ */
+

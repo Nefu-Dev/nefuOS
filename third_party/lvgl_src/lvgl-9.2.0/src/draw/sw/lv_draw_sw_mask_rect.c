@@ -132,3 +132,4 @@ void lv_draw_sw_mask_rect(lv_draw_unit_t * draw_unit, const lv_draw_mask_rect_ds
 
 #endif /*LV_DRAW_SW_COMPLEX*/
 #endif /*LV_USE_DRAW_SW*/
+

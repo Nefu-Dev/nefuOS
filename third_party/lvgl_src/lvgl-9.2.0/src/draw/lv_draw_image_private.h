@@ -83,3 +83,4 @@ void lv_image_buf_get_transformed_area(lv_area_t * res, int32_t w, int32_t h, in
 #endif
 
 #endif /*LV_DRAW_IMAGE_PRIVATE_H*/
+

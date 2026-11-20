@@ -91,3 +91,4 @@ void openamp_init(void);
 void openamp_remoteproc_notified(mp_sched_node_t *node);
 
 #endif // MICROPY_INCLUDED_MODOPENAMP_H
+

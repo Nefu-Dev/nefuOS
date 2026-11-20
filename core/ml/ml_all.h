@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 聚合头
 // 一次性引入全部 ML 模块，并提供统一的汇总自检入口 ml_self_test()。
 #pragma once
@@ -35,3 +40,4 @@ inline int ml_self_test() {
 
 } // namespace ml
 } // namespace nefu
+

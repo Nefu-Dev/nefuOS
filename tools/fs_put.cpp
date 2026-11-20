@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS: put a host file into the VFS snapshot using the real VFS API
 // (guaranteed byte-identical to what the kernel writes/reads).
 // Usage: fs_put <fs_path> <dst_path_in_fs> <host_file>
@@ -78,3 +83,4 @@ int main(int argc, char** argv) {
     printf("fs_put: %s (%d bytes) -> %s (%u bytes total)\n", argv[2], (int)hn, argv[1], osz);
     return 0;
 }
+

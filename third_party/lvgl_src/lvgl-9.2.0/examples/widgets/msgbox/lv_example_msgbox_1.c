@@ -27,3 +27,4 @@ void lv_example_msgbox_1(void)
 }
 
 #endif
+

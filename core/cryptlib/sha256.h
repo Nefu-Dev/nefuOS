@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — SHA-256 (sha256)
 // SHA-256：安全散列算法，输出 256 位（32 字节）摘要。
 // 经典流程：填充（追加 0x80 + 补零 + 64 位长度）→ 按 512 位分块 →
@@ -21,3 +26,4 @@ int sha256_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

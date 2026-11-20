@@ -46,3 +46,4 @@ lv_obj_t * lv_button_create(lv_obj_t * parent);
 #endif
 
 #endif /*LV_BUTTON_H*/
+

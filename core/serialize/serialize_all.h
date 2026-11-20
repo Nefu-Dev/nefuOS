@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数据序列化与编解码库 —— 聚合头
 // 一次 include 即可使用全部子模块；并提供 serialize_self_test() 汇总入口。
 #pragma once

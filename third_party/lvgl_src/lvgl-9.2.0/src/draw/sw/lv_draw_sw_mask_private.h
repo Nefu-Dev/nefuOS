@@ -151,3 +151,4 @@ void lv_draw_sw_mask_cleanup(void);
 #endif
 
 #endif /*LV_DRAW_SW_MASK_PRIVATE_H*/
+

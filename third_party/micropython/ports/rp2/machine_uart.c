@@ -686,3 +686,4 @@ static mp_uint_t mp_machine_uart_ioctl(mp_obj_t self_in, mp_uint_t request, uint
 MP_REGISTER_ROOT_POINTER(void *rp2_uart_rx_buffer[2]);
 MP_REGISTER_ROOT_POINTER(void *rp2_uart_tx_buffer[2]);
 MP_REGISTER_ROOT_POINTER(void *rp2_uart_irq_obj[2]);
+

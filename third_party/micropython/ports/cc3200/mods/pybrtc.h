@@ -56,3 +56,4 @@ extern void pyb_rtc_repeat_alarm (pyb_rtc_obj_t *self);
 extern void pyb_rtc_disable_alarm (void);
 
 #endif // MICROPY_INCLUDED_CC3200_MODS_PYBRTC_H
+

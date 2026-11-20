@@ -193,3 +193,4 @@ const lv_image_dsc_t img_lv_demo_music_cover_1 = {
 };
 
 #endif /*LV_USE_DEMO_MUSIC*/
+

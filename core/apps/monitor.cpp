@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS system monitor - LVGL GUI (live curves, real RAM/DISK, process list)
 #include "apps.h"
 #include "../gui/wm.h"
@@ -161,7 +166,7 @@ static void mo_wm_mouse(Window* w, int mx, int my, uint8_t buttons) {
 void monitor_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("System Monitor", x, y, 560, 420);
+    Window* w = g_wm->create_window(T("系统监视器", "System Monitor"), x, y, 560, 420);
     if (!w) return;
     MonitorLvState* st = new MonitorLvState();
     st->w = w->content_w;

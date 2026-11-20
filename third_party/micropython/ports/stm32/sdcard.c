@@ -912,3 +912,4 @@ void sdcard_init_vfs(fs_user_mount_t *vfs, int part) {
 #endif // !BUILDING_MBOOT
 
 #endif // MICROPY_HW_ENABLE_SDCARD || MICROPY_HW_ENABLE_MMCARD
+

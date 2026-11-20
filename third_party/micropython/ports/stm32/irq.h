@@ -189,3 +189,4 @@ static inline void restore_irq_pri(uint32_t state) {
 #endif
 
 #endif // MICROPY_INCLUDED_STM32_IRQ_H
+

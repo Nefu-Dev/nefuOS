@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # Makefile fragment for generating native .mpy files from C source
 # MPY_DIR must be set to the top of the MicroPython source tree
 
@@ -153,3 +158,4 @@ $(BUILD)/$(MOD).native.mpy: $(SRC_O)
 $(MOD).mpy: $(BUILD)/$(MOD).native.mpy $(SRC_MPY)
 	$(ECHO) "GEN $@"
 	$(Q)$(MPY_TOOL) --merge -o $@ $^
+

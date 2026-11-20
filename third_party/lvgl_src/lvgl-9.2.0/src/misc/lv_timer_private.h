@@ -79,3 +79,4 @@ void lv_timer_core_deinit(void);
 #endif
 
 #endif /*LV_TIMER_PRIVATE_H*/
+

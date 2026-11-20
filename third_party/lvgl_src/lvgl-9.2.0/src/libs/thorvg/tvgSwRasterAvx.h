@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2021 - 2024 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -211,4 +211,5 @@ static bool avxRasterTranslucentRle(SwSurface* surface, const SwRleData* rle, ui
 #endif
 
 #endif /* LV_USE_THORVG_INTERNAL */
+
 

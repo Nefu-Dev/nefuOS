@@ -19,3 +19,4 @@ float nearbyintf(float x)
 		return s ? -0.0f : 0.0f;
 	return y;
 }
+

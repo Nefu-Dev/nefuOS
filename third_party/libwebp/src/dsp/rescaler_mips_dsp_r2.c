@@ -312,3 +312,4 @@ WEBP_TSAN_IGNORE_FUNCTION void WebPRescalerDspInitMIPSdspR2(void) {
 WEBP_DSP_INIT_STUB(WebPRescalerDspInitMIPSdspR2)
 
 #endif  // WEBP_USE_MIPS_DSP_R2
+

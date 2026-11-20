@@ -66,3 +66,4 @@ void init() {
 void deinit() {
     SetConsoleCtrlHandler(console_sighandler, FALSE);
 }
+

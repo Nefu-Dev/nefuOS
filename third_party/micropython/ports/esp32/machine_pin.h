@@ -192,3 +192,4 @@ extern const machine_pin_obj_t machine_pin_obj_table[GPIO_NUM_MAX];
 extern const mp_obj_dict_t machine_pin_board_pins_locals_dict;
 
 #endif // MICROPY_INCLUDED_ESP32_MACHINE_PIN_H
+

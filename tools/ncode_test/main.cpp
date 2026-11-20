@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // =============================================================================
 //  ncode_test/main.cpp — host-side unit harness for the .ncode interpreter
 // -----------------------------------------------------------------------------
@@ -221,3 +226,4 @@ int main() {
            g_fails, g_fails == 1 ? "" : "s");
     return g_fails == 0 ? 0 : 1;
 }
+

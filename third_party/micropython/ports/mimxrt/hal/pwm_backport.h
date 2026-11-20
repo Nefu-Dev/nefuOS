@@ -41,3 +41,4 @@ status_t QTMR_SetupPwm_u16(TMR_Type *base, qtmr_channel_selection_t channel, uin
 #endif // FSL_FEATURE_SOC_TMR_COUNT
 
 #endif // PWM_BACKPORT_H
+

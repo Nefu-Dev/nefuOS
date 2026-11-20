@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — longest common subsequence (LCS)
 // 最长公共子序列：不要求连续，但保持相对顺序。
 // 例：LCS("ABCBDAB", "BDCABA") = 4（"BCBA" 或 "BDAB"）。
@@ -22,3 +27,4 @@ int lcs_self_test();
 
 } // namespace text
 } // namespace nefu
+

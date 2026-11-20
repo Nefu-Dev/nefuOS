@@ -226,3 +226,4 @@ static inline T mathLerp(const T &start, const T &end, float t)
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

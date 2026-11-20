@@ -707,3 +707,4 @@ soft_reset_exit:
 }
 
 MP_REGISTER_ROOT_POINTER(mp_obj_t pyb_config_main);
+

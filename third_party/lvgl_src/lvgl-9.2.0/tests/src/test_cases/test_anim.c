@@ -92,3 +92,4 @@ void test_anim_delete_custom(void)
 }
 
 #endif
+

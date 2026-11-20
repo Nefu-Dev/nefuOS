@@ -61,3 +61,4 @@ const lv_image_dsc_t img_star = {
   .data_size = 870 * 4,
   .data = img_star_map,
 };
+

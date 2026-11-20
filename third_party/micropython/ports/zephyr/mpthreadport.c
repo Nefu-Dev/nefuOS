@@ -306,3 +306,4 @@ static int32_t mp_thread_find_stack_slot(void) {
 }
 
 #endif // MICROPY_PY_THREAD
+

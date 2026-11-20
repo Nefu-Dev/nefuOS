@@ -34,3 +34,4 @@ bool svgPathToShape(const char* svgPath, Shape* shape);
 
 #endif /* LV_USE_THORVG_INTERNAL */
 
+

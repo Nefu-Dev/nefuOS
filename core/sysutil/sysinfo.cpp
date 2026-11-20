@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 系统工具扩展库 —— 系统信息模块实现
 #include "sysinfo.h"
 #include "../platform.h"
@@ -458,3 +463,4 @@ int sysinfo_self_test() {
 
 } // namespace sysutil
 } // namespace nefu
+

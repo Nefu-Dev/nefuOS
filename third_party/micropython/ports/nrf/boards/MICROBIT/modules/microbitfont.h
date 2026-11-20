@@ -143,3 +143,4 @@ const unsigned char font_pendolino3_5x5_pad3msb[475] = {
 };
 
 #endif // MICROPY_INCLUDED_NRF_BOARD_MICROBIT_MICROBITFONT_H
+

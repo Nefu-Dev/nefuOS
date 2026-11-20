@@ -175,3 +175,4 @@ void hal_entry(void);
 void g_hal_init(void);
 FSP_FOOTER
 #endif /* HAL_DATA_H_ */
+

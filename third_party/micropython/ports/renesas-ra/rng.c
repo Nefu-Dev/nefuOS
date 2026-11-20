@@ -50,3 +50,4 @@ uint32_t rng_read(void) {
 }
 
 #endif
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS compression library — Huffman 编码 (huffman)
 // Huffman：基于频率的最优前缀编码（1952）。思想：出现越频繁的字符
 // 用越短的码。构建方式：把每个符号当作叶子，反复合并权值最小的两棵树，
@@ -20,3 +25,4 @@ int huffman_self_test();
 
 } // namespace comp
 } // namespace nefu
+

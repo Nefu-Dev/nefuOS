@@ -247,3 +247,4 @@ status_t flexspi_nor_get_vendor_id(FLEXSPI_Type *base, uint8_t *vendorId) {
 
     return status;
 }
+

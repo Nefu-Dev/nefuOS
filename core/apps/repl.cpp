@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefu::minilang —— 图形化 REPL 窗口（core/apps/repl.cpp）
 // ----------------------------------------------------------------------------
 // 一个最简的交互式迷你语言终端：顶部是输出历史，底部是输入行。
@@ -176,7 +181,7 @@ static void repl_close(Window* w) {
 void nefu::repl_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("MiniLang REPL", x, y, REPL_W, REPL_H);
+    Window* w = g_wm->create_window(T("MiniLang 终端", "MiniLang REPL"), x, y, REPL_W, REPL_H);
     if (!w) return;
     ReplState* r = new ReplState();
     r->init();
@@ -186,3 +191,4 @@ void nefu::repl_launch() {
     w->on_close = repl_close;
     g_wm->raise(w);
 }
+

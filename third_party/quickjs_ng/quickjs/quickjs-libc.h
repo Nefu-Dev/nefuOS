@@ -85,3 +85,4 @@ JS_LIBC_EXTERN void js_std_set_worker_new_context_func(JSContext *(*func)(JSRunt
 #endif
 
 #endif /* QUICKJS_LIBC_H */
+

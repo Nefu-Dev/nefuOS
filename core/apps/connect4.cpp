@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // connect4.cpp —— nefuOS 四子棋（人机对战，alpha-beta 剪枝）
 //
 // 玩法：
@@ -154,7 +159,7 @@ static void c4_close(Window* w) {
 void connect4_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Connect Four", x, y, GW, GH);
+    Window* w = g_wm->create_window(T("四子棋", "Connect Four"), x, y, GW, GH);
     if (!w) return;
     Connect4* g = new Connect4();
     g->reset();
@@ -167,3 +172,4 @@ void connect4_launch() {
 }
 
 } // namespace nefu
+

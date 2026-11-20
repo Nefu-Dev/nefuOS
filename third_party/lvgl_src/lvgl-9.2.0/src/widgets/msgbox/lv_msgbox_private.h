@@ -55,3 +55,4 @@ struct lv_msgbox_t {
 #endif
 
 #endif /*LV_MSGBOX_PRIVATE_H*/
+

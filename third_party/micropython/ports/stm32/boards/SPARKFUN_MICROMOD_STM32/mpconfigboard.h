@@ -94,3 +94,4 @@ extern struct _spi_bdev_t spi_bdev;
 
 // USB device config
 #define MICROPY_HW_USB_FS (1)
+

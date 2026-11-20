@@ -72,3 +72,4 @@ void lv_color_filter_dsc_init(lv_color_filter_dsc_t * dsc, lv_color_filter_cb_t 
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+

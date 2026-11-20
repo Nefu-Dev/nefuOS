@@ -58,3 +58,4 @@ const image_tuple_8_t microbit_const_image_all_arrows_tuple_obj = {
         (mp_obj_t)&microbit_const_image_arrow_nw_obj
     }
 };
+

@@ -47,3 +47,4 @@ void lv_port_disp_init(void);
 #endif /*LV_PORT_LCD_STM32_TEMPL_H*/
 
 #endif /*Disable/Enable content*/
+

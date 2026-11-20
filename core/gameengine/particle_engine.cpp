@@ -1,4 +1,9 @@
-﻿// particle_engine.cpp —— 粒子系统实现：发射、生命周期、渐变、自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// particle_engine.cpp —— 粒子系统实现：发射、生命周期、渐变、自测
 #include "particle_engine.h"
 
 namespace nefu {
@@ -190,3 +195,4 @@ int particle_engine_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

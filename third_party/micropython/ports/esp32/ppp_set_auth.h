@@ -20,3 +20,4 @@ typedef struct ppp_pcb_s ppp_pcb;
 void pppapi_set_auth(ppp_pcb *pcb, u8_t authtype, const char *user, const char *passwd);
 
 #endif
+

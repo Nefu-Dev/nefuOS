@@ -207,3 +207,4 @@ WEBP_TSAN_IGNORE_FUNCTION void VP8FiltersInitMSA(void) {
 WEBP_DSP_INIT_STUB(VP8FiltersInitMSA)
 
 #endif  // WEBP_USE_MSA
+

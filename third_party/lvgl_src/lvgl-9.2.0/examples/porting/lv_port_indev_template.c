@@ -404,3 +404,4 @@ static bool button_is_pressed(uint8_t id)
 /*This dummy typedef exists purely to silence -Wpedantic.*/
 typedef int keep_pedantic_happy;
 #endif
+

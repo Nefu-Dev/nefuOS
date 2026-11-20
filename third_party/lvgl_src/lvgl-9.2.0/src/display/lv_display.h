@@ -591,3 +591,4 @@ int32_t lv_display_dpx(const lv_display_t * disp, int32_t n);
 #endif
 
 #endif /*LV_DISPLAY_H*/
+

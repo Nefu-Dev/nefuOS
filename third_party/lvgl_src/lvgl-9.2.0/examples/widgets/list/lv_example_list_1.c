@@ -50,3 +50,4 @@ void lv_example_list_1(void)
 }
 
 #endif
+

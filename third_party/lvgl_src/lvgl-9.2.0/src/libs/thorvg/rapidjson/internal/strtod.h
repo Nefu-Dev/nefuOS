@@ -291,3 +291,4 @@ inline double StrtodFullPrecision(double d, int p, const Ch* decimals, size_t le
 RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_STRTOD_
+

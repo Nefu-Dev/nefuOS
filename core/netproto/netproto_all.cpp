@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 网络协议栈 —— 聚合自测实现 (汇总全部模块 self_test)
 // 由 netproto_self_test() 统一调用各模块自测
 #include "netproto_all.h"
@@ -52,6 +57,10 @@ int netproto_self_test() {
     printf("  websocket: %s (%d)\n", f == 0 ? "OK" : "FAIL", f);
     total += f;
 
+    f = colyseus_self_test();
+    printf("  colyseus : %s (%d)\n", f == 0 ? "OK" : "FAIL", f);
+    total += f;
+
     f = mqtt_self_test();
     printf("  mqtt     : %s (%d)\n", f == 0 ? "OK" : "FAIL", f);
     total += f;
@@ -95,3 +104,4 @@ int netproto_self_test() {
 
 } // namespace netproto
 } // namespace nefu
+

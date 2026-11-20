@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefuOS 3D 模型查看器 —— gfx3dview
 // ----------------------------------------------------------------------------
@@ -218,7 +223,7 @@ static void view_close(Window* w) {
 void gfx3dview_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("gfx3d Viewer", x, y, WIN_W, WIN_H);
+    Window* w = g_wm->create_window(T("3D 图形查看器", "gfx3d Viewer"), x, y, WIN_W, WIN_H);
     if (!w) return;
     ViewState* v = new ViewState();
     v->buf = new uint32_t[(size_t)VW * VH];
@@ -232,3 +237,4 @@ void gfx3dview_launch() {
 }
 
 } // namespace nefu
+

@@ -68,3 +68,4 @@ two25 =  3.3554432000e+07f; /* 0x4c000000 */
 }
 
 #endif /* defined(_DOUBLE_IS_32BITS) */
+

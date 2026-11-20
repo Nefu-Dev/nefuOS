@@ -60,3 +60,4 @@ static inline int mp_obj_jsproxy_get_ref(mp_obj_t o) {
 }
 
 #endif // MICROPY_INCLUDED_WEBASSEMBLY_PROXY_C_H
+

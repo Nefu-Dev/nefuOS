@@ -37,3 +37,4 @@ extern "C" {
 #endif
 
 #endif /*LV_DRAW_RECT_PRIVATE_H*/
+

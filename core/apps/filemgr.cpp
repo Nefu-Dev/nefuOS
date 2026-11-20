@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS File Manager v3: context menu, trash, drag&drop, sort, views
 #include "apps.h"
 #include "../gui/gfx.h"
@@ -185,8 +190,9 @@ static void fm_new_entry(FMState* st, int mode) {
     path += name;
     FSNode* n = (mode == 2) ? g_vfs->mkdir(path.c_str()) : g_vfs->create_file(path.c_str());
     if (!n) {
-        ksprintf(st->status_msg, sizeof(st->status_msg), "Cannot create %s here",
-                 mode == 2 ? "folder" : "file");
+        ksprintf(st->status_msg, sizeof(st->status_msg),
+                 T("无法在此创建%s", "Cannot create %s here"),
+                 mode == 2 ? T("目录", "folder") : T("文件", "file"));
         return;
     }
     st->sel_file = n->name;
@@ -195,7 +201,7 @@ static void fm_new_entry(FMState* st, int mode) {
     st->renaming = true;
     st->rename_buf = n->name;
     ksprintf(st->status_msg, sizeof(st->status_msg),
-             "Type a name, Enter to confirm (%s)", name.c_str());
+             T("输入名称,回车确认 (%s)", "Type a name, Enter to confirm (%s)"), name.c_str());
 }
 
 // ---------- context menu actions ----------
@@ -269,7 +275,7 @@ static void fm_paint(Window* w) {
 
     // tree
     gfx::fillrect(s, 0, TOOL_H, left_w, 24, FM_HEAD);
-    gfx::text(s, 6, TOOL_H + 4, "Folders", color::TEXT, FM_HEAD);
+    gfx::text(s, 6, TOOL_H + 4, T("目录", "Folders"), color::TEXT, FM_HEAD);
     gfx::vline(s, left_w, TOOL_H, H - STAT_H, 0x00D8D7D1);
     List<TreeRow> rows;
     tree_collect(g_vfs->root(), 0, rows, 2048);
@@ -302,7 +308,7 @@ static void fm_paint(Window* w) {
     if (st->view_mode == 0) {
         gfx::fillrect(s, rx, TOOL_H, rw, HEAD_H, FM_HEAD);
         gfx::hline(s, rx, W - 1, TOOL_H + HEAD_H, color::BORDER);
-        const char* cols[3] = { "Name", "Size", "Type" };
+        const char* cols[3] = { T("名称", "Name"), T("大小", "Size"), T("类型", "Type") };
         for (int i = 0; i < 3; i++) {
             int cx = rx + 8 + i * 130;
             uint32_t cc = (st->sort_mode == i) ? color::BLUE : color::TEXT;
@@ -319,7 +325,7 @@ static void fm_paint(Window* w) {
             uint32_t bg = sel ? FM_SEL : (drop ? 0x00FFF3CC : FM_BG);
             gfx::fillrect(s, rx, y, rw, 16, bg);
             if (drop) gfx::rect(s, rx, y, rw - 1, 16, color::ORANGE);
-            gfx::text(s, rx + 4, y + 1, c->is_dir ? "DIR " : "FILE", c->is_dir ? color::ORANGE : color::TEXT2, bg);
+            gfx::text(s, rx + 4, y + 1, c->is_dir ? T("目录", "DIR ") : T("文件", "FILE"), c->is_dir ? color::ORANGE : color::TEXT2, bg);
             gfx::text(s, rx + 44, y + 1, c->name.c_str(), c->is_dir ? color::BLUE : color::TEXT, bg);
             if (!c->is_dir) {
                 char sz[24];
@@ -387,7 +393,7 @@ static void fm_paint(Window* w) {
     if (st->status_msg[0]) {
         gfx::text(s, 8, H - STAT_H + 3, st->status_msg, color::BLUE, FM_HEAD);
     } else {
-        ksprintf(buf, sizeof(buf), "%d items  (%d dirs, %d files)", d->children.size(), dirs, files);
+        ksprintf(buf, sizeof(buf), T("共 %d 项(%d 个目录, %d 个文件)", "%d items  (%d dirs, %d files)"), d->children.size(), dirs, files);
         gfx::text(s, 8, H - STAT_H + 3, buf, color::TEXT2, FM_HEAD);
         if (!st->sel_file.empty()) {
             ksprintf(buf, sizeof(buf), "Selected: %s", st->sel_file.c_str());
@@ -399,23 +405,23 @@ static void fm_paint(Window* w) {
     if (st->menu_open) {
         const char* items[MENU_N];
         if (st->menu_node && st->menu_node->is_dir && in_trash_dir(st->sel_dir)) {
-            items[MENU_NEW_FILE] = "New File"; items[MENU_NEW_FOLDER] = "New Folder";
-            items[MENU_OPEN] = "Open"; items[MENU_RENAME] = "Rename";
-            items[MENU_TRASH] = "Delete folder"; items[MENU_DELETE] = "Delete";
-            items[MENU_RESTORE] = "Restore"; items[MENU_EMPTY_TRASH] = "Empty Trash";
-            items[MENU_PROPS] = "Properties";
+            items[MENU_NEW_FILE] = T("新建文件", "New File"); items[MENU_NEW_FOLDER] = T("新建文件夹", "New Folder");
+            items[MENU_OPEN] = T("打开", "Open"); items[MENU_RENAME] = T("重命名", "Rename");
+            items[MENU_TRASH] = T("删除目录", "Delete folder"); items[MENU_DELETE] = T("删除", "Delete");
+            items[MENU_RESTORE] = T("还原", "Restore"); items[MENU_EMPTY_TRASH] = T("清空回收站", "Empty Trash");
+            items[MENU_PROPS] = T("属性", "Properties");
         } else if (st->menu_node && st->menu_node->is_dir) {
-            items[MENU_NEW_FILE] = "New File"; items[MENU_NEW_FOLDER] = "New Folder";
-            items[MENU_OPEN] = "Open"; items[MENU_RENAME] = "Rename";
-            items[MENU_TRASH] = "Move to Trash"; items[MENU_DELETE] = "Delete folder";
-            items[MENU_RESTORE] = "Restore"; items[MENU_EMPTY_TRASH] = "Empty Trash";
-            items[MENU_PROPS] = "Properties";
+            items[MENU_NEW_FILE] = T("新建文件", "New File"); items[MENU_NEW_FOLDER] = T("新建文件夹", "New Folder");
+            items[MENU_OPEN] = T("打开", "Open"); items[MENU_RENAME] = T("重命名", "Rename");
+            items[MENU_TRASH] = T("移入回收站", "Move to Trash"); items[MENU_DELETE] = T("删除目录", "Delete folder");
+            items[MENU_RESTORE] = T("还原", "Restore"); items[MENU_EMPTY_TRASH] = T("清空回收站", "Empty Trash");
+            items[MENU_PROPS] = T("属性", "Properties");
         } else {
-            items[MENU_NEW_FILE] = "New File"; items[MENU_NEW_FOLDER] = "New Folder";
-            items[MENU_OPEN] = "Open"; items[MENU_RENAME] = "Rename";
+            items[MENU_NEW_FILE] = T("新建文件", "New File"); items[MENU_NEW_FOLDER] = T("新建文件夹", "New Folder");
+            items[MENU_OPEN] = T("打开", "Open"); items[MENU_RENAME] = T("重命名", "Rename");
             items[MENU_TRASH] = "Move to Trash"; items[MENU_DELETE] = "Delete";
-            items[MENU_RESTORE] = "Restore"; items[MENU_EMPTY_TRASH] = "Empty Trash";
-            items[MENU_PROPS] = "Properties";
+            items[MENU_RESTORE] = T("还原", "Restore"); items[MENU_EMPTY_TRASH] = T("清空回收站", "Empty Trash");
+            items[MENU_PROPS] = T("属性", "Properties");
         }
         int mw = 180, mh = MENU_N * 22 + 6;
         int mx = st->menu_x, my = st->menu_y;
@@ -683,7 +689,7 @@ static void fm_key(Window* w, const KeyEvent* e) {
                         st->sel_file = st->rename_buf;
                         ksprintf(st->status_msg, sizeof(st->status_msg), "Renamed: %s", st->rename_buf.c_str());
                     } else {
-                        ksprintf(st->status_msg, sizeof(st->status_msg), "Name already exists");
+                        ksprintf(st->status_msg, sizeof(st->status_msg), T("同名文件已存在", "Name already exists"));
                     }
                 } else {
                     st->sel_file = st->rename_buf;   // kept default name
@@ -732,32 +738,32 @@ static void fm_click(void* ud) {
     FMState* st = (FMState*)ud;
     if (!st->cur) return;
     const char* lab = st->cur->label;
-    if (strcmp(lab, "Back") == 0) {
+    if (strcmp(lab, T("后退", "Back")) == 0) {
         if (st->hist_back.size() > 0) {
             st->hist_fwd.push(st->sel_dir);
             st->sel_dir = st->hist_back.pop();
             st->sel_file.clear();
             st->list_scroll = 0;
         }
-    } else if (strcmp(lab, "Fwd") == 0) {
+    } else if (strcmp(lab, T("前进", "Fwd")) == 0) {
         if (st->hist_fwd.size() > 0) {
             st->hist_back.push(st->sel_dir);
             st->sel_dir = st->hist_fwd.pop();
             st->sel_file.clear();
             st->list_scroll = 0;
         }
-    } else if (strcmp(lab, "Up") == 0) {
+    } else if (strcmp(lab, T("上级", "Up")) == 0) {
         if (st->sel_dir && st->sel_dir->parent) fm_cd(st, st->sel_dir->parent, true);
-    } else if (strcmp(lab, "Ref") == 0) {
+    } else if (strcmp(lab, T("刷新", "Ref")) == 0) {
         st->sel_file.clear();
         st->status_msg[0] = 0;
-    } else if (strcmp(lab, "List") == 0) {
+    } else if (strcmp(lab, T("列表", "List")) == 0) {
         st->view_mode = 0;
         st->list_scroll = 0;
-    } else if (strcmp(lab, "Icons") == 0) {
+    } else if (strcmp(lab, T("图标", "Icons")) == 0) {
         st->view_mode = 1;
         st->list_scroll = 0;
-    } else if (strcmp(lab, "New") == 0) {
+    } else if (strcmp(lab, T("新建", "New")) == 0) {
         fm_new_entry(st, 1);   // new file in the current directory
     }
 }
@@ -770,7 +776,7 @@ static void fm_close(Window* w) {
 void fm_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("File Manager", x, y, 680, 440);
+    Window* w = g_wm->create_window(T("文件管理器", "File Manager"), x, y, 680, 440);
     if (!w) return;
     FMState* st = new FMState();
     st->win = w;
@@ -785,7 +791,9 @@ void fm_launch() {
     st->view_mode = 0;
     st->cur = 0;
     st->last_buttons = 0;
-    const char* labels[7] = { "Back", "Fwd", "Up", "Ref", "List", "Icons", "New" };
+    const char* labels[7] = { T("后退", "Back"), T("前进", "Fwd"), T("上级", "Up"),
+                              T("刷新", "Ref"), T("列表", "List"), T("图标", "Icons"),
+                              T("新建", "New") };
     for (int i = 0; i < 7; i++) {
         Button& b = st->btns[i];
         b.x = 6 + i * 44;
@@ -807,6 +815,10 @@ void fm_launch() {
     w->on_drag = fm_drag_update;
     w->on_drop = fm_drag_drop;
     w->app_scroll = true;   // filemgr paints its own scrolled viewport
+    // Give the window the keyboard focus: the file manager is driven by the
+    // keyboard, and on the bare kernel there is no mouse to click it with.
+    g_wm->raise(w);
 }
 
 } // namespace nefu
+

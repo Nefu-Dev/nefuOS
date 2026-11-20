@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS gfxmath —— 4x4 矩阵 mat4
 // 教学版：列主序 4x4 变换矩阵（平移/缩放/旋转/投影）及其乘法、求逆。
 // 图形学中把模型、视图、投影变换统一为矩阵乘法。class / STL / 中文注释。
@@ -69,3 +74,4 @@ struct Mat4 {
 
 } // namespace gfx
 } // namespace nefu
+

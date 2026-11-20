@@ -255,3 +255,4 @@ WEBP_DSP_INIT_FUNC(WebPInitConvertARGBToYUV) {
   assert(WebPConvertBGR24ToY != NULL);
   assert(WebPConvertRGBA32ToUV != NULL);
 }
+

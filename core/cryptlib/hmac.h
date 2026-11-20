@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS crypto library — HMAC-SHA256 (hmac)
 // HMAC：密钥哈希消息认证码。结构：
 //   HMAC(K, m) = H((K' ^ opad) || H((K' ^ ipad) || m))
@@ -20,3 +25,4 @@ int hmac_self_test();
 
 } // namespace crypt
 } // namespace nefu
+

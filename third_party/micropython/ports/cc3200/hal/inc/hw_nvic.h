@@ -1708,3 +1708,4 @@
 #define NVIC_SW_TRIG_INTID_S    0
 
 #endif // __HW_NVIC_H__
+

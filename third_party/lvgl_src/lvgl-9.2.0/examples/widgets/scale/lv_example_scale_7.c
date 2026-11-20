@@ -70,3 +70,4 @@ void lv_example_scale_7(void)
 }
 
 #endif
+

@@ -32,3 +32,4 @@ float asinhf(float x)
 	}
 	return s ? -x : x;
 }
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 前缀树 / 压缩前缀树
 //   - Trie(完整前缀树)：插入、精确查询、前缀计数、自动补全
 //   - Radix Tree(压缩前缀树 / 基数树)：把单链节点合并成带边标签的边
@@ -37,3 +42,4 @@ int trie_self_test();
 
 } // namespace textproc
 } // namespace nefu
+

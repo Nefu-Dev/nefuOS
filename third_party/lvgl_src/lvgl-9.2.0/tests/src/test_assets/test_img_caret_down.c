@@ -34,3 +34,4 @@ const lv_image_dsc_t test_image_caret_down = {
 };
 
 #endif /* LV_BUILD_TEST */
+

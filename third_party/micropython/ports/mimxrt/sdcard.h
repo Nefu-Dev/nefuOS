@@ -109,3 +109,4 @@ static inline bool sdcard_state_initialized(mimxrt_sdcard_obj_t *card) {
 }
 
 #endif // MICROPY_INCLUDED_MIMXRT_SDCARD_H
+

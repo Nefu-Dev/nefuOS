@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 大整数 bigint
 // 教学版：十进制字符串存储，手写加减乘除，适合理解逐位运算。
 // 支持：加、减、乘、除（整除）、比较、取负、绝对值。
@@ -52,3 +57,4 @@ int bigint_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

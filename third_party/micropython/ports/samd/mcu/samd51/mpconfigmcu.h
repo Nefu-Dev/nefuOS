@@ -56,3 +56,4 @@ static inline uint32_t raise_irq_pri(uint32_t pri) {
 static inline void restore_irq_pri(uint32_t basepri) {
     __set_BASEPRI(basepri);
 }
+

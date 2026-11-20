@@ -1,4 +1,9 @@
-﻿// input.cpp —— 输入系统自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// input.cpp —— 输入系统自测
 #include "input.h"
 
 namespace nefu {
@@ -138,3 +143,4 @@ int input_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

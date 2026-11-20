@@ -127,3 +127,4 @@ int VP8EstimateQuality(const uint8_t* const data, size_t size) {
   }
   return Q;
 }
+

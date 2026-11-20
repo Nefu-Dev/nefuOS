@@ -114,3 +114,4 @@
 #define MICROPY_HW_ETH_RMII_TXD1            (pin_B13)
 
 void NUCLEO_H723ZG_board_early_init(void);
+

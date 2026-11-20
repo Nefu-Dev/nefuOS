@@ -118,3 +118,4 @@ void usb_serial_jtag_tx_strn(const char *str, size_t len) {
 }
 
 #endif // MICROPY_HW_ESP_USB_SERIAL_JTAG
+

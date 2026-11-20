@@ -149,3 +149,4 @@ JSModuleDef *js_init_module(JSContext *ctx, const char *module_name)
     JS_AddModuleExport(ctx, m, "Point");
     return m;
 }
+

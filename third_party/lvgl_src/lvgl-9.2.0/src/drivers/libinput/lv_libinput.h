@@ -99,3 +99,4 @@ void lv_libinput_delete(lv_indev_t * indev);
 #endif
 
 #endif /* LV_LIBINPUT_H */
+

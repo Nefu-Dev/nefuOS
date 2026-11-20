@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
     .file   "gchelper.s"
     .text
 
@@ -20,3 +25,4 @@ gc_helper_get_regs_and_sp:
     ret.n
 
     .size   gc_helper_get_regs_and_sp, .-gc_helper_get_regs_and_sp
+

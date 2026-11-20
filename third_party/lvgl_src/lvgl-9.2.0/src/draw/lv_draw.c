@@ -469,3 +469,4 @@ static bool is_independent(lv_layer_t * layer, lv_draw_task_t * t_check)
 
     return true;
 }
+

@@ -1411,3 +1411,4 @@ static const mp_irq_methods_t wlan_irq_methods = {
     .disable = wlan_lpds_irq_disable,
     .flags = wlan_irq_flags,
 };
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 MCU_SERIES = SAMD51
 CMSIS_MCU = SAMD51J19A
 LD_FILES = boards/samd51x19a.ld sections.ld
@@ -8,3 +13,4 @@ MICROPY_PY_NETWORK ?= 1
 MICROPY_PY_NETWORK_NINAW10 ?= 1
 
 MICROPY_HW_CODESIZE ?= 496K
+

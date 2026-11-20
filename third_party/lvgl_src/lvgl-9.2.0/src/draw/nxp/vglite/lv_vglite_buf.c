@@ -114,3 +114,4 @@ static inline void _set_vgbuf_ptr(vg_lite_buffer_t * vgbuf, void * buf)
 }
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

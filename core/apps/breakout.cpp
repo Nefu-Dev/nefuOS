@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // breakout.cpp —— nefuOS 打砖块（Breakout）
 //
 // 玩法：
@@ -528,7 +533,7 @@ static void breakout_close(Window* w) {
 void breakout_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Breakout", x, y, BW, BH);
+    Window* w = g_wm->create_window(T("打砖块", "Breakout"), x, y, BW, BH);
     if (!w) return;
     Breakout* g = new Breakout();
     g->start_game();
@@ -542,3 +547,4 @@ void breakout_launch() {
 }
 
 } // namespace nefu
+

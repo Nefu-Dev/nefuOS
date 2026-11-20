@@ -138,3 +138,4 @@ static inline void _gifdec_render_frame_mve(uint8_t * dst, uint16_t w, uint16_t 
 #endif
 
 #endif /*GIFDEC_MVE_H*/
+

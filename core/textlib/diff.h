@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS text library — line-level diff (Myers-style, LCS based)
 // 行级差异：把两段文本按行切分，输出增删行清单。
 // 基于 LCS 的思想：保留最长公共子序列（未变化行），其余标记 +/-。
@@ -29,3 +34,4 @@ int diff_self_test();
 
 } // namespace text
 } // namespace nefu
+

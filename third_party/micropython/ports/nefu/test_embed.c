@@ -120,3 +120,4 @@ int main(void) {
     printf("after deinit\n");
     return 0;
 }
+

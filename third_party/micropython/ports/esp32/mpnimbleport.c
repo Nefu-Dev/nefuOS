@@ -82,3 +82,4 @@ void mp_bluetooth_nimble_port_shutdown(void) {
 }
 
 #endif
+

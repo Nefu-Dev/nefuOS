@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本处理库 —— 语音编码(phonetic encoding)
 //   把单词映射成按发音归类的代码，用于人名/地名模糊匹配。
 //   - Soundex(US 人口普查)
@@ -37,3 +42,4 @@ int phonetic_self_test();
 
 } // namespace textproc
 } // namespace nefu
+

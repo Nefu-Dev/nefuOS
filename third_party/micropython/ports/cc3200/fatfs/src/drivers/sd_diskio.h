@@ -25,3 +25,4 @@ DRESULT sd_disk_read (BYTE* pBuffer, DWORD ulSectorNumber, UINT bSectorCount);
 DRESULT sd_disk_write (const BYTE* pBuffer, DWORD ulSectorNumber, UINT bSectorCount);
 
 #endif /* SD_DISKIO_H_ */
+

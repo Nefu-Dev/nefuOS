@@ -252,3 +252,4 @@ const mp_obj_module_t esp32_module = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_esp32, esp32_module);
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS audlib —— 音序器 seq 与音符 note
 // 教学版：音符频率表 + 步进音序器（pattern 播放）。
 // 用于简单编曲与音乐教学。class / STL / 中文注释。
@@ -55,3 +60,4 @@ private:
 
 } // namespace audx
 } // namespace nefu
+

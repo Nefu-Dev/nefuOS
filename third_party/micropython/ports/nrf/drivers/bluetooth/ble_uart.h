@@ -44,3 +44,4 @@ mp_uint_t mp_ble_uart_stdout_tx_strn(const char *str, size_t len);
 #endif // BLUETOOTH_SD
 
 #endif // BLUETOOTH_LE_UART_H__
+

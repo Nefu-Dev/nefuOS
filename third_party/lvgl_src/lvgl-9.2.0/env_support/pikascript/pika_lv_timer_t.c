@@ -42,3 +42,4 @@ void pika_lvgl_lv_timer_t__delete(PikaObj* self) {
     lv_timer_delete(lv_timer);
 }
 #endif
+

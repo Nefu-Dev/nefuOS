@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // probe tests 4/5/6: blend, colormask, control flow
 #include <cstdio>
 #include <cstdlib>
@@ -179,3 +184,4 @@ void main() {
     nefu::swgl_shutdown();
     return 0;
 }
+

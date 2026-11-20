@@ -137,3 +137,4 @@ void test_math_cubic_bezier_result_should_be_precise(void)
 }
 
 #endif
+

@@ -148,3 +148,4 @@
 #define MICROPY_HW_FMC_D13      (pin_D8)
 #define MICROPY_HW_FMC_D14      (pin_D9)
 #define MICROPY_HW_FMC_D15      (pin_D10)
+

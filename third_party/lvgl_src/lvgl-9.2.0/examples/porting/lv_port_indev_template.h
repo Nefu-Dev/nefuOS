@@ -47,3 +47,4 @@ void lv_port_indev_init(void);
 #endif /*LV_PORT_INDEV_TEMPL_H*/
 
 #endif /*Disable/Enable content*/
+

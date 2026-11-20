@@ -475,3 +475,4 @@ lv_font_t lv_font_unscii_8 = {
 };
 
 #endif /*#if LV_FONT_UNSCII_8*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 主成分分析（PCA）
 // 步骤：数据中心化 -> 协方差矩阵 -> Jacobi 特征值分解 -> 投影到前 k 主成分。
 // 输出：降维后向量（k 维），并给出各主成分解释方差比。
@@ -34,3 +39,4 @@ int pca_self_test();
 
 } // namespace ml
 } // namespace nefu
+

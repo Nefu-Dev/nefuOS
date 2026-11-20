@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— Chart 图表组件
 // 折线图(多系列/图例/坐标轴/网格)、柱状图(分组/堆叠)、饼图(扇区/百分比)、
 // 面积图、散点图、雷达图,支持实时数据更新。
@@ -84,3 +89,4 @@ int chart_self_test();
 
 } // namespace ui
 } // namespace nefu
+

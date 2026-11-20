@@ -1470,3 +1470,4 @@ void nsvgRasterize(NSVGrasterizer* r,
 #endif // NANOSVGRAST_IMPLEMENTATION
 
 #endif // NANOSVGRAST_H
+

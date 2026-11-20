@@ -9,3 +9,4 @@ void board_early_init(void) {
     #endif
 
 }
+

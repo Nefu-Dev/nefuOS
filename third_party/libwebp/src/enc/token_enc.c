@@ -260,3 +260,4 @@ void VP8TBufferClear(VP8TBuffer* const b) {
 
 #endif    // !DISABLE_TOKEN_BUFFER
 
+

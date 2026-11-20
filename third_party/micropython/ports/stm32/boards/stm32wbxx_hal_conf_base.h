@@ -118,3 +118,4 @@
 #define CFG_HW_RNG_SEMID                        0
 
 #endif // MICROPY_INCLUDED_STM32WBXX_HAL_CONF_BASE_H
+

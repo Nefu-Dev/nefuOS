@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_color.c
  *
  */
@@ -400,3 +400,4 @@ static lv_color_t lv_color_filter_shade_cb(const lv_color_filter_dsc_t * dsc, lv
     if(opa < LV_OPA_50) return lv_color_lighten(c, (LV_OPA_50 - opa) * 2);
     else return lv_color_darken(c, (opa - LV_OPA_50 * LV_OPA_50) * 2);
 }
+

@@ -1,4 +1,9 @@
-﻿// ui.cpp —— UI 纯逻辑：按钮状态机、进度条比例、菜单命中、自测
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// ui.cpp —— UI 纯逻辑：按钮状态机、进度条比例、菜单命中、自测
 #include "ui.h"
 
 namespace nefu {
@@ -212,3 +217,4 @@ int ui_self_test() {
 
 } // namespace gameengine
 } // namespace nefu
+

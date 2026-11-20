@@ -57,3 +57,4 @@ static mp_obj_t pyb_irq_stats(void) {
 }
 MP_DEFINE_CONST_FUN_OBJ_0(pyb_irq_stats_obj, pyb_irq_stats);
 #endif
+

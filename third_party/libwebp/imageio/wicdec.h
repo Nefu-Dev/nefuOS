@@ -32,3 +32,4 @@ int ReadPictureWithWIC(const char* const filename,
 #endif
 
 #endif  // WEBP_IMAGEIO_WICDEC_H_
+

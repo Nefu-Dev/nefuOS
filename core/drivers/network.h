@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS network driver - real NIC probe framework (header-only).
 // Supports the mainstream families: Intel PRO/1000 (e1000), Realtek RTL8139
 // and virtio-net; the actual register-level drivers live in core/net/net.cpp.
@@ -60,3 +65,4 @@ static inline bool nic_present(void) {
 
 } // namespace drivers
 } // namespace nefu
+

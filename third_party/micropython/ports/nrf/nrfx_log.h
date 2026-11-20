@@ -82,3 +82,4 @@
 #endif // NRFX_LOG_ENABLED
 
 #endif // NRFX_LOG_H
+

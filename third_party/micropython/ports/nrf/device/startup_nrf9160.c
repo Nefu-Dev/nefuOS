@@ -268,3 +268,4 @@ const func __Vectors[] __attribute__ ((section(".isr_vector"),used)) = {
     Reserved_Handler38,
     CRYPTOCELL_IRQHandler,
 };
+

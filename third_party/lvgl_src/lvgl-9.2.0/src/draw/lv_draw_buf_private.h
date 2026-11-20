@@ -51,3 +51,4 @@ void lv_draw_buf_init_handlers(void);
 #endif
 
 #endif /*LV_DRAW_BUF_PRIVATE_H*/
+

@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 稠密矩阵模块
 // 动态行/列的 double 稠密矩阵，行主序存储（m[i*cols+j]）。
 // 覆盖：四则运算、转置、行列式(LU)、逆(Gauss-Jordan)、秩、迹、
@@ -113,3 +118,4 @@ int matrix_self_test();
 
 } // namespace mathext
 } // namespace nefu
+

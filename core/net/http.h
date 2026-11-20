@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS HTTP Client Library
 // Full-featured HTTP/1.1 client with GET, POST, headers, cookies, redirects
 #pragma once
@@ -297,13 +302,15 @@ private:
         req_len += ksprintf(request + req_len, sizeof(request) - req_len,
                            "Host: %s\r\n", req->host);
         
-        // User-Agent
+        // User-Agent: same string as navigator.userAgent and the TLS path
         req_len += ksprintf(request + req_len, sizeof(request) - req_len,
-                           "User-Agent: nefuOS/1.0\r\n");
+                           "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36\r\n");
         
         // Accept
         req_len += ksprintf(request + req_len, sizeof(request) - req_len,
                            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n");
+        req_len += ksprintf(request + req_len, sizeof(request) - req_len,
+                           "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8\r\n");
         
         // Connection
         req_len += ksprintf(request + req_len, sizeof(request) - req_len,
@@ -426,3 +433,4 @@ HttpClient* http_client() {
 
 } // namespace net
 } // namespace nefu
+

@@ -67,3 +67,4 @@ struct lv_dropdown_list_t {
 #endif
 
 #endif /*LV_DROPDOWN_PRIVATE_H*/
+

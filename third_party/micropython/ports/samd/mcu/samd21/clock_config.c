@@ -346,3 +346,4 @@ void enable_sercom_clock(int id) {
     while (GCLK->STATUS.bit.SYNCBUSY) {
     }
 }
+

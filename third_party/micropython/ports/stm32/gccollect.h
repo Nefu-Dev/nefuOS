@@ -42,3 +42,4 @@ extern uint32_t _estack;
 extern uint32_t _ram_end;
 
 #endif // MICROPY_INCLUDED_STM32_GCCOLLECT_H
+

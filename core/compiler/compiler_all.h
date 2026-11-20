@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // ============================================================================
 // nefu::compiler —— 聚合头（compiler_all.h）
 // ----------------------------------------------------------------------------
@@ -181,3 +186,4 @@ inline int compiler_pipeline(const char* source, String& out) {
 
 } // namespace compiler
 } // namespace nefu
+

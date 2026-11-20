@@ -225,3 +225,4 @@ do {								\
 
 #define SAFE_RIGHT_SHIFT(op,amt)				\
   (((amt) < 8 * sizeof(op)) ? ((op) >> (amt)) : 0)
+

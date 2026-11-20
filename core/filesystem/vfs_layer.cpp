@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文件系统库 —— VFS 层实现
 #include "vfs_layer.h"
 #include "../klib/klib.h"
@@ -316,3 +321,4 @@ int vfs_layer_self_test() {
 
 } // namespace filesystem
 } // namespace nefu
+

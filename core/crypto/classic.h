@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 密码学库 —— 古典密码模块
 // 教学用途，全部基于字母 A-Z（自动转大写，忽略非字母）：
 //   Caesar、Vigenere、Autokey、Beaufort、Playfair、Hill、Bifid、Trifid、
@@ -75,3 +80,4 @@ int classic_self_test();
 
 } // namespace crypto
 } // namespace nefu
+

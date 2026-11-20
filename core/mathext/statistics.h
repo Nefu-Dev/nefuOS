@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 数学扩展库 —— 统计与随机数模块
 // 描述统计、相关回归、简化假设检验、直方图与常用分布随机数。
 // 无 STL：数组由调用方提供，函数只做纯计算。
@@ -64,3 +69,4 @@ int statistics_self_test();
 
 } // namespace mathext
 } // namespace nefu
+

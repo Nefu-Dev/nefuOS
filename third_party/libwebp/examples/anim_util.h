@@ -71,3 +71,4 @@ void GetAnimatedImageVersions(int* const decoder_version,
 #endif
 
 #endif  // WEBP_EXAMPLES_ANIM_UTIL_H_
+

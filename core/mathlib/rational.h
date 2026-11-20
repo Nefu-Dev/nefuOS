@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS mathlib —— 分数 rational
 // 教学版：分子/分母 + 约分（辗转相除）+ 四则运算 + 比较。
 #pragma once
@@ -35,3 +40,4 @@ int rational_self_test();
 
 } // namespace mathx
 } // namespace nefu
+

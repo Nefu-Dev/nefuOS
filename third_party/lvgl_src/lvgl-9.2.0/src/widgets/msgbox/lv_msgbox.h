@@ -139,3 +139,4 @@ void lv_msgbox_close_async(lv_obj_t * mbox);
 #endif
 
 #endif /*LV_MSGBOX_H*/
+

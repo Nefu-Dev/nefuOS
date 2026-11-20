@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS UI 组件库 —— 宿主独立编译测试入口
 // 编译:
 //   g++.exe -std=c++17 -fno-exceptions -fno-rtti -O2 -I core \
@@ -60,3 +65,4 @@ int main() {
     else        printf("UIWIDGETS FAILURES DETECTED\n");
     return f == 0 ? 0 : 1;
 }
+

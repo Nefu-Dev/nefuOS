@@ -1196,3 +1196,4 @@ void SWI2_EGU2_IRQHandler(void) {
 }
 
 #endif // BLUETOOTH_SD
+

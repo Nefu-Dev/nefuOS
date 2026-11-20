@@ -143,3 +143,4 @@ static void image_cache_free_cb(lv_image_cache_data_t * entry, void * user_data)
     /*Free the duplicated file name*/
     if(entry->src_type == LV_IMAGE_SRC_FILE) lv_free((void *)entry->src);
 }
+

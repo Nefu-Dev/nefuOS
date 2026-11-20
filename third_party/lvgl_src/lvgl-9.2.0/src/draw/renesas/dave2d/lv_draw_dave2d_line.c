@@ -89,3 +89,4 @@ void lv_draw_dave2d_line(lv_draw_dave2d_unit_t * u, const lv_draw_line_dsc_t * d
 }
 
 #endif /*LV_USE_DRAW_DAVE2D*/
+

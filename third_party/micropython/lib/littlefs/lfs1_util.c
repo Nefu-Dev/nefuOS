@@ -29,3 +29,4 @@ void lfs1_crc(uint32_t *restrict crc, const void *buffer, size_t size) {
 
 
 #endif
+

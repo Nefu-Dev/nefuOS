@@ -324,3 +324,4 @@ void test_label_properties(void)
 }
 
 #endif
+

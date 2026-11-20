@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // 单模块诊断：complib 分模块跑
 #include <cstdio>
 #include <cstdlib>
@@ -23,3 +28,4 @@ int main(int argc, char** argv) {
     printf("DONE\n");
     return f;
 }
+

@@ -74,3 +74,4 @@ void CRYPTOHASH_SHAMD5Read (uint8_t *hash) {
     // read the result
     MAP_SHAMD5ResultRead(SHAMD5_BASE, hash);
 }
+

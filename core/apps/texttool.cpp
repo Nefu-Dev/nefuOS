@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 文本工具 —— 两段文本的快速对比与分析
 // 输入两段文本(s1/s2)，选择一个操作，结果即时显示：
 //   1) 编辑距离 (Levenshtein)
@@ -139,7 +144,7 @@ static void tt_close(Window* w) {
 void texttool_launch() {
     int x, y;
     cascade_pos(&x, &y);
-    Window* w = g_wm->create_window("Text Tool", x, y, TW_W, TW_H);
+    Window* w = g_wm->create_window(T("文本工具", "Text Tool"), x, y, TW_W, TW_H);
     if (!w) return;
     TextTool* t = new TextTool();
     t->recompute();
@@ -151,3 +156,4 @@ void texttool_launch() {
 }
 
 } // namespace nefu
+

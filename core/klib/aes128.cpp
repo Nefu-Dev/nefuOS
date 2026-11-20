@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // aes128.cpp - minimal AES-128 (CBC decrypt) for nefuOS (no STL).
 #include "aes128.h"
 
@@ -139,3 +144,4 @@ void aes128_cbc_decrypt(const uint8_t key[16], const uint8_t iv[16],
 }
 
 } // namespace nefu
+

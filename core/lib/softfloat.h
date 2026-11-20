@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS soft-float math library (single precision).
 // All arithmetic uses the C++ `float` type, which the bare-metal kernel
 // provides through the GCC soft-float library (no hardware FPU needed).
@@ -273,3 +278,4 @@ inline void sf_to_str(char* out, size_t n, float v, int digits) {
 
 } // namespace sf
 } // namespace nefu
+

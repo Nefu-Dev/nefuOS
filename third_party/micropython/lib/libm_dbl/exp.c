@@ -132,3 +132,4 @@ double exp(double x)
 		return y;
 	return scalbn(y, k);
 }
+

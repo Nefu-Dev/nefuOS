@@ -355,3 +355,4 @@ static void cont_scroll_end_event_cb(lv_event_t * e)
     }
 }
 #endif /*LV_USE_TABVIEW*/
+

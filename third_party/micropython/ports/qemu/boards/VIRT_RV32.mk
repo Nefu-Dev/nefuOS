@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 QEMU_ARCH = riscv32
 QEMU_MACHINE = virt
 
@@ -12,3 +17,4 @@ MPY_CROSS_FLAGS += -march=rv32imc
 
 # These Thumb tests don't run on RV32, so exclude them.
 RUN_TESTS_ARGS = --exclude 'inlineasm|qemu/asm_test'
+

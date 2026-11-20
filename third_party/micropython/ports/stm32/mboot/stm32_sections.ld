@@ -1,4 +1,9 @@
 /*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
+/*
     Linker script fragment for mboot on an STM32xxx MCU.
     This needs the following MEMORY sections to be defined: FLASH_BL, RAM.
 */
@@ -76,3 +81,4 @@ SECTIONS
 
     .ARM.attributes 0 : { *(.ARM.attributes) }
 }
+

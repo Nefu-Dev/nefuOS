@@ -33,3 +33,4 @@
 void machine_init(void);
 
 #endif // __MICROPY_INCLUDED_NRF5_MODMACHINE_H__
+

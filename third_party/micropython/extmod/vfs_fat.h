@@ -44,3 +44,4 @@ extern const mp_obj_type_t mp_type_vfs_fat_textio;
 MP_DECLARE_CONST_FUN_OBJ_3(fat_vfs_open_obj);
 
 #endif // MICROPY_INCLUDED_EXTMOD_VFS_FAT_H
+

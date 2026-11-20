@@ -40,3 +40,4 @@ extern uint8_t irq_to_ch[IRQ_MAX];
 void ra_int_init(void);
 
 #endif /* RA_RA_INT_H_ */
+

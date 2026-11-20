@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 /* Memory configuration */
 #if defined MICROPY_HW_FLASH_RESERVED
 reserved_size = MICROPY_HW_FLASH_RESERVED;
@@ -36,3 +41,4 @@ _sstack = __StackLimit;
 /* Use all OCRAM for the GC heap. */
 _gc_heap_start = ORIGIN(m_ocrm);
 _gc_heap_end = ORIGIN(m_ocrm) + LENGTH(m_ocrm);
+

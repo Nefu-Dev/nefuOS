@@ -232,3 +232,4 @@ WebPMuxError MuxValidate(const WebPMux* const mux);
 #endif
 
 #endif  // WEBP_MUX_MUXI_H_
+

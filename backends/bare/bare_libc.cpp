@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS bare kernel libc shims for QuickJS.
 // QuickJS (quickjs.c/libregexp.c/cutils.c/dtoa.c) and the minijs.cpp host
 // driver need a small libc surface that the bare kernel does not ship:
@@ -176,7 +181,12 @@ static void fmt_float_copy(Fmt* f, int sign, double av, char conv, int prec, int
 
 int vsnprintf(char* out, size_t cap, const char* fmt, va_list ap) {
     if (cap == 0) return 0;
-    Fmt f = { out, out + cap - 1 };
+    // vsprintf() passes (size_t)-1 to mean "unbounded". Computing out + cap - 1
+    // there wraps around the address space to out - 2, so `o < end` is false for
+    // every character and the whole call silently writes nothing and returns 0.
+    // Cap the sentinel explicitly with the maximum pointer instead.
+    char* end = (cap == (size_t)-1) ? (char*)(uintptr_t)-1 : out + cap - 1;
+    Fmt f = { out, end };
     const char* p = fmt;
     while (*p) {
         if (*p != '%') { fputc_(&f, *p++); continue; }
@@ -442,16 +452,33 @@ static double exp2_x87(double x) {
     return r;
 }
 static double log2_x87(double x) {
+    // FYL2X computes ST(1) = ST(1) * log2(ST(0)) and pops ST(0), so the
+    // operand order matters: ST(0) has to hold x and ST(1) has to hold the
+    // multiplier 1.0. The previous "fld1; fyl2x" sequence pushed the 1.0
+    // on top of x, so FYL2X evaluated x * log2(1.0) and the result was
+    // always 0 - which silently broke Math.log, Math.log10 and Math.pow
+    // for every script running on the bare kernel. One site noticed it:
+    // bloxd's "is this a power of two" test computes log(n)/log(2), got
+    // NaN and refused to load the animation atlas.
     double r;
-    __asm__ volatile("fld1\n\tfyl2x" : "=t"(r) : "0"(x));
+    __asm__ volatile("fld1\n\tfldl %1\n\tfyl2x" : "=t"(r) : "m"(x));
     return r;
 }
 double exp(double x) {
     // exp(x) = 2^(x*log2(e))
     return exp2_x87(x * 1.4426950408889634);
 }
-double log(double x) { return log2_x87(x) * 0.6931471805599453; }
-double log10(double x) { return log2_x87(x) * 0.3010299956639812; }
+double log(double x) {
+    // Multiply in the x87 80-bit format: the double constant for ln(2) is
+    // only 53 bits, so log(2^k) = k * ln2 would otherwise drift by an ulp or
+    // two and a test like log(8)/log(2) % 1 would not come out as 0.
+    return (double)((long double)log2_x87(x) *
+                    0.693147180559945309417232121458176568L);
+}
+double log10(double x) {
+    return (double)((long double)log2_x87(x) *
+                    0.301029995663981195213738894724493027L);
+}
 double pow(double x, double y) {
     if (y == 0.0) return 1.0;
     if (x == 1.0) return 1.0;
@@ -518,6 +545,75 @@ static unsigned char cmos_read(unsigned char reg) {
 }
 static int bcd2(int v) { return (v & 0xF) + ((v >> 4) * 10); }
 
+// ---- one decoder for the whole kernel --------------------------------------
+// Status register B decides the encoding, and getting it wrong is silent:
+//   bit2 = 0 -> the fields are BCD (what every firmware ships by default)
+//   bit1 = 0 -> 12-hour clock, bit7 of the hour byte is the PM flag
+// The PM flag must be stripped BEFORE the BCD conversion: 0x92 is "9 PM" in
+// BCD, and bcd2(0x92) would produce 92 instead of 9. Register layout is
+// 0x00 sec / 0x02 min / 0x04 hour / 0x06 weekday / 0x07 day / 0x08 month /
+// 0x09 year; the weekday register is NOT the day of month.
+// Callers: rtc_epoch() below, and platform_rtc_date() in bare.cpp - the two
+// used to decode differently (the backend was one register off and failed on
+// every day past the 12th, because the day landed in the month field).
+int nefu_rtc_read_civil(int* year, int* month, int* day,
+                        int* hour, int* min, int* sec) {
+    for (int spin = 0; spin < 1000000; spin++)
+        if (!(cmos_read(0x0A) & 0x80)) break;   // UIP clear: registers are stable
+    int s  = cmos_read(0x00);
+    int mi = cmos_read(0x02);
+    int h  = cmos_read(0x04);
+    int d  = cmos_read(0x07);
+    int mo = cmos_read(0x08);
+    int y  = cmos_read(0x09);
+    int stb = cmos_read(0x0B);
+    bool pm = (!(stb & 0x02) && (h & 0x80));
+    h &= 0x7F;                                // strip the PM flag, then decode
+    if (!(stb & 0x04)) {
+        s = bcd2(s); mi = bcd2(mi); h = bcd2(h);
+        d = bcd2(d); mo = bcd2(mo); y = bcd2(y);
+    }
+    if (!(stb & 0x02)) {                      // 12h -> 24h
+        if (h == 12) h = 0;
+        if (pm) h += 12;
+    }
+    int yr = (y < 80) ? 2000 + y : 1900 + y;  // 2-digit year, no century register
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || s > 59)
+        return 0;                             // chip returned nonsense: say so
+    if (year)  *year = yr;
+    if (month) *month = mo;
+    if (day)   *day = d;
+    if (hour)  *hour = h;
+    if (min)   *min = mi;
+    if (sec)   *sec = s;
+    return 1;
+}
+
+// ---- timezone state -----------------------------------------------------
+// Two independent facts decide what the CMOS chip means. Both are persisted in
+// /etc/settings.conf and pushed in by nefuos_init() right after settings_load():
+//   s_rtc_is_utc : what the RTC stores. 0 = local wall clock (the Windows
+//                  dual-boot convention, and this machine's default),
+//                  1 = UTC (the Linux convention).
+//   s_tz_min     : offset of the zone we are in, minutes EAST of UTC
+//                  (CST-8 => +480, i.e. Asia/Shanghai).
+// time() always returns true UTC; localtime() and the desktop clock add s_tz_min.
+// Before this existed time() returned the RTC wall clock and *called* it UTC,
+// which shifted every timestamp (HTTP Date, TLS validity, logs) by the zone
+// offset while the on-screen clock looked perfectly correct.
+static int s_rtc_is_utc = 0;
+static int s_tz_min = 480;
+
+int nefu_tz_offset_minutes(void) { return s_tz_min; }
+void nefu_set_tz_offset_minutes(int minutes) {
+    // Real zones span UTC-12:00 .. UTC+14:00; clamp instead of trusting the caller.
+    if (minutes < -12 * 60) minutes = -12 * 60;
+    if (minutes >  14 * 60) minutes =  14 * 60;
+    s_tz_min = minutes;
+}
+int nefu_rtc_is_utc(void) { return s_rtc_is_utc; }
+void nefu_set_rtc_is_utc(int on) { s_rtc_is_utc = on ? 1 : 0; }
+
 static int64_t days_from_civil(int y, int m, int d) {
     y -= m <= 2;
     int64_t era = (y >= 0 ? y : y - 399) / 400;
@@ -539,28 +635,29 @@ static void civil_from_days(int64_t z, int* y, unsigned* m, unsigned* d) {
     *y = (int)(yy + (*m <= 2));
 }
 
-static int64_t rtc_epoch(void) {
-    while (cmos_read(0x0A) & 0x80) { }   // wait for UIP clear
-    int sec = bcd2(cmos_read(0x00));
-    int min = bcd2(cmos_read(0x02));
-    int hour = bcd2(cmos_read(0x04));
-    int day = bcd2(cmos_read(0x07));
-    int mon = bcd2(cmos_read(0x08));
-    int year = bcd2(cmos_read(0x09)) + 2000;
-    if (year < 2000) year += 100;        // QEMU may leave year < 2000 (older RTC)
-    int64_t days = days_from_civil(year, mon, day);
-    return days * 86400 + hour * 3600 + min * 60 + sec;
+// RTC value as an epoch, still in whatever zone the chip stores it in.
+static int64_t rtc_wall_epoch(void) {
+    int y, mo, d, h, mi, s;
+    if (!nefu_rtc_read_civil(&y, &mo, &d, &h, &mi, &s)) return 0;
+    return days_from_civil(y, mo, d) * 86400 + h * 3600 + mi * 60 + s;
+}
+
+// True UTC. A chip that holds local wall clock must lose the zone offset here;
+// a chip that holds UTC is already done. This is the single place that knows
+// the difference, so nothing downstream has to guess.
+long long nefu_now_utc(void) {
+    int64_t wall = rtc_wall_epoch();
+    return (long long)(wall - (s_rtc_is_utc ? 0 : (int64_t)s_tz_min * 60));
 }
 
 int gettimeofday(struct timeval* tv, void* tz) {
     (void)tz;
-    int64_t s = rtc_epoch();
-    if (tv) { tv->tv_sec = (long)s; tv->tv_usec = 0; }
+    if (tv) { tv->tv_sec = (long)nefu_now_utc(); tv->tv_usec = 0; }
     return 0;
 }
 
 time_t time(time_t* t) {
-    time_t s = (time_t)rtc_epoch();
+    time_t s = (time_t)nefu_now_utc();
     if (t) *t = s;
     return s;
 }
@@ -590,10 +687,26 @@ struct tm* gmtime(const time_t* t) {
     s_tm.tm_isdst = 0;
     return &s_tm;
 }
-struct tm* localtime(const time_t* t) { return gmtime(t); }   // UTC, offset 0
+// UTC -> local: shift first, then reuse the UTC formatter. localtime() used to
+// be a straight alias of gmtime() under the comment "UTC, offset 0" - the bug
+// was that the offset is not zero, it just lived in a hardcoded table inside
+// core\sys\sysapi_extended.cpp, a file the build never compiles.
+struct tm* localtime(const time_t* t) {
+    time_t shifted = (time_t)((int64_t)*t + (int64_t)s_tz_min * 60);
+    return gmtime(&shifted);
+}
+
+// Inverse of localtime(): local civil fields in, UTC out. tm_wday / tm_yday
+// are filled in for callers that follow the C contract.
 time_t mktime(struct tm* tm) {
+    if (!tm) return (time_t)-1;
     int64_t days = days_from_civil(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
-    return (time_t)(days * 86400 + tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec);
+    int64_t wall = days * 86400 + tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
+    int wd = (int)((days + 4) % 7); if (wd < 0) wd += 7;   // 1970-01-01 = Thursday
+    tm->tm_wday = wd;
+    tm->tm_yday = (int)(days - days_from_civil(tm->tm_year + 1900, 1, 1));
+    tm->tm_isdst = 0;
+    return (time_t)(wall - (int64_t)s_tz_min * 60);
 }
 
 // ===================== abort / exit =====================

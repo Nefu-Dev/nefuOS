@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS 机器学习库 —— 共享标量工具（全定点 Q16.16，无 FPU 依赖）
 // 本头文件只放 inline 小工具，不对应独立 self_test；供 matrix/dataset/linear/
 // knn/kmeans/pca/neuralnet/bayes 等模块复用。
@@ -139,3 +144,4 @@ struct Rng {
 
 } // namespace ml
 } // namespace nefu
+

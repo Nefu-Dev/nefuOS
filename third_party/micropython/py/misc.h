@@ -405,3 +405,4 @@ static inline uint32_t mp_clz_mpi(mp_int_t x) {
 }
 
 #endif // MICROPY_INCLUDED_PY_MISC_H
+

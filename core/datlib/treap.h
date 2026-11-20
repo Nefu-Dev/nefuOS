@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // nefuOS data-types library — treap (randomized BST)
 // 树堆：二叉搜索树 + 随机优先级堆性质。每个节点带随机优先级，
 // 通过旋转保证"堆序"（父优先级 > 子），随机化使期望高度 O(log n)，
@@ -94,3 +99,4 @@ int treap_self_test();
 
 } // namespace dt
 } // namespace nefu
+

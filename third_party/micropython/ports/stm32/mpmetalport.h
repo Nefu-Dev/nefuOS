@@ -75,3 +75,4 @@ static inline void metal_generic_default_poll(void) {
 }
 
 #endif // MICROPY_INCLUDED_STM32_METAL_PORT_H
+

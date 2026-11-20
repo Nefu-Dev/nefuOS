@@ -126,3 +126,4 @@ static status_t ENET_MDIO_Read(mdio_handle_t *handle, uint32_t phyAddr, uint32_t
 
     return kStatus_Success;
 }
+

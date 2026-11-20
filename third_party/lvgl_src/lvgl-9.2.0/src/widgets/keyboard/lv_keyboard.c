@@ -488,3 +488,4 @@ static void lv_keyboard_update_ctrl_map(lv_obj_t * obj)
 }
 
 #endif  /*LV_USE_KEYBOARD*/
+

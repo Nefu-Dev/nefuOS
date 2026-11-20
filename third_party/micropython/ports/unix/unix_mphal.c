@@ -259,3 +259,4 @@ void mp_hal_get_random(size_t n, void *buf) {
     close(fd);
     #endif
 }
+

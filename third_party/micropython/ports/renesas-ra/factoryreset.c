@@ -109,3 +109,4 @@ MP_WEAK int factory_reset_create_filesystem(void) {
 #endif // MICROPY_VFS_FAT
 
 #endif // MICROPY_HW_ENABLE_STORAGE
+

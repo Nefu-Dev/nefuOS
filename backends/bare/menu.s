@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv3 <https://www.gnu.org/licenses/gpl-3.0.html>
+ * See COPYING for full license text.
+ */
 # nefuOS multi-boot picker — 16-bit real-mode boot-stage OS selector.
 # Loaded by boot.s at 0x10000 (2 CD sectors @ LBA 24) with a single EDD DAP
 # rewrite, entered with CS=0x1000:0x0000, DS=0, SS:SP = 0:0x7C00 (the boot.s
@@ -361,3 +366,4 @@ str_hint:
 str_secs:
     .ascii "   Seconds until the highlighted choice is started automatically:  "
     .byte 0
+

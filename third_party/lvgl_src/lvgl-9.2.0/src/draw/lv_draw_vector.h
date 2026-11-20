@@ -487,3 +487,4 @@ typedef void (*vector_draw_task_cb)(void * ctx, const lv_vector_path_t * path, c
 #endif
 
 #endif /* LV_DRAW_VECTOR_H */
+

@@ -80,3 +80,4 @@ static float one = 1.0f;
 }
 
 #endif /* defined(_DOUBLE_IS_32BITS) */
+

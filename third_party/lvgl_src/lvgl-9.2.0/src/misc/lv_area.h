@@ -252,3 +252,4 @@ int32_t lv_pct_to_px(int32_t v, int32_t base);
 #endif
 
 #endif
+

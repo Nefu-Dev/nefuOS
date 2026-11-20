@@ -70,3 +70,4 @@ bool lv_obj_is_group_def(lv_obj_t * obj);
 #endif
 
 #endif /*LV_OBJ_CLASS_H*/
+

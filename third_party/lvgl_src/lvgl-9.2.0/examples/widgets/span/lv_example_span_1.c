@@ -56,3 +56,4 @@ void lv_example_span_1(void)
 }
 
 #endif
+

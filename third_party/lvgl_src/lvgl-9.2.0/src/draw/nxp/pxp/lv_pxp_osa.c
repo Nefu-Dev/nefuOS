@@ -184,3 +184,4 @@ static void _pxp_wait(void)
 }
 
 #endif /*LV_USE_DRAW_PXP*/
+

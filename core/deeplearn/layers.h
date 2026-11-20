@@ -1,4 +1,9 @@
-﻿// nefuOS 深度学习库 —— 层实现
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
+// nefuOS 深度学习库 —— 层实现
 // Dense / Conv2D / MaxPool2D / AvgPool2D / Flatten / Dropout /
 // BatchNorm / LayerNorm / Embedding。
 // 层是持有参数 Tensor 的结构体；forward 复用 tensor/activations 的反向节点。
@@ -105,3 +110,4 @@ int layers_self_test();
 
 } // namespace deeplearn
 } // namespace nefu
+

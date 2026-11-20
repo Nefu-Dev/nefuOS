@@ -907,3 +907,4 @@ MP_REGISTER_MODULE(MP_QSTR_framebuf, mp_module_framebuf);
 #endif
 
 #endif // MICROPY_PY_FRAMEBUF
+

@@ -28,3 +28,4 @@ void lv_example_event_1(void)
 }
 
 #endif
+

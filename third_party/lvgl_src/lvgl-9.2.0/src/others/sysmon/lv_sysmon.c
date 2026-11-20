@@ -333,3 +333,4 @@ static void mem_observer_cb(lv_observer_t * observer, lv_subject_t * subject)
 #endif
 
 #endif /*LV_USE_SYSMON*/
+

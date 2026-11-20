@@ -154,7 +154,7 @@ $coreSrc = @(
   "core\deeplearn\weights.cpp", "core\apps\netlab.cpp", "core\apps\sysmon.cpp", "core\apps\repl.cpp", "core\apps\fsview.cpp",
   "core\apps\rayview.cpp", "core\apps\compilerlab.cpp", "core\apps\gedemo.cpp", "core\apps\deepviz.cpp",
   "third_party\stb_image_wrap.cpp",
-  "backends\win32\win32.cpp", "backends\win32\media_win32.cpp"
+  "backends\win32\win32.cpp", "backends\win32\ws_win32.cpp", "backends\win32\media_win32.cpp"
 )
 
 $lvConfPath = (Resolve-Path "third_party\lvgl_conf\lv_conf.h").Path -replace '\\', '/'
@@ -190,6 +190,6 @@ $rsp = "$env:TEMP\nefu_objs_mine.rsp"
 [IO.File]::WriteAllText($rsp, (($all | ForEach-Object { '"' + $_ + '"' }) -join "`r`n"), (New-Object Text.UTF8Encoding $false))
 $exe = "$env:TEMP\nefu_fix_test\nefuOS_mine.exe"
 New-Item -ItemType Directory -Force "$env:TEMP\nefu_fix_test" | Out-Null
-& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation "-Wl,--stack,67108864" -o $exe "@$rsp" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 2> "$env:TEMP\gcc_link_err_mine.txt"
+& $g -std=c++17 -O2 -fno-exceptions -fno-rtti -fno-builtin -Wall -Wextra -Wno-sized-deallocation "-Wl,--stack,67108864" -o $exe "@$rsp" -lgdi32 -luser32 -lgdiplus -lole32 -luuid -lws2_32 -liphlpapi -lwlanapi -lwininet -lwinhttp -lwinmm -lmfplat -lmfreadwrite -lmf -lmfuuid -lcomdlg32 2> "$env:TEMP\gcc_link_err_mine.txt"
 if ($LASTEXITCODE -ne 0) { Write-Output "LINK FAILED"; exit 1 }
 Write-Output "host exe OK: $((Get-Item $exe).Length) bytes -> $exe"

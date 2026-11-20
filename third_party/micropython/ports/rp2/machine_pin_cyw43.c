@@ -84,3 +84,4 @@ void machine_pin_ext_config(machine_pin_obj_t *self, int mode, int value) {
 }
 
 #endif // defined(MICROPY_PY_NETWORK_CYW43) && defined(MICROPY_HW_PIN_EXT_COUNT) && defined(CYW43_GPIO) && CYW43_GPIO == 1
+

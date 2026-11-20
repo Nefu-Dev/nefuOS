@@ -591,3 +591,4 @@ static void _vglite_render_thread_cb(void * ptr)
 #endif
 
 #endif /*LV_USE_DRAW_VGLITE*/
+

@@ -1129,3 +1129,4 @@ void* nefu_lvgl_pool_alloc(size_t size);
 #endif /*LV_CONF_H*/
 
 #endif /*End of "Content enable"*/
+

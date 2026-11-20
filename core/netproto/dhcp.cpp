@@ -1,3 +1,8 @@
+/*
+ * nefuOS Copyright (C) 2026 nefu-dev
+ * Licensed under GNU GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+ * See COPYING for full license text.
+ */
 // dhcp.cpp - DHCP/BOOTP 客户端协议实现
 #include "dhcp.h"
 #include "netproto_common.h"
@@ -289,3 +294,4 @@ int dhcp_self_test() {
 
 } // namespace netproto
 } // namespace nefu
+

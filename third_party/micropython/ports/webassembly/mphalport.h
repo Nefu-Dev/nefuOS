@@ -61,3 +61,4 @@ int mp_hal_get_interrupt_char(void);
     }
 
 #endif
+

@@ -81,3 +81,4 @@ void lv_draw_triangle(lv_layer_t * layer, const lv_draw_triangle_dsc_t * dsc)
 /**********************
  *   STATIC FUNCTIONS
  **********************/
+
